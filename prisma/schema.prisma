@@ -1,0 +1,90 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Prisma Schema Models
+
+model Organization {
+  id             String         @id @default(cuid())
+  name           String
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  users          User[]
+  tools          Tool[]
+  flows          Flow[]
+  executionLogs  ExecutionLog[]
+}
+
+model User {
+  id            String      @id @default(cuid())
+  orgId         String
+  email         String      @unique
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  organization  Organization @relation(fields: [orgId], references: [id])
+  executionLogs ExecutionLog[]
+}
+
+model Tool {
+  id            String       @id @default(cuid())
+  orgId         String
+  name          String
+  baseUrl       String
+  authType      String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  organization  Organization @relation(fields: [orgId], references: [id])
+  actions       Action[]
+}
+
+model Action {
+  id          String   @id @default(cuid())
+  toolId      String
+  endpoint    String
+  method      String
+  schema      Json
+  executeIf   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tool        Tool     @relation(fields: [toolId], references: [id])
+}
+
+model Flow {
+  id            String   @id @default(cuid())
+  orgId         String
+  version       Int      @default(1)
+  steps         Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  organization  Organization @relation(fields: [orgId], references: [id])
+  executionLogs ExecutionLog[]
+}
+
+model ExecutionLog {
+  id          String   @id @default(cuid())
+  orgId       String
+  userId      String
+  flowId      String
+  stepId      String
+  inputs      Json
+  outputs     Json?
+  status      String
+  createdAt   DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+  flow         Flow         @relation(fields: [flowId], references: [id])
+}
