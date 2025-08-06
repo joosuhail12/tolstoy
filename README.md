@@ -1,6 +1,6 @@
 # Tolstoy - NestJS + Fastify + Prisma + Neon PostgreSQL
 
-A robust workflow automation platform built with NestJS, Fastify, Prisma ORM, and Neon PostgreSQL, deployed on Vercel.
+A robust workflow automation platform built with NestJS, Fastify, Prisma ORM, and Neon PostgreSQL.
 
 ## 🚀 Quick Start
 
@@ -321,46 +321,9 @@ npm start
 - **SecretNotFound**: Ensure secret exists in the correct AWS region
 - **NetworkError**: Check AWS region and network connectivity
 
-## 🚀 Vercel Deployment & Environment Variables
+## 🚀 Deployment
 
-### Deployment URL
-Your app is deployed at:
-**https://tolstoy-1ye7fwe3y-global-admin-pullseais-projects.vercel.app**
-
-### Environment Variables (Secrets)
-Your Neon PostgreSQL DB URL is securely managed through Vercel's environment variables:
-- `DATABASE_URL` - Encrypted and secured by Vercel
-
-### Deployment Steps
-
-1. **Install & login to Vercel CLI:**
-```bash
-npm i -g vercel
-vercel login
-```
-
-2. **Deploy your app:**
-```bash
-vercel --prod
-```
-
-3. **Set environment variables:**
-```bash
-vercel env add DATABASE_URL
-# Paste your Neon PostgreSQL connection string when prompted
-```
-
-### Automatic Deployments
-- Commits to your main branch automatically trigger redeployment
-- Vercel builds using the `vercel-build` script: `prisma generate && tsc`
-- Environment variables are securely managed through Vercel dashboard
-
-### Why Vercel Works Well
-- ✅ **Developer-friendly**: Easy to use, minimal configuration
-- ✅ **Integrated Secrets**: Simple, secure secrets management  
-- ✅ **Fast Deployments**: Automatic Git deployments & previews
-- ✅ **Cost-effective**: Generous free tier
-- ✅ **Node.js Optimized**: Built specifically for Node.js applications
+The application can be deployed to various platforms. Configure your deployment environment with the necessary environment variables and ensure database connectivity.
 
 ## 📁 Project Structure
 
@@ -417,7 +380,6 @@ tolstoy/
 │   ├── aws-deployment-guide.md # AWS deployment documentation
 │   └── aws-iam-policy.md   # IAM policy documentation
 ├── .env                    # Environment variables
-├── vercel.json             # Vercel deployment configuration
 ├── .gitignore             # Git ignore rules
 ├── tsconfig.json          # TypeScript configuration
 └── package.json           # Dependencies and scripts

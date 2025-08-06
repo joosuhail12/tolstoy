@@ -3,12 +3,10 @@
   "version": "1.0.0",
   "main": "dist/main.js",
   "scripts": {
-    "build": "prisma generate && tsc",
-    "vercel-build": "prisma generate && tsc",
+    "build": "tsc",
     "start": "node dist/main.js",
     "start:prod": "node dist/main.js",
     "start:dev": "nodemon --exec ts-node src/main.ts",
-    "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
