@@ -4,6 +4,7 @@
   "main": "dist/main.js",
   "scripts": {
     "start": "node dist/main.js",
+    "start:prod": "node dist/main.js",
     "start:dev": "nodemon --exec ts-node src/main.ts",
     "build": "tsc",
     "db:generate": "prisma generate",

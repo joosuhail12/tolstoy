@@ -1,6 +1,6 @@
 # Tolstoy - NestJS + Fastify + Prisma + Neon PostgreSQL
 
-A robust workflow automation platform built with NestJS, Fastify, Prisma ORM, and Neon PostgreSQL.
+A robust workflow automation platform built with NestJS, Fastify, Prisma ORM, and Neon PostgreSQL, deployed on AWS App Runner with API Gateway.
 
 ## 🚀 Quick Start
 
@@ -321,6 +321,56 @@ npm start
 - **SecretNotFound**: Ensure secret exists in the correct AWS region
 - **NetworkError**: Check AWS region and network connectivity
 
+## 🚀 AWS App Runner & API Gateway Deployment
+
+### Overview
+The application is containerized and deployed on AWS App Runner with API Gateway for secure, scalable hosting.
+
+### Quick Deployment Steps
+
+#### 1. Build and Push to ECR
+```bash
+# Update AWS account ID in the script
+vim scripts/deploy-to-ecr.sh
+
+# Run deployment script
+./scripts/deploy-to-ecr.sh
+```
+
+#### 2. Deploy to App Runner
+- Navigate to AWS App Runner Console
+- Create service from ECR image
+- Configure environment variables:
+  - `NODE_ENV=production`
+  - `USE_AWS_SECRETS=true`
+  - `AWS_SECRET_NAME=conductor-db-secret`
+
+#### 3. Set Up API Gateway
+- Create HTTP API in API Gateway Console
+- Configure integration with App Runner URL
+- Deploy to production stage
+
+### Service URLs
+```bash
+# App Runner URL (Direct)
+https://<service-id>.us-east-1.awsapprunner.com
+
+# API Gateway URL (Recommended)
+https://<api-id>.execute-api.us-east-1.amazonaws.com
+```
+
+### Docker Support
+```bash
+# Build locally
+docker build -t tolstoy-api .
+
+# Run locally
+docker run -p 3000:3000 --env-file .env tolstoy-api
+```
+
+### Deployment Documentation
+For detailed deployment instructions, see [AWS Deployment Guide](docs/aws-deployment-guide.md)
+
 ## 📁 Project Structure
 
 ```
@@ -370,8 +420,17 @@ tolstoy/
 │   ├── app.module.ts       # Root module
 │   ├── app.controller.ts   # Basic controller
 │   ├── app.service.ts      # Application service
-│   └── prisma.service.ts   # Prisma service integration
+│   ├── prisma.service.ts   # Prisma service integration
+│   └── aws-secrets.service.ts # AWS Secrets Manager service
+├── scripts/
+│   └── deploy-to-ecr.sh    # ECR deployment script
+├── docs/
+│   ├── aws-deployment-guide.md # AWS deployment documentation
+│   └── aws-iam-policy.md   # IAM policy documentation
 ├── .env                    # Environment variables
+├── .env.production.example # Production environment template
+├── .dockerignore          # Docker ignore rules
+├── Dockerfile             # Docker container configuration
 ├── .gitignore             # Git ignore rules
 ├── tsconfig.json          # TypeScript configuration
 └── package.json           # Dependencies and scripts
