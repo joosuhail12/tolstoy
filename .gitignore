@@ -99,3 +99,4 @@ generated/
 *.sqlite
 *.db
 EOF < /dev/null
+.vercel

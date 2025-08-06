@@ -12,6 +12,7 @@ import { ToolsModule } from './tools/tools.module';
 import { ActionsModule } from './actions/actions.module';
 import { FlowsModule } from './flows/flows.module';
 import { ExecutionLogsModule } from './execution-logs/execution-logs.module';
+import { HealthModule } from './health/health.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ExecutionLogsModule } from './execution-logs/execution-logs.module';
       envFilePath: '.env',
     }),
     CommonModule,
+    HealthModule,
     OrganizationsModule,
     UsersModule,
     ToolsModule,
@@ -34,7 +36,7 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     consumer
       .apply(TenantMiddleware)
-      .exclude('organizations/(.*)', '/', '/health')
+      .exclude('organizations/(.*)', '/', '/health', '/status')
       .forRoutes('users', 'tools', 'actions', 'flows', 'execution-logs');
   }
 }
