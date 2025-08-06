@@ -1,6 +1,6 @@
 # Tolstoy - NestJS + Fastify + Prisma + Neon PostgreSQL
 
-A robust workflow automation platform built with NestJS, Fastify, Prisma ORM, and Neon PostgreSQL, deployed on AWS App Runner with API Gateway.
+A robust workflow automation platform built with NestJS, Fastify, Prisma ORM, and Neon PostgreSQL, deployed on Vercel.
 
 ## 🚀 Quick Start
 
@@ -321,55 +321,46 @@ npm start
 - **SecretNotFound**: Ensure secret exists in the correct AWS region
 - **NetworkError**: Check AWS region and network connectivity
 
-## 🚀 AWS App Runner & API Gateway Deployment
+## 🚀 Vercel Deployment & Environment Variables
 
-### Overview
-The application is containerized and deployed on AWS App Runner with API Gateway for secure, scalable hosting.
+### Deployment URL
+Your app is deployed at:
+**https://tolstoy-1ye7fwe3y-global-admin-pullseais-projects.vercel.app**
 
-### Quick Deployment Steps
+### Environment Variables (Secrets)
+Your Neon PostgreSQL DB URL is securely managed through Vercel's environment variables:
+- `DATABASE_URL` - Encrypted and secured by Vercel
 
-#### 1. Build and Push to ECR
+### Deployment Steps
+
+1. **Install & login to Vercel CLI:**
 ```bash
-# Update AWS account ID in the script
-vim scripts/deploy-to-ecr.sh
-
-# Run deployment script
-./scripts/deploy-to-ecr.sh
+npm i -g vercel
+vercel login
 ```
 
-#### 2. Deploy to App Runner
-- Navigate to AWS App Runner Console
-- Create service from ECR image
-- Configure environment variables:
-  - `NODE_ENV=production`
-  - `USE_AWS_SECRETS=true`
-  - `AWS_SECRET_NAME=conductor-db-secret`
-
-#### 3. Set Up API Gateway
-- Create HTTP API in API Gateway Console
-- Configure integration with App Runner URL
-- Deploy to production stage
-
-### Service URLs
+2. **Deploy your app:**
 ```bash
-# App Runner URL (Direct)
-https://<service-id>.us-east-1.awsapprunner.com
-
-# API Gateway URL (Recommended)
-https://<api-id>.execute-api.us-east-1.amazonaws.com
+vercel --prod
 ```
 
-### Docker Support
+3. **Set environment variables:**
 ```bash
-# Build locally
-docker build -t tolstoy-api .
-
-# Run locally
-docker run -p 3000:3000 --env-file .env tolstoy-api
+vercel env add DATABASE_URL
+# Paste your Neon PostgreSQL connection string when prompted
 ```
 
-### Deployment Documentation
-For detailed deployment instructions, see [AWS Deployment Guide](docs/aws-deployment-guide.md)
+### Automatic Deployments
+- Commits to your main branch automatically trigger redeployment
+- Vercel builds using the `vercel-build` script: `prisma generate && tsc`
+- Environment variables are securely managed through Vercel dashboard
+
+### Why Vercel Works Well
+- ✅ **Developer-friendly**: Easy to use, minimal configuration
+- ✅ **Integrated Secrets**: Simple, secure secrets management  
+- ✅ **Fast Deployments**: Automatic Git deployments & previews
+- ✅ **Cost-effective**: Generous free tier
+- ✅ **Node.js Optimized**: Built specifically for Node.js applications
 
 ## 📁 Project Structure
 
@@ -422,15 +413,11 @@ tolstoy/
 │   ├── app.service.ts      # Application service
 │   ├── prisma.service.ts   # Prisma service integration
 │   └── aws-secrets.service.ts # AWS Secrets Manager service
-├── scripts/
-│   └── deploy-to-ecr.sh    # ECR deployment script
 ├── docs/
 │   ├── aws-deployment-guide.md # AWS deployment documentation
 │   └── aws-iam-policy.md   # IAM policy documentation
 ├── .env                    # Environment variables
-├── .env.production.example # Production environment template
-├── .dockerignore          # Docker ignore rules
-├── Dockerfile             # Docker container configuration
+├── vercel.json             # Vercel deployment configuration
 ├── .gitignore             # Git ignore rules
 ├── tsconfig.json          # TypeScript configuration
 └── package.json           # Dependencies and scripts
