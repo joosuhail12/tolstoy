@@ -113,6 +113,101 @@ npm run db:push
 - Flow → ExecutionLogs (1:many)
 - User → ExecutionLogs (1:many)
 
+## 🔗 API Endpoints
+
+### Multi-Tenant CRUD API
+All endpoints (except Organizations) require multi-tenant headers:
+- `X-Org-ID`: Organization identifier
+- `X-User-ID`: User identifier
+
+#### Organizations (No tenant headers required)
+```bash
+GET    /organizations       # List all organizations
+POST   /organizations       # Create organization
+GET    /organizations/:id   # Get organization by ID
+PUT    /organizations/:id   # Update organization
+DELETE /organizations/:id   # Delete organization
+```
+
+#### Users (Requires tenant headers)
+```bash
+GET    /users              # List users in organization
+POST   /users              # Create user in organization
+GET    /users/:id          # Get user by ID
+PUT    /users/:id          # Update user
+DELETE /users/:id          # Delete user
+```
+
+#### Tools (Requires tenant headers)
+```bash
+GET    /tools              # List tools in organization
+POST   /tools              # Create tool in organization
+GET    /tools/:id          # Get tool by ID
+PUT    /tools/:id          # Update tool
+DELETE /tools/:id          # Delete tool
+```
+
+#### Actions (Requires tenant headers)
+```bash
+GET    /actions            # List actions in organization
+POST   /actions            # Create action
+GET    /actions/:id        # Get action by ID
+PUT    /actions/:id        # Update action
+DELETE /actions/:id        # Delete action
+```
+
+#### Flows (Requires tenant headers)
+```bash
+GET    /flows              # List flows in organization
+POST   /flows              # Create flow
+GET    /flows/:id          # Get flow by ID
+PUT    /flows/:id          # Update flow
+DELETE /flows/:id          # Delete flow
+```
+
+#### Execution Logs (Requires tenant headers)
+```bash
+GET    /execution-logs     # List execution logs in organization
+POST   /execution-logs     # Create execution log
+GET    /execution-logs/:id # Get execution log by ID
+PUT    /execution-logs/:id # Update execution log
+DELETE /execution-logs/:id # Delete execution log
+```
+
+### API Testing Examples
+
+#### Create an Organization
+```bash
+curl -X POST http://localhost:3000/organizations \
+  -H "Content-Type: application/json" \
+  -d '{"name":"My Organization"}'
+```
+
+#### Create a User (with tenant headers)
+```bash
+curl -X POST http://localhost:3000/users \
+  -H "Content-Type: application/json" \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id" \
+  -d '{"email":"user@example.com"}'
+```
+
+#### Create a Tool (with tenant headers)
+```bash
+curl -X POST http://localhost:3000/tools \
+  -H "Content-Type: application/json" \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id" \
+  -d '{"name":"Slack API","baseUrl":"https://api.slack.com","authType":"bearer"}'
+```
+
+### API Features
+- **Type-safe validation** using DTOs and class-validator
+- **Multi-tenant isolation** with automatic data filtering
+- **Relationship handling** with proper foreign key validation
+- **Error handling** with meaningful HTTP status codes
+- **Auto-generated timestamps** for all entities
+
 ## 🛠️ Development Scripts
 
 ```bash
@@ -163,12 +258,47 @@ tolstoy/
 │   │   └── migration_lock.toml
 │   └── schema.prisma        # Database schema definition
 ├── src/
+│   ├── common/              # Shared utilities
+│   │   ├── decorators/      # Custom decorators (e.g., @Tenant)
+│   │   ├── interfaces/      # TypeScript interfaces
+│   │   └── middleware/      # Middleware (tenant validation)
+│   ├── organizations/       # Organization CRUD module
+│   │   ├── dto/            # Data transfer objects
+│   │   ├── organizations.controller.ts
+│   │   ├── organizations.service.ts
+│   │   └── organizations.module.ts
+│   ├── users/              # User CRUD module
+│   │   ├── dto/
+│   │   ├── users.controller.ts
+│   │   ├── users.service.ts
+│   │   └── users.module.ts
+│   ├── tools/              # Tool CRUD module
+│   │   ├── dto/
+│   │   ├── tools.controller.ts
+│   │   ├── tools.service.ts
+│   │   └── tools.module.ts
+│   ├── actions/            # Action CRUD module
+│   │   ├── dto/
+│   │   ├── actions.controller.ts
+│   │   ├── actions.service.ts
+│   │   └── actions.module.ts
+│   ├── flows/              # Flow CRUD module
+│   │   ├── dto/
+│   │   ├── flows.controller.ts
+│   │   ├── flows.service.ts
+│   │   └── flows.module.ts
+│   ├── execution-logs/     # ExecutionLog CRUD module
+│   │   ├── dto/
+│   │   ├── execution-logs.controller.ts
+│   │   ├── execution-logs.service.ts
+│   │   └── execution-logs.module.ts
 │   ├── main.ts             # Application bootstrap
 │   ├── app.module.ts       # Root module
 │   ├── app.controller.ts   # Basic controller
 │   ├── app.service.ts      # Application service
 │   └── prisma.service.ts   # Prisma service integration
 ├── .env                    # Environment variables
+├── .gitignore             # Git ignore rules
 ├── tsconfig.json          # TypeScript configuration
 └── package.json           # Dependencies and scripts
 ```
