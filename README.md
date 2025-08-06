@@ -321,9 +321,181 @@ npm start
 - **SecretNotFound**: Ensure secret exists in the correct AWS region
 - **NetworkError**: Check AWS region and network connectivity
 
-## 🚀 Deployment
+## 🚀 AWS EC2 Deployment
 
-The application can be deployed to various platforms. Configure your deployment environment with the necessary environment variables and ensure database connectivity.
+### Overview
+The Tolstoy application is deployed on AWS EC2 with a production-ready setup using Ubuntu 22.04 LTS, Node.js v20, PM2, and Nginx.
+
+### Deployment Specifications
+- **Instance Type**: t3.medium (2 vCPUs, 4 GB RAM)
+- **Operating System**: Ubuntu 22.04 LTS
+- **Runtime**: Node.js v20 LTS
+- **Process Manager**: PM2
+- **Reverse Proxy**: Nginx
+- **Secrets Management**: AWS Secrets Manager
+- **Database**: Neon PostgreSQL
+
+### Quick Deployment Guide
+
+#### 1. Prerequisites
+- AWS CLI configured with appropriate permissions
+- SSH key pair for EC2 access
+
+#### 2. Deploy Infrastructure
+```bash
+# Create AWS Secrets Manager secret
+./scripts/create-aws-secret.sh
+
+# Set up IAM role for EC2
+./scripts/setup-iam-role.sh
+
+# Deploy EC2 instance
+./scripts/deploy-ec2.sh
+```
+
+#### 3. Deploy Application
+```bash
+# SSH to EC2 instance
+ssh -i tolstoy-key-pair.pem ubuntu@<PUBLIC_IP>
+
+# Copy and run server setup
+scp -i tolstoy-key-pair.pem scripts/app-deploy.sh ubuntu@<PUBLIC_IP>:~/
+./app-deploy.sh
+```
+
+### AWS Secrets Manager Configuration
+
+#### Secret Details
+- **Secret Name**: `tolstoy-db-secret`
+- **Region**: `us-east-1`
+- **Keys**: `DATABASE_URL`, `DIRECT_URL`
+
+#### Environment Variables
+```bash
+NODE_ENV=production
+AWS_REGION=us-east-1
+AWS_SECRET_NAME=tolstoy-db-secret
+USE_AWS_SECRETS=true
+```
+
+### PM2 Process Management
+
+#### Useful Commands
+```bash
+# Check application status
+pm2 status
+
+# View logs
+pm2 logs tolstoy-api
+
+# Restart application
+pm2 restart tolstoy-api
+
+# Stop application
+pm2 stop tolstoy-api
+
+# Start application
+pm2 start tolstoy-api
+```
+
+#### PM2 Configuration
+The application uses an ecosystem configuration file:
+```javascript
+module.exports = {
+  apps: [{
+    name: 'tolstoy-api',
+    script: 'dist/main.js',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 3000,
+      AWS_REGION: 'us-east-1',
+      AWS_SECRET_NAME: 'tolstoy-db-secret',
+      USE_AWS_SECRETS: 'true'
+    },
+    instances: 1,
+    autorestart: true,
+    max_memory_restart: '1G'
+  }]
+};
+```
+
+### Nginx Reverse Proxy
+
+#### Configuration
+Nginx is configured to proxy requests to the Node.js application running on port 3000:
+```nginx
+server {
+    listen 80;
+    server_name _;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+### Health Monitoring
+
+#### Health Check Endpoints
+- **Basic Health**: `http://<PUBLIC_IP>/health`
+- **Comprehensive Status**: `http://<PUBLIC_IP>/status`  
+- **Detailed Status**: `http://<PUBLIC_IP>/status/detailed`
+
+### Security & IAM
+
+#### IAM Role Permissions
+The EC2 instance requires an IAM role with the following policy:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+      ],
+      "Resource": [
+        "arn:aws:secretsmanager:*:*:secret:tolstoy-db-secret*"
+      ]
+    }
+  ]
+}
+```
+
+#### Security Group Rules
+- **SSH (22)**: For server management
+- **HTTP (80)**: For web traffic
+- **HTTPS (443)**: For secure web traffic
+
+### Deployment Scripts
+
+#### Available Scripts
+- `scripts/deploy-ec2.sh` - Deploy EC2 infrastructure
+- `scripts/create-aws-secret.sh` - Create AWS Secrets Manager secret
+- `scripts/setup-iam-role.sh` - Set up IAM role and policies
+- `scripts/app-deploy.sh` - Deploy application on EC2 instance
+
+### Troubleshooting
+
+#### Common Issues
+1. **Database Connection**: Verify AWS Secrets Manager setup
+2. **PM2 Issues**: Check logs with `pm2 logs tolstoy-api`
+3. **Nginx Issues**: Test config with `sudo nginx -t`
+4. **IAM Permissions**: Ensure EC2 has proper IAM role attached
+
+#### Log Locations
+- **Application Logs**: `/home/ubuntu/logs/`
+- **Nginx Logs**: `/var/log/nginx/`
+- **PM2 Logs**: `~/.pm2/logs/`
 
 ## 📁 Project Structure
 
@@ -376,6 +548,11 @@ tolstoy/
 │   ├── app.service.ts      # Application service
 │   ├── prisma.service.ts   # Prisma service integration
 │   └── aws-secrets.service.ts # AWS Secrets Manager service
+├── scripts/
+│   ├── deploy-ec2.sh       # EC2 instance deployment
+│   ├── create-aws-secret.sh # AWS Secrets Manager setup
+│   ├── setup-iam-role.sh   # IAM role configuration
+│   └── app-deploy.sh       # Application deployment on EC2
 ├── docs/
 │   ├── aws-deployment-guide.md # AWS deployment documentation
 │   └── aws-iam-policy.md   # IAM policy documentation
