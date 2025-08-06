@@ -241,11 +241,85 @@ DIRECT_URL="postgresql://user:password@host.neon.tech/db?sslmode=require&channel
 NODE_ENV=development
 PORT=3000
 APP_NAME=Tolstoy
+
+# AWS Secrets Manager (Optional)
+AWS_REGION=us-east-1
+AWS_SECRET_NAME=tolstoy-db-secret
+USE_AWS_SECRETS=false
+# AWS_ACCESS_KEY_ID=your-access-key-id       # For local development only
+# AWS_SECRET_ACCESS_KEY=your-secret-access-key # For local development only
 ```
 
 ### Connection Types
 - **DATABASE_URL**: Pooled connection for application queries
 - **DIRECT_URL**: Direct connection for Prisma migrations
+
+## 🔒 AWS Secrets Manager Integration
+
+### Overview
+The application supports optional AWS Secrets Manager integration for secure database credential management in production environments.
+
+### Configuration Modes
+1. **Local Development** (`USE_AWS_SECRETS=false`): Uses local `.env` variables
+2. **Production** (`NODE_ENV=production` or `USE_AWS_SECRETS=true`): Uses AWS Secrets Manager
+
+### Setting Up AWS Secrets Manager
+
+#### 1. Create Secret in AWS
+```bash
+# Using AWS CLI
+aws secretsmanager create-secret \
+  --name tolstoy-db-secret \
+  --description "Database credentials for Tolstoy application" \
+  --secret-string '{"DATABASE_URL":"postgresql://user:password@host-pooler.neon.tech/db?sslmode=require","DIRECT_URL":"postgresql://user:password@host.neon.tech/db?sslmode=require"}'
+```
+
+#### 2. Environment Configuration
+```bash
+# Production environment variables
+AWS_REGION=us-east-1
+AWS_SECRET_NAME=tolstoy-db-secret
+USE_AWS_SECRETS=true
+# No DATABASE_URL needed - retrieved from Secrets Manager
+```
+
+#### 3. IAM Permissions
+Your application needs the following IAM policy:
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue"
+      ],
+      "Resource": "arn:aws:secretsmanager:us-east-1:ACCOUNT-ID:secret:tolstoy-db-secret*"
+    }
+  ]
+}
+```
+
+#### 4. Authentication Methods
+- **Production**: Use IAM roles (recommended)
+- **Local Development**: Use AWS credentials in environment variables (not recommended for production)
+
+### Testing AWS Integration
+```bash
+# Enable AWS Secrets Manager locally (requires AWS credentials)
+export USE_AWS_SECRETS=true
+export AWS_ACCESS_KEY_ID=your-access-key
+export AWS_SECRET_ACCESS_KEY=your-secret-key
+export AWS_REGION=us-east-1
+
+npm start
+```
+
+### Troubleshooting AWS Integration
+- **CredentialsProviderError**: Check AWS credentials configuration
+- **AccessDenied**: Verify IAM permissions for Secrets Manager
+- **SecretNotFound**: Ensure secret exists in the correct AWS region
+- **NetworkError**: Check AWS region and network connectivity
 
 ## 📁 Project Structure
 
