@@ -2,8 +2,8 @@ import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { PrismaService } from './prisma.service';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
+import { CommonModule } from './common/common.module';
 
 // Feature Modules
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -19,6 +19,7 @@ import { ExecutionLogsModule } from './execution-logs/execution-logs.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    CommonModule,
     OrganizationsModule,
     UsersModule,
     ToolsModule,
@@ -27,7 +28,7 @@ import { ExecutionLogsModule } from './execution-logs/execution-logs.module';
     ExecutionLogsModule,
   ],
   controllers: [AppController],
-  providers: [AppService, PrismaService],
+  providers: [AppService],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
