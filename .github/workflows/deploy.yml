@@ -132,11 +132,19 @@ jobs:
         run: |
           echo "🔍 Verifying application health..."
           
-          # Wait for the application to fully start (AWS Secrets Manager takes a moment)
-          echo "⏳ Waiting 20 seconds for application startup..."
-          sleep 20
+          # Check PM2 logs first to see if there are any startup issues
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${EC2_USER}@${EC2_HOST}" "pm2 logs tolstoy-api --lines 10"
+          
+          # Wait longer for the application to fully start (AWS Secrets Manager + database connection)
+          echo "⏳ Waiting 30 seconds for application startup..."
+          sleep 30
+          
+          # Check if the application is listening on port 3000
+          echo "🔍 Checking if application is listening on port 3000..."
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${EC2_USER}@${EC2_HOST}" "ss -tlnp | grep :3000 || echo 'Port 3000 not listening'"
           
           # Test health endpoint
+          echo "🔍 Testing health endpoint..."
           HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://${EC2_HOST}/health)
           
           if [ "$HEALTH_CHECK" -eq 200 ]; then
