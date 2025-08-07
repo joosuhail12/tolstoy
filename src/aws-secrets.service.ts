@@ -128,6 +128,41 @@ export class AwsSecretsService {
     return this.getSecret(secretId, 'DIRECT_URL');
   }
 
+  async getDaytonaApiKey(secretId: string = 'conductor-db-secret'): Promise<string> {
+    return this.getSecret(secretId, 'DAYTONA_API_KEY');
+  }
+
+  async getDaytonaBaseUrl(secretId: string = 'conductor-db-secret'): Promise<string> {
+    return this.getSecret(secretId, 'DAYTONA_BASE_URL');
+  }
+
+  async getDaytonaSyncTimeout(secretId: string = 'conductor-db-secret'): Promise<string> {
+    return this.getSecret(secretId, 'DAYTONA_SYNC_TIMEOUT');
+  }
+
+  async getDaytonaAsyncTimeout(secretId: string = 'conductor-db-secret'): Promise<string> {
+    return this.getSecret(secretId, 'DAYTONA_ASYNC_TIMEOUT');
+  }
+
+  async getInngestApiKey(secretId: string = 'tolstoy/env'): Promise<string> {
+    return this.getSecret(secretId, 'INNGEST_API_KEY');
+  }
+
+  async getInngestWebhookSecret(secretId: string = 'tolstoy/env'): Promise<string> {
+    return this.getSecret(secretId, 'INNGEST_WEBHOOK_SECRET');
+  }
+
+  async getInngestConfig(secretId: string = 'tolstoy/env'): Promise<{
+    apiKey: string;
+    webhookSecret: string;
+  }> {
+    const secrets = await this.getSecretAsJson(secretId);
+    return {
+      apiKey: secrets.INNGEST_API_KEY,
+      webhookSecret: secrets.INNGEST_WEBHOOK_SECRET,
+    };
+  }
+
   async validateSecretAccess(secretId: string): Promise<boolean> {
     try {
       await this.getSecret(secretId);

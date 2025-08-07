@@ -20,6 +20,8 @@ import { ExecutionLogsModule } from './execution-logs/execution-logs.module';
 import { HealthModule } from './health/health.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import { ToolSecretsModule } from './tool-secrets/tool-secrets.module';
+import { SandboxModule } from './sandbox/sandbox.module';
+import { InngestModule } from './flows/inngest/inngest.module';
 
 @Module({
   imports: [
@@ -79,6 +81,8 @@ import { ToolSecretsModule } from './tool-secrets/tool-secrets.module';
     ExecutionLogsModule,
     WebhooksModule,
     ToolSecretsModule,
+    SandboxModule,
+    InngestModule,
   ],
   controllers: [AppController],
   providers: [

@@ -13,6 +13,7 @@ import {
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { FlowsService } from './flows.service';
 import { FlowExecutorService } from './flow-executor.service';
+import { InngestExecutionService } from './inngest/inngest-execution.service';
 import { CreateFlowDto } from './dto/create-flow.dto';
 import { UpdateFlowDto } from './dto/update-flow.dto';
 import { Tenant } from '../common/decorators/tenant.decorator';
@@ -23,6 +24,7 @@ export class FlowsController {
   constructor(
     private readonly flowsService: FlowsService,
     private readonly flowExecutorService: FlowExecutorService,
+    private readonly inngestExecutionService: InngestExecutionService,
     @InjectPinoLogger(FlowsController.name)
     private readonly logger: PinoLogger,
   ) {}
@@ -75,19 +77,122 @@ export class FlowsController {
   @HttpCode(HttpStatus.ACCEPTED)
   async executeFlow(
     @Param('id') id: string,
-    @Body() executionInput: { variables?: Record<string, any> },
+    @Body() executionInput: { variables?: Record<string, any>; useDurable?: boolean },
     @Tenant() tenant: TenantContext,
   ) {
-    this.logger.info({ flowId: id, orgId: tenant.orgId, variableCount: Object.keys(executionInput.variables || {}).length }, 'Starting flow execution');
+    const { variables = {}, useDurable = true } = executionInput;
     
-    const result = await this.flowExecutorService.executeFlow(
-      id,
-      tenant,
-      executionInput.variables || {}
-    );
+    this.logger.info({ 
+      flowId: id, 
+      orgId: tenant.orgId, 
+      variableCount: Object.keys(variables).length,
+      useDurable,
+    }, 'Starting flow execution');
     
-    this.logger.info({ flowId: id, orgId: tenant.orgId, executionLogId: result.id, status: result.status }, 'Flow execution started');
+    if (useDurable) {
+      // Use Inngest for durable execution
+      const result = await this.inngestExecutionService.executeFlow(
+        id,
+        tenant,
+        variables
+      );
+      
+      this.logger.info({ 
+        flowId: id, 
+        orgId: tenant.orgId, 
+        executionId: result.executionId, 
+        status: result.status 
+      }, 'Durable flow execution enqueued');
+      
+      return result;
+    } else {
+      // Use direct execution (legacy mode)
+      const result = await this.flowExecutorService.executeFlow(
+        id,
+        tenant,
+        variables
+      );
+      
+      this.logger.info({ 
+        flowId: id, 
+        orgId: tenant.orgId, 
+        executionLogId: result.id, 
+        status: result.status 
+      }, 'Direct flow execution started');
+      
+      return result;
+    }
+  }
+
+  @Get(':id/executions')
+  async getFlowExecutions(
+    @Param('id') id: string,
+    @Tenant() tenant: TenantContext,
+  ) {
+    return this.inngestExecutionService.getFlowExecutions(id, tenant);
+  }
+
+  @Get(':id/executions/:executionId')
+  async getExecutionStatus(
+    @Param('id') flowId: string,
+    @Param('executionId') executionId: string,
+    @Tenant() tenant: TenantContext,
+  ) {
+    return this.inngestExecutionService.getExecutionStatus(executionId, tenant);
+  }
+
+  @Post(':id/executions/:executionId/cancel')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async cancelExecution(
+    @Param('id') flowId: string,
+    @Param('executionId') executionId: string,
+    @Tenant() tenant: TenantContext,
+  ) {
+    this.logger.warn({ 
+      flowId, 
+      executionId, 
+      orgId: tenant.orgId 
+    }, 'Cancelling flow execution');
+    
+    await this.inngestExecutionService.cancelExecution(executionId, tenant);
+    
+    this.logger.info({ 
+      flowId, 
+      executionId, 
+      orgId: tenant.orgId 
+    }, 'Flow execution cancelled');
+  }
+
+  @Post(':id/executions/:executionId/retry')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async retryExecution(
+    @Param('id') flowId: string,
+    @Param('executionId') executionId: string,
+    @Tenant() tenant: TenantContext,
+  ) {
+    this.logger.info({ 
+      flowId, 
+      executionId, 
+      orgId: tenant.orgId 
+    }, 'Retrying failed flow execution');
+    
+    const result = await this.inngestExecutionService.retryExecution(executionId, tenant);
+    
+    this.logger.info({ 
+      flowId, 
+      originalExecutionId: executionId,
+      newExecutionId: result.executionId,
+      orgId: tenant.orgId 
+    }, 'Flow execution retry initiated');
     
     return result;
+  }
+
+  @Get(':id/metrics')
+  async getExecutionMetrics(
+    @Param('id') id: string,
+    @Tenant() tenant: TenantContext,
+  ) {
+    return this.inngestExecutionService.getExecutionMetrics(id, tenant);
   }
 }

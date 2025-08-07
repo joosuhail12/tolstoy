@@ -7,6 +7,7 @@ import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { SecretsResolver } from '../secrets/secrets-resolver.service';
 import { OAuthTokenService } from '../oauth/oauth-token.service';
 import { InputValidatorService } from '../common/services/input-validator.service';
+import { SandboxService, SandboxExecutionContext } from '../sandbox/sandbox.service';
 
 export interface FlowStep {
   id: string;
@@ -54,6 +55,7 @@ export class FlowExecutorService {
     private readonly secretsResolver: SecretsResolver,
     private readonly oauthService: OAuthTokenService,
     private readonly inputValidator: InputValidatorService,
+    private readonly sandboxService: SandboxService,
     @InjectPinoLogger(FlowExecutorService.name)
     private readonly logger: PinoLogger,
   ) {}
@@ -265,6 +267,12 @@ export class FlowExecutorService {
         return this.executeConditional(step, context);
       case 'delay':
         return this.executeDelay(step, context);
+      case 'sandbox_sync':
+        return this.executeSandboxSync(step, context);
+      case 'sandbox_async':
+        return this.executeSandboxAsync(step, context);
+      case 'code_execution':
+        return this.executeCodeExecution(step, context);
       default:
         return {
           success: false,
@@ -385,46 +393,144 @@ export class FlowExecutorService {
   }
 
   private async executeDataTransform(step: FlowStep, context: FlowExecutionContext): Promise<StepExecutionResult> {
-    const { script } = step.config;
+    const { script, useSandbox = true } = step.config;
     
-    try {
-      const transformFunction = new Function('input', 'context', script);
-      const result = transformFunction(context.stepOutputs, context);
-      
-      return {
-        success: true,
-        output: result
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: {
-          message: `Data transform failed: ${error.message}`,
-          code: 'TRANSFORM_ERROR'
-        }
-      };
+    if (useSandbox && this.sandboxService.isConfigured()) {
+      // Use sandbox for secure execution
+      const sandboxCode = `
+        // Data transformation script
+        const input = context.stepOutputs;
+        const flowContext = context;
+        
+        ${script}
+      `;
+
+      try {
+        const sandboxContext: SandboxExecutionContext = {
+          orgId: context.orgId,
+          userId: context.userId,
+          flowId: context.flowId,
+          stepId: step.id,
+          executionId: context.executionId,
+          variables: context.variables,
+          stepOutputs: context.stepOutputs,
+        };
+
+        const result = await this.sandboxService.runSync(sandboxCode, sandboxContext);
+        
+        return {
+          success: result.success,
+          output: result.output,
+          error: result.error,
+          metadata: {
+            duration: result.executionTime || 0,
+            executionTime: result.executionTime,
+            sandboxMode: 'sync',
+            stepType: 'data_transform'
+          }
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: {
+            message: `Sandbox data transform failed: ${error.message}`,
+            code: 'SANDBOX_TRANSFORM_ERROR'
+          }
+        };
+      }
+    } else {
+      // Fallback to direct execution (less secure)
+      try {
+        const transformFunction = new Function('input', 'context', script);
+        const result = transformFunction(context.stepOutputs, context);
+        
+        return {
+          success: true,
+          output: result,
+          metadata: {
+            duration: 0,
+            executionMode: 'direct'
+          }
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: {
+            message: `Data transform failed: ${error.message}`,
+            code: 'TRANSFORM_ERROR'
+          }
+        };
+      }
     }
   }
 
   private async executeConditional(step: FlowStep, context: FlowExecutionContext): Promise<StepExecutionResult> {
-    const { condition } = step.config;
+    const { condition, useSandbox = true } = step.config;
     
-    try {
-      const conditionFunction = new Function('context', `return ${condition}`);
-      const result = conditionFunction(context);
-      
-      return {
-        success: true,
-        output: { conditionResult: result }
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: {
-          message: `Condition evaluation failed: ${error.message}`,
-          code: 'CONDITION_ERROR'
-        }
-      };
+    if (useSandbox && this.sandboxService.isConfigured()) {
+      // Use sandbox for secure condition evaluation
+      const sandboxCode = `
+        // Conditional evaluation
+        const context = arguments[0];
+        return ${condition};
+      `;
+
+      try {
+        const sandboxContext: SandboxExecutionContext = {
+          orgId: context.orgId,
+          userId: context.userId,
+          flowId: context.flowId,
+          stepId: step.id,
+          executionId: context.executionId,
+          variables: context.variables,
+          stepOutputs: context.stepOutputs,
+        };
+
+        const result = await this.sandboxService.runSync(sandboxCode, sandboxContext);
+        
+        return {
+          success: result.success,
+          output: { conditionResult: result.output },
+          error: result.error,
+          metadata: {
+            duration: result.executionTime || 0,
+            executionTime: result.executionTime,
+            sandboxMode: 'sync',
+            stepType: 'conditional'
+          }
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: {
+            message: `Sandbox condition evaluation failed: ${error.message}`,
+            code: 'SANDBOX_CONDITION_ERROR'
+          }
+        };
+      }
+    } else {
+      // Fallback to direct execution (less secure)
+      try {
+        const conditionFunction = new Function('context', `return ${condition}`);
+        const result = conditionFunction(context);
+        
+        return {
+          success: true,
+          output: { conditionResult: result },
+          metadata: {
+            duration: 0,
+            executionMode: 'direct'
+          }
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: {
+            message: `Condition evaluation failed: ${error.message}`,
+            code: 'CONDITION_ERROR'
+          }
+        };
+      }
     }
   }
 
@@ -602,6 +708,185 @@ export class FlowExecutorService {
           code: 'ACTION_NETWORK_ERROR'
         }
       };
+    }
+  }
+
+  /**
+   * Execute code synchronously in Daytona sandbox
+   * Blocks until execution completes
+   */
+  private async executeSandboxSync(
+    step: FlowStep,
+    context: FlowExecutionContext
+  ): Promise<StepExecutionResult> {
+    const { code, language } = step.config;
+
+    if (!code) {
+      return {
+        success: false,
+        error: {
+          message: 'Code is required for sandbox_sync step',
+          code: 'MISSING_CODE'
+        }
+      };
+    }
+
+    try {
+      const sandboxContext: SandboxExecutionContext = {
+        orgId: context.orgId,
+        userId: context.userId,
+        flowId: context.flowId,
+        stepId: step.id,
+        executionId: context.executionId,
+        variables: context.variables,
+        stepOutputs: context.stepOutputs,
+      };
+
+      const result = await this.sandboxService.runSync(code, sandboxContext);
+      
+      return {
+        success: result.success,
+        output: result.output,
+        error: result.error,
+        metadata: {
+          duration: result.executionTime || 0,
+          executionTime: result.executionTime,
+          sandboxMode: 'sync',
+          language: language || 'javascript'
+        }
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: `Sandbox sync execution failed: ${error.message}`,
+          code: 'SANDBOX_SYNC_ERROR'
+        }
+      };
+    }
+  }
+
+  /**
+   * Execute code asynchronously in Daytona sandbox
+   * Returns immediately with session info
+   */
+  private async executeSandboxAsync(
+    step: FlowStep,
+    context: FlowExecutionContext
+  ): Promise<StepExecutionResult> {
+    const { code, language, pollInterval = 1000, maxPollAttempts = 300 } = step.config;
+
+    if (!code) {
+      return {
+        success: false,
+        error: {
+          message: 'Code is required for sandbox_async step',
+          code: 'MISSING_CODE'
+        }
+      };
+    }
+
+    try {
+      const sandboxContext: SandboxExecutionContext = {
+        orgId: context.orgId,
+        userId: context.userId,
+        flowId: context.flowId,
+        stepId: step.id,
+        executionId: context.executionId,
+        variables: context.variables,
+        stepOutputs: context.stepOutputs,
+      };
+
+      // Start async execution
+      const sessionId = await this.sandboxService.runAsync(code, sandboxContext);
+      
+      // Poll for completion or return session info for later retrieval
+      if (step.config.waitForCompletion !== false) {
+        // Poll for completion
+        let attempts = 0;
+        while (attempts < maxPollAttempts) {
+          await new Promise(resolve => setTimeout(resolve, pollInterval));
+          attempts++;
+
+          const asyncResult = await this.sandboxService.getAsyncResult(sessionId, sandboxContext);
+          
+          if (asyncResult.status === 'completed' || asyncResult.status === 'failed') {
+            const result = asyncResult.result;
+            return {
+              success: result?.success || false,
+              output: result?.output,
+              error: result?.error,
+              metadata: {
+                duration: result?.executionTime || 0,
+                executionTime: result?.executionTime,
+                sandboxMode: 'async',
+                sessionId: asyncResult.sessionId,
+                pollAttempts: attempts,
+                language: language || 'javascript'
+              }
+            };
+          }
+        }
+
+        // Timeout reached
+        return {
+          success: false,
+          output: { sessionId },
+          error: {
+            message: `Async execution timed out after ${maxPollAttempts} attempts`,
+            code: 'SANDBOX_ASYNC_TIMEOUT'
+          },
+          metadata: {
+            duration: maxPollAttempts * pollInterval,
+            sandboxMode: 'async',
+            sessionId,
+            pollAttempts: attempts,
+            language: language || 'javascript'
+          }
+        };
+      } else {
+        // Return immediately with session info
+        return {
+          success: true,
+          output: { 
+            sessionId,
+            message: 'Async execution started - use getAsyncResult to retrieve results'
+          },
+          metadata: {
+            duration: 0,
+            sandboxMode: 'async',
+            sessionId,
+            language: language || 'javascript'
+          }
+        };
+      }
+
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: `Sandbox async execution failed: ${error.message}`,
+          code: 'SANDBOX_ASYNC_ERROR'
+        }
+      };
+    }
+  }
+
+  /**
+   * Generic code execution step - chooses sync or async based on config
+   * This provides backward compatibility and flexibility
+   */
+  private async executeCodeExecution(
+    step: FlowStep,
+    context: FlowExecutionContext
+  ): Promise<StepExecutionResult> {
+    const { mode = 'sync' } = step.config;
+
+    if (mode === 'async') {
+      return this.executeSandboxAsync(step, context);
+    } else {
+      return this.executeSandboxSync(step, context);
     }
   }
 

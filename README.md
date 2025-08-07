@@ -693,6 +693,764 @@ Tolstoy provides secure credential storage for external tools using AWS Secrets 
 ]
 ```
 
+## ⚡ Inngest Durable Workflow Orchestration
+
+### Overview
+Tolstoy integrates with Inngest to provide durable, reliable workflow orchestration with automatic retries, step-level checkpointing, and comprehensive observability. This ensures that complex workflows can recover from failures, scale efficiently, and provide real-time execution visibility.
+
+### Key Features
+- **Durable Execution**: Automatic recovery from failures with step-level checkpointing
+- **Reliable Queuing**: Flow executions are queued and processed reliably via Inngest events
+- **Step-level Retries**: Individual step failures don't restart the entire workflow
+- **Real-time Updates**: Live execution progress via Ably WebSocket integration
+- **Execution Management**: Cancel, retry, and monitor workflow executions
+- **Multi-tenant Isolation**: Organization-scoped execution with proper data isolation
+- **Comprehensive Metrics**: Success rates, execution statistics, and performance analytics
+
+### Configuration
+
+#### Environment Variables
+```bash
+# Inngest Configuration
+INNGEST_API_KEY=your_inngest_api_key_here
+INNGEST_WEBHOOK_SECRET=your_inngest_webhook_secret_here
+INNGEST_BASE_URL=https://api.inngest.com  # Optional, defaults to Inngest Cloud
+```
+
+#### AWS Secrets Manager Integration
+When `USE_AWS_SECRETS=true` is set, Inngest configuration will be automatically loaded from AWS Secrets Manager instead of environment variables. The secrets are stored in the main environment secret (`tolstoy/env`) with the following keys:
+- `INNGEST_API_KEY`
+- `INNGEST_WEBHOOK_SECRET`
+
+This provides enhanced security for production deployments by keeping sensitive configuration in AWS Secrets Manager.
+
+### Workflow Execution Modes
+
+#### 1. Legacy Direct Execution
+For immediate execution without durability:
+```bash
+curl -X POST http://localhost:3000/flows/flow-123/execute \
+  -H "Content-Type: application/json" \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id" \
+  -d '{
+    "variables": { "userId": "user-456" },
+    "useDurable": false
+  }'
+```
+
+#### 2. Durable Execution with Inngest (Default)
+For reliable, durable workflow execution:
+```bash
+curl -X POST http://localhost:3000/flows/flow-123/execute \
+  -H "Content-Type: application/json" \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id" \
+  -d '{
+    "variables": { "userId": "user-456" },
+    "useDurable": true
+  }'
+```
+
+### Execution Management API
+
+#### List Flow Executions
+```bash
+curl -X GET http://localhost:3000/flows/flow-123/executions \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+**Response:**
+```json
+[
+  {
+    "executionId": "exec_1704067200_abc123",
+    "flowId": "flow-123",
+    "status": "completed",
+    "userId": "user-456",
+    "userEmail": "user@example.com",
+    "inputs": { "userId": "user-456" },
+    "outputs": { "step1": "result", "step2": "data" },
+    "createdAt": "2025-01-01T00:00:00.000Z"
+  }
+]
+```
+
+#### Get Execution Status
+```bash
+curl -X GET http://localhost:3000/flows/flow-123/executions/exec_1704067200_abc123 \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+**Response:**
+```json
+{
+  "executionId": "exec_1704067200_abc123",
+  "flowId": "flow-123",
+  "status": "running",
+  "inputs": { "userId": "user-456" },
+  "outputs": null,
+  "createdAt": "2025-01-01T00:00:00.000Z"
+}
+```
+
+#### Cancel Execution
+```bash
+curl -X POST http://localhost:3000/flows/flow-123/executions/exec_1704067200_abc123/cancel \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+#### Retry Failed Execution
+```bash
+curl -X POST http://localhost:3000/flows/flow-123/executions/exec_1704067200_abc123/retry \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+**Response:**
+```json
+{
+  "executionId": "exec_1704067300_def456",
+  "flowId": "flow-123",
+  "status": "queued"
+}
+```
+
+#### Get Execution Metrics
+```bash
+curl -X GET http://localhost:3000/flows/flow-123/metrics \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+**Response:**
+```json
+{
+  "totalExecutions": 150,
+  "statusBreakdown": {
+    "completed": 120,
+    "failed": 20,
+    "running": 5,
+    "queued": 3,
+    "cancelled": 2
+  },
+  "successRate": 80.0
+}
+```
+
+### Durable Flow Step Execution
+
+All step types from the original flow executor are supported with enhanced durability:
+
+#### Supported Step Types
+- **`sandbox_sync`**: Synchronous code execution in Daytona sandboxes
+- **`sandbox_async`**: Asynchronous code execution with polling
+- **`code_execution`**: Generic code execution (sync/async)
+- **`data_transform`**: Data transformation with sandbox isolation
+- **`conditional`**: Conditional logic with complex expressions
+- **`http_request`**: HTTP API calls with retry logic
+- **`delay`**: Controlled delays in workflow execution
+
+#### Step Execution Flow
+1. **Event Reception**: Inngest receives `flow.execute` event
+2. **Step Processing**: Each step is wrapped in `step.run()` for durability
+3. **Progress Updates**: Real-time updates published via Ably
+4. **Error Handling**: Failed steps are retried with exponential backoff
+5. **State Management**: Step outputs are preserved across failures
+6. **Final Status**: Execution marked as completed/failed based on step results
+
+### Real-time Execution Monitoring
+
+#### Ably Integration
+Inngest workflows publish real-time events via Ably WebSocket channels:
+
+**Channel Structure:**
+- **Execution Events**: `executions.{orgId}.{executionId}`
+- **Step Events**: `steps.{orgId}.{executionId}.{stepId}`
+
+**Event Types:**
+```json
+{
+  "executionId": "exec_1704067200_abc123",
+  "status": "started",
+  "timestamp": "2025-01-01T00:00:00.000Z",
+  "orgId": "org-123",
+  "flowId": "flow-456",
+  "totalSteps": 3
+}
+```
+
+```json
+{
+  "stepId": "data-transform",
+  "status": "completed",
+  "timestamp": "2025-01-01T00:01:30.000Z",
+  "executionId": "exec_1704067200_abc123",
+  "stepName": "Transform User Data",
+  "output": { "processedRecords": 150 },
+  "duration": 1500
+}
+```
+
+### Error Handling & Recovery
+
+#### Automatic Retry Logic
+- **Function-level Retries**: 3 automatic retries for entire function failures
+- **Step-level Retries**: Individual step failures don't restart workflow
+- **Exponential Backoff**: Increasing delays between retry attempts
+- **Critical Step Handling**: Optional step criticality configuration
+
+#### Failure Scenarios
+1. **Network Errors**: Automatic retry with exponential backoff
+2. **Service Timeouts**: Configurable timeout handling
+3. **Step Failures**: Continue execution or halt based on step criticality
+4. **Sandbox Errors**: Proper error propagation and logging
+5. **Database Issues**: Resilient execution log management
+
+#### Recovery Process
+```typescript
+// Example critical step configuration
+{
+  "id": "critical-data-sync",
+  "type": "http_request",
+  "name": "Sync Critical Data",
+  "config": {
+    "critical": true,  // Stops execution on failure
+    "url": "https://api.example.com/sync",
+    "method": "POST"
+  }
+}
+```
+
+### Performance & Scalability
+
+#### Execution Concurrency
+- **Default Concurrency**: 10 concurrent workflow executions
+- **Organization Isolation**: Separate execution contexts per tenant
+- **Step Parallelization**: Independent steps can run concurrently
+- **Resource Management**: Automatic cleanup and resource optimization
+
+#### Execution ID Format
+```typescript
+// Format: exec_{timestamp}_{random_hash}
+"exec_1704067200_abc123"
+
+// Benefits:
+// - Chronological ordering
+// - Collision resistance  
+// - Easy debugging and tracking
+```
+
+#### Performance Monitoring
+```json
+{
+  "level": "info",
+  "time": "2025-01-01T00:02:15.000Z",
+  "msg": "Flow execution completed successfully",
+  "orgId": "org-123",
+  "flowId": "flow-456", 
+  "executionId": "exec_1704067200_abc123",
+  "status": "completed",
+  "completedSteps": 3,
+  "failedSteps": 0,
+  "totalSteps": 3,
+  "totalDuration": 3250
+}
+```
+
+### Security & Data Isolation
+
+#### Multi-tenant Security
+- **Organization Scoping**: All executions scoped to organization context
+- **User Attribution**: Executions attributed to specific users
+- **Data Isolation**: No cross-tenant data access in execution context
+- **Audit Trail**: Complete execution history with user tracking
+
+#### Secure Context Injection
+```typescript
+interface FlowExecutionContext {
+  orgId: string;        // Organization identifier
+  userId: string;       // User who initiated execution
+  flowId: string;       // Flow being executed
+  executionId: string;  // Unique execution identifier
+  variables: Record<string, any>;  // Initial flow variables
+  stepOutputs: Record<string, any>; // Previous step results
+}
+```
+
+### Development & Testing
+
+#### Local Development Setup
+```bash
+# Install Inngest dependencies
+npm install inngest nestjs-inngest
+
+# Configure environment
+export INNGEST_API_KEY=your_development_key
+export INNGEST_WEBHOOK_SECRET=your_webhook_secret
+
+# Start development server
+npm run start:dev
+```
+
+#### Testing Inngest Integration
+```bash
+# Run Inngest-specific tests
+npm test src/flows/inngest/
+
+# Run integration tests
+npm test src/flows/inngest/inngest-execution.service.spec.ts
+npm test src/flows/inngest/execute-flow.handler.spec.ts
+```
+
+#### Mock Development
+When Inngest is unavailable, the implementation includes:
+- Simulated event publishing
+- Mock execution tracking
+- Error scenario testing
+- Performance simulation
+
+### Troubleshooting
+
+#### Common Issues
+1. **Event Not Processed**: Verify Inngest API key and webhook secret
+2. **Execution Stuck**: Check Inngest dashboard for function status
+3. **Step Failures**: Review execution logs and step-specific errors
+4. **Real-time Updates Missing**: Verify Ably service configuration
+5. **Database Errors**: Check PostgreSQL connection and permissions
+
+#### Debugging Commands
+```bash
+# Check execution logs
+curl http://localhost:3000/flows/flow-123/executions/exec_123_abc/logs
+
+# Monitor Inngest function health
+# (via Inngest dashboard or monitoring tools)
+
+# Verify Ably connection
+curl http://localhost:3000/health
+```
+
+#### Health Monitoring
+```json
+{
+  "inngestService": {
+    "configured": true,
+    "apiKeyPresent": true,
+    "webhookSecretPresent": true,
+    "functionsRegistered": 1,
+    "lastEventSent": "2025-01-01T00:00:00.000Z"
+  }
+}
+```
+
+### Advanced Configuration
+
+#### Custom Execution Policies
+```typescript
+// Flow-specific execution configuration
+{
+  "id": "high-priority-flow",
+  "name": "Critical Data Pipeline", 
+  "config": {
+    "execution": {
+      "concurrency": 5,        // Max concurrent executions
+      "timeout": 300000,       // 5 minute timeout
+      "retryPolicy": {
+        "maxRetries": 5,
+        "backoffStrategy": "exponential",
+        "baseDelayMs": 1000
+      }
+    }
+  }
+}
+```
+
+#### Event Filtering
+```bash
+# Filter executions by status
+curl -X GET "http://localhost:3000/flows/flow-123/executions?status=failed" \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+
+# Pagination support
+curl -X GET "http://localhost:3000/flows/flow-123/executions?limit=10&offset=20" \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+## 🏝️ Daytona Sandbox Integration
+
+### Overview
+Tolstoy integrates with Daytona for secure, isolated code execution within workflow steps. This enables running user-provided scripts, data transformations, and conditional logic in a secure sandbox environment, protecting your infrastructure from potentially malicious code.
+
+### Key Features
+- **Secure Execution**: All code runs in isolated Daytona sandboxes
+- **Multi-Language Support**: JavaScript, Python, Go, Rust automatic language detection
+- **Sync & Async Modes**: Blocking execution or session-based background processing
+- **Context Injection**: Access to flow variables, step outputs, and utility functions
+- **Enhanced Security**: Replaces dangerous `eval()` calls with sandboxed execution
+- **Comprehensive Logging**: Structured logging with execution metrics and error details
+
+### Configuration
+
+#### Environment Variables
+```bash
+# Daytona API Configuration
+DAYTONA_API_KEY=your_daytona_api_key_here
+DAYTONA_BASE_URL=https://api.daytona.dev
+DAYTONA_SYNC_TIMEOUT=30000     # 30 seconds for sync execution
+DAYTONA_ASYNC_TIMEOUT=300000   # 5 minutes for async execution
+```
+
+#### AWS Secrets Manager Integration
+When `USE_AWS_SECRETS=true` is set, Daytona configuration will be automatically loaded from AWS Secrets Manager instead of environment variables. The secrets are stored in the main application secret (`conductor-db-secret`) with the following keys:
+- `DAYTONA_API_KEY`
+- `DAYTONA_BASE_URL` 
+- `DAYTONA_SYNC_TIMEOUT`
+- `DAYTONA_ASYNC_TIMEOUT`
+
+This provides enhanced security for production deployments by keeping sensitive configuration in AWS Secrets Manager rather than environment variables.
+
+#### Service Integration
+The `SandboxService` is automatically available throughout the application:
+```typescript
+// Sync execution - blocks until completion
+const result = await sandboxService.runSync(code, context);
+
+// Async execution - returns session ID immediately  
+const sessionId = await sandboxService.runAsync(code, context);
+
+// Retrieve async result
+const asyncResult = await sandboxService.getAsyncResult(sessionId, context);
+```
+
+### Flow Step Types
+
+#### 1. Synchronous Execution (`sandbox_sync`)
+Executes code and waits for completion. Best for quick scripts and transformations.
+
+```json
+{
+  "id": "data-process",
+  "type": "sandbox_sync",
+  "name": "Process User Data",
+  "config": {
+    "code": "return context.variables.users.filter(u => u.active).map(u => ({ id: u.id, name: u.name }));",
+    "language": "javascript"
+  }
+}
+```
+
+#### 2. Asynchronous Execution (`sandbox_async`)
+Starts execution in background. Useful for long-running processes or when immediate response is needed.
+
+```json
+{
+  "id": "heavy-computation",
+  "type": "sandbox_async", 
+  "name": "Complex Data Analysis",
+  "config": {
+    "code": "// Long running analysis code here\nreturn processLargeDataset(context.stepOutputs.dataFetch);",
+    "waitForCompletion": false,
+    "pollInterval": 1000,
+    "maxPollAttempts": 300
+  }
+}
+```
+
+#### 3. Generic Code Execution (`code_execution`)
+Flexible step type that chooses sync or async based on configuration:
+
+```json
+{
+  "id": "flexible-code",
+  "type": "code_execution",
+  "name": "Flexible Execution",
+  "config": {
+    "code": "return { result: 'processed', timestamp: new Date() };",
+    "mode": "sync"
+  }
+}
+```
+
+### Language Support
+
+#### Automatic Language Detection
+The sandbox service automatically detects programming languages:
+
+```javascript
+// JavaScript - detected by 'function', 'const', 'console.log'
+function processData(input) {
+  console.log('Processing:', input);
+  return { processed: true };
+}
+
+# Python - detected by 'def', 'import', 'print('
+def process_data(input_data):
+    print(f"Processing: {input_data}")
+    return {"processed": True}
+
+// Go - detected by 'func', 'package', 'fmt.Print'
+func processData(input interface{}) map[string]bool {
+    fmt.Printf("Processing: %v\n", input)
+    return map[string]bool{"processed": true}
+}
+
+// Rust - detected by 'fn', 'let mut', 'println!'
+fn process_data(input: &str) -> std::collections::HashMap<String, bool> {
+    println!("Processing: {}", input);
+    let mut result = std::collections::HashMap::new();
+    result.insert("processed".to_string(), true);
+    result
+}
+```
+
+### Execution Context
+
+#### Available Variables
+Every sandbox execution has access to:
+```javascript
+{
+  // Flow variables from initial execution input
+  variables: {
+    userId: "user-123",
+    environmentType: "production"
+  },
+  
+  // Outputs from previous steps
+  stepOutputs: {
+    "fetch-data": { users: [{ id: 1, name: "John" }] },
+    "validate-input": { isValid: true }
+  },
+  
+  // Execution metadata
+  meta: {
+    orgId: "org-123",
+    userId: "user-456", 
+    flowId: "flow-789",
+    stepId: "current-step",
+    executionId: "exec-abc",
+    timestamp: "2025-01-01T00:00:00Z"
+  },
+  
+  // Utility functions
+  utils: {
+    log: (message, data) => ({ type: 'log', message, data, timestamp: '...' }),
+    error: (message, data) => ({ type: 'error', message, data, timestamp: '...' }),
+    warn: (message, data) => ({ type: 'warn', message, data, timestamp: '...' })
+  }
+}
+```
+
+#### Example Usage in Code
+```javascript
+// Access flow variables
+const environmentType = context.variables.environmentType;
+
+// Use previous step outputs
+const users = context.stepOutputs['fetch-users'].data;
+
+// Log execution info
+context.utils.log('Starting data processing', { userCount: users.length });
+
+// Process data
+const activeUsers = users.filter(user => {
+  if (user.active) {
+    context.utils.log('Processing active user', { userId: user.id });
+    return true;
+  }
+  return false;
+});
+
+// Return result
+return {
+  processedUsers: activeUsers,
+  summary: {
+    total: users.length,
+    active: activeUsers.length,
+    processedAt: context.meta.timestamp
+  }
+};
+```
+
+### Enhanced Step Types
+
+#### Secure Data Transformation
+The `data_transform` step type now uses sandbox execution by default:
+
+```json
+{
+  "id": "transform-user-data",
+  "type": "data_transform", 
+  "name": "Transform User Data",
+  "config": {
+    "script": "return input.users.map(user => ({ ...user, displayName: `${user.firstName} ${user.lastName}` }));",
+    "useSandbox": true
+  }
+}
+```
+
+#### Secure Conditional Logic
+The `conditional` step type supports sandbox execution for complex conditions:
+
+```json
+{
+  "id": "check-business-rules",
+  "type": "conditional",
+  "name": "Check Business Rules", 
+  "config": {
+    "condition": "context.variables.userRole === 'admin' && context.stepOutputs.validation.score > 0.8",
+    "useSandbox": true
+  }
+}
+```
+
+### Error Handling & Monitoring
+
+#### Execution Results
+All sandbox executions return detailed results:
+```typescript
+interface SandboxExecutionResult {
+  success: boolean;
+  output?: any;
+  error?: {
+    message: string;
+    code?: string;
+    stack?: string;
+  };
+  executionTime: number;
+  sessionId?: string; // For async executions
+}
+```
+
+#### Structured Logging
+Comprehensive logging with execution context:
+```json
+{
+  "level": "info",
+  "time": "2025-01-01T00:00:00.000Z",
+  "msg": "Synchronous sandbox execution completed successfully",
+  "orgId": "org-123",
+  "userId": "user-456",
+  "flowId": "flow-789", 
+  "stepId": "data-transform",
+  "executionId": "exec-abc",
+  "executionTime": 1250,
+  "mode": "sync"
+}
+```
+
+#### Error Scenarios
+- **Syntax Errors**: Invalid code syntax
+- **Runtime Errors**: Exceptions during execution  
+- **Timeout Errors**: Execution exceeds time limits
+- **Network Errors**: Daytona API connectivity issues
+- **Resource Errors**: Insufficient sandbox resources
+
+### Performance & Scaling
+
+#### Execution Modes
+- **Sync Mode**: Best for quick transformations (< 30 seconds)
+- **Async Mode**: Ideal for long-running processes (up to 5 minutes)
+- **Polling Strategy**: Configurable poll intervals for async completion
+
+#### Timeout Configuration
+```typescript
+// Sync execution timeout
+DAYTONA_SYNC_TIMEOUT=30000 // 30 seconds
+
+// Async execution timeout  
+DAYTONA_ASYNC_TIMEOUT=300000 // 5 minutes
+
+// Custom timeouts in step config
+{
+  "config": {
+    "code": "...",
+    "pollInterval": 2000,      // Poll every 2 seconds
+    "maxPollAttempts": 150     // Max 5 minutes (150 * 2s)
+  }
+}
+```
+
+### Security Considerations
+
+#### Sandbox Isolation
+- Code runs in isolated Daytona containers
+- No access to host system or network
+- Limited execution time and resources
+- Automatic cleanup after execution
+
+#### Data Security
+- Sensitive data masked in logs
+- Organization-based execution context isolation
+- Secure credential handling through context injection
+- No persistent data storage in sandboxes
+
+#### Best Practices
+- Use sandbox execution for all user-provided code
+- Set appropriate timeout limits
+- Monitor execution resources and performance
+- Implement proper error handling and logging
+- Validate input data before sandbox execution
+
+### Development & Testing
+
+#### Local Development
+```bash
+# Enable Daytona integration (requires API key)
+DAYTONA_API_KEY=your_test_key_here
+DAYTONA_BASE_URL=https://api.daytona.dev
+
+# Run with sandbox execution
+npm run start:dev
+```
+
+#### Testing Sandbox Integration
+```bash
+# Run sandbox service tests
+npm test src/sandbox/sandbox.service.spec.ts
+
+# Run flow executor integration tests
+npm test src/flows/flow-executor-sandbox.integration.spec.ts
+```
+
+#### Mock Development
+When Daytona API is unavailable, the implementation includes comprehensive mocks:
+- Simulated API responses with realistic delays
+- Error scenario testing
+- Language detection validation
+- Async execution simulation
+
+### Troubleshooting
+
+#### Common Issues
+1. **API Key Invalid**: Verify `DAYTONA_API_KEY` is correct
+2. **Network Timeout**: Check `DAYTONA_BASE_URL` and connectivity
+3. **Execution Timeout**: Increase timeout values or optimize code
+4. **Memory Errors**: Reduce data size or use async mode
+5. **Language Detection**: Manually specify language in step config
+
+#### Health Check
+```bash
+# Check sandbox service status
+curl http://localhost:3000/health
+
+# Sandbox health info (if health endpoint includes it)
+{
+  "sandboxService": {
+    "configured": true,
+    "apiKeyPresent": true,
+    "baseUrl": "https://api.daytona.dev",
+    "syncTimeout": 30000,
+    "asyncTimeout": 300000
+  }
+}
+```
+
 ### Setting Up AWS Secrets Manager
 
 #### 1. Create Secret in AWS
