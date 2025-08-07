@@ -6,7 +6,6 @@ import { CreateWebhookDto } from './dto/create-webhook.dto';
 
 describe('WebhooksService', () => {
   let service: WebhooksService;
-  let prisma: PrismaService;
 
   const mockPrisma = {
     webhook: {
@@ -49,7 +48,6 @@ describe('WebhooksService', () => {
     }).compile();
 
     service = module.get(WebhooksService);
-    prisma = module.get(PrismaService);
 
     // Reset all mocks before each test
     jest.clearAllMocks();

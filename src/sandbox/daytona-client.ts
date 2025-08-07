@@ -1,9 +1,8 @@
-import { Injectable, Inject, Optional } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AwsSecretsService } from '../aws-secrets.service';
 import {
   DaytonaClient,
-  DaytonaClientConfig,
   DaytonaRunRequest,
   DaytonaRunResponse,
   DaytonaSessionRequest,
@@ -61,14 +60,14 @@ export class DaytonaClientImpl implements DaytonaClient {
           this.baseUrl = await this.awsSecretsService.getDaytonaBaseUrl();
           this.timeout = parseInt(await this.awsSecretsService.getDaytonaSyncTimeout(), 10);
           // console.log('Loaded Daytona config from AWS Secrets Manager');
-        } catch (error) {
+        } catch {
           // Fall back to environment variables if AWS secrets are not available
           // console.log('Falling back to environment variables for Daytona config');
         }
       }
 
       this.configInitialized = true;
-    } catch (error) {
+    } catch {
       // If all else fails, keep the defaults from environment variables
       this.configInitialized = true;
     }
@@ -207,8 +206,6 @@ export class DaytonaClientImpl implements DaytonaClient {
   }
 
   private async makeApiRequest(endpoint: string, options: RequestInit): Promise<Response> {
-    const url = `${this.baseUrl}${endpoint}`;
-
     const defaultHeaders = {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${this.apiKey}`,
@@ -231,7 +228,7 @@ export class DaytonaClientImpl implements DaytonaClient {
    * Simulate Daytona API responses for development and testing
    * This should be removed when integrating with the real Daytona API
    */
-  private async simulateApiResponse(endpoint: string, options: RequestInit): Promise<Response> {
+  private async simulateApiResponse(endpoint: string, _options: RequestInit): Promise<Response> {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 400));
 

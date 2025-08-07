@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { PinoLogger } from 'nestjs-pino';
 import { Redis } from '@upstash/redis';
 import { RedisCacheService } from './redis-cache.service';
 import { AwsSecretsService } from '../aws-secrets.service';

@@ -1,5 +1,5 @@
 import { Injectable, NestMiddleware, BadRequestException } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { randomUUID } from 'crypto';
 import { RequestWithTenant } from '../interfaces/tenant-context.interface';
 

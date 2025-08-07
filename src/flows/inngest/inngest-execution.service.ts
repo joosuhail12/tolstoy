@@ -60,7 +60,7 @@ export class InngestExecutionService {
     const steps = this.parseFlowSteps(flow.steps);
 
     // Create execution log
-    const executionLog = await this.prisma.executionLog.create({
+    await this.prisma.executionLog.create({
       data: {
         id: executionId,
         flowId,

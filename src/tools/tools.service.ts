@@ -55,7 +55,7 @@ export class ToolsService {
   }
 
   async update(id: string, updateToolDto: UpdateToolDto, tenant: TenantContext): Promise<Tool> {
-    const tool = await this.findOne(id, tenant);
+    await this.findOne(id, tenant);
 
     try {
       return await this.prisma.tool.update({
@@ -71,7 +71,7 @@ export class ToolsService {
   }
 
   async remove(id: string, tenant: TenantContext): Promise<Tool> {
-    const tool = await this.findOne(id, tenant);
+    await this.findOne(id, tenant);
 
     try {
       return await this.prisma.tool.delete({

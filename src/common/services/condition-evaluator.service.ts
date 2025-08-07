@@ -258,13 +258,13 @@ export class ConditionEvaluatorService {
     switch (operator) {
       case '==':
       case 'equals':
-        return fieldValue == value;
+        return fieldValue === value;
       case '===':
       case 'strictEquals':
         return fieldValue === value;
       case '!=':
       case 'notEquals':
-        return fieldValue != value;
+        return fieldValue !== value;
       case '!==':
       case 'strictNotEquals':
         return fieldValue !== value;
@@ -385,10 +385,7 @@ export class ConditionEvaluatorService {
   /**
    * Custom DSL: Time window evaluation
    */
-  private evaluateTimeWindow(config: any, context: ConditionContext): boolean {
-    const { start, end, timezone = 'UTC' } = config;
-    const now = new Date();
-
+  private evaluateTimeWindow(_config: any, _context: ConditionContext): boolean {
     // Implementation would depend on specific time window logic
     // This is a placeholder for custom time-based conditions
     return true;
@@ -397,8 +394,7 @@ export class ConditionEvaluatorService {
   /**
    * Custom DSL: User role evaluation
    */
-  private evaluateUserRole(config: any, context: ConditionContext): boolean {
-    const { roles } = config;
+  private evaluateUserRole(_config: any, _context: ConditionContext): boolean {
     // This would integrate with your user role system
     // Placeholder implementation
     return true;

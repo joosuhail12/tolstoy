@@ -1,6 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConfigService } from '@nestjs/config';
-import { PinoLogger } from 'nestjs-pino';
 import { ExecuteFlowHandler } from './execute-flow.handler';
 import { SandboxService } from '../../sandbox/sandbox.service';
 import { SecretsResolver } from '../../secrets/secrets-resolver.service';
@@ -20,7 +18,7 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
   let mockLogger: any;
 
   const mockStep = {
-    run: jest.fn().mockImplementation(async (name, fn, config) => {
+    run: jest.fn().mockImplementation(async (name, fn, _config) => {
       // Simulate step execution with config
       return await fn();
     }),
@@ -407,10 +405,8 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
   describe('Retry Logic with Throttling', () => {
     it('should log retry attempts with throttling information', async () => {
       // Mock step execution to fail first time, succeed second time
-      let attemptCount = 0;
       mockSandboxService.runSync
         .mockImplementationOnce(() => {
-          attemptCount++;
           return Promise.resolve({
             success: false,
             error: { message: 'Temporary failure', code: 'TEMP_FAIL' },
@@ -418,7 +414,6 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
           });
         })
         .mockImplementationOnce(() => {
-          attemptCount++;
           return Promise.resolve({
             success: true,
             output: { result: 'success-after-retry' },

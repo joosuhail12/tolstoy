@@ -11,7 +11,7 @@ import {
 } from '../../common/services/condition-evaluator.service';
 import { PrismaService } from '../../prisma.service';
 
-interface FlowExecutionEvent {
+export interface FlowExecutionEvent {
   data: {
     orgId: string;
     userId: string;
@@ -361,8 +361,6 @@ export class ExecuteFlowHandler {
     });
 
     // Calculate overall flow metrics with throttling insights
-    const flowEndTime = Date.now();
-    const totalFlowExecutionTime = flowEndTime - Date.now(); // This would need flow start time
 
     this.logger.info(
       {
@@ -800,7 +798,7 @@ export class ExecuteFlowHandler {
     }
   }
 
-  private async executeHttpRequest(step: any, context: any): Promise<StepExecutionResult> {
+  private async executeHttpRequest(step: any, _context: any): Promise<StepExecutionResult> {
     const { url, method = 'GET', headers = {}, body } = step.config;
 
     try {
@@ -848,7 +846,7 @@ export class ExecuteFlowHandler {
     }
   }
 
-  private async executeDelay(step: any, context: any): Promise<StepExecutionResult> {
+  private async executeDelay(step: any, _context: any): Promise<StepExecutionResult> {
     const { delayMs } = step.config;
 
     await new Promise(resolve => setTimeout(resolve, delayMs));

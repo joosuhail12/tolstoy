@@ -1,5 +1,4 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PinoLogger } from 'nestjs-pino';
 import { Flow } from '@prisma/client';
 import { FlowsService } from './flows.service';
 import { PrismaService } from '../prisma.service';

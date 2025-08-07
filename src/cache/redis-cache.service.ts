@@ -65,7 +65,7 @@ export class RedisCacheService {
           'UPSTASH_REDIS_REST_TOKEN',
         );
         this.logger.info('Retrieved Redis credentials from AWS Secrets Manager');
-      } catch (error) {
+      } catch {
         // Fallback to environment variables
         redisUrl = this.configService.get('UPSTASH_REDIS_REST_URL');
         redisToken = this.configService.get('UPSTASH_REDIS_REST_TOKEN');

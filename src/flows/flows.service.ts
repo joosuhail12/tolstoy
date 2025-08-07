@@ -143,7 +143,7 @@ export class FlowsService {
   }
 
   async update(id: string, updateFlowDto: UpdateFlowDto, tenant: TenantContext): Promise<Flow> {
-    const flow = await this.findOne(id, tenant);
+    await this.findOne(id, tenant);
 
     try {
       const updatedFlow = await this.prisma.flow.update({
@@ -173,7 +173,7 @@ export class FlowsService {
   }
 
   async remove(id: string, tenant: TenantContext): Promise<Flow> {
-    const flow = await this.findOne(id, tenant);
+    await this.findOne(id, tenant);
 
     try {
       const deletedFlow = await this.prisma.flow.delete({

@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, Logger, Optional } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { DaytonaClientImpl } from './daytona-client';
@@ -467,7 +467,7 @@ export class SandboxService {
         const timeout = await this.awsSecretsService.getDaytonaSyncTimeout();
         return parseInt(timeout, 10);
       }
-    } catch (error) {
+    } catch {
       // Fall back to environment variable
     }
     return this.configService.get('DAYTONA_SYNC_TIMEOUT') || 30000;
@@ -480,7 +480,7 @@ export class SandboxService {
         const timeout = await this.awsSecretsService.getDaytonaAsyncTimeout();
         return parseInt(timeout, 10);
       }
-    } catch (error) {
+    } catch {
       // Fall back to environment variable
     }
     return this.configService.get('DAYTONA_ASYNC_TIMEOUT') || 300000;

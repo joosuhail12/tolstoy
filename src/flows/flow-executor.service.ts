@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { Flow, ExecutionLog } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
-import { AblyService, FlowStepEvent, FlowExecutionEvent } from '../ably/ably.service';
+import { AblyService } from '../ably/ably.service';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { SecretsResolver } from '../secrets/secrets-resolver.service';
 import { OAuthTokenService } from '../oauth/oauth-token.service';
@@ -409,7 +409,7 @@ export class FlowExecutorService {
 
   private async executeHttpRequest(
     step: FlowStep,
-    context: FlowExecutionContext,
+    _context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     const { url, method = 'GET', headers = {}, body } = step.config;
 
@@ -513,8 +513,8 @@ export class FlowExecutorService {
   }
 
   private async executeWebhook(
-    step: FlowStep,
-    context: FlowExecutionContext,
+    _step: FlowStep,
+    _context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     return {
       success: true,
@@ -1029,7 +1029,7 @@ export class FlowExecutorService {
 
   private async executeDelay(
     step: FlowStep,
-    context: FlowExecutionContext,
+    _context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     const { delayMs } = step.config;
 
@@ -1203,7 +1203,7 @@ export class FlowExecutorService {
     executionId: string,
     status: string,
     output: any,
-    error?: string,
+    _error?: string,
   ): Promise<ExecutionLog> {
     return this.prisma.executionLog.update({
       where: { id: executionId },

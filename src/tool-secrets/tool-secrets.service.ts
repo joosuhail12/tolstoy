@@ -201,8 +201,6 @@ export class ToolSecretsService {
     }
 
     try {
-      let credentials: ToolCredentials;
-
       if (maskValues) {
         // For masked values, try to get from cache first
         const credentialsCacheKey = CacheKeys.toolCredentials(orgId, toolId);
@@ -226,7 +224,7 @@ export class ToolSecretsService {
       }
 
       // Fetch from AWS Secrets Manager
-      credentials = await this.awsSecrets.getSecretAsJson((tool as any).secretName);
+      const credentials = await this.awsSecrets.getSecretAsJson((tool as any).secretName);
       const maskedCredentials = this.maskCredentials(credentials);
 
       // Cache the masked credentials metadata

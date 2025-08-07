@@ -7,14 +7,11 @@ import { SecretsResolver } from '../secrets/secrets-resolver.service';
 import { OAuthTokenService } from '../oauth/oauth-token.service';
 import { InputValidatorService } from '../common/services/input-validator.service';
 import { ConditionEvaluatorService } from '../common/services/condition-evaluator.service';
-import { PinoLogger } from 'nestjs-pino';
 
 describe('FlowExecutorService - Sandbox Integration', () => {
   let flowExecutorService: FlowExecutorService;
   let sandboxService: any;
-  let prismaService: any;
   let ablyService: any;
-  let logger: any;
 
   const mockContext: FlowExecutionContext = {
     executionId: 'exec-123',
@@ -92,9 +89,7 @@ describe('FlowExecutorService - Sandbox Integration', () => {
 
     flowExecutorService = module.get(FlowExecutorService);
     sandboxService = module.get(SandboxService);
-    prismaService = module.get(PrismaService);
     ablyService = module.get(AblyService);
-    logger = module.get(`PinoLogger:${FlowExecutorService.name}`);
 
     // Default mock implementations
     ablyService.createStepEvent.mockResolvedValue({} as any);

@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { InternalServerErrorException } from '@nestjs/common';
-import { PinoLogger } from 'nestjs-pino';
 import { SandboxService, SandboxExecutionContext } from './sandbox.service';
 import { DaytonaClientImpl } from './daytona-client';
 
@@ -143,7 +142,7 @@ describe('SandboxService', () => {
       });
 
       // Create new service instance to trigger initialization
-      const testModule = Test.createTestingModule({
+      Test.createTestingModule({
         providers: [
           SandboxService,
           { provide: ConfigService, useValue: configService },

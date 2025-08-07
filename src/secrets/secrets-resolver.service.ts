@@ -120,7 +120,6 @@ export class SecretsResolver {
   }
 
   async updateOAuthTokens(toolName: string, orgId: string, tokens: OAuthTokens): Promise<void> {
-    const secretId = this.buildToolSecretId(toolName, orgId);
     const cacheKey = CacheKeys.secrets(orgId, toolName);
 
     try {
@@ -130,7 +129,7 @@ export class SecretsResolver {
 
       try {
         existingCredentials = await this.getToolCredentials(toolName, orgId);
-      } catch (error) {
+      } catch {
         this.logger.debug({ toolName, orgId }, 'No existing credentials found, creating new');
       }
 
@@ -193,7 +192,7 @@ export class SecretsResolver {
 
     try {
       existingCredentials = await this.getToolCredentials(toolName, orgId);
-    } catch (error) {
+    } catch {
       this.logger.debug(
         { toolName, orgId },
         'No existing credentials found for token access, creating new',
@@ -220,7 +219,6 @@ export class SecretsResolver {
   }
 
   async deleteToolCredentials(toolName: string, orgId: string): Promise<void> {
-    const secretId = this.buildToolSecretId(toolName, orgId);
     const cacheKey = CacheKeys.secrets(orgId, toolName);
 
     try {

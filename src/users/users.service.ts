@@ -57,7 +57,7 @@ export class UsersService {
   }
 
   async update(id: string, updateUserDto: UpdateUserDto, tenant: TenantContext): Promise<User> {
-    const user = await this.findOne(id, tenant);
+    await this.findOne(id, tenant);
 
     try {
       return await this.prisma.user.update({
@@ -73,7 +73,7 @@ export class UsersService {
   }
 
   async remove(id: string, tenant: TenantContext): Promise<User> {
-    const user = await this.findOne(id, tenant);
+    await this.findOne(id, tenant);
 
     try {
       return await this.prisma.user.delete({

@@ -6,28 +6,9 @@ import { AblyService } from '../../ably/ably.service';
 import { InputValidatorService } from '../../common/services/input-validator.service';
 import { ConditionEvaluatorService } from '../../common/services/condition-evaluator.service';
 import { PrismaService } from '../../prisma.service';
-import { PinoLogger } from 'nestjs-pino';
 
 describe('ExecuteFlowHandler', () => {
   let handler: ExecuteFlowHandler;
-
-  const mockEvent = {
-    data: {
-      orgId: 'test-org-123',
-      userId: 'test-user-456',
-      flowId: 'test-flow-789',
-      executionId: 'exec_123456_abc123',
-      steps: [
-        {
-          id: 'step-1',
-          type: 'sandbox_sync',
-          name: 'Test Step',
-          config: { code: 'return "test";' },
-        },
-      ],
-      variables: { testVar: 'testValue' },
-    },
-  };
 
   beforeEach(async () => {
     const mockSandboxService = {

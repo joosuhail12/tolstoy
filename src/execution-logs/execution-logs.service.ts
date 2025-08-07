@@ -83,7 +83,7 @@ export class ExecutionLogsService {
     updateExecutionLogDto: UpdateExecutionLogDto,
     tenant: TenantContext,
   ): Promise<ExecutionLog> {
-    const executionLog = await this.findOne(id, tenant);
+    await this.findOne(id, tenant);
 
     // If flowId is being updated, verify the new flow belongs to the organization
     if (updateExecutionLogDto.flowId) {
@@ -110,7 +110,7 @@ export class ExecutionLogsService {
   }
 
   async remove(id: string, tenant: TenantContext): Promise<ExecutionLog> {
-    const executionLog = await this.findOne(id, tenant);
+    await this.findOne(id, tenant);
 
     try {
       return await this.prisma.executionLog.delete({

@@ -3,7 +3,6 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ToolSecretsService, ToolCredentials } from './tool-secrets.service';
 import { PrismaService } from '../prisma.service';
 import { AwsSecretsService } from '../aws-secrets.service';
-import { PinoLogger } from 'nestjs-pino';
 
 describe('ToolSecretsService', () => {
   let service: ToolSecretsService;

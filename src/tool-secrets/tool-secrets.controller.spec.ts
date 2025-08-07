@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ToolSecretsController, ToolSecretsListController } from './tool-secrets.controller';
 import { ToolSecretsService } from './tool-secrets.service';
-import { PinoLogger } from 'nestjs-pino';
 
 describe('ToolSecretsController', () => {
   let controller: ToolSecretsController;

@@ -2,13 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { InngestExecutionService } from './inngest-execution.service';
 import { InngestService } from 'nestjs-inngest';
 import { PrismaService } from '../../prisma.service';
-import { PinoLogger } from 'nestjs-pino';
 
 describe('InngestExecutionService', () => {
   let service: InngestExecutionService;
   let inngestService: InngestService;
   let prismaService: PrismaService;
-  let logger: PinoLogger;
 
   const mockTenant = {
     orgId: 'test-org-123',
@@ -86,7 +84,6 @@ describe('InngestExecutionService', () => {
     service = module.get(InngestExecutionService);
     inngestService = module.get(InngestService);
     prismaService = module.get(PrismaService);
-    logger = module.get(`PinoLogger:${InngestExecutionService.name}`);
   });
 
   afterEach(() => {

@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
 import { ConditionEvaluatorService, ConditionContext } from './condition-evaluator.service';
-import { PinoLogger } from 'nestjs-pino';
 
 describe('ConditionEvaluatorService', () => {
   let service: ConditionEvaluatorService;
