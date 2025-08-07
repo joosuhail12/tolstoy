@@ -6,6 +6,7 @@ import { AblyService } from '../ably/ably.service';
 import { SecretsResolver } from '../secrets/secrets-resolver.service';
 import { OAuthTokenService } from '../oauth/oauth-token.service';
 import { InputValidatorService } from '../common/services/input-validator.service';
+import { ConditionEvaluatorService } from '../common/services/condition-evaluator.service';
 import { PinoLogger } from 'nestjs-pino';
 
 describe('FlowExecutorService - Sandbox Integration', () => {
@@ -62,6 +63,11 @@ describe('FlowExecutorService - Sandbox Integration', () => {
     const mockSecretsResolver = {};
     const mockOAuthTokenService = {};
     const mockInputValidatorService = {};
+    const mockConditionEvaluatorService = {
+      evaluate: jest.fn().mockReturnValue(true),
+      validateRule: jest.fn().mockReturnValue({ valid: true }),
+      getAvailableVariables: jest.fn().mockReturnValue([]),
+    };
 
     const mockLogger = {
       info: jest.fn(),
@@ -79,6 +85,7 @@ describe('FlowExecutorService - Sandbox Integration', () => {
         { provide: SecretsResolver, useValue: mockSecretsResolver },
         { provide: OAuthTokenService, useValue: mockOAuthTokenService },
         { provide: InputValidatorService, useValue: mockInputValidatorService },
+        { provide: ConditionEvaluatorService, useValue: mockConditionEvaluatorService },
         { provide: `PinoLogger:${FlowExecutorService.name}`, useValue: mockLogger },
       ],
     }).compile();

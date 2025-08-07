@@ -19,6 +19,8 @@ export interface FlowStepEvent {
     stack?: string;
   };
   duration?: number;
+  skipReason?: string; // Reason for skipping the step
+  executeIf?: any; // The condition that caused the skip
   metadata?: {
     [key: string]: any;
   };
@@ -33,6 +35,7 @@ export interface FlowExecutionEvent {
   totalSteps?: number;
   completedSteps?: number;
   failedSteps?: number;
+  skippedSteps?: number;
   duration?: number;
   output?: any;
   error?: {
@@ -240,6 +243,8 @@ export class AblyService implements OnModuleDestroy {
       output?: any;
       error?: { message: string; code?: string; stack?: string };
       duration?: number;
+      skipReason?: string;
+      executeIf?: any;
       metadata?: { [key: string]: any };
     } = {}
   ): Promise<FlowStepEvent> {
@@ -263,6 +268,7 @@ export class AblyService implements OnModuleDestroy {
       totalSteps?: number;
       completedSteps?: number;
       failedSteps?: number;
+      skippedSteps?: number;
       duration?: number;
       output?: any;
       error?: { message: string; code?: string };

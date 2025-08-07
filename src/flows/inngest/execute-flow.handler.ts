@@ -5,6 +5,7 @@ import { SandboxService, SandboxExecutionContext } from '../../sandbox/sandbox.s
 import { SecretsResolver } from '../../secrets/secrets-resolver.service';
 import { AblyService } from '../../ably/ably.service';
 import { InputValidatorService } from '../../common/services/input-validator.service';
+import { ConditionEvaluatorService, ConditionContext } from '../../common/services/condition-evaluator.service';
 import { PrismaService } from '../../prisma.service';
 
 interface FlowExecutionEvent {
@@ -26,6 +27,7 @@ interface FlowExecutionEvent {
 
 interface StepExecutionResult {
   success: boolean;
+  skipped?: boolean; // New field to indicate if step was skipped due to executeIf condition
   output?: any;
   error?: {
     message: string;
@@ -34,6 +36,7 @@ interface StepExecutionResult {
   };
   metadata?: {
     duration: number;
+    skipReason?: string; // Reason for skipping the step
     [key: string]: any;
   };
 }
@@ -51,6 +54,7 @@ export class ExecuteFlowHandler {
     private readonly secretsResolver: SecretsResolver,
     private readonly ablyService: AblyService,
     private readonly inputValidator: InputValidatorService,
+    private readonly conditionEvaluator: ConditionEvaluatorService,
     private readonly prisma: PrismaService,
     @InjectPinoLogger(ExecuteFlowHandler.name)
     private readonly logger: PinoLogger,
@@ -120,7 +124,38 @@ export class ExecuteFlowHandler {
           }
         );
 
-        if (stepResult.success) {
+        if (stepResult.skipped) {
+          // Handle skipped steps
+          this.logger.info({
+            stepId: flowStep.id,
+            stepType: flowStep.type,
+            executionId,
+            duration: stepResult.metadata?.duration,
+            skipReason: stepResult.metadata?.skipReason,
+          }, 'Step skipped in durable workflow');
+
+          // Publish step skipped event
+          await step.run(`publish-step-skipped-${flowStep.id}`, async () => {
+            await this.ablyService.publishStepEvent({
+              stepId: flowStep.id,
+              status: 'skipped',
+              timestamp: new Date().toISOString(),
+              executionId,
+              orgId,
+              flowId,
+              stepName: flowStep.name,
+              duration: stepResult.metadata?.duration,
+              metadata: {
+                skipReason: stepResult.metadata?.skipReason,
+                executeIf: flowStep.executeIf,
+              },
+            });
+          });
+
+          // Skipped steps don't contribute output but don't fail the flow
+          continue;
+
+        } else if (stepResult.success) {
           stepOutputs[flowStep.id] = stepResult.output;
           completedSteps++;
 
@@ -269,6 +304,65 @@ export class ExecuteFlowHandler {
     }
   ): Promise<StepExecutionResult> {
     const startTime = Date.now();
+
+    // Check executeIf condition before executing the step
+    if (step.executeIf) {
+      try {
+        const conditionContext: ConditionContext = {
+          inputs: context.variables,
+          variables: context.variables,
+          stepOutputs: context.stepOutputs,
+          currentStep: step,
+          orgId: context.orgId,
+          userId: context.userId,
+          meta: {
+            flowId: context.flowId,
+            executionId: context.executionId,
+            stepId: step.id,
+          },
+        };
+
+        const shouldExecute = this.conditionEvaluator.evaluate(step.executeIf, conditionContext);
+        
+        if (!shouldExecute) {
+          const duration = Date.now() - startTime;
+          const skipReason = 'executeIf condition evaluated to false';
+          
+          this.logger.info({ 
+            stepId: step.id, 
+            stepType: step.type, 
+            flowId: context.flowId, 
+            executionId: context.executionId,
+            executeIf: step.executeIf,
+            skipReason 
+          }, 'Step skipped due to executeIf condition in durable workflow');
+          
+          return {
+            success: true,
+            skipped: true,
+            metadata: {
+              duration,
+              skipReason,
+              stepType: step.type,
+              stepId: step.id,
+              timestamp: new Date().toISOString(),
+            }
+          };
+        }
+        
+      } catch (error) {
+        this.logger.error({ 
+          stepId: step.id, 
+          stepType: step.type, 
+          flowId: context.flowId, 
+          executionId: context.executionId,
+          executeIf: step.executeIf,
+          error: error.message 
+        }, 'Failed to evaluate executeIf condition in durable workflow, proceeding with step execution');
+        
+        // If condition evaluation fails, proceed with step execution to be safe
+      }
+    }
 
     try {
       let result: StepExecutionResult;

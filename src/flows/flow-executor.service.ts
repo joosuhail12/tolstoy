@@ -7,6 +7,7 @@ import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { SecretsResolver } from '../secrets/secrets-resolver.service';
 import { OAuthTokenService } from '../oauth/oauth-token.service';
 import { InputValidatorService } from '../common/services/input-validator.service';
+import { ConditionEvaluatorService, ConditionContext } from '../common/services/condition-evaluator.service';
 import { SandboxService, SandboxExecutionContext } from '../sandbox/sandbox.service';
 
 export interface FlowStep {
@@ -14,6 +15,7 @@ export interface FlowStep {
   type: string;
   name: string;
   config: any;
+  executeIf?: any; // JSONLogic rule or condition for conditional execution
   dependsOn?: string[];
   retryPolicy?: {
     maxRetries: number;
@@ -34,6 +36,7 @@ export interface FlowExecutionContext {
 
 export interface StepExecutionResult {
   success: boolean;
+  skipped?: boolean; // New field to indicate if step was skipped due to executeIf condition
   output?: any;
   error?: {
     message: string;
@@ -43,6 +46,7 @@ export interface StepExecutionResult {
   metadata?: {
     duration: number;
     retryAttempt?: number;
+    skipReason?: string; // Reason for skipping the step
     [key: string]: any;
   };
 }
@@ -55,6 +59,7 @@ export class FlowExecutorService {
     private readonly secretsResolver: SecretsResolver,
     private readonly oauthService: OAuthTokenService,
     private readonly inputValidator: InputValidatorService,
+    private readonly conditionEvaluator: ConditionEvaluatorService,
     private readonly sandboxService: SandboxService,
     @InjectPinoLogger(FlowExecutorService.name)
     private readonly logger: PinoLogger,
@@ -104,11 +109,25 @@ export class FlowExecutorService {
     let executionError: { message: string; code?: string } | undefined;
     let completedSteps = 0;
     let failedSteps = 0;
+    let skippedSteps = 0;
 
     try {
       for (const step of steps) {
         try {
           const stepResult = await this.executeStep(step, executionContext);
+          
+          if (stepResult.skipped) {
+            skippedSteps++;
+            this.logger.info({ 
+              stepId: step.id, 
+              stepType: step.type, 
+              flowId: flowId, 
+              executionId: executionId,
+              skipReason: stepResult.metadata?.skipReason 
+            }, 'Step skipped due to executeIf condition');
+            // Skipped steps don't contribute output but don't fail the flow
+            continue;
+          }
           
           if (stepResult.success) {
             completedSteps++;
@@ -149,6 +168,7 @@ export class FlowExecutorService {
           totalSteps: steps.length,
           completedSteps,
           failedSteps,
+          skippedSteps,
           duration,
           output: executionContext.stepOutputs,
           error: executionError
@@ -167,6 +187,8 @@ export class FlowExecutorService {
         executionId,
         status: executionStatus,
         completedSteps,
+        failedSteps,
+        skippedSteps,
         totalSteps: steps.length,
         duration
       }, `Flow execution ${executionStatus}`);
@@ -184,6 +206,7 @@ export class FlowExecutorService {
           totalSteps: steps.length,
           completedSteps,
           failedSteps: failedSteps + 1,
+          skippedSteps,
           duration,
           error: { message: error.message, code: error.code || 'EXECUTION_ERROR' }
         }
@@ -206,6 +229,68 @@ export class FlowExecutorService {
     context: FlowExecutionContext
   ): Promise<StepExecutionResult> {
     const startTime = Date.now();
+    
+    // Check executeIf condition before executing the step
+    if (step.executeIf) {
+      try {
+        const conditionContext: ConditionContext = {
+          inputs: context.variables,
+          variables: context.variables,
+          stepOutputs: context.stepOutputs,
+          currentStep: step,
+          orgId: context.orgId,
+          userId: context.userId,
+          meta: {
+            flowId: context.flowId,
+            executionId: context.executionId,
+            stepId: step.id,
+          },
+        };
+
+        const shouldExecute = this.conditionEvaluator.evaluate(step.executeIf, conditionContext);
+        
+        if (!shouldExecute) {
+          const duration = Date.now() - startTime;
+          const skipReason = 'executeIf condition evaluated to false';
+          
+          this.logger.info({ 
+            stepId: step.id, 
+            stepType: step.type, 
+            flowId: context.flowId, 
+            executionId: context.executionId,
+            executeIf: step.executeIf,
+            skipReason 
+          }, 'Step skipped due to executeIf condition');
+          
+          // Publish step skipped event
+          await this.publishStepSkipped(step, context, skipReason);
+          
+          return {
+            success: true,
+            skipped: true,
+            metadata: {
+              duration,
+              skipReason,
+              stepType: step.type,
+              stepId: step.id,
+              timestamp: new Date().toISOString(),
+            }
+          };
+        }
+        
+      } catch (error) {
+        this.logger.error({ 
+          stepId: step.id, 
+          stepType: step.type, 
+          flowId: context.flowId, 
+          executionId: context.executionId,
+          executeIf: step.executeIf,
+          error: error.message 
+        }, 'Failed to evaluate executeIf condition, proceeding with step execution');
+        
+        // If condition evaluation fails, proceed with step execution to be safe
+      }
+    }
     
     await this.publishStepStarted(step, context);
     
@@ -956,6 +1041,27 @@ export class FlowExecutorService {
     await this.ablyService.publishStepEvent(event);
   }
 
+  private async publishStepSkipped(
+    step: FlowStep,
+    context: FlowExecutionContext,
+    skipReason: string
+  ): Promise<void> {
+    const event = await this.ablyService.createStepEvent(
+      step.id,
+      'skipped',
+      context.executionId,
+      context.orgId,
+      context.flowId,
+      {
+        stepName: step.name,
+        skipReason,
+        executeIf: step.executeIf,
+      }
+    );
+    
+    await this.ablyService.publishStepEvent(event);
+  }
+
   private async publishExecutionStarted(
     context: FlowExecutionContext,
     flow: Flow,
@@ -980,6 +1086,7 @@ export class FlowExecutorService {
       totalSteps: number;
       completedSteps: number;
       failedSteps: number;
+      skippedSteps?: number;
       duration: number;
       output?: any;
       error?: { message: string; code?: string };

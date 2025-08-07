@@ -4,6 +4,7 @@ import { SandboxService } from '../../sandbox/sandbox.service';
 import { SecretsResolver } from '../../secrets/secrets-resolver.service';
 import { AblyService } from '../../ably/ably.service';
 import { InputValidatorService } from '../../common/services/input-validator.service';
+import { ConditionEvaluatorService } from '../../common/services/condition-evaluator.service';
 import { PrismaService } from '../../prisma.service';
 import { PinoLogger } from 'nestjs-pino';
 
@@ -52,6 +53,12 @@ describe('ExecuteFlowHandler', () => {
       validate: jest.fn().mockReturnValue({ isValid: true }),
     };
 
+    const mockConditionEvaluator = {
+      evaluate: jest.fn().mockReturnValue(true),
+      validateRule: jest.fn().mockReturnValue({ valid: true }),
+      getAvailableVariables: jest.fn().mockReturnValue([]),
+    };
+
     const mockAblyService = {
       publishStepEvent: jest.fn().mockResolvedValue(undefined),
       publishExecutionEvent: jest.fn().mockResolvedValue(undefined),
@@ -78,6 +85,7 @@ describe('ExecuteFlowHandler', () => {
         { provide: SecretsResolver, useValue: mockSecretsResolver },
         { provide: AblyService, useValue: mockAblyService },
         { provide: InputValidatorService, useValue: mockInputValidator },
+        { provide: ConditionEvaluatorService, useValue: mockConditionEvaluator },
         { provide: PrismaService, useValue: mockPrismaService },
         {
           provide: `PinoLogger:${ExecuteFlowHandler.name}`,
