@@ -53,7 +53,7 @@ cat > tolstoy-secrets-policy.json << 'EOF'
         "secretsmanager:DescribeSecret"
       ],
       "Resource": [
-        "arn:aws:secretsmanager:*:*:secret:tolstoy-db-secret*"
+        "arn:aws:secretsmanager:*:*:secret:conductor-db-secret*"
       ]
     }
   ]

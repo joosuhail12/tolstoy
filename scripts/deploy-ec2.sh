@@ -11,7 +11,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 INSTANCE_TYPE="t3.medium"
-AMI_ID="ami-0e86e20dae90224b6"  # Ubuntu 22.04 LTS in us-east-1
+AMI_ID="ami-021589336d307b577"  # Ubuntu 22.04 LTS in us-east-1
 KEY_PAIR_NAME="tolstoy-key-pair"
 SECURITY_GROUP_NAME="tolstoy-sg"
 INSTANCE_NAME="tolstoy-ec2"

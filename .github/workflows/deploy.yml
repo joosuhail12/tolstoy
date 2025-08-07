@@ -1,0 +1,113 @@
+name: Tolstoy CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  deploy:
+    name: Deploy to EC2
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔑 Setup SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" | base64 -d > ssh_key.pem
+          chmod 600 ssh_key.pem
+          
+      - name: ✅ Test SSH connection
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH connection successful'"
+          
+      - name: 🚀 Deploy application to EC2
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'DEPLOY_SCRIPT'
+            set -e
+            
+            echo "🔄 Navigating to application directory..."
+            cd ${{ secrets.EC2_PATH }}
+            
+            echo "📥 Pulling latest code from GitHub..."
+            git pull origin main
+            
+            echo "📦 Installing dependencies..."
+            yarn install --production=false
+            
+            echo "⚙️ Generating Prisma client..."
+            yarn db:generate
+            
+            echo "🔨 Building application..."
+            yarn build
+            
+            echo "🔄 Restarting PM2 application..."
+            pm2 restart tolstoy-api || pm2 start ecosystem.config.js
+            
+            echo "📊 PM2 status..."
+            pm2 status
+            
+            echo "✅ Deployment completed successfully!"
+          DEPLOY_SCRIPT
+          
+      - name: 🗃️ Run database migrations (optional)
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'MIGRATION_SCRIPT'
+            set -e
+            cd ${{ secrets.EC2_PATH }}
+            
+            echo "🗃️ Running Prisma migrations..."
+            yarn db:migrate:deploy || echo "⚠️ No migrations to deploy or migration failed"
+            
+            echo "✅ Migration step completed!"
+          MIGRATION_SCRIPT
+          
+      - name: 🔍 Verify deployment
+        run: |
+          echo "🔍 Verifying application health..."
+          
+          # Wait a moment for the application to start
+          sleep 10
+          
+          # Test health endpoint
+          HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}/health)
+          
+          if [ "$HEALTH_CHECK" -eq 200 ]; then
+            echo "✅ Health check passed (HTTP $HEALTH_CHECK)"
+          else
+            echo "❌ Health check failed (HTTP $HEALTH_CHECK)"
+            exit 1
+          fi
+          
+          # Test status endpoint
+          STATUS_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}/status)
+          
+          if [ "$STATUS_CHECK" -eq 200 ]; then
+            echo "✅ Status check passed (HTTP $STATUS_CHECK)"
+          else
+            echo "❌ Status check failed (HTTP $STATUS_CHECK)"
+            exit 1
+          fi
+          
+          echo "🎉 Deployment verification successful!"
+          
+      - name: 🧹 Cleanup SSH key
+        if: always()
+        run: |
+          rm -f ssh_key.pem
+          echo "🧹 SSH key cleaned up"
+          
+      - name: 📢 Deployment summary
+        if: success()
+        run: |
+          echo "🎉 DEPLOYMENT SUCCESSFUL!"
+          echo "📊 Summary:"
+          echo "  • Repository: ${{ github.repository }}"
+          echo "  • Branch: ${{ github.ref_name }}"
+          echo "  • Commit: ${{ github.sha }}"
+          echo "  • Target: ${{ secrets.EC2_HOST }}"
+          echo "  • Health: http://${{ secrets.EC2_HOST }}/health"
+          echo "  • Status: http://${{ secrets.EC2_HOST }}/status"
