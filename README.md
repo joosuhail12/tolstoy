@@ -550,6 +550,159 @@ function verifyWebhookSignature(payload, signature, secret, timestamp) {
 }
 ```
 
+## 🔔 Webhook Dispatch via Inngest
+
+### Overview
+Tolstoy automatically dispatches HTTP POST requests to registered webhooks when flow and step events occur. Webhook dispatch uses Inngest for durability, retry logic, and reliable delivery.
+
+### Supported Event Types
+- **Flow Events**
+  - `flow.started` - When a flow execution begins
+  - `flow.completed` - When a flow execution completes successfully
+  - `flow.failed` - When a flow execution fails
+- **Step Events**
+  - `step.started` - When a step begins execution
+  - `step.completed` - When a step completes successfully
+  - `step.failed` - When a step fails
+  - `step.skipped` - When a step is skipped due to conditions
+- **Action Events**
+  - `action.executed` - When an action is executed
+  - `action.failed` - When an action execution fails
+- **Test Events**
+  - `webhook.test` - For webhook endpoint testing
+
+### Webhook Dispatch Workflow
+
+```mermaid
+graph LR
+    A[Flow Step Completes] --> B[Publish Ably Event]
+    B --> C[Queue Webhook Dispatch]
+    C --> D[Inngest Processing]
+    D --> E[Fetch Registered Webhooks]
+    E --> F[For Each Webhook]
+    F --> G[Create Signed Payload]
+    G --> H[HTTP POST with Retry]
+    H --> I[Success/Failure Logging]
+```
+
+### Dispatch Configuration
+- **Workflow**: `dispatch-webhook`
+- **Retries**: 5 attempts with exponential backoff
+- **Backoff Strategy**: 1s → 2s → 4s → 8s → 16s
+- **Timeout**: 30 seconds per request
+- **Signing**: HMAC-SHA256 via webhook `secret` field
+
+### Payload Structure
+Webhooks receive standardized payloads for all event types:
+
+```json
+{
+  "eventType": "step.completed",
+  "timestamp": 1234567890000,
+  "data": {
+    "orgId": "org-123",
+    "flowId": "flow-456",
+    "executionId": "exec-789",
+    "stepKey": "step-1",
+    "status": "completed",
+    "output": { "result": "success" },
+    "stepName": "API Call",
+    "duration": 1500
+  },
+  "metadata": {
+    "orgId": "org-123",
+    "webhookId": "webhook-123",
+    "deliveryId": "whd_1234567890_abc123"
+  }
+}
+```
+
+### Flow Completion Payload
+Flow events include additional execution metrics:
+
+```json
+{
+  "eventType": "flow.completed",
+  "timestamp": 1234567890000,
+  "data": {
+    "orgId": "org-123",
+    "flowId": "flow-456",
+    "executionId": "exec-789",
+    "status": "completed",
+    "totalSteps": 5,
+    "completedSteps": 5,
+    "failedSteps": 0,
+    "skippedSteps": 0,
+    "duration": 15000,
+    "output": { "finalResult": "success" }
+  },
+  "metadata": {
+    "orgId": "org-123",
+    "webhookId": "webhook-123",
+    "deliveryId": "whd_1234567890_abc123"
+  }
+}
+```
+
+### HTTP Headers
+All webhook requests include standardized headers:
+
+```http
+Content-Type: application/json
+x-webhook-event: step.completed
+x-webhook-timestamp: 1234567890000
+x-webhook-delivery: whd_1234567890_abc123
+x-webhook-signature: sha256=a1b2c3d4e5f6... (if secret configured)
+```
+
+### Signature Verification
+If a webhook has a `secret` configured, payloads are signed with HMAC-SHA256:
+
+```javascript
+// Example verification (Node.js)
+const crypto = require('crypto');
+
+function verifyWebhook(payload, signature, secret, timestamp) {
+  const payloadWithTimestamp = {
+    timestamp: parseInt(timestamp),
+    ...payload,
+  };
+  
+  const expectedSignature = 'sha256=' + 
+    crypto.createHmac('sha256', secret)
+      .update(JSON.stringify(payloadWithTimestamp))
+      .digest('hex');
+  
+  return crypto.timingSafeEqual(
+    Buffer.from(signature),
+    Buffer.from(expectedSignature)
+  );
+}
+```
+
+### Error Handling
+- **Network failures**: Automatic retry with exponential backoff
+- **4xx responses**: Logged as webhook endpoint errors, no retry
+- **5xx responses**: Retried up to 5 times
+- **Timeout failures**: Retried with exponential backoff
+- **Dispatch failures**: Logged but don't fail the original flow execution
+
+### Monitoring
+Webhook dispatch events are logged with structured data:
+
+```json
+{
+  "level": "info",
+  "msg": "Webhook delivered successfully",
+  "webhookId": "webhook-123",
+  "url": "https://api.example.com/webhook",
+  "statusCode": 200,
+  "deliveryId": "whd_1234567890_abc123",
+  "orgId": "org-123",
+  "eventType": "step.completed"
+}
+```
+
 ## 🛠️ Development Scripts
 
 ```bash

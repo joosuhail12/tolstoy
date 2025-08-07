@@ -1,6 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
-import { InngestFunction } from 'nestjs-inngest';
+import { InngestFunction, InngestService } from 'nestjs-inngest';
 import { SandboxService, SandboxExecutionContext } from '../../sandbox/sandbox.service';
 import { SecretsResolver } from '../../secrets/secrets-resolver.service';
 import { AblyService } from '../../ably/ably.service';
@@ -59,6 +59,7 @@ export class ExecuteFlowHandler {
     private readonly inputValidator: InputValidatorService,
     private readonly conditionEvaluator: ConditionEvaluatorService,
     private readonly prisma: PrismaService,
+    @Optional() private readonly inngestService: InngestService,
     @InjectPinoLogger(ExecuteFlowHandler.name)
     private readonly logger: PinoLogger,
   ) {}
@@ -1015,5 +1016,42 @@ export class ExecuteFlowHandler {
 
   private isStepCritical(step: any): boolean {
     return step.config?.critical !== false;
+  }
+
+  private async dispatchWebhook(eventType: string, payload: any): Promise<void> {
+    if (!this.inngestService) {
+      this.logger.debug('InngestService not available, skipping webhook dispatch');
+      return;
+    }
+
+    try {
+      await this.inngestService.send({
+        name: 'webhook.dispatch',
+        data: {
+          orgId: payload.orgId,
+          eventType,
+          payload,
+        },
+      });
+
+      this.logger.debug(
+        { 
+          eventType, 
+          orgId: payload.orgId, 
+          executionId: payload.executionId 
+        },
+        'Webhook dispatch event queued',
+      );
+    } catch (error) {
+      this.logger.error(
+        { 
+          eventType, 
+          orgId: payload.orgId, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        },
+        'Failed to queue webhook dispatch event',
+      );
+      // Don't throw error - webhook dispatch failure shouldn't fail the flow
+    }
   }
 }

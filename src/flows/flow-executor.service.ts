@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { Flow, ExecutionLog } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
@@ -12,6 +12,7 @@ import {
   ConditionContext,
 } from '../common/services/condition-evaluator.service';
 import { SandboxService, SandboxExecutionContext } from '../sandbox/sandbox.service';
+import { InngestService } from 'nestjs-inngest';
 
 export interface FlowStep {
   id: string;
@@ -64,6 +65,7 @@ export class FlowExecutorService {
     private readonly inputValidator: InputValidatorService,
     private readonly conditionEvaluator: ConditionEvaluatorService,
     private readonly sandboxService: SandboxService,
+    @Optional() private readonly inngestService: InngestService,
     @InjectPinoLogger(FlowExecutorService.name)
     private readonly logger: PinoLogger,
   ) {}
@@ -1073,6 +1075,18 @@ export class FlowExecutorService {
     );
 
     await this.ablyService.publishStepEvent(event);
+
+    // Dispatch webhook after Ably event
+    await this.dispatchWebhook('step.completed', {
+      orgId: context.orgId,
+      flowId: context.flowId,
+      executionId: context.executionId,
+      stepKey: step.id,
+      status: 'completed',
+      output: result.output,
+      stepName: step.name,
+      duration: result.metadata?.duration,
+    });
   }
 
   private async publishStepFailed(
@@ -1094,6 +1108,18 @@ export class FlowExecutorService {
     );
 
     await this.ablyService.publishStepEvent(event);
+
+    // Dispatch webhook after Ably event
+    await this.dispatchWebhook('step.failed', {
+      orgId: context.orgId,
+      flowId: context.flowId,
+      executionId: context.executionId,
+      stepKey: step.id,
+      status: 'failed',
+      error: result.error,
+      stepName: step.name,
+      duration: result.metadata?.duration,
+    });
   }
 
   private async publishStepSkipped(
@@ -1115,6 +1141,18 @@ export class FlowExecutorService {
     );
 
     await this.ablyService.publishStepEvent(event);
+
+    // Dispatch webhook after Ably event
+    await this.dispatchWebhook('step.skipped', {
+      orgId: context.orgId,
+      flowId: context.flowId,
+      executionId: context.executionId,
+      stepKey: step.id,
+      status: 'skipped',
+      stepName: step.name,
+      skipReason,
+      executeIf: step.executeIf,
+    });
   }
 
   private async publishExecutionStarted(
@@ -1156,6 +1194,22 @@ export class FlowExecutorService {
     );
 
     await this.ablyService.publishExecutionEvent(event);
+
+    // Dispatch webhook after Ably event
+    const eventType = status === 'completed' ? 'flow.completed' : 'flow.failed';
+    await this.dispatchWebhook(eventType, {
+      orgId: context.orgId,
+      flowId: context.flowId,
+      executionId: context.executionId,
+      status,
+      output: options.output,
+      error: options.error,
+      totalSteps: options.totalSteps,
+      completedSteps: options.completedSteps,
+      failedSteps: options.failedSteps,
+      skippedSteps: options.skippedSteps,
+      duration: options.duration,
+    });
   }
 
   private parseFlowSteps(stepsData: any): FlowStep[] {
@@ -1212,5 +1266,42 @@ export class FlowExecutorService {
         outputs: output,
       },
     });
+  }
+
+  private async dispatchWebhook(eventType: string, payload: any): Promise<void> {
+    if (!this.inngestService) {
+      this.logger.debug('InngestService not available, skipping webhook dispatch');
+      return;
+    }
+
+    try {
+      await this.inngestService.send({
+        name: 'webhook.dispatch',
+        data: {
+          orgId: payload.orgId,
+          eventType,
+          payload,
+        },
+      });
+
+      this.logger.debug(
+        { 
+          eventType, 
+          orgId: payload.orgId, 
+          executionId: payload.executionId 
+        },
+        'Webhook dispatch event queued',
+      );
+    } catch (error) {
+      this.logger.error(
+        { 
+          eventType, 
+          orgId: payload.orgId, 
+          error: error instanceof Error ? error.message : 'Unknown error' 
+        },
+        'Failed to queue webhook dispatch event',
+      );
+      // Don't throw error - webhook dispatch failure shouldn't fail the flow
+    }
   }
 }

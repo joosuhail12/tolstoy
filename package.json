@@ -25,6 +25,7 @@
   "description": "",
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.862.0",
+    "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.1.5",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.1.5",

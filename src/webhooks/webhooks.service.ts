@@ -153,6 +153,12 @@ export class WebhooksService {
     });
   }
 
+  async getWebhooksForEvent(orgId: string, eventType: string): Promise<Webhook[]> {
+    return this.prisma.webhook.findMany({
+      where: { orgId, enabled: true, eventTypes: { has: eventType } }
+    });
+  }
+
   async testWebhook(
     id: string,
     tenant: TenantContext,
