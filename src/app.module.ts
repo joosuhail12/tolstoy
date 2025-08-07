@@ -4,6 +4,10 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { CommonModule } from './common/common.module';
+import { AwsSecretsService } from './aws-secrets.service';
+import { SecretsResolver } from './secrets/secrets-resolver.service';
+import { OAuthTokenService } from './oauth/oauth-token.service';
+import { AblyService } from './ably/ably.service';
 
 // Feature Modules
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -30,7 +34,19 @@ import { HealthModule } from './health/health.module';
     ExecutionLogsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    AwsSecretsService,
+    SecretsResolver,
+    OAuthTokenService,
+    AblyService
+  ],
+  exports: [
+    AwsSecretsService,
+    SecretsResolver,
+    OAuthTokenService,
+    AblyService
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

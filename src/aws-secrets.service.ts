@@ -1,6 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+import { 
+  SecretsManagerClient, 
+  GetSecretValueCommand, 
+  PutSecretValueCommand,
+  CreateSecretCommand,
+  DescribeSecretCommand,
+  ResourceNotFoundException 
+} from '@aws-sdk/client-secrets-manager';
 
 @Injectable()
 export class AwsSecretsService {
@@ -122,6 +129,80 @@ export class AwsSecretsService {
     } catch (error) {
       this.logger.error(`Cannot access secret ${secretId}:`, error);
       return false;
+    }
+  }
+
+  async updateSecret(secretId: string, secretValue: string | Record<string, any>): Promise<void> {
+    try {
+      this.logger.log(`Updating secret: ${secretId}`);
+
+      const secretString = typeof secretValue === 'string' 
+        ? secretValue 
+        : JSON.stringify(secretValue);
+
+      const command = new PutSecretValueCommand({
+        SecretId: secretId,
+        SecretString: secretString
+      });
+
+      await this.client.send(command);
+      
+      // Clear cache for this secret
+      const keysToRemove = Array.from(this.secretCache.keys())
+        .filter(key => key.startsWith(secretId));
+      keysToRemove.forEach(key => this.secretCache.delete(key));
+
+      this.logger.log(`Successfully updated secret: ${secretId}`);
+    } catch (error) {
+      this.logger.error(`Failed to update secret ${secretId}:`, error);
+      throw error;
+    }
+  }
+
+  async createSecret(secretName: string, secretValue: string | Record<string, any>, description?: string): Promise<void> {
+    try {
+      this.logger.log(`Creating secret: ${secretName}`);
+
+      const secretString = typeof secretValue === 'string' 
+        ? secretValue 
+        : JSON.stringify(secretValue);
+
+      const command = new CreateSecretCommand({
+        Name: secretName,
+        SecretString: secretString,
+        Description: description
+      });
+
+      await this.client.send(command);
+      this.logger.log(`Successfully created secret: ${secretName}`);
+    } catch (error) {
+      this.logger.error(`Failed to create secret ${secretName}:`, error);
+      throw error;
+    }
+  }
+
+  async secretExists(secretId: string): Promise<boolean> {
+    try {
+      const command = new DescribeSecretCommand({ SecretId: secretId });
+      await this.client.send(command);
+      return true;
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        return false;
+      }
+      throw error;
+    }
+  }
+
+  async updateSecretKey(secretId: string, key: string, value: string): Promise<void> {
+    try {
+      const existingSecret = await this.getSecretAsJson(secretId);
+      existingSecret[key] = value;
+      await this.updateSecret(secretId, existingSecret);
+      this.logger.log(`Successfully updated key '${key}' in secret: ${secretId}`);
+    } catch (error) {
+      this.logger.error(`Failed to update key '${key}' in secret ${secretId}:`, error);
+      throw error;
     }
   }
 

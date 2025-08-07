@@ -257,11 +257,40 @@ USE_AWS_SECRETS=false
 ## 🔒 AWS Secrets Manager Integration
 
 ### Overview
-The application supports optional AWS Secrets Manager integration for secure database credential management in production environments.
+Complete secrets management solution using AWS Secrets Manager for database credentials, OAuth tokens, API keys, and webhook secrets with multi-tenant organization isolation.
+
+### Key Features
+- Database credentials stored in `conductor-db-secret`
+- Tool-specific OAuth tokens and API keys (`tolstoy/{tool}/{orgId}`)
+- Automatic token refresh for OAuth providers
+- Organization-based secret isolation
+- 5-minute caching with stale fallback
+
+**Core Services:**
+- `AwsSecretsService` - Core AWS integration with caching and retry logic
+- `SecretsResolver` - Tool-specific credential management  
+- `OAuthTokenService` - OAuth lifecycle management with automatic refresh
 
 ### Configuration Modes
 1. **Local Development** (`USE_AWS_SECRETS=false`): Uses local `.env` variables
 2. **Production** (`NODE_ENV=production` or `USE_AWS_SECRETS=true`): Uses AWS Secrets Manager
+
+### 🔄 Real-Time Flow Execution with Ably
+
+Live monitoring and debugging of workflow executions using Ably WebSocket integration:
+
+**Key Features:**
+- **Real-time Events**: Step-by-step execution progress via WebSockets
+- **Live Debugging**: Instant visibility into failures and performance metrics
+- **Channel Structure**: `flows.{orgId}.{executionId}` for organization isolation
+- **Event Types**: Step status (`started`, `completed`, `failed`, `skipped`) and execution lifecycle
+- **Frontend Integration**: React hooks and JavaScript SDK support
+
+**Technical Implementation:**
+- Automatic retry logic with exponential backoff
+- AWS Secrets Manager integration for API key storage
+- Comprehensive error handling and connection management
+- Built-in rate limiting and performance optimization
 
 ### Setting Up AWS Secrets Manager
 

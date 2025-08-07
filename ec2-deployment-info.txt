@@ -1,0 +1,14 @@
+EC2 Deployment Information
+==========================
+Instance ID: i-0ea0ff0e9a8db29d4
+Instance Type: t3.medium
+Public IP: 3.81.233.52
+Key Pair: tolstoy-key-pair.pem
+Security Group: tolstoy-sg (sg-0c95e3aea2579a573)
+Region: us-east-1
+
+SSH Command:
+ssh -i tolstoy-key-pair.pem ubuntu@3.81.233.52
+
+SCP Command Example:
+scp -i tolstoy-key-pair.pem file.txt ubuntu@3.81.233.52:~/

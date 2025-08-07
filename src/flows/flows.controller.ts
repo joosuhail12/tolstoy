@@ -11,6 +11,7 @@ import {
   HttpCode,
 } from '@nestjs/common';
 import { FlowsService } from './flows.service';
+import { FlowExecutorService } from './flow-executor.service';
 import { CreateFlowDto } from './dto/create-flow.dto';
 import { UpdateFlowDto } from './dto/update-flow.dto';
 import { Tenant } from '../common/decorators/tenant.decorator';
@@ -18,7 +19,10 @@ import { TenantContext } from '../common/interfaces/tenant-context.interface';
 
 @Controller('flows')
 export class FlowsController {
-  constructor(private readonly flowsService: FlowsService) {}
+  constructor(
+    private readonly flowsService: FlowsService,
+    private readonly flowExecutorService: FlowExecutorService
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -52,5 +56,19 @@ export class FlowsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     return this.flowsService.remove(id, tenant);
+  }
+
+  @Post(':id/execute')
+  @HttpCode(HttpStatus.ACCEPTED)
+  async executeFlow(
+    @Param('id') id: string,
+    @Body() executionInput: { variables?: Record<string, any> },
+    @Tenant() tenant: TenantContext,
+  ) {
+    return this.flowExecutorService.executeFlow(
+      id,
+      tenant,
+      executionInput.variables || {}
+    );
   }
 }
