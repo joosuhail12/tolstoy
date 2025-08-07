@@ -69,7 +69,7 @@ jobs:
             yarn build
             
             echo "🔄 Restarting PM2 application..."
-            pm2 restart tolstoy-api || pm2 start ecosystem.config.js
+            pm2 restart tolstoy-api --update-env || pm2 start ecosystem.config.js
             
             echo "📊 PM2 status..."
             pm2 status
@@ -87,6 +87,11 @@ jobs:
             cd /home/ubuntu/tolstoy
             
             echo "🗃️ Running Prisma migrations..."
+            # Set environment variables for Prisma migration
+            export NODE_ENV=production
+            export AWS_REGION=us-east-1 
+            export AWS_SECRET_NAME=conductor-db-secret
+            export USE_AWS_SECRETS=true
             yarn db:migrate:deploy || echo "⚠️ No migrations to deploy or migration failed"
             
             echo "✅ Migration step completed!"
@@ -99,8 +104,9 @@ jobs:
         run: |
           echo "🔍 Verifying application health..."
           
-          # Wait a moment for the application to start
-          sleep 10
+          # Wait for the application to fully start (AWS Secrets Manager takes a moment)
+          echo "⏳ Waiting 20 seconds for application startup..."
+          sleep 20
           
           # Test health endpoint
           HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://${EC2_HOST}/health)
