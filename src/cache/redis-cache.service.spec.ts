@@ -347,14 +347,15 @@ describe('RedisCacheService', () => {
 
   describe('cache metrics', () => {
     beforeEach(async () => {
-      mockConfigService.get
-        .mockReturnValueOnce('https://redis-url.upstash.io')
-        .mockReturnValueOnce('redis-token-123');
+      // Setup successful initialization via AWS Secrets
+      mockAwsSecretsService.getSecret
+        .mockResolvedValueOnce('https://redis-url.upstash.io')
+        .mockResolvedValueOnce('redis-token-123');
       mockRedis.ping.mockResolvedValue('PONG');
       await service['initializeRedis']();
     });
 
-    it.skip('should track cache hits and misses', async () => {
+    it('should track cache hits and misses', async () => {
       // Ensure service is connected for this test
       const status = service.getConnectionStatus();
       if (!status.connected) {
@@ -374,7 +375,7 @@ describe('RedisCacheService', () => {
       expect(metrics.hitRate).toBe(50);
     });
 
-    it.skip('should track operation counts', async () => {
+    it('should track operation counts', async () => {
       // Ensure service is connected for this test
       const status = service.getConnectionStatus();
       if (!status.connected) {
