@@ -28,6 +28,7 @@
     "@nestjs/mapped-types": "^2.1.0",
     "@nestjs/platform-fastify": "^11.1.5",
     "@prisma/client": "^6.13.0",
+    "@upstash/redis": "^1.35.3",
     "ably": "^2.10.1",
     "axios": "^1.11.0",
     "class-transformer": "^0.5.1",
@@ -39,6 +40,7 @@
     "pino": "^9.7.0",
     "pino-http": "^10.5.0",
     "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
     "zod": "^4.0.15"
   },
   "devDependencies": {

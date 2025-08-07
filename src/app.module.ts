@@ -1,11 +1,13 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule, OnModuleInit } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { CommonModule } from './common/common.module';
+import { CacheModule } from './cache/cache.module';
 import { AwsSecretsService } from './aws-secrets.service';
+import { RedisCacheService } from './cache/redis-cache.service';
 import { SecretsResolver } from './secrets/secrets-resolver.service';
 import { OAuthTokenService } from './oauth/oauth-token.service';
 import { AblyService } from './ably/ably.service';
@@ -72,6 +74,7 @@ import { InngestModule } from './flows/inngest/inngest.module';
       },
     }),
     CommonModule,
+    CacheModule,
     HealthModule,
     OrganizationsModule,
     UsersModule,
@@ -99,7 +102,17 @@ import { InngestModule } from './flows/inngest/inngest.module';
     AblyService
   ],
 })
-export class AppModule implements NestModule {
+export class AppModule implements NestModule, OnModuleInit {
+  constructor(
+    private readonly awsSecretsService: AwsSecretsService,
+    private readonly cacheService: RedisCacheService,
+  ) {}
+
+  async onModuleInit() {
+    // Configure cache service for AWS Secrets Manager after all dependencies are initialized
+    this.awsSecretsService.setCacheService(this.cacheService);
+  }
+
   configure(consumer: MiddlewareConsumer): void {
     consumer
       .apply(TenantMiddleware)

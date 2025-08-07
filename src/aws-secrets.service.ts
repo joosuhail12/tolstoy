@@ -10,13 +10,15 @@ import {
   DeleteSecretCommand,
   ResourceNotFoundException 
 } from '@aws-sdk/client-secrets-manager';
+import { RedisCacheService } from './cache/redis-cache.service';
+import CacheKeys from './cache/cache-keys';
 
 @Injectable()
 export class AwsSecretsService {
   private client: SecretsManagerClient;
   private region: string;
-  private secretCache = new Map<string, { value: any; timestamp: number }>();
-  private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+  // Remove in-memory cache - will use Redis instead
+  private cacheService: RedisCacheService | null = null;
 
   constructor(
     private configService: ConfigService,
@@ -34,14 +36,25 @@ export class AwsSecretsService {
     this.logger.info({ region: this.region }, 'AWS Secrets Manager client initialized');
   }
 
+  /**
+   * Set the cache service after dependency injection is complete
+   * This prevents circular dependencies during initialization
+   */
+  setCacheService(cacheService: RedisCacheService): void {
+    this.cacheService = cacheService;
+    this.logger.debug('Redis cache service configured for AWS Secrets Manager');
+  }
+
   async getSecret(secretId: string, key?: string): Promise<string> {
-    const cacheKey = `${secretId}:${key || 'full'}`;
+    const cacheKey = CacheKeys.awsSecret(secretId, key);
     
-    // Check cache first
-    const cached = this.secretCache.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
-      this.logger.debug({ secretId, key, cached: true }, 'Using cached secret');
-      return cached.value;
+    // Check Redis cache first if available
+    if (this.cacheService) {
+      const cached = await this.cacheService.get<string>(cacheKey);
+      if (cached) {
+        this.logger.debug({ secretId, key, cached: true }, 'Using cached secret from Redis');
+        return cached;
+      }
     }
 
     try {
@@ -76,11 +89,10 @@ export class AwsSecretsService {
             this.logger.info({ secretId, key, fromCache: false }, 'Successfully retrieved secret key');
           }
 
-          // Cache the result
-          this.secretCache.set(cacheKey, {
-            value: resultValue,
-            timestamp: Date.now()
-          });
+          // Cache the result in Redis
+          if (this.cacheService) {
+            await this.cacheService.set(cacheKey, resultValue, { ttl: CacheKeys.TTL.CONFIG });
+          }
 
           return resultValue;
 
@@ -99,11 +111,17 @@ export class AwsSecretsService {
     } catch (error) {
       this.logger.error({ secretId, key, error: error.message, attempts: 3 }, 'Failed to retrieve secret after all attempts');
       
-      // If we have a stale cached value, use it as fallback
-      const staleCache = this.secretCache.get(cacheKey);
-      if (staleCache) {
-        this.logger.warn({ secretId, key, cached: true, stale: true }, 'Using stale cached value due to error');
-        return staleCache.value;
+      // Try to get stale cached value from Redis as fallback
+      if (this.cacheService) {
+        try {
+          const staleCache = await this.cacheService.get<string>(cacheKey);
+          if (staleCache) {
+            this.logger.warn({ secretId, key, cached: true, stale: true }, 'Using stale cached value from Redis due to error');
+            return staleCache;
+          }
+        } catch (cacheError) {
+          this.logger.debug({ error: cacheError.message }, 'Could not retrieve stale cache value');
+        }
       }
       
       throw error;
@@ -192,12 +210,13 @@ export class AwsSecretsService {
 
       await this.client.send(command);
       
-      // Clear cache for this secret
-      const keysToRemove = Array.from(this.secretCache.keys())
-        .filter(key => key.startsWith(secretId));
-      keysToRemove.forEach(key => this.secretCache.delete(key));
+      // Clear Redis cache for this secret
+      if (this.cacheService) {
+        const pattern = CacheKeys.awsSecret(secretId, '*');
+        await this.cacheService.delPattern(pattern);
+      }
 
-      this.logger.info({ secretId }, 'Successfully updated secret');
+      this.logger.info({ secretId }, 'Successfully updated secret and cleared cache');
     } catch (error) {
       this.logger.error({ secretId, error: error.message }, 'Failed to update secret');
       throw error;
@@ -262,12 +281,13 @@ export class AwsSecretsService {
 
       await this.client.send(command);
       
-      // Clear cache for this secret
-      const keysToRemove = Array.from(this.secretCache.keys())
-        .filter(key => key.startsWith(secretId));
-      keysToRemove.forEach(key => this.secretCache.delete(key));
+      // Clear Redis cache for this secret
+      if (this.cacheService) {
+        const pattern = CacheKeys.awsSecret(secretId, '*');
+        await this.cacheService.delPattern(pattern);
+      }
 
-      this.logger.info({ secretId }, 'Successfully deleted secret');
+      this.logger.info({ secretId }, 'Successfully deleted secret and cleared cache');
     } catch (error) {
       if (error instanceof ResourceNotFoundException) {
         this.logger.warn({ secretId }, 'Secret not found, may already be deleted');
@@ -278,8 +298,27 @@ export class AwsSecretsService {
     }
   }
 
-  clearCache(): void {
-    this.secretCache.clear();
-    this.logger.info({ cacheSize: this.secretCache.size }, 'Secret cache cleared');
+  async clearCache(): Promise<void> {
+    if (this.cacheService) {
+      try {
+        const pattern = 'aws-secret:*';
+        const deletedCount = await this.cacheService.delPattern(pattern);
+        this.logger.info({ deletedKeys: deletedCount }, 'AWS Secrets Manager cache cleared from Redis');
+      } catch (error) {
+        this.logger.error({ error: error.message }, 'Failed to clear AWS Secrets Manager cache');
+      }
+    } else {
+      this.logger.debug('No cache service available to clear');
+    }
+  }
+
+  /**
+   * Get cache metrics for monitoring
+   */
+  getCacheMetrics(): any {
+    if (this.cacheService) {
+      return this.cacheService.getMetrics();
+    }
+    return { error: 'Cache service not available' };
   }
 }

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { AwsSecretsService } from '../aws-secrets.service';
+import { RedisCacheService } from '../cache/redis-cache.service';
+import CacheKeys from '../cache/cache-keys';
 
 export interface ToolCredentials {
   accessToken?: string;
@@ -25,16 +27,30 @@ export interface OAuthTokens {
 export class SecretsResolver {
   constructor(
     private readonly awsSecretsService: AwsSecretsService,
+    private readonly cacheService: RedisCacheService,
     @InjectPinoLogger(SecretsResolver.name)
     private readonly logger: PinoLogger,
   ) {}
 
   async getToolCredentials(toolName: string, orgId: string): Promise<ToolCredentials> {
+    const cacheKey = CacheKeys.secrets(orgId, toolName);
+    
+    // Try cache first
+    const cached = await this.cacheService.get<ToolCredentials>(cacheKey);
+    if (cached) {
+      this.logger.debug({ toolName, orgId, cached: true }, 'Retrieved credentials from cache');
+      return cached;
+    }
+
     const secretId = this.buildToolSecretId(toolName, orgId);
     
     try {
-      this.logger.debug({ toolName, orgId }, 'Retrieving credentials for tool');
+      this.logger.debug({ toolName, orgId, cached: false }, 'Retrieving credentials from AWS Secrets Manager');
       const credentials = await this.awsSecretsService.getSecretAsJson(secretId);
+      
+      // Cache the credentials
+      await this.cacheService.set(cacheKey, credentials, { ttl: CacheKeys.TTL.SECRETS });
+      
       return credentials as ToolCredentials;
     } catch (error) {
       this.logger.error({ toolName, orgId, error: error.message }, 'Failed to retrieve credentials for tool');
@@ -44,6 +60,7 @@ export class SecretsResolver {
 
   async setToolCredentials(toolName: string, orgId: string, credentials: ToolCredentials): Promise<void> {
     const secretId = this.buildToolSecretId(toolName, orgId);
+    const cacheKey = CacheKeys.secrets(orgId, toolName);
     
     try {
       this.logger.info({ toolName, orgId }, 'Setting credentials for tool');
@@ -60,7 +77,10 @@ export class SecretsResolver {
         );
       }
       
-      this.logger.info({ toolName, orgId }, 'Successfully stored credentials');
+      // Invalidate cache after updating credentials
+      await this.cacheService.del(cacheKey);
+      
+      this.logger.info({ toolName, orgId }, 'Successfully stored credentials and invalidated cache');
     } catch (error) {
       this.logger.error({ toolName, orgId, error: error.message }, 'Failed to store credentials');
       throw error;
@@ -85,6 +105,7 @@ export class SecretsResolver {
 
   async updateOAuthTokens(toolName: string, orgId: string, tokens: OAuthTokens): Promise<void> {
     const secretId = this.buildToolSecretId(toolName, orgId);
+    const cacheKey = CacheKeys.secrets(orgId, toolName);
     
     try {
       this.logger.info({ toolName, orgId, expiresAt: tokens.expiresAt }, 'Updating OAuth tokens');
@@ -108,7 +129,11 @@ export class SecretsResolver {
       };
 
       await this.setToolCredentials(toolName, orgId, updatedCredentials);
-      this.logger.info({ toolName, orgId }, 'Successfully updated OAuth tokens');
+      
+      // Additional cache invalidation for OAuth-specific operations
+      await this.cacheService.del(cacheKey);
+      
+      this.logger.info({ toolName, orgId }, 'Successfully updated OAuth tokens and invalidated cache');
     } catch (error) {
       this.logger.error({ toolName, orgId, error: error.message }, 'Failed to update OAuth tokens');
       throw error;
@@ -168,7 +193,20 @@ export class SecretsResolver {
 
   async deleteToolCredentials(toolName: string, orgId: string): Promise<void> {
     const secretId = this.buildToolSecretId(toolName, orgId);
-    this.logger.warn({ toolName, orgId }, 'Deleting credentials - AWS Secrets Manager will schedule deletion, not immediate');
+    const cacheKey = CacheKeys.secrets(orgId, toolName);
+    
+    try {
+      // Invalidate cache immediately
+      await this.cacheService.del(cacheKey);
+      
+      this.logger.warn({ toolName, orgId }, 'Deleting credentials - AWS Secrets Manager will schedule deletion, not immediate');
+      
+      // Note: AWS Secrets Manager deletion is scheduled, not immediate
+      // The cache invalidation ensures stale data isn't served
+      
+    } catch (error) {
+      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to invalidate cache during credential deletion');
+    }
   }
 
   private buildToolSecretId(toolName: string, orgId: string): string {
@@ -180,5 +218,59 @@ export class SecretsResolver {
   async listAvailableTools(orgId: string): Promise<string[]> {
     this.logger.debug({ orgId }, 'Listing available tools for organization');
     return [];
+  }
+
+  /**
+   * Invalidate all cached secrets for an organization
+   * Useful for bulk operations or when organization data changes
+   */
+  async invalidateOrgSecrets(orgId: string): Promise<void> {
+    try {
+      const pattern = CacheKeys.secretsPattern(orgId);
+      const deletedCount = await this.cacheService.delPattern(pattern);
+      
+      this.logger.info({ 
+        orgId, 
+        deletedKeys: deletedCount 
+      }, 'Invalidated all cached secrets for organization');
+      
+    } catch (error) {
+      this.logger.error({ 
+        orgId, 
+        error: error.message 
+      }, 'Failed to invalidate organization secrets cache');
+    }
+  }
+
+  /**
+   * Warm up cache for commonly used tool credentials
+   * Can be called during application startup or scheduled
+   */
+  async warmupCache(orgId: string, toolNames: string[]): Promise<void> {
+    this.logger.info({ 
+      orgId, 
+      tools: toolNames.length 
+    }, 'Warming up credentials cache');
+
+    const warmupPromises = toolNames.map(async (toolName) => {
+      try {
+        // This will cache the credentials if they exist
+        await this.getToolCredentials(toolName, orgId);
+      } catch (error) {
+        // Ignore errors during warmup - tools may not have credentials
+        this.logger.debug({ 
+          toolName, 
+          orgId, 
+          error: error.message 
+        }, 'Skipped warmup for tool without credentials');
+      }
+    });
+
+    await Promise.allSettled(warmupPromises);
+    
+    this.logger.info({ 
+      orgId, 
+      tools: toolNames.length 
+    }, 'Cache warmup completed');
   }
 }
