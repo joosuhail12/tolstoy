@@ -133,7 +133,7 @@ jobs:
           echo "🔍 Verifying application health..."
           
           # Check PM2 logs first to see if there are any startup issues
-          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${EC2_USER}@${EC2_HOST}" "pm2 logs tolstoy-api --lines 10"
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${EC2_USER}@${EC2_HOST} "pm2 logs tolstoy-api --lines 10"
           
           # Wait longer for the application to fully start (AWS Secrets Manager + database connection)
           echo "⏳ Waiting 30 seconds for application startup..."
@@ -141,7 +141,7 @@ jobs:
           
           # Check if the application is listening on port 3000
           echo "🔍 Checking if application is listening on port 3000..."
-          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${EC2_USER}@${EC2_HOST}" "ss -tlnp | grep :3000 || echo 'Port 3000 not listening'"
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${EC2_USER}@${EC2_HOST} "ss -tlnp | grep :3000 || echo 'Port 3000 not listening'"
           
           # Test health endpoint
           echo "🔍 Testing health endpoint..."
@@ -166,6 +166,7 @@ jobs:
           
           echo "🎉 Deployment verification successful!"
         env:
+          EC2_USER: ${{ secrets.EC2_USER }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
           
       - name: 🧹 Cleanup SSH key
