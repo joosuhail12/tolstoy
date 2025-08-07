@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { SecretsResolver, OAuthTokens } from '../secrets/secrets-resolver.service';
 import axios, { AxiosResponse } from 'axios';
 
@@ -20,30 +21,32 @@ export interface TokenRefreshResponse {
 
 @Injectable()
 export class OAuthTokenService {
-  private readonly logger = new Logger(OAuthTokenService.name);
-
-  constructor(private readonly secretsResolver: SecretsResolver) {}
+  constructor(
+    private readonly secretsResolver: SecretsResolver,
+    @InjectPinoLogger(OAuthTokenService.name)
+    private readonly logger: PinoLogger,
+  ) {}
 
   async getValidAccessToken(toolName: string, orgId: string): Promise<string> {
     try {
       const isExpired = await this.secretsResolver.isTokenExpired(toolName, orgId);
       
       if (isExpired) {
-        this.logger.log(`Token expired for ${toolName}/${orgId}, attempting refresh`);
+        this.logger.info({ toolName, orgId, expired: true }, 'Token expired, attempting refresh');
         await this.refreshToken(toolName, orgId);
       }
 
       const tokens = await this.secretsResolver.getOAuthTokens(toolName, orgId);
       return tokens.accessToken;
     } catch (error) {
-      this.logger.error(`Failed to get valid access token for ${toolName}/${orgId}:`, error);
+      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to get valid access token');
       throw new Error(`Unable to obtain valid access token for ${toolName}`);
     }
   }
 
   async refreshToken(toolName: string, orgId: string): Promise<OAuthTokens> {
     try {
-      this.logger.log(`Refreshing OAuth token for ${toolName}/${orgId}`);
+      this.logger.info({ toolName, orgId }, 'Refreshing OAuth token');
 
       const currentTokens = await this.secretsResolver.getOAuthTokens(toolName, orgId);
       const credentials = await this.secretsResolver.getToolCredentials(toolName, orgId);
@@ -79,10 +82,10 @@ export class OAuthTokenService {
 
       await this.secretsResolver.updateOAuthTokens(toolName, orgId, newTokens);
       
-      this.logger.log(`Successfully refreshed token for ${toolName}/${orgId}`);
+      this.logger.info({ toolName, orgId, expiresIn: refreshedTokens.expires_in }, 'Successfully refreshed token');
       return newTokens;
     } catch (error) {
-      this.logger.error(`Failed to refresh token for ${toolName}/${orgId}:`, error);
+      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to refresh token');
       throw error;
     }
   }
@@ -121,11 +124,11 @@ export class OAuthTokenService {
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        this.logger.error('Token refresh HTTP error:', {
+        this.logger.error({
           status: error.response?.status,
-          data: error.response?.data,
+          responseData: error.response?.data,
           message: error.message
-        });
+        }, 'Token refresh HTTP error');
       }
       throw error;
     }
@@ -138,7 +141,7 @@ export class OAuthTokenService {
     config: Partial<OAuthConfig>
   ): Promise<void> {
     try {
-      this.logger.log(`Storing initial OAuth tokens for ${toolName}/${orgId}`);
+      this.logger.info({ toolName, orgId }, 'Storing initial OAuth tokens');
 
       const credentials = {
         accessToken: tokens.accessToken,
@@ -153,9 +156,9 @@ export class OAuthTokenService {
       };
 
       await this.secretsResolver.setToolCredentials(toolName, orgId, credentials);
-      this.logger.log(`Successfully stored initial tokens for ${toolName}/${orgId}`);
+      this.logger.info({ toolName, orgId }, 'Successfully stored initial tokens');
     } catch (error) {
-      this.logger.error(`Failed to store initial tokens for ${toolName}/${orgId}:`, error);
+      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to store initial tokens');
       throw error;
     }
   }
@@ -167,7 +170,7 @@ export class OAuthTokenService {
 
   async revokeToken(toolName: string, orgId: string): Promise<void> {
     try {
-      this.logger.log(`Revoking OAuth token for ${toolName}/${orgId}`);
+      this.logger.info({ toolName, orgId }, 'Revoking OAuth token');
       
       const tokens = await this.secretsResolver.getOAuthTokens(toolName, orgId);
       const credentials = await this.secretsResolver.getToolCredentials(toolName, orgId);
@@ -181,16 +184,16 @@ export class OAuthTokenService {
             client_id: credentials.clientId,
             client_secret: credentials.clientSecret
           });
-          this.logger.log(`Successfully revoked token at provider for ${toolName}/${orgId}`);
+          this.logger.info({ toolName, orgId }, 'Successfully revoked token at provider');
         } catch (error) {
-          this.logger.warn(`Failed to revoke token at provider for ${toolName}/${orgId}:`, error);
+          this.logger.warn({ toolName, orgId, error: error.message }, 'Failed to revoke token at provider');
         }
       }
 
       await this.secretsResolver.deleteToolCredentials(toolName, orgId);
-      this.logger.log(`Successfully removed stored tokens for ${toolName}/${orgId}`);
+      this.logger.info({ toolName, orgId }, 'Successfully removed stored tokens');
     } catch (error) {
-      this.logger.error(`Failed to revoke token for ${toolName}/${orgId}:`, error);
+      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to revoke token');
       throw error;
     }
   }
@@ -238,7 +241,7 @@ export class OAuthTokenService {
 
       return true;
     } catch (error) {
-      this.logger.debug(`Token health check failed for ${toolName}/${orgId}:`, error);
+      this.logger.debug({ toolName, orgId, error: error.message }, 'Token health check failed');
       return false;
     }
   }

@@ -1,13 +1,18 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ logger: true }),
+    new FastifyAdapter({ logger: false }),
+    { bufferLogs: true },
   );
+  
+  // Use Pino logger globally
+  app.useLogger(app.get(Logger));
   
   // Enable global validation
   app.useGlobalPipes(
@@ -20,7 +25,9 @@ async function bootstrap() {
   );
   
   await app.listen(3000, '0.0.0.0');
-  console.log('Application is running on: http://localhost:3000');
+  
+  const logger = app.get(Logger);
+  logger.log('Application is running on: http://localhost:3000', 'Bootstrap');
 }
 
 bootstrap();

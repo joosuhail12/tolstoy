@@ -1,4 +1,5 @@
-import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@prisma/client';
 import { AwsSecretsService } from './aws-secrets.service';
@@ -19,7 +20,6 @@ class DynamicPrismaClient extends PrismaClient {
 
 @Injectable()
 export class PrismaService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(PrismaService.name);
   private useSecretsManager: boolean;
   private prismaClient: DynamicPrismaClient;
   private isInitialized = false;
@@ -27,6 +27,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly awsSecretsService: AwsSecretsService,
     private readonly configService: ConfigService,
+    @InjectPinoLogger(PrismaService.name)
+    private readonly logger: PinoLogger,
   ) {
     // Check if we should use AWS Secrets Manager (enabled by default in production)
     const nodeEnv = this.configService.get<string>('NODE_ENV');
@@ -35,7 +37,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     
     this.useSecretsManager = nodeEnv === 'production' || useAwsSecrets;
     
-    this.logger.log(`Prisma service initialized with secrets manager: ${this.useSecretsManager}`);
+    this.logger.info({ useSecretsManager: this.useSecretsManager, nodeEnv }, 'Prisma service initialized');
   }
 
   async onModuleInit(): Promise<void> {
@@ -47,9 +49,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       let databaseUrl: string;
 
       if (this.useSecretsManager) {
-        this.logger.log('Using AWS Secrets Manager for database credentials...');
-        
         const secretName = this.configService.get<string>('AWS_SECRET_NAME', 'conductor-db-secret');
+        this.logger.info({ secretName }, 'Using AWS Secrets Manager for database credentials');
         
         // Validate secret access first
         const canAccessSecret = await this.awsSecretsService.validateSecretAccess(secretName);
@@ -69,9 +70,9 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
           throw new Error(`Invalid DATABASE_URL format: ${databaseUrl.substring(0, 20)}...`);
         }
         
-        this.logger.log('✅ Database URL retrieved from AWS Secrets Manager');
+        this.logger.info({ databaseUrlLength: databaseUrl.length }, 'Database URL retrieved from AWS Secrets Manager');
       } else {
-        this.logger.log('Using local environment variables for database credentials...');
+        this.logger.info('Using local environment variables for database credentials');
         databaseUrl = this.configService.get<string>('DATABASE_URL');
         
         if (!databaseUrl) {
@@ -89,28 +90,28 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       await this.prismaClient.$queryRaw`SELECT 1 as test`;
       
       const connectionType = this.useSecretsManager ? 'AWS Secrets Manager' : 'local environment';
-      this.logger.log(`✅ Successfully connected to Neon DB via ${connectionType}`);
+      this.logger.info({ connectionType, isInitialized: true }, 'Successfully connected to Neon DB');
       
       this.isInitialized = true;
       
     } catch (error) {
-      this.logger.error('Failed to initialize database connection:', error);
+      this.logger.error({ error: error.message, useSecretsManager: this.useSecretsManager }, 'Failed to initialize database connection');
       
       // If we're using secrets manager, try falling back to env vars
       if (this.useSecretsManager && !this.isInitialized) {
-        this.logger.warn('Attempting fallback to environment variables...');
+        this.logger.warn('Attempting fallback to environment variables');
         try {
           const fallbackUrl = this.configService.get<string>('DATABASE_URL');
           if (fallbackUrl) {
             this.prismaClient = new DynamicPrismaClient(fallbackUrl);
             await this.prismaClient.$connect();
             await this.prismaClient.$queryRaw`SELECT 1 as test`;
-            this.logger.log('✅ Fallback connection successful using environment variables');
+            this.logger.info('Fallback connection successful using environment variables');
             this.isInitialized = true;
             return;
           }
         } catch (fallbackError) {
-          this.logger.error('Fallback connection also failed:', fallbackError);
+          this.logger.error({ error: fallbackError.message }, 'Fallback connection also failed');
         }
       }
       
@@ -121,7 +122,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     if (this.prismaClient) {
       await this.prismaClient.$disconnect();
-      this.logger.log('Disconnected from Prisma');
+      this.logger.info('Disconnected from Prisma');
     }
   }
 
@@ -184,7 +185,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       await this.prismaClient.$queryRaw`SELECT 1 as health_check`;
       return true;
     } catch (error) {
-      this.logger.error('Health check failed:', error);
+      this.logger.error({ error: error.message }, 'Database health check failed');
       return false;
     }
   }

@@ -1,0 +1,257 @@
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
+import { PrismaService } from '../prisma.service';
+import { AwsSecretsService } from '../aws-secrets.service';
+
+export interface ToolCredentials {
+  [key: string]: string;
+}
+
+export interface StoredCredentials {
+  toolId: string;
+  toolName: string;
+  credentials: ToolCredentials;
+  maskedCredentials: Record<string, string>;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+@Injectable()
+export class ToolSecretsService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly awsSecrets: AwsSecretsService,
+    @InjectPinoLogger(ToolSecretsService.name)
+    private readonly logger: PinoLogger,
+  ) {}
+
+  private generateSecretName(orgId: string, toolId: string): string {
+    return `tolstoy/${orgId}/${toolId}`;
+  }
+
+  private maskCredential(value: string): string {
+    if (!value || value.length <= 8) {
+      return '***';
+    }
+    return value.substring(0, 4) + '*'.repeat(value.length - 8) + value.substring(value.length - 4);
+  }
+
+  private maskCredentials(credentials: ToolCredentials): Record<string, string> {
+    const masked: Record<string, string> = {};
+    Object.keys(credentials).forEach(key => {
+      masked[key] = this.maskCredential(credentials[key]);
+    });
+    return masked;
+  }
+
+  private validateCredentials(credentials: ToolCredentials): void {
+    if (!credentials || typeof credentials !== 'object') {
+      throw new BadRequestException('Credentials must be an object');
+    }
+
+    const keys = Object.keys(credentials);
+    if (keys.length === 0) {
+      throw new BadRequestException('Credentials cannot be empty');
+    }
+
+    // Validate credential keys and values
+    keys.forEach(key => {
+      if (typeof key !== 'string' || key.trim().length === 0) {
+        throw new BadRequestException('Credential keys must be non-empty strings');
+      }
+      
+      const value = credentials[key];
+      if (typeof value !== 'string' || value.trim().length === 0) {
+        throw new BadRequestException(`Credential value for '${key}' must be a non-empty string`);
+      }
+
+      // Security check: prevent storing common sensitive field names
+      const lowerKey = key.toLowerCase();
+      if (lowerKey.includes('secret') || lowerKey.includes('password') || lowerKey.includes('token') || lowerKey.includes('key')) {
+        if (value.length < 8) {
+          throw new BadRequestException(`Credential '${key}' appears to be sensitive but is too short (minimum 8 characters)`);
+        }
+      }
+    });
+  }
+
+  async storeCredentials(
+    orgId: string,
+    toolId: string,
+    credentials: ToolCredentials,
+  ): Promise<StoredCredentials> {
+    this.logger.info({ toolId, orgId }, 'Storing credentials for tool');
+
+    // Validate inputs
+    this.validateCredentials(credentials);
+
+    // Verify tool exists and belongs to organization
+    const tool = await this.prisma.tool.findFirst({
+      where: { id: toolId, orgId },
+    });
+
+    if (!tool) {
+      throw new NotFoundException(`Tool ${toolId} not found in organization ${orgId}`);
+    }
+
+    const secretName = this.generateSecretName(orgId, toolId);
+
+    try {
+      // Check if secret already exists
+      const secretExists = await this.awsSecrets.secretExists(secretName);
+      
+      if (secretExists) {
+        // Update existing secret
+        await this.awsSecrets.updateSecret(secretName, credentials);
+        this.logger.info({ toolId, orgId, secretName }, 'Updated existing credentials');
+      } else {
+        // Create new secret
+        await this.awsSecrets.createSecret(
+          secretName,
+          credentials,
+          `Tool credentials for ${tool.name} in organization ${orgId}`,
+        );
+        this.logger.info({ toolId, orgId, secretName }, 'Created new credentials');
+      }
+
+      // Update tool record with secret name
+      await this.prisma.tool.update({
+        where: { id: toolId },
+        data: { secretName },
+      });
+
+      return {
+        toolId,
+        toolName: tool.name,
+        credentials,
+        maskedCredentials: this.maskCredentials(credentials),
+        createdAt: tool.createdAt,
+        updatedAt: new Date(),
+      };
+
+    } catch (error) {
+      this.logger.error({ toolId, orgId, error: error.message }, 'Failed to store credentials for tool');
+      throw new BadRequestException(`Failed to store credentials: ${error.message}`);
+    }
+  }
+
+  async getCredentials(
+    orgId: string,
+    toolId: string,
+    maskValues: boolean = true,
+  ): Promise<StoredCredentials> {
+    this.logger.info({ toolId, orgId, maskValues }, 'Retrieving credentials for tool');
+
+    // Verify tool exists and belongs to organization
+    const tool = await this.prisma.tool.findFirst({
+      where: { id: toolId, orgId },
+    });
+
+    if (!tool) {
+      throw new NotFoundException(`Tool ${toolId} not found in organization ${orgId}`);
+    }
+
+    if (!tool.secretName) {
+      throw new NotFoundException(`No credentials stored for tool ${toolId}`);
+    }
+
+    try {
+      const credentials = await this.awsSecrets.getSecretAsJson(tool.secretName);
+
+      return {
+        toolId,
+        toolName: tool.name,
+        credentials: maskValues ? {} : credentials,
+        maskedCredentials: this.maskCredentials(credentials),
+        createdAt: tool.createdAt,
+        updatedAt: tool.updatedAt,
+      };
+
+    } catch (error) {
+      this.logger.error({ toolId, orgId, error: error.message }, 'Failed to retrieve credentials for tool');
+      throw new BadRequestException(`Failed to retrieve credentials: ${error.message}`);
+    }
+  }
+
+  async deleteCredentials(orgId: string, toolId: string): Promise<void> {
+    this.logger.info({ toolId, orgId }, 'Deleting credentials for tool');
+
+    // Verify tool exists and belongs to organization
+    const tool = await this.prisma.tool.findFirst({
+      where: { id: toolId, orgId },
+    });
+
+    if (!tool) {
+      throw new NotFoundException(`Tool ${toolId} not found in organization ${orgId}`);
+    }
+
+    if (!tool.secretName) {
+      throw new NotFoundException(`No credentials stored for tool ${toolId}`);
+    }
+
+    try {
+      // Delete secret from AWS
+      await this.awsSecrets.deleteSecret(tool.secretName, false); // Use soft delete by default
+      
+      // Remove secret name from tool record
+      await this.prisma.tool.update({
+        where: { id: toolId },
+        data: { secretName: null },
+      });
+
+      this.logger.info({ toolId, orgId }, 'Successfully deleted credentials for tool');
+
+    } catch (error) {
+      this.logger.error({ toolId, orgId, error: error.message }, 'Failed to delete credentials for tool');
+      throw new BadRequestException(`Failed to delete credentials: ${error.message}`);
+    }
+  }
+
+  async listToolsWithCredentials(orgId: string): Promise<Array<{
+    toolId: string;
+    toolName: string;
+    baseUrl: string;
+    authType: string;
+    hasCredentials: boolean;
+    credentialKeys?: string[];
+  }>> {
+    this.logger.info({ orgId }, 'Listing tools with credentials for organization');
+
+    const tools = await this.prisma.tool.findMany({
+      where: { orgId },
+      select: {
+        id: true,
+        name: true,
+        baseUrl: true,
+        authType: true,
+        secretName: true,
+      },
+    });
+
+    const result = await Promise.all(
+      tools.map(async (tool) => {
+        let credentialKeys: string[] = [];
+        
+        if (tool.secretName) {
+          try {
+            const credentials = await this.awsSecrets.getSecretAsJson(tool.secretName);
+            credentialKeys = Object.keys(credentials);
+          } catch (error) {
+            this.logger.warn({ toolId: tool.id, orgId, error: error.message }, 'Failed to retrieve credential keys for tool');
+          }
+        }
+
+        return {
+          toolId: tool.id,
+          toolName: tool.name,
+          baseUrl: tool.baseUrl,
+          authType: tool.authType,
+          hasCredentials: !!tool.secretName,
+          credentialKeys: tool.secretName ? credentialKeys : undefined,
+        };
+      }),
+    );
+
+    return result;
+  }
+}

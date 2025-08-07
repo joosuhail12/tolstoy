@@ -1,5 +1,6 @@
 import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
@@ -18,12 +19,55 @@ import { FlowsModule } from './flows/flows.module';
 import { ExecutionLogsModule } from './execution-logs/execution-logs.module';
 import { HealthModule } from './health/health.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
+import { ToolSecretsModule } from './tool-secrets/tool-secrets.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
+    }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.LOG_LEVEL || 'info',
+        transport: process.env.NODE_ENV !== 'production' ? {
+          target: 'pino-pretty',
+          options: {
+            colorize: true,
+            translateTime: 'SYS:standard',
+            ignore: 'pid,hostname',
+          },
+        } : undefined,
+        formatters: {
+          level(level) {
+            return { level };
+          },
+        },
+        serializers: {
+          req: (req: any) => ({
+            id: req.id,
+            method: req.method,
+            url: req.url,
+            headers: {
+              'x-org-id': req.headers['x-org-id'],
+              'x-user-id': req.headers['x-user-id'],
+              'x-request-id': req.headers['x-request-id'],
+            },
+          }),
+          res: (res: any) => ({
+            statusCode: res.statusCode,
+          }),
+        },
+        customSuccessMessage: (req: any, res: any, responseTime: number) =>
+          `${req.method} ${req.url} completed in ${responseTime}ms`,
+        customErrorMessage: (req: any, res: any, error: Error) =>
+          `Error on ${req.method} ${req.url}: ${error.message}`,
+        customProps: (req: any) => ({
+          orgId: req.headers['x-org-id'],
+          userId: req.headers['x-user-id'],
+          requestId: req.id || req.headers['x-request-id'],
+        }),
+      },
     }),
     CommonModule,
     HealthModule,
@@ -34,6 +78,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
     FlowsModule,
     ExecutionLogsModule,
     WebhooksModule,
+    ToolSecretsModule,
   ],
   controllers: [AppController],
   providers: [
@@ -55,6 +100,6 @@ export class AppModule implements NestModule {
     consumer
       .apply(TenantMiddleware)
       .exclude('organizations/(.*)', '/', '/health', '/status', 'webhooks/event-types')
-      .forRoutes('users', 'tools', 'actions', 'flows', 'execution-logs', 'webhooks');
+      .forRoutes('users', 'tools', 'actions', 'flows', 'execution-logs', 'webhooks', 'tools/:toolId/secrets');
   }
 }

@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { Flow, ExecutionLog } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { AblyService, FlowStepEvent, FlowExecutionEvent } from '../ably/ably.service';
@@ -47,14 +48,14 @@ export interface StepExecutionResult {
 
 @Injectable()
 export class FlowExecutorService {
-  private readonly logger = new Logger(FlowExecutorService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly ablyService: AblyService,
     private readonly secretsResolver: SecretsResolver,
     private readonly oauthService: OAuthTokenService,
-    private readonly inputValidator: InputValidatorService
+    private readonly inputValidator: InputValidatorService,
+    @InjectPinoLogger(FlowExecutorService.name)
+    private readonly logger: PinoLogger,
   ) {}
 
   async executeFlow(
@@ -65,7 +66,7 @@ export class FlowExecutorService {
     const startTime = new Date();
     const executionId = this.generateExecutionId();
 
-    this.logger.log(`Starting flow execution: ${flowId} (${executionId})`);
+    this.logger.info({ flowId, executionId, orgId: tenant.orgId, userId: tenant.userId }, 'Starting flow execution');
 
     const flow = await this.prisma.flow.findUnique({
       where: { id: flowId, orgId: tenant.orgId }
@@ -118,12 +119,12 @@ export class FlowExecutorService {
               executionError = stepResult.error || { message: 'Step execution failed' };
               break;
             } else {
-              this.logger.warn(`Non-critical step ${step.id} failed, continuing execution`);
+              this.logger.warn({ stepId: step.id, stepType: step.type, flowId: flowId, executionId: executionId }, 'Non-critical step failed, continuing execution');
             }
           }
         } catch (error) {
           failedSteps++;
-          this.logger.error(`Unexpected error in step ${step.id}:`, error);
+          this.logger.error({ stepId: step.id, stepType: step.type, flowId: flowId, executionId: executionId, error: error.message }, 'Unexpected error in step execution');
           
           if (this.isStepCritical(step)) {
             executionStatus = 'failed';
@@ -159,10 +160,14 @@ export class FlowExecutorService {
         executionError?.message
       );
 
-      this.logger.log(
-        `Flow execution ${executionStatus}: ${flowId} (${executionId}) - ` +
-        `${completedSteps}/${steps.length} steps completed in ${duration}ms`
-      );
+      this.logger.info({
+        flowId,
+        executionId,
+        status: executionStatus,
+        completedSteps,
+        totalSteps: steps.length,
+        duration
+      }, `Flow execution ${executionStatus}`);
 
       return updatedLog;
 
@@ -189,7 +194,7 @@ export class FlowExecutorService {
         error.message
       );
 
-      this.logger.error(`Flow execution failed: ${flowId} (${executionId}):`, error);
+      this.logger.error({ flowId, executionId, error: error.message }, 'Flow execution failed');
       return updatedLog;
     }
   }
@@ -203,7 +208,7 @@ export class FlowExecutorService {
     await this.publishStepStarted(step, context);
     
     try {
-      this.logger.debug(`Executing step: ${step.id} (${step.type})`);
+      this.logger.debug({ stepId: step.id, stepType: step.type, flowId: context.flowId, executionId: context.executionId }, 'Executing step');
       
       const result = await this.executeStepByType(step, context);
       const duration = Date.now() - startTime;

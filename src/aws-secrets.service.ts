@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { ConfigService } from '@nestjs/config';
 import { 
   SecretsManagerClient, 
@@ -6,18 +7,23 @@ import {
   PutSecretValueCommand,
   CreateSecretCommand,
   DescribeSecretCommand,
+  DeleteSecretCommand,
   ResourceNotFoundException 
 } from '@aws-sdk/client-secrets-manager';
 
 @Injectable()
 export class AwsSecretsService {
-  private readonly logger = new Logger(AwsSecretsService.name);
   private client: SecretsManagerClient;
   private region: string;
   private secretCache = new Map<string, { value: any; timestamp: number }>();
   private readonly CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-  constructor(private configService: ConfigService) {
+  constructor(
+    private configService: ConfigService,
+    @InjectPinoLogger(AwsSecretsService.name)
+    private readonly logger: PinoLogger,
+  ) {
+
     this.region = this.configService.get<string>('AWS_REGION', 'us-east-1');
     this.client = new SecretsManagerClient({ 
       region: this.region,
@@ -25,7 +31,7 @@ export class AwsSecretsService {
       retryMode: 'adaptive'
     });
     
-    this.logger.log(`AWS Secrets Manager client initialized for region: ${this.region}`);
+    this.logger.info({ region: this.region }, 'AWS Secrets Manager client initialized');
   }
 
   async getSecret(secretId: string, key?: string): Promise<string> {
@@ -34,12 +40,12 @@ export class AwsSecretsService {
     // Check cache first
     const cached = this.secretCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp) < this.CACHE_DURATION) {
-      this.logger.debug(`Using cached secret: ${cacheKey}`);
+      this.logger.debug({ secretId, key, cached: true }, 'Using cached secret');
       return cached.value;
     }
 
     try {
-      this.logger.log(`Retrieving secret: ${secretId}${key ? ` (key: ${key})` : ''}`);
+      this.logger.info({ secretId, key }, 'Retrieving secret from AWS');
       
       // Add retry logic with exponential backoff
       let lastError: Error;
@@ -57,7 +63,7 @@ export class AwsSecretsService {
           // If no specific key is requested, return the entire secret string
           if (!key) {
             resultValue = response.SecretString;
-            this.logger.log(`Successfully retrieved secret: ${secretId}`);
+            this.logger.info({ secretId, fromCache: false }, 'Successfully retrieved secret');
           } else {
             // Parse JSON and extract specific key
             const secrets = JSON.parse(response.SecretString);
@@ -67,7 +73,7 @@ export class AwsSecretsService {
             }
 
             resultValue = secrets[key];
-            this.logger.log(`Successfully retrieved secret key: ${secretId}/${key}`);
+            this.logger.info({ secretId, key, fromCache: false }, 'Successfully retrieved secret key');
           }
 
           // Cache the result
@@ -82,7 +88,7 @@ export class AwsSecretsService {
           lastError = error as Error;
           if (attempt < 3) {
             const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-            this.logger.warn(`Attempt ${attempt} failed, retrying in ${delay}ms: ${error.message}`);
+            this.logger.warn({ secretId, key, attempt, delay, error: error.message }, 'Secret retrieval failed, retrying');
             await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
@@ -91,12 +97,12 @@ export class AwsSecretsService {
       throw lastError!;
       
     } catch (error) {
-      this.logger.error(`Failed to retrieve secret ${secretId}${key ? `/${key}` : ''} after 3 attempts:`, error);
+      this.logger.error({ secretId, key, error: error.message, attempts: 3 }, 'Failed to retrieve secret after all attempts');
       
       // If we have a stale cached value, use it as fallback
       const staleCache = this.secretCache.get(cacheKey);
       if (staleCache) {
-        this.logger.warn(`Using stale cached value for ${cacheKey} due to error`);
+        this.logger.warn({ secretId, key, cached: true, stale: true }, 'Using stale cached value due to error');
         return staleCache.value;
       }
       
@@ -109,7 +115,7 @@ export class AwsSecretsService {
       const secretString = await this.getSecret(secretId);
       return JSON.parse(secretString);
     } catch (error) {
-      this.logger.error(`Failed to parse secret ${secretId} as JSON:`, error);
+      this.logger.error({ secretId, error: error.message }, 'Failed to parse secret as JSON');
       throw error;
     }
   }
@@ -127,14 +133,14 @@ export class AwsSecretsService {
       await this.getSecret(secretId);
       return true;
     } catch (error) {
-      this.logger.error(`Cannot access secret ${secretId}:`, error);
+      this.logger.error({ secretId, error: error.message }, 'Cannot access secret');
       return false;
     }
   }
 
   async updateSecret(secretId: string, secretValue: string | Record<string, any>): Promise<void> {
     try {
-      this.logger.log(`Updating secret: ${secretId}`);
+      this.logger.info({ secretId }, 'Updating secret value');
 
       const secretString = typeof secretValue === 'string' 
         ? secretValue 
@@ -152,16 +158,16 @@ export class AwsSecretsService {
         .filter(key => key.startsWith(secretId));
       keysToRemove.forEach(key => this.secretCache.delete(key));
 
-      this.logger.log(`Successfully updated secret: ${secretId}`);
+      this.logger.info({ secretId }, 'Successfully updated secret');
     } catch (error) {
-      this.logger.error(`Failed to update secret ${secretId}:`, error);
+      this.logger.error({ secretId, error: error.message }, 'Failed to update secret');
       throw error;
     }
   }
 
   async createSecret(secretName: string, secretValue: string | Record<string, any>, description?: string): Promise<void> {
     try {
-      this.logger.log(`Creating secret: ${secretName}`);
+      this.logger.info({ secretName, description }, 'Creating new secret');
 
       const secretString = typeof secretValue === 'string' 
         ? secretValue 
@@ -174,9 +180,9 @@ export class AwsSecretsService {
       });
 
       await this.client.send(command);
-      this.logger.log(`Successfully created secret: ${secretName}`);
+      this.logger.info({ secretName }, 'Successfully created secret');
     } catch (error) {
-      this.logger.error(`Failed to create secret ${secretName}:`, error);
+      this.logger.error({ secretName, error: error.message }, 'Failed to create secret');
       throw error;
     }
   }
@@ -199,15 +205,42 @@ export class AwsSecretsService {
       const existingSecret = await this.getSecretAsJson(secretId);
       existingSecret[key] = value;
       await this.updateSecret(secretId, existingSecret);
-      this.logger.log(`Successfully updated key '${key}' in secret: ${secretId}`);
+      this.logger.info({ secretId, key }, 'Successfully updated secret key');
     } catch (error) {
-      this.logger.error(`Failed to update key '${key}' in secret ${secretId}:`, error);
+      this.logger.error({ secretId, key, error: error.message }, 'Failed to update secret key');
+      throw error;
+    }
+  }
+
+  async deleteSecret(secretId: string, forceDelete: boolean = false): Promise<void> {
+    try {
+      this.logger.info({ secretId, forceDelete }, 'Deleting secret');
+
+      const command = new DeleteSecretCommand({
+        SecretId: secretId,
+        ForceDeleteWithoutRecovery: forceDelete
+      });
+
+      await this.client.send(command);
+      
+      // Clear cache for this secret
+      const keysToRemove = Array.from(this.secretCache.keys())
+        .filter(key => key.startsWith(secretId));
+      keysToRemove.forEach(key => this.secretCache.delete(key));
+
+      this.logger.info({ secretId }, 'Successfully deleted secret');
+    } catch (error) {
+      if (error instanceof ResourceNotFoundException) {
+        this.logger.warn({ secretId }, 'Secret not found, may already be deleted');
+        return; // Don't throw error if secret doesn't exist
+      }
+      this.logger.error({ secretId, error: error.message }, 'Failed to delete secret');
       throw error;
     }
   }
 
   clearCache(): void {
     this.secretCache.clear();
-    this.logger.log('Secret cache cleared');
+    this.logger.info({ cacheSize: this.secretCache.size }, 'Secret cache cleared');
   }
 }

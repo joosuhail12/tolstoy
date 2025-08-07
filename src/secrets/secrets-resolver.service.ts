@@ -1,4 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { AwsSecretsService } from '../aws-secrets.service';
 
 export interface ToolCredentials {
@@ -22,19 +23,21 @@ export interface OAuthTokens {
 
 @Injectable()
 export class SecretsResolver {
-  private readonly logger = new Logger(SecretsResolver.name);
-
-  constructor(private readonly awsSecretsService: AwsSecretsService) {}
+  constructor(
+    private readonly awsSecretsService: AwsSecretsService,
+    @InjectPinoLogger(SecretsResolver.name)
+    private readonly logger: PinoLogger,
+  ) {}
 
   async getToolCredentials(toolName: string, orgId: string): Promise<ToolCredentials> {
     const secretId = this.buildToolSecretId(toolName, orgId);
     
     try {
-      this.logger.debug(`Retrieving credentials for tool: ${toolName}, org: ${orgId}`);
+      this.logger.debug({ toolName, orgId }, 'Retrieving credentials for tool');
       const credentials = await this.awsSecretsService.getSecretAsJson(secretId);
       return credentials as ToolCredentials;
     } catch (error) {
-      this.logger.error(`Failed to retrieve credentials for ${toolName}/${orgId}:`, error);
+      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to retrieve credentials for tool');
       throw new Error(`Tool credentials not found for ${toolName}`);
     }
   }
@@ -43,7 +46,7 @@ export class SecretsResolver {
     const secretId = this.buildToolSecretId(toolName, orgId);
     
     try {
-      this.logger.log(`Setting credentials for tool: ${toolName}, org: ${orgId}`);
+      this.logger.info({ toolName, orgId }, 'Setting credentials for tool');
       
       const secretExists = await this.awsSecretsService.secretExists(secretId);
       
@@ -57,9 +60,9 @@ export class SecretsResolver {
         );
       }
       
-      this.logger.log(`Successfully stored credentials for ${toolName}/${orgId}`);
+      this.logger.info({ toolName, orgId }, 'Successfully stored credentials');
     } catch (error) {
-      this.logger.error(`Failed to store credentials for ${toolName}/${orgId}:`, error);
+      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to store credentials');
       throw error;
     }
   }
@@ -84,14 +87,14 @@ export class SecretsResolver {
     const secretId = this.buildToolSecretId(toolName, orgId);
     
     try {
-      this.logger.log(`Updating OAuth tokens for ${toolName}/${orgId}`);
+      this.logger.info({ toolName, orgId, expiresAt: tokens.expiresAt }, 'Updating OAuth tokens');
       
       let existingCredentials: ToolCredentials = {};
       
       try {
         existingCredentials = await this.getToolCredentials(toolName, orgId);
       } catch (error) {
-        this.logger.debug(`No existing credentials found for ${toolName}/${orgId}, creating new`);
+        this.logger.debug({ toolName, orgId }, 'No existing credentials found, creating new');
       }
 
       const updatedCredentials: ToolCredentials = {
@@ -105,9 +108,9 @@ export class SecretsResolver {
       };
 
       await this.setToolCredentials(toolName, orgId, updatedCredentials);
-      this.logger.log(`Successfully updated OAuth tokens for ${toolName}/${orgId}`);
+      this.logger.info({ toolName, orgId }, 'Successfully updated OAuth tokens');
     } catch (error) {
-      this.logger.error(`Failed to update OAuth tokens for ${toolName}/${orgId}:`, error);
+      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to update OAuth tokens');
       throw error;
     }
   }
@@ -120,7 +123,7 @@ export class SecretsResolver {
       
       return tokens.expiresAt > 0 && (tokens.expiresAt - bufferTime) <= now;
     } catch (error) {
-      this.logger.debug(`Could not check token expiration for ${toolName}/${orgId}:`, error);
+      this.logger.debug({ toolName, orgId, error: error.message }, 'Could not check token expiration');
       return true;
     }
   }
@@ -141,7 +144,7 @@ export class SecretsResolver {
     try {
       existingCredentials = await this.getToolCredentials(toolName, orgId);
     } catch (error) {
-      this.logger.debug(`No existing credentials found for ${toolName}/${orgId}, creating new`);
+      this.logger.debug({ toolName, orgId }, 'No existing credentials found for token access, creating new');
     }
 
     const updatedCredentials: ToolCredentials = {
@@ -165,7 +168,7 @@ export class SecretsResolver {
 
   async deleteToolCredentials(toolName: string, orgId: string): Promise<void> {
     const secretId = this.buildToolSecretId(toolName, orgId);
-    this.logger.warn(`Deleting credentials for ${toolName}/${orgId} - Note: AWS Secrets Manager will schedule deletion, not immediate`);
+    this.logger.warn({ toolName, orgId }, 'Deleting credentials - AWS Secrets Manager will schedule deletion, not immediate');
   }
 
   private buildToolSecretId(toolName: string, orgId: string): string {
@@ -175,7 +178,7 @@ export class SecretsResolver {
   }
 
   async listAvailableTools(orgId: string): Promise<string[]> {
-    this.logger.debug(`Listing available tools for org: ${orgId}`);
+    this.logger.debug({ orgId }, 'Listing available tools for organization');
     return [];
   }
 }

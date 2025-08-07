@@ -355,6 +355,15 @@ PATCH  /webhooks/:id/toggle  # Enable/disable webhook
 POST   /webhooks/:id/test    # Send test event to webhook
 ```
 
+#### Tool Credentials (Requires tenant headers)
+```bash
+GET    /tools/secrets                    # List all tools with credential status
+POST   /tools/:toolId/secrets           # Store credentials for a tool
+GET    /tools/:toolId/secrets           # Get credentials for a tool (masked by default)
+GET    /tools/:toolId/secrets?unmask=true # Get unmasked credentials (use with caution)
+DELETE /tools/:toolId/secrets           # Delete stored credentials for a tool
+```
+
 ### API Testing Examples
 
 #### Create an Organization
@@ -380,6 +389,34 @@ curl -X POST http://localhost:3000/tools \
   -H "X-Org-ID: your-org-id" \
   -H "X-User-ID: your-user-id" \
   -d '{"name":"Slack API","baseUrl":"https://api.slack.com","authType":"bearer"}'
+```
+
+#### Store Tool Credentials (with tenant headers)
+```bash
+curl -X POST http://localhost:3000/tools/tool-123/secrets \
+  -H "Content-Type: application/json" \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id" \
+  -d '{
+    "credentials": {
+      "api_key": "sk-1234567890abcdef",
+      "client_secret": "cs-abcdef1234567890"
+    }
+  }'
+```
+
+#### List Tools with Credential Status
+```bash
+curl -X GET http://localhost:3000/tools/secrets \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+#### Get Tool Credentials (masked)
+```bash
+curl -X GET http://localhost:3000/tools/tool-123/secrets \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
 ```
 
 ### API Features
@@ -596,6 +633,65 @@ Live monitoring and debugging of workflow executions using Ably WebSocket integr
 - AWS Secrets Manager integration for API key storage
 - Comprehensive error handling and connection management
 - Built-in rate limiting and performance optimization
+
+### Tool Credentials Management
+
+Tolstoy provides secure credential storage for external tools using AWS Secrets Manager. This enables organizations to store API keys, OAuth tokens, and other sensitive credentials with proper multi-tenant isolation.
+
+#### Key Features
+- **Secure Storage**: All credentials stored in AWS Secrets Manager with encryption at rest
+- **Multi-tenant Isolation**: Credentials scoped per organization using naming convention `tolstoy/{orgId}/{toolId}`
+- **Automatic Masking**: Sensitive values are masked in API responses by default
+- **Credential Validation**: Input validation ensures secure credential formats
+- **Audit Trail**: Full logging of credential operations for security compliance
+
+#### Credential Storage Process
+1. **Tool Registration**: Create a tool in the system
+2. **Credential Storage**: Store credentials using the tool secrets API
+3. **Secret Creation**: AWS Secrets Manager secret created with organization scoping
+4. **Database Update**: Tool record updated with secret reference
+
+#### Security Best Practices
+- Credentials are never logged in plain text
+- API responses mask credential values by default
+- Short credentials (< 8 characters) rejected for sensitive fields
+- AWS Secrets Manager provides encryption at rest and in transit
+- Organization-based access control prevents cross-tenant access
+
+#### Example Credential Storage Response
+```json
+{
+  "toolId": "tool-123",
+  "toolName": "Slack API",
+  "maskedCredentials": {
+    "api_key": "sk-12***********cdef",
+    "client_secret": "cs-ab***********7890"
+  },
+  "createdAt": "2023-01-01T00:00:00.000Z",
+  "updatedAt": "2023-01-02T00:00:00.000Z"
+}
+```
+
+#### Tools with Credentials List Response
+```json
+[
+  {
+    "toolId": "tool-123",
+    "toolName": "Slack API",
+    "baseUrl": "https://api.slack.com",
+    "authType": "bearer",
+    "hasCredentials": true,
+    "credentialKeys": ["api_key", "client_secret"]
+  },
+  {
+    "toolId": "tool-456", 
+    "toolName": "GitHub API",
+    "baseUrl": "https://api.github.com",
+    "authType": "token",
+    "hasCredentials": false
+  }
+]
+```
 
 ### Setting Up AWS Secrets Manager
 
