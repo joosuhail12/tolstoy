@@ -10,6 +10,7 @@ jobs:
   deploy:
     name: Deploy to EC2
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     
     steps:
       - name: 📥 Checkout repository
@@ -94,14 +95,18 @@ jobs:
             echo '};' >> ecosystem.config.js
             
             echo "🔄 Restarting PM2 application..."
-            # Stop all PM2 processes and kill any remaining Node processes
-            pm2 stop all 2>/dev/null || true
-            pm2 delete all 2>/dev/null || true
-            pkill -f "tolstoy" 2>/dev/null || true
-            pkill -f "dist/main.js" 2>/dev/null || true
-            sleep 2
+            # Aggressive cleanup - kill all Node processes and PM2
+            pm2 kill 2>/dev/null || true
+            pkill -9 -f "node" 2>/dev/null || true
+            pkill -9 -f "tolstoy" 2>/dev/null || true
+            pkill -9 -f "dist/main.js" 2>/dev/null || true
+            sleep 3
             
-            # Clean start
+            # Clear old logs
+            rm -rf /home/ubuntu/logs/tolstoy-*
+            mkdir -p /home/ubuntu/logs
+            
+            # Fresh PM2 start
             pm2 start ecosystem.config.js
             pm2 save
             
