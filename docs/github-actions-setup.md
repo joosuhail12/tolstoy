@@ -37,7 +37,10 @@ You must configure the following secrets in your GitHub repository:
 To encode your SSH private key for the `EC2_KEY` secret:
 
 ```bash
-# On macOS/Linux:
+# On macOS:
+base64 -i tolstoy-key-pair.pem
+
+# On Linux:
 base64 -w 0 tolstoy-key-pair.pem
 
 # On Windows (PowerShell):

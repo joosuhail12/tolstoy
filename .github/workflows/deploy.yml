@@ -22,11 +22,11 @@ jobs:
           
       - name: ✅ Test SSH connection
         run: |
-          ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "echo 'SSH connection successful'"
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${{ secrets.EC2_USER }}"@"${{ secrets.EC2_HOST }}" "echo 'SSH connection successful'"
           
       - name: 🚀 Deploy application to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'DEPLOY_SCRIPT'
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${{ secrets.EC2_USER }}"@"${{ secrets.EC2_HOST }}" << 'DEPLOY_SCRIPT'
             set -e
             
             echo "🔄 Navigating to application directory..."
@@ -55,7 +55,7 @@ jobs:
           
       - name: 🗃️ Run database migrations (optional)
         run: |
-          ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'MIGRATION_SCRIPT'
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${{ secrets.EC2_USER }}"@"${{ secrets.EC2_HOST }}" << 'MIGRATION_SCRIPT'
             set -e
             cd ${{ secrets.EC2_PATH }}
             

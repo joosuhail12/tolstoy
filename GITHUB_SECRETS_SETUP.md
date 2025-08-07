@@ -16,6 +16,10 @@ Configure these secrets in your GitHub repository (**Settings** → **Secrets an
 Run this command to encode your SSH private key:
 
 ```bash
+# On macOS:
+base64 -i tolstoy-key-pair.pem
+
+# On Linux:
 base64 -w 0 tolstoy-key-pair.pem
 ```
 
