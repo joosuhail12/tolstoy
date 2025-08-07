@@ -1,15 +1,15 @@
-import { 
-  IsString, 
-  IsNotEmpty, 
-  IsUrl, 
-  IsArray, 
-  IsOptional, 
+import {
+  IsString,
+  IsNotEmpty,
+  IsUrl,
+  IsArray,
+  IsOptional,
   IsBoolean,
   ArrayNotEmpty,
   ArrayUnique,
   IsObject,
   MinLength,
-  MaxLength
+  MaxLength,
 } from 'class-validator';
 
 export class CreateWebhookDto {

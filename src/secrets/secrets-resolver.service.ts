@@ -34,7 +34,7 @@ export class SecretsResolver {
 
   async getToolCredentials(toolName: string, orgId: string): Promise<ToolCredentials> {
     const cacheKey = CacheKeys.secrets(orgId, toolName);
-    
+
     // Try cache first
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
@@ -43,53 +43,69 @@ export class SecretsResolver {
     }
 
     const secretId = this.buildToolSecretId(toolName, orgId);
-    
+
     try {
-      this.logger.debug({ toolName, orgId, cached: false }, 'Retrieving credentials from AWS Secrets Manager');
+      this.logger.debug(
+        { toolName, orgId, cached: false },
+        'Retrieving credentials from AWS Secrets Manager',
+      );
       const credentials = await this.awsSecretsService.getSecretAsJson(secretId);
-      
+
       // Cache the credentials
       await this.cacheService.set(cacheKey, credentials, { ttl: CacheKeys.TTL.SECRETS });
-      
+
       return credentials as ToolCredentials;
     } catch (error) {
-      this.logger.error({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to retrieve credentials for tool');
+      this.logger.error(
+        { toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' },
+        'Failed to retrieve credentials for tool',
+      );
       throw new Error(`Tool credentials not found for ${toolName}`);
     }
   }
 
-  async setToolCredentials(toolName: string, orgId: string, credentials: ToolCredentials): Promise<void> {
+  async setToolCredentials(
+    toolName: string,
+    orgId: string,
+    credentials: ToolCredentials,
+  ): Promise<void> {
     const secretId = this.buildToolSecretId(toolName, orgId);
     const cacheKey = CacheKeys.secrets(orgId, toolName);
-    
+
     try {
       this.logger.info({ toolName, orgId }, 'Setting credentials for tool');
-      
+
       const secretExists = await this.awsSecretsService.secretExists(secretId);
-      
+
       if (secretExists) {
         await this.awsSecretsService.updateSecret(secretId, credentials);
       } else {
         await this.awsSecretsService.createSecret(
-          secretId, 
-          credentials, 
-          `Credentials for ${toolName} - Organization ${orgId}`
+          secretId,
+          credentials,
+          `Credentials for ${toolName} - Organization ${orgId}`,
         );
       }
-      
+
       // Invalidate cache after updating credentials
       await this.cacheService.del(cacheKey);
-      
-      this.logger.info({ toolName, orgId }, 'Successfully stored credentials and invalidated cache');
+
+      this.logger.info(
+        { toolName, orgId },
+        'Successfully stored credentials and invalidated cache',
+      );
     } catch (error) {
-      this.logger.error({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to store credentials');
+      this.logger.error(
+        { toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' },
+        'Failed to store credentials',
+      );
       throw error;
     }
   }
 
   async getOAuthTokens(toolName: string, orgId: string): Promise<OAuthTokens> {
     const credentials = await this.getToolCredentials(toolName, orgId);
-    
+
     if (!credentials.accessToken) {
       throw new Error(`No access token found for ${toolName}`);
     }
@@ -99,19 +115,19 @@ export class SecretsResolver {
       refreshToken: credentials.refreshToken,
       expiresAt: credentials.expiresAt || 0,
       scope: credentials.scope,
-      tokenType: credentials.tokenType || 'Bearer'
+      tokenType: credentials.tokenType || 'Bearer',
     };
   }
 
   async updateOAuthTokens(toolName: string, orgId: string, tokens: OAuthTokens): Promise<void> {
     const secretId = this.buildToolSecretId(toolName, orgId);
     const cacheKey = CacheKeys.secrets(orgId, toolName);
-    
+
     try {
       this.logger.info({ toolName, orgId, expiresAt: tokens.expiresAt }, 'Updating OAuth tokens');
-      
+
       let existingCredentials: ToolCredentials = {};
-      
+
       try {
         existingCredentials = await this.getToolCredentials(toolName, orgId);
       } catch (error) {
@@ -125,17 +141,23 @@ export class SecretsResolver {
         expiresAt: tokens.expiresAt,
         scope: tokens.scope,
         tokenType: tokens.tokenType,
-        lastUpdated: new Date().toISOString()
+        lastUpdated: new Date().toISOString(),
       };
 
       await this.setToolCredentials(toolName, orgId, updatedCredentials);
-      
+
       // Additional cache invalidation for OAuth-specific operations
       await this.cacheService.del(cacheKey);
-      
-      this.logger.info({ toolName, orgId }, 'Successfully updated OAuth tokens and invalidated cache');
+
+      this.logger.info(
+        { toolName, orgId },
+        'Successfully updated OAuth tokens and invalidated cache',
+      );
     } catch (error) {
-      this.logger.error({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to update OAuth tokens');
+      this.logger.error(
+        { toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' },
+        'Failed to update OAuth tokens',
+      );
       throw error;
     }
   }
@@ -145,17 +167,20 @@ export class SecretsResolver {
       const tokens = await this.getOAuthTokens(toolName, orgId);
       const now = Date.now();
       const bufferTime = 5 * 60 * 1000; // 5 minutes buffer
-      
-      return tokens.expiresAt > 0 && (tokens.expiresAt - bufferTime) <= now;
+
+      return tokens.expiresAt > 0 && tokens.expiresAt - bufferTime <= now;
     } catch (error) {
-      this.logger.debug({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Could not check token expiration');
+      this.logger.debug(
+        { toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' },
+        'Could not check token expiration',
+      );
       return true;
     }
   }
 
   async getApiKey(toolName: string, orgId: string): Promise<string> {
     const credentials = await this.getToolCredentials(toolName, orgId);
-    
+
     if (!credentials.apiKey) {
       throw new Error(`No API key found for ${toolName}`);
     }
@@ -165,17 +190,20 @@ export class SecretsResolver {
 
   async setApiKey(toolName: string, orgId: string, apiKey: string): Promise<void> {
     let existingCredentials: ToolCredentials = {};
-    
+
     try {
       existingCredentials = await this.getToolCredentials(toolName, orgId);
     } catch (error) {
-      this.logger.debug({ toolName, orgId }, 'No existing credentials found for token access, creating new');
+      this.logger.debug(
+        { toolName, orgId },
+        'No existing credentials found for token access, creating new',
+      );
     }
 
     const updatedCredentials: ToolCredentials = {
       ...existingCredentials,
       apiKey,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     };
 
     await this.setToolCredentials(toolName, orgId, updatedCredentials);
@@ -183,7 +211,7 @@ export class SecretsResolver {
 
   async getWebhookSecret(toolName: string, orgId: string): Promise<string> {
     const credentials = await this.getToolCredentials(toolName, orgId);
-    
+
     if (!credentials.webhookSecret) {
       throw new Error(`No webhook secret found for ${toolName}`);
     }
@@ -194,18 +222,23 @@ export class SecretsResolver {
   async deleteToolCredentials(toolName: string, orgId: string): Promise<void> {
     const secretId = this.buildToolSecretId(toolName, orgId);
     const cacheKey = CacheKeys.secrets(orgId, toolName);
-    
+
     try {
       // Invalidate cache immediately
       await this.cacheService.del(cacheKey);
-      
-      this.logger.warn({ toolName, orgId }, 'Deleting credentials - AWS Secrets Manager will schedule deletion, not immediate');
-      
+
+      this.logger.warn(
+        { toolName, orgId },
+        'Deleting credentials - AWS Secrets Manager will schedule deletion, not immediate',
+      );
+
       // Note: AWS Secrets Manager deletion is scheduled, not immediate
       // The cache invalidation ensures stale data isn't served
-      
     } catch (error) {
-      this.logger.error({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to invalidate cache during credential deletion');
+      this.logger.error(
+        { toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' },
+        'Failed to invalidate cache during credential deletion',
+      );
     }
   }
 
@@ -228,17 +261,22 @@ export class SecretsResolver {
     try {
       const pattern = CacheKeys.secretsPattern(orgId);
       const deletedCount = await this.cacheService.delPattern(pattern);
-      
-      this.logger.info({ 
-        orgId, 
-        deletedKeys: deletedCount 
-      }, 'Invalidated all cached secrets for organization');
-      
+
+      this.logger.info(
+        {
+          orgId,
+          deletedKeys: deletedCount,
+        },
+        'Invalidated all cached secrets for organization',
+      );
     } catch (error) {
-      this.logger.error({ 
-        orgId, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      }, 'Failed to invalidate organization secrets cache');
+      this.logger.error(
+        {
+          orgId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        'Failed to invalidate organization secrets cache',
+      );
     }
   }
 
@@ -247,31 +285,40 @@ export class SecretsResolver {
    * Can be called during application startup or scheduled
    */
   async warmupCache(orgId: string, toolNames: string[]): Promise<void> {
-    this.logger.info({ 
-      orgId, 
-      tools: toolNames.length 
-    }, 'Warming up credentials cache');
+    this.logger.info(
+      {
+        orgId,
+        tools: toolNames.length,
+      },
+      'Warming up credentials cache',
+    );
 
-    const warmupPromises = toolNames.map(async (toolName) => {
+    const warmupPromises = toolNames.map(async toolName => {
       try {
         // This will cache the credentials if they exist
         await this.getToolCredentials(toolName, orgId);
       } catch (error) {
         // Ignore errors during warmup - tools may not have credentials
         const errorMsg = error instanceof Error ? error.message : 'Unknown warmup error';
-        this.logger.debug({ 
-          toolName, 
-          orgId, 
-          error: errorMsg 
-        }, 'Skipped warmup for tool without credentials');
+        this.logger.debug(
+          {
+            toolName,
+            orgId,
+            error: errorMsg,
+          },
+          'Skipped warmup for tool without credentials',
+        );
       }
     });
 
     await Promise.allSettled(warmupPromises);
-    
-    this.logger.info({ 
-      orgId, 
-      tools: toolNames.length 
-    }, 'Cache warmup completed');
+
+    this.logger.info(
+      {
+        orgId,
+        tools: toolNames.length,
+      },
+      'Cache warmup completed',
+    );
   }
 }

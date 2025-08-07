@@ -99,9 +99,9 @@ describe('ToolSecretsController', () => {
 
       const dto = { credentials: {} };
 
-      await expect(
-        controller.storeCredentials('tool-123', dto, 'org-123'),
-      ).rejects.toThrow(BadRequestException);
+      await expect(controller.storeCredentials('tool-123', dto, 'org-123')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should handle tool not found errors', async () => {
@@ -113,9 +113,9 @@ describe('ToolSecretsController', () => {
         credentials: { api_key: 'test-key' },
       };
 
-      await expect(
-        controller.storeCredentials('tool-123', dto, 'org-123'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.storeCredentials('tool-123', dto, 'org-123')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -164,9 +164,9 @@ describe('ToolSecretsController', () => {
         new NotFoundException('Tool tool-123 not found in organization org-123'),
       );
 
-      await expect(
-        controller.getCredentials('tool-123', 'org-123', undefined),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getCredentials('tool-123', 'org-123', undefined)).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should handle no credentials stored errors', async () => {
@@ -174,9 +174,9 @@ describe('ToolSecretsController', () => {
         new NotFoundException('No credentials stored for tool tool-123'),
       );
 
-      await expect(
-        controller.getCredentials('tool-123', 'org-123', undefined),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.getCredentials('tool-123', 'org-123', undefined)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -194,9 +194,9 @@ describe('ToolSecretsController', () => {
         new NotFoundException('Tool tool-123 not found in organization org-123'),
       );
 
-      await expect(
-        controller.deleteCredentials('tool-123', 'org-123'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.deleteCredentials('tool-123', 'org-123')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('should handle no credentials stored errors', async () => {
@@ -204,9 +204,9 @@ describe('ToolSecretsController', () => {
         new NotFoundException('No credentials stored for tool tool-123'),
       );
 
-      await expect(
-        controller.deleteCredentials('tool-123', 'org-123'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(controller.deleteCredentials('tool-123', 'org-123')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });
@@ -281,13 +281,11 @@ describe('ToolSecretsListController', () => {
     });
 
     it('should handle service errors', async () => {
-      service.listToolsWithCredentials.mockRejectedValue(
-        new Error('Database connection failed'),
-      );
+      service.listToolsWithCredentials.mockRejectedValue(new Error('Database connection failed'));
 
-      await expect(
-        controller.listToolsWithCredentials('org-123'),
-      ).rejects.toThrow('Database connection failed');
+      await expect(controller.listToolsWithCredentials('org-123')).rejects.toThrow(
+        'Database connection failed',
+      );
     });
   });
 });

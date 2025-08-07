@@ -75,7 +75,7 @@ export class AblyService implements OnModuleDestroy {
       this.logger.info('Initializing Ably client');
 
       const apiKey = await this.getAblyApiKey();
-      
+
       if (!apiKey) {
         this.logger.warn('Ably API key not found - real-time events will be disabled');
         return;
@@ -89,7 +89,7 @@ export class AblyService implements OnModuleDestroy {
         autoConnect: true,
         disconnectedRetryTimeout: 5000,
         suspendedRetryTimeout: 10000,
-        realtimeRequestTimeout: 10000
+        realtimeRequestTimeout: 10000,
       });
 
       this.client.connection.on('connected', () => {
@@ -100,14 +100,26 @@ export class AblyService implements OnModuleDestroy {
         this.logger.warn({ connectionState: 'disconnected' }, 'Ably connection lost');
       });
 
-      this.client.connection.on('failed', (error) => {
-        this.logger.error({ error: error instanceof Error ? error.message : 'Unknown error', connectionState: 'failed' }, 'Ably connection failed');
+      this.client.connection.on('failed', error => {
+        this.logger.error(
+          {
+            error: error instanceof Error ? error.message : 'Unknown error',
+            connectionState: 'failed',
+          },
+          'Ably connection failed',
+        );
       });
 
       this.isInitialized = true;
-      this.logger.info({ isInitialized: this.isInitialized }, 'Ably service initialized successfully');
+      this.logger.info(
+        { isInitialized: this.isInitialized },
+        'Ably service initialized successfully',
+      );
     } catch (error) {
-      this.logger.error({ error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to initialize Ably client');
+      this.logger.error(
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        'Failed to initialize Ably client',
+      );
       this.client = null;
     }
   }
@@ -122,7 +134,10 @@ export class AblyService implements OnModuleDestroy {
       const secretKey = await this.awsSecretsService.getAblyApiKey();
       return secretKey;
     } catch (error) {
-      this.logger.debug({ error: error instanceof Error ? error.message : 'Unknown error' }, 'Ably API key not found in secrets');
+      this.logger.debug(
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        'Ably API key not found in secrets',
+      );
       return null;
     }
   }
@@ -131,20 +146,36 @@ export class AblyService implements OnModuleDestroy {
     await this.initialize();
 
     if (!this.client) {
-      this.logger.debug({ stepId: event.stepId, status: event.status }, 'Ably client not available - skipping step event publication');
+      this.logger.debug(
+        { stepId: event.stepId, status: event.status },
+        'Ably client not available - skipping step event publication',
+      );
       return;
     }
 
     const channel = this.getFlowExecutionChannel(event.orgId, event.executionId);
-    
+
     try {
-      this.logger.debug({ channel, stepId: event.stepId, status: event.status, executionId: event.executionId }, 'Publishing step event to channel');
+      this.logger.debug(
+        { channel, stepId: event.stepId, status: event.status, executionId: event.executionId },
+        'Publishing step event to channel',
+      );
 
       await this.publishWithRetry(channel, 'step-status', event);
-      
-      this.logger.debug({ stepId: event.stepId, status: event.status }, 'Step event published successfully');
+
+      this.logger.debug(
+        { stepId: event.stepId, status: event.status },
+        'Step event published successfully',
+      );
     } catch (error) {
-      this.logger.error({ stepId: event.stepId, status: event.status, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to publish step event');
+      this.logger.error(
+        {
+          stepId: event.stepId,
+          status: event.status,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        'Failed to publish step event',
+      );
     }
   }
 
@@ -152,28 +183,44 @@ export class AblyService implements OnModuleDestroy {
     await this.initialize();
 
     if (!this.client) {
-      this.logger.debug({ executionId: event.executionId, status: event.status }, 'Ably client not available - skipping execution event publication');
+      this.logger.debug(
+        { executionId: event.executionId, status: event.status },
+        'Ably client not available - skipping execution event publication',
+      );
       return;
     }
 
     const channel = this.getFlowExecutionChannel(event.orgId, event.executionId);
-    
+
     try {
-      this.logger.debug({ channel, executionId: event.executionId, status: event.status, flowId: event.flowId }, 'Publishing execution event to channel');
+      this.logger.debug(
+        { channel, executionId: event.executionId, status: event.status, flowId: event.flowId },
+        'Publishing execution event to channel',
+      );
 
       await this.publishWithRetry(channel, 'execution-status', event);
-      
-      this.logger.info({ executionId: event.executionId, status: event.status }, 'Execution event published');
+
+      this.logger.info(
+        { executionId: event.executionId, status: event.status },
+        'Execution event published',
+      );
     } catch (error) {
-      this.logger.error({ executionId: event.executionId, status: event.status, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to publish execution event');
+      this.logger.error(
+        {
+          executionId: event.executionId,
+          status: event.status,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        'Failed to publish execution event',
+      );
     }
   }
 
   private async publishWithRetry(
-    channelName: string, 
-    eventName: string, 
-    data: any, 
-    maxRetries: number = 3
+    channelName: string,
+    eventName: string,
+    data: any,
+    maxRetries: number = 3,
   ): Promise<void> {
     if (!this.client) {
       throw new Error('Ably client not available');
@@ -188,10 +235,19 @@ export class AblyService implements OnModuleDestroy {
         return;
       } catch (error) {
         lastError = error as Error;
-        
+
         if (attempt < maxRetries) {
           const delay = Math.pow(2, attempt) * 1000;
-          this.logger.warn({ channelName, eventName, attempt, delay, error: error instanceof Error ? error.message : 'Unknown error' }, 'Ably publish attempt failed, retrying');
+          this.logger.warn(
+            {
+              channelName,
+              eventName,
+              attempt,
+              delay,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            },
+            'Ably publish attempt failed, retrying',
+          );
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
@@ -208,27 +264,38 @@ export class AblyService implements OnModuleDestroy {
     return `flows.${orgId}`;
   }
 
-  async publishCustomEvent(orgId: string, executionId: string, eventName: string, data: any): Promise<void> {
+  async publishCustomEvent(
+    orgId: string,
+    executionId: string,
+    eventName: string,
+    data: any,
+  ): Promise<void> {
     await this.initialize();
 
     if (!this.client) {
-      this.logger.debug({ eventName }, 'Ably client not available - skipping custom event publication');
+      this.logger.debug(
+        { eventName },
+        'Ably client not available - skipping custom event publication',
+      );
       return;
     }
 
     const channel = this.getFlowExecutionChannel(orgId, executionId);
-    
+
     try {
       await this.publishWithRetry(channel, eventName, {
         ...data,
         timestamp: new Date().toISOString(),
         orgId,
-        executionId
+        executionId,
       });
-      
+
       this.logger.debug({ channel, eventName }, 'Custom event published');
     } catch (error) {
-      this.logger.error({ eventName, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to publish custom event');
+      this.logger.error(
+        { eventName, error: error instanceof Error ? error.message : 'Unknown error' },
+        'Failed to publish custom event',
+      );
     }
   }
 
@@ -246,7 +313,7 @@ export class AblyService implements OnModuleDestroy {
       skipReason?: string;
       executeIf?: any;
       metadata?: { [key: string]: any };
-    } = {}
+    } = {},
   ): Promise<FlowStepEvent> {
     return {
       stepId,
@@ -255,7 +322,7 @@ export class AblyService implements OnModuleDestroy {
       executionId,
       orgId,
       flowId,
-      ...options
+      ...options,
     };
   }
 
@@ -272,7 +339,7 @@ export class AblyService implements OnModuleDestroy {
       duration?: number;
       output?: any;
       error?: { message: string; code?: string };
-    } = {}
+    } = {},
   ): Promise<FlowExecutionEvent> {
     return {
       executionId,
@@ -280,7 +347,7 @@ export class AblyService implements OnModuleDestroy {
       timestamp: new Date().toISOString(),
       orgId,
       flowId,
-      ...options
+      ...options,
     };
   }
 

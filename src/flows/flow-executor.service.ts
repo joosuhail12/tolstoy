@@ -7,7 +7,10 @@ import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { SecretsResolver } from '../secrets/secrets-resolver.service';
 import { OAuthTokenService } from '../oauth/oauth-token.service';
 import { InputValidatorService } from '../common/services/input-validator.service';
-import { ConditionEvaluatorService, ConditionContext } from '../common/services/condition-evaluator.service';
+import {
+  ConditionEvaluatorService,
+  ConditionContext,
+} from '../common/services/condition-evaluator.service';
 import { SandboxService, SandboxExecutionContext } from '../sandbox/sandbox.service';
 
 export interface FlowStep {
@@ -68,15 +71,18 @@ export class FlowExecutorService {
   async executeFlow(
     flowId: string,
     tenant: TenantContext,
-    inputVariables: any = {}
+    inputVariables: any = {},
   ): Promise<ExecutionLog> {
     const startTime = new Date();
     const executionId = this.generateExecutionId();
 
-    this.logger.info({ flowId, executionId, orgId: tenant.orgId, userId: tenant.userId }, 'Starting flow execution');
+    this.logger.info(
+      { flowId, executionId, orgId: tenant.orgId, userId: tenant.userId },
+      'Starting flow execution',
+    );
 
     const flow = await this.prisma.flow.findUnique({
-      where: { id: flowId, orgId: tenant.orgId }
+      where: { id: flowId, orgId: tenant.orgId },
     });
 
     if (!flow) {
@@ -90,11 +96,11 @@ export class FlowExecutorService {
       userId: tenant.userId,
       startTime,
       variables: inputVariables,
-      stepOutputs: {}
+      stepOutputs: {},
     };
 
     const steps = this.parseFlowSteps(flow.steps);
-    
+
     await this.publishExecutionStarted(executionContext, flow, steps.length);
 
     const executionLog = await this.createExecutionLog(
@@ -102,7 +108,7 @@ export class FlowExecutorService {
       flowId,
       tenant,
       'running',
-      inputVariables
+      inputVariables,
     );
 
     let executionStatus: 'completed' | 'failed' | 'cancelled' = 'completed';
@@ -115,43 +121,61 @@ export class FlowExecutorService {
       for (const step of steps) {
         try {
           const stepResult = await this.executeStep(step, executionContext);
-          
+
           if (stepResult.skipped) {
             skippedSteps++;
-            this.logger.info({ 
-              stepId: step.id, 
-              stepType: step.type, 
-              flowId: flowId, 
-              executionId: executionId,
-              skipReason: stepResult.metadata?.skipReason 
-            }, 'Step skipped due to executeIf condition');
+            this.logger.info(
+              {
+                stepId: step.id,
+                stepType: step.type,
+                flowId: flowId,
+                executionId: executionId,
+                skipReason: stepResult.metadata?.skipReason,
+              },
+              'Step skipped due to executeIf condition',
+            );
             // Skipped steps don't contribute output but don't fail the flow
             continue;
           }
-          
+
           if (stepResult.success) {
             completedSteps++;
             executionContext.stepOutputs[step.id] = stepResult.output;
           } else {
             failedSteps++;
-            
+
             if (this.isStepCritical(step)) {
               executionStatus = 'failed';
               executionError = stepResult.error || { message: 'Step execution failed' };
               break;
             } else {
-              this.logger.warn({ stepId: step.id, stepType: step.type, flowId: flowId, executionId: executionId }, 'Non-critical step failed, continuing execution');
+              this.logger.warn(
+                { stepId: step.id, stepType: step.type, flowId: flowId, executionId: executionId },
+                'Non-critical step failed, continuing execution',
+              );
             }
           }
         } catch (error) {
           failedSteps++;
-          this.logger.error({ stepId: step.id, stepType: step.type, flowId: flowId, executionId: executionId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Unexpected error in step execution');
-          
+          this.logger.error(
+            {
+              stepId: step.id,
+              stepType: step.type,
+              flowId: flowId,
+              executionId: executionId,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            },
+            'Unexpected error in step execution',
+          );
+
           if (this.isStepCritical(step)) {
             executionStatus = 'failed';
-            executionError = { 
-              message: error instanceof Error ? error.message : 'Unknown error', 
-              code: error instanceof Error && (error as any).code ? (error as any).code : 'EXECUTION_ERROR' 
+            executionError = {
+              message: error instanceof Error ? error.message : 'Unknown error',
+              code:
+                error instanceof Error && (error as any).code
+                  ? (error as any).code
+                  : 'EXECUTION_ERROR',
             };
             break;
           }
@@ -159,77 +183,76 @@ export class FlowExecutorService {
       }
 
       const duration = Date.now() - startTime.getTime();
-      
-      await this.publishExecutionCompleted(
-        executionContext, 
-        flow, 
-        executionStatus, 
-        {
-          totalSteps: steps.length,
-          completedSteps,
-          failedSteps,
-          skippedSteps,
-          duration,
-          output: executionContext.stepOutputs,
-          error: executionError
-        }
-      );
+
+      await this.publishExecutionCompleted(executionContext, flow, executionStatus, {
+        totalSteps: steps.length,
+        completedSteps,
+        failedSteps,
+        skippedSteps,
+        duration,
+        output: executionContext.stepOutputs,
+        error: executionError,
+      });
 
       const updatedLog = await this.updateExecutionLog(
         executionLog.id,
         executionStatus,
         executionContext.stepOutputs,
-        executionError?.message
+        executionError?.message,
       );
 
-      this.logger.info({
-        flowId,
-        executionId,
-        status: executionStatus,
-        completedSteps,
-        failedSteps,
-        skippedSteps,
-        totalSteps: steps.length,
-        duration
-      }, `Flow execution ${executionStatus}`);
+      this.logger.info(
+        {
+          flowId,
+          executionId,
+          status: executionStatus,
+          completedSteps,
+          failedSteps,
+          skippedSteps,
+          totalSteps: steps.length,
+          duration,
+        },
+        `Flow execution ${executionStatus}`,
+      );
 
       return updatedLog;
-
     } catch (error) {
       const duration = Date.now() - startTime.getTime();
-      
-      await this.publishExecutionCompleted(
-        executionContext,
-        flow,
-        'failed',
-        {
-          totalSteps: steps.length,
-          completedSteps,
-          failedSteps: failedSteps + 1,
-          skippedSteps,
-          duration,
-          error: { message: error instanceof Error ? error.message : 'Unknown error', code: error instanceof Error && (error as any).code ? (error as any).code : 'EXECUTION_ERROR' }
-        }
-      );
+
+      await this.publishExecutionCompleted(executionContext, flow, 'failed', {
+        totalSteps: steps.length,
+        completedSteps,
+        failedSteps: failedSteps + 1,
+        skippedSteps,
+        duration,
+        error: {
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code:
+            error instanceof Error && (error as any).code ? (error as any).code : 'EXECUTION_ERROR',
+        },
+      });
 
       const updatedLog = await this.updateExecutionLog(
         executionLog.id,
         'failed',
         executionContext.stepOutputs,
-        error instanceof Error ? error.message : 'Unknown error'
+        error instanceof Error ? error.message : 'Unknown error',
       );
 
-      this.logger.error({ flowId, executionId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Flow execution failed');
+      this.logger.error(
+        { flowId, executionId, error: error instanceof Error ? error.message : 'Unknown error' },
+        'Flow execution failed',
+      );
       return updatedLog;
     }
   }
 
   private async executeStep(
     step: FlowStep,
-    context: FlowExecutionContext
+    context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     const startTime = Date.now();
-    
+
     // Check executeIf condition before executing the step
     if (step.executeIf) {
       try {
@@ -248,23 +271,26 @@ export class FlowExecutorService {
         };
 
         const shouldExecute = this.conditionEvaluator.evaluate(step.executeIf, conditionContext);
-        
+
         if (!shouldExecute) {
           const duration = Date.now() - startTime;
           const skipReason = 'executeIf condition evaluated to false';
-          
-          this.logger.info({ 
-            stepId: step.id, 
-            stepType: step.type, 
-            flowId: context.flowId, 
-            executionId: context.executionId,
-            executeIf: step.executeIf,
-            skipReason 
-          }, 'Step skipped due to executeIf condition');
-          
+
+          this.logger.info(
+            {
+              stepId: step.id,
+              stepType: step.type,
+              flowId: context.flowId,
+              executionId: context.executionId,
+              executeIf: step.executeIf,
+              skipReason,
+            },
+            'Step skipped due to executeIf condition',
+          );
+
           // Publish step skipped event
           await this.publishStepSkipped(step, context, skipReason);
-          
+
           return {
             success: true,
             skipped: true,
@@ -274,38 +300,48 @@ export class FlowExecutorService {
               stepType: step.type,
               stepId: step.id,
               timestamp: new Date().toISOString(),
-            }
+            },
           };
         }
-        
       } catch (error) {
-        this.logger.error({ 
-          stepId: step.id, 
-          stepType: step.type, 
-          flowId: context.flowId, 
-          executionId: context.executionId,
-          executeIf: step.executeIf,
-          error: error instanceof Error ? error.message : 'Unknown error' 
-        }, 'Failed to evaluate executeIf condition, proceeding with step execution');
-        
+        this.logger.error(
+          {
+            stepId: step.id,
+            stepType: step.type,
+            flowId: context.flowId,
+            executionId: context.executionId,
+            executeIf: step.executeIf,
+            error: error instanceof Error ? error.message : 'Unknown error',
+          },
+          'Failed to evaluate executeIf condition, proceeding with step execution',
+        );
+
         // If condition evaluation fails, proceed with step execution to be safe
       }
     }
-    
+
     await this.publishStepStarted(step, context);
-    
+
     try {
-      this.logger.debug({ stepId: step.id, stepType: step.type, flowId: context.flowId, executionId: context.executionId }, 'Executing step');
-      
+      this.logger.debug(
+        {
+          stepId: step.id,
+          stepType: step.type,
+          flowId: context.flowId,
+          executionId: context.executionId,
+        },
+        'Executing step',
+      );
+
       const result = await this.executeStepByType(step, context);
       const duration = Date.now() - startTime;
-      
+
       const stepResult: StepExecutionResult = {
         ...result,
         metadata: {
           ...result.metadata,
-          duration
-        }
+          duration,
+        },
       };
 
       if (result.success) {
@@ -315,17 +351,19 @@ export class FlowExecutorService {
       }
 
       return stepResult;
-
     } catch (error) {
       const duration = Date.now() - startTime;
       const stepResult: StepExecutionResult = {
         success: false,
         error: {
           message: error instanceof Error ? error.message : 'Unknown error',
-          code: error instanceof Error && (error as any).code ? (error as any).code : 'STEP_EXECUTION_ERROR',
-          stack: error instanceof Error ? error.stack : 'No stack trace'
+          code:
+            error instanceof Error && (error as any).code
+              ? (error as any).code
+              : 'STEP_EXECUTION_ERROR',
+          stack: error instanceof Error ? error.stack : 'No stack trace',
         },
-        metadata: { duration }
+        metadata: { duration },
       };
 
       await this.publishStepFailed(step, context, stepResult);
@@ -335,7 +373,7 @@ export class FlowExecutorService {
 
   private async executeStepByType(
     step: FlowStep,
-    context: FlowExecutionContext
+    context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     switch (step.type) {
       case 'action':
@@ -363,31 +401,31 @@ export class FlowExecutorService {
           success: false,
           error: {
             message: `Unknown step type: ${step.type}`,
-            code: 'UNKNOWN_STEP_TYPE'
-          }
+            code: 'UNKNOWN_STEP_TYPE',
+          },
         };
     }
   }
 
   private async executeHttpRequest(
     step: FlowStep,
-    context: FlowExecutionContext
+    context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     const { url, method = 'GET', headers = {}, body } = step.config;
-    
+
     try {
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
-          ...headers
+          ...headers,
         },
-        body: body ? JSON.stringify(body) : undefined
+        body: body ? JSON.stringify(body) : undefined,
       });
 
       const responseData = await response.text();
       let parsedData;
-      
+
       try {
         parsedData = JSON.parse(responseData);
       } catch {
@@ -400,46 +438,48 @@ export class FlowExecutorService {
           status: response.status,
           statusText: response.statusText,
           data: parsedData,
-          headers: Object.fromEntries(response.headers.entries())
+          headers: Object.fromEntries(response.headers.entries()),
         },
-        error: response.ok ? undefined : {
-          message: `HTTP ${response.status}: ${response.statusText}`,
-          code: 'HTTP_ERROR'
-        }
+        error: response.ok
+          ? undefined
+          : {
+              message: `HTTP ${response.status}: ${response.statusText}`,
+              code: 'HTTP_ERROR',
+            },
       };
     } catch (error) {
       return {
         success: false,
         error: {
           message: error instanceof Error ? error.message : 'Unknown error',
-          code: 'NETWORK_ERROR'
-        }
+          code: 'NETWORK_ERROR',
+        },
       };
     }
   }
 
   private async executeOAuthApiCall(
     step: FlowStep,
-    context: FlowExecutionContext
+    context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     const { toolName, url, method = 'GET', headers = {}, body } = step.config;
-    
+
     try {
       const accessToken = await this.oauthService.getValidAccessToken(toolName, context.orgId);
-      
+
       const response = await fetch(url, {
         method,
         headers: {
-          'Authorization': `Bearer ${accessToken}`,
+          Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
-          ...headers
+          ...headers,
         },
-        body: body ? JSON.stringify(body) : undefined
+        body: body ? JSON.stringify(body) : undefined,
       });
 
       const responseData = await response.text();
       let parsedData;
-      
+
       try {
         parsedData = JSON.parse(responseData);
       } catch {
@@ -452,34 +492,42 @@ export class FlowExecutorService {
           status: response.status,
           statusText: response.statusText,
           data: parsedData,
-          headers: Object.fromEntries(response.headers.entries())
+          headers: Object.fromEntries(response.headers.entries()),
         },
-        error: response.ok ? undefined : {
-          message: `HTTP ${response.status}: ${response.statusText}`,
-          code: 'OAUTH_API_ERROR'
-        }
+        error: response.ok
+          ? undefined
+          : {
+              message: `HTTP ${response.status}: ${response.statusText}`,
+              code: 'OAUTH_API_ERROR',
+            },
       };
     } catch (error) {
       return {
         success: false,
         error: {
           message: `OAuth API call failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          code: 'OAUTH_ERROR'
-        }
+          code: 'OAUTH_ERROR',
+        },
       };
     }
   }
 
-  private async executeWebhook(step: FlowStep, context: FlowExecutionContext): Promise<StepExecutionResult> {
+  private async executeWebhook(
+    step: FlowStep,
+    context: FlowExecutionContext,
+  ): Promise<StepExecutionResult> {
     return {
       success: true,
-      output: { message: 'Webhook step executed (placeholder)' }
+      output: { message: 'Webhook step executed (placeholder)' },
     };
   }
 
-  private async executeDataTransform(step: FlowStep, context: FlowExecutionContext): Promise<StepExecutionResult> {
+  private async executeDataTransform(
+    step: FlowStep,
+    context: FlowExecutionContext,
+  ): Promise<StepExecutionResult> {
     const { script, useSandbox = true } = step.config;
-    
+
     if (useSandbox && this.sandboxService.isConfigured()) {
       // Use sandbox for secure execution
       const sandboxCode = `
@@ -502,7 +550,7 @@ export class FlowExecutorService {
         };
 
         const result = await this.sandboxService.runSync(sandboxCode, sandboxContext);
-        
+
         return {
           success: result.success,
           output: result.output,
@@ -511,16 +559,16 @@ export class FlowExecutorService {
             duration: result.executionTime || 0,
             executionTime: result.executionTime,
             sandboxMode: 'sync',
-            stepType: 'data_transform'
-          }
+            stepType: 'data_transform',
+          },
         };
       } catch (error) {
         return {
           success: false,
           error: {
             message: `Sandbox data transform failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            code: 'SANDBOX_TRANSFORM_ERROR'
-          }
+            code: 'SANDBOX_TRANSFORM_ERROR',
+          },
         };
       }
     } else {
@@ -528,30 +576,33 @@ export class FlowExecutorService {
       try {
         const transformFunction = new Function('input', 'context', script);
         const result = transformFunction(context.stepOutputs, context);
-        
+
         return {
           success: true,
           output: result,
           metadata: {
             duration: 0,
-            executionMode: 'direct'
-          }
+            executionMode: 'direct',
+          },
         };
       } catch (error) {
         return {
           success: false,
           error: {
             message: `Data transform failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            code: 'TRANSFORM_ERROR'
-          }
+            code: 'TRANSFORM_ERROR',
+          },
         };
       }
     }
   }
 
-  private async executeConditional(step: FlowStep, context: FlowExecutionContext): Promise<StepExecutionResult> {
+  private async executeConditional(
+    step: FlowStep,
+    context: FlowExecutionContext,
+  ): Promise<StepExecutionResult> {
     const { condition, useSandbox = true } = step.config;
-    
+
     if (useSandbox && this.sandboxService.isConfigured()) {
       // Use sandbox for secure condition evaluation
       const sandboxCode = `
@@ -572,7 +623,7 @@ export class FlowExecutorService {
         };
 
         const result = await this.sandboxService.runSync(sandboxCode, sandboxContext);
-        
+
         return {
           success: result.success,
           output: { conditionResult: result.output },
@@ -581,16 +632,16 @@ export class FlowExecutorService {
             duration: result.executionTime || 0,
             executionTime: result.executionTime,
             sandboxMode: 'sync',
-            stepType: 'conditional'
-          }
+            stepType: 'conditional',
+          },
         };
       } catch (error) {
         return {
           success: false,
           error: {
             message: `Sandbox condition evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            code: 'SANDBOX_CONDITION_ERROR'
-          }
+            code: 'SANDBOX_CONDITION_ERROR',
+          },
         };
       }
     } else {
@@ -598,22 +649,22 @@ export class FlowExecutorService {
       try {
         const conditionFunction = new Function('context', `return ${condition}`);
         const result = conditionFunction(context);
-        
+
         return {
           success: true,
           output: { conditionResult: result },
           metadata: {
             duration: 0,
-            executionMode: 'direct'
-          }
+            executionMode: 'direct',
+          },
         };
       } catch (error) {
         return {
           success: false,
           error: {
             message: `Condition evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            code: 'CONDITION_ERROR'
-          }
+            code: 'CONDITION_ERROR',
+          },
         };
       }
     }
@@ -621,7 +672,7 @@ export class FlowExecutorService {
 
   private async executeAction(
     step: FlowStep,
-    context: FlowExecutionContext
+    context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     const { actionId, inputs } = step.config;
 
@@ -630,15 +681,15 @@ export class FlowExecutorService {
         success: false,
         error: {
           message: 'Action ID is required for action step',
-          code: 'MISSING_ACTION_ID'
-        }
+          code: 'MISSING_ACTION_ID',
+        },
       };
     }
 
     try {
       const action = await this.prisma.action.findUnique({
         where: { id: actionId },
-        include: { tool: true }
+        include: { tool: true },
       });
 
       if (!action) {
@@ -646,8 +697,8 @@ export class FlowExecutorService {
           success: false,
           error: {
             message: `Action with ID ${actionId} not found`,
-            code: 'ACTION_NOT_FOUND'
-          }
+            code: 'ACTION_NOT_FOUND',
+          },
         };
       }
 
@@ -656,13 +707,13 @@ export class FlowExecutorService {
           success: false,
           error: {
             message: 'Access denied: Action belongs to different organization',
-            code: 'ACTION_ACCESS_DENIED'
-          }
+            code: 'ACTION_ACCESS_DENIED',
+          },
         };
       }
 
       let validatedInputs = inputs || {};
-      
+
       if (action.inputSchema && Array.isArray(action.inputSchema)) {
         try {
           validatedInputs = this.inputValidator.validate(action.inputSchema as any[], inputs);
@@ -671,8 +722,8 @@ export class FlowExecutorService {
             success: false,
             error: {
               message: `Input validation failed: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`,
-              code: 'INPUT_VALIDATION_ERROR'
-            }
+              code: 'INPUT_VALIDATION_ERROR',
+            },
           };
         }
       }
@@ -683,16 +734,15 @@ export class FlowExecutorService {
       return {
         success: executionResult.success,
         output: executionResult.output,
-        error: executionResult.error
+        error: executionResult.error,
       };
-
     } catch (error) {
       return {
         success: false,
         error: {
           message: `Action execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          code: 'ACTION_EXECUTION_ERROR'
-        }
+          code: 'ACTION_EXECUTION_ERROR',
+        },
       };
     }
   }
@@ -720,21 +770,21 @@ export class FlowExecutorService {
   private resolveTemplate(template: string, context: FlowExecutionContext): any {
     return template.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
       const trimmedPath = path.trim();
-      
+
       if (trimmedPath.startsWith('steps.')) {
         const stepPath = trimmedPath.substring(6);
         return this.getNestedValue(context.stepOutputs, stepPath);
       }
-      
+
       if (trimmedPath.startsWith('variables.')) {
         const varPath = trimmedPath.substring(10);
         return this.getNestedValue(context.variables, varPath);
       }
-      
+
       if (context.variables[trimmedPath] !== undefined) {
         return context.variables[trimmedPath];
       }
-      
+
       return match;
     });
   }
@@ -752,20 +802,22 @@ export class FlowExecutorService {
     try {
       const requestHeaders = {
         'Content-Type': 'application/json',
-        ...headers
+        ...headers,
       };
 
-      const requestBody = ['GET', 'HEAD'].includes(method.toUpperCase()) ? undefined : JSON.stringify(inputs);
+      const requestBody = ['GET', 'HEAD'].includes(method.toUpperCase())
+        ? undefined
+        : JSON.stringify(inputs);
 
       const response = await fetch(url, {
         method: method.toUpperCase(),
         headers: requestHeaders,
-        body: requestBody
+        body: requestBody,
       });
 
       const responseData = await response.text();
       let parsedData;
-      
+
       try {
         parsedData = JSON.parse(responseData);
       } catch {
@@ -778,20 +830,22 @@ export class FlowExecutorService {
           status: response.status,
           statusText: response.statusText,
           data: parsedData,
-          headers: Object.fromEntries(response.headers.entries())
+          headers: Object.fromEntries(response.headers.entries()),
         },
-        error: response.ok ? undefined : {
-          message: `HTTP ${response.status}: ${response.statusText}`,
-          code: 'ACTION_HTTP_ERROR'
-        }
+        error: response.ok
+          ? undefined
+          : {
+              message: `HTTP ${response.status}: ${response.statusText}`,
+              code: 'ACTION_HTTP_ERROR',
+            },
       };
     } catch (error) {
       return {
         success: false,
         error: {
           message: `Action request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          code: 'ACTION_NETWORK_ERROR'
-        }
+          code: 'ACTION_NETWORK_ERROR',
+        },
       };
     }
   }
@@ -802,7 +856,7 @@ export class FlowExecutorService {
    */
   private async executeSandboxSync(
     step: FlowStep,
-    context: FlowExecutionContext
+    context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     const { code, language } = step.config;
 
@@ -811,8 +865,8 @@ export class FlowExecutorService {
         success: false,
         error: {
           message: 'Code is required for sandbox_sync step',
-          code: 'MISSING_CODE'
-        }
+          code: 'MISSING_CODE',
+        },
       };
     }
 
@@ -828,7 +882,7 @@ export class FlowExecutorService {
       };
 
       const result = await this.sandboxService.runSync(code, sandboxContext);
-      
+
       return {
         success: result.success,
         output: result.output,
@@ -837,17 +891,16 @@ export class FlowExecutorService {
           duration: result.executionTime || 0,
           executionTime: result.executionTime,
           sandboxMode: 'sync',
-          language: language || 'javascript'
-        }
+          language: language || 'javascript',
+        },
       };
-
     } catch (error) {
       return {
         success: false,
         error: {
           message: `Sandbox sync execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          code: 'SANDBOX_SYNC_ERROR'
-        }
+          code: 'SANDBOX_SYNC_ERROR',
+        },
       };
     }
   }
@@ -858,7 +911,7 @@ export class FlowExecutorService {
    */
   private async executeSandboxAsync(
     step: FlowStep,
-    context: FlowExecutionContext
+    context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     const { code, language, pollInterval = 1000, maxPollAttempts = 300 } = step.config;
 
@@ -867,8 +920,8 @@ export class FlowExecutorService {
         success: false,
         error: {
           message: 'Code is required for sandbox_async step',
-          code: 'MISSING_CODE'
-        }
+          code: 'MISSING_CODE',
+        },
       };
     }
 
@@ -885,7 +938,7 @@ export class FlowExecutorService {
 
       // Start async execution
       const sessionId = await this.sandboxService.runAsync(code, sandboxContext);
-      
+
       // Poll for completion or return session info for later retrieval
       if (step.config.waitForCompletion !== false) {
         // Poll for completion
@@ -895,7 +948,7 @@ export class FlowExecutorService {
           attempts++;
 
           const asyncResult = await this.sandboxService.getAsyncResult(sessionId, sandboxContext);
-          
+
           if (asyncResult.status === 'completed' || asyncResult.status === 'failed') {
             const result = asyncResult.result;
             return {
@@ -908,8 +961,8 @@ export class FlowExecutorService {
                 sandboxMode: 'async',
                 sessionId: asyncResult.sessionId,
                 pollAttempts: attempts,
-                language: language || 'javascript'
-              }
+                language: language || 'javascript',
+              },
             };
           }
         }
@@ -920,40 +973,39 @@ export class FlowExecutorService {
           output: { sessionId },
           error: {
             message: `Async execution timed out after ${maxPollAttempts} attempts`,
-            code: 'SANDBOX_ASYNC_TIMEOUT'
+            code: 'SANDBOX_ASYNC_TIMEOUT',
           },
           metadata: {
             duration: maxPollAttempts * pollInterval,
             sandboxMode: 'async',
             sessionId,
             pollAttempts: attempts,
-            language: language || 'javascript'
-          }
+            language: language || 'javascript',
+          },
         };
       } else {
         // Return immediately with session info
         return {
           success: true,
-          output: { 
+          output: {
             sessionId,
-            message: 'Async execution started - use getAsyncResult to retrieve results'
+            message: 'Async execution started - use getAsyncResult to retrieve results',
           },
           metadata: {
             duration: 0,
             sandboxMode: 'async',
             sessionId,
-            language: language || 'javascript'
-          }
+            language: language || 'javascript',
+          },
         };
       }
-
     } catch (error) {
       return {
         success: false,
         error: {
           message: `Sandbox async execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-          code: 'SANDBOX_ASYNC_ERROR'
-        }
+          code: 'SANDBOX_ASYNC_ERROR',
+        },
       };
     }
   }
@@ -964,7 +1016,7 @@ export class FlowExecutorService {
    */
   private async executeCodeExecution(
     step: FlowStep,
-    context: FlowExecutionContext
+    context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     const { mode = 'sync' } = step.config;
 
@@ -975,14 +1027,17 @@ export class FlowExecutorService {
     }
   }
 
-  private async executeDelay(step: FlowStep, context: FlowExecutionContext): Promise<StepExecutionResult> {
+  private async executeDelay(
+    step: FlowStep,
+    context: FlowExecutionContext,
+  ): Promise<StepExecutionResult> {
     const { delayMs } = step.config;
-    
+
     await new Promise(resolve => setTimeout(resolve, delayMs));
-    
+
     return {
       success: true,
-      output: { delayedFor: delayMs }
+      output: { delayedFor: delayMs },
     };
   }
 
@@ -993,16 +1048,16 @@ export class FlowExecutorService {
       context.executionId,
       context.orgId,
       context.flowId,
-      { stepName: step.name }
+      { stepName: step.name },
     );
-    
+
     await this.ablyService.publishStepEvent(event);
   }
 
   private async publishStepCompleted(
     step: FlowStep,
     context: FlowExecutionContext,
-    result: StepExecutionResult
+    result: StepExecutionResult,
   ): Promise<void> {
     const event = await this.ablyService.createStepEvent(
       step.id,
@@ -1013,17 +1068,17 @@ export class FlowExecutorService {
       {
         stepName: step.name,
         output: result.output,
-        duration: result.metadata?.duration
-      }
+        duration: result.metadata?.duration,
+      },
     );
-    
+
     await this.ablyService.publishStepEvent(event);
   }
 
   private async publishStepFailed(
     step: FlowStep,
     context: FlowExecutionContext,
-    result: StepExecutionResult
+    result: StepExecutionResult,
   ): Promise<void> {
     const event = await this.ablyService.createStepEvent(
       step.id,
@@ -1034,17 +1089,17 @@ export class FlowExecutorService {
       {
         stepName: step.name,
         error: result.error,
-        duration: result.metadata?.duration
-      }
+        duration: result.metadata?.duration,
+      },
     );
-    
+
     await this.ablyService.publishStepEvent(event);
   }
 
   private async publishStepSkipped(
     step: FlowStep,
     context: FlowExecutionContext,
-    skipReason: string
+    skipReason: string,
   ): Promise<void> {
     const event = await this.ablyService.createStepEvent(
       step.id,
@@ -1056,25 +1111,25 @@ export class FlowExecutorService {
         stepName: step.name,
         skipReason,
         executeIf: step.executeIf,
-      }
+      },
     );
-    
+
     await this.ablyService.publishStepEvent(event);
   }
 
   private async publishExecutionStarted(
     context: FlowExecutionContext,
     flow: Flow,
-    totalSteps: number
+    totalSteps: number,
   ): Promise<void> {
     const event = await this.ablyService.createExecutionEvent(
       context.executionId,
       'started',
       context.orgId,
       context.flowId,
-      { totalSteps }
+      { totalSteps },
     );
-    
+
     await this.ablyService.publishExecutionEvent(event);
   }
 
@@ -1090,16 +1145,16 @@ export class FlowExecutorService {
       duration: number;
       output?: any;
       error?: { message: string; code?: string };
-    }
+    },
   ): Promise<void> {
     const event = await this.ablyService.createExecutionEvent(
       context.executionId,
       status,
       context.orgId,
       context.flowId,
-      options
+      options,
     );
-    
+
     await this.ablyService.publishExecutionEvent(event);
   }
 
@@ -1107,11 +1162,11 @@ export class FlowExecutorService {
     if (Array.isArray(stepsData)) {
       return stepsData;
     }
-    
+
     if (typeof stepsData === 'string') {
       return JSON.parse(stepsData);
     }
-    
+
     return [];
   }
 
@@ -1128,7 +1183,7 @@ export class FlowExecutorService {
     flowId: string,
     tenant: TenantContext,
     status: string,
-    input: any
+    input: any,
   ): Promise<ExecutionLog> {
     return this.prisma.executionLog.create({
       data: {
@@ -1139,8 +1194,8 @@ export class FlowExecutorService {
         stepId: 'flow_start',
         status,
         inputs: input,
-        outputs: null
-      }
+        outputs: null,
+      },
     });
   }
 
@@ -1148,14 +1203,14 @@ export class FlowExecutorService {
     executionId: string,
     status: string,
     output: any,
-    error?: string
+    error?: string,
   ): Promise<ExecutionLog> {
     return this.prisma.executionLog.update({
       where: { id: executionId },
       data: {
         status,
-        outputs: output
-      }
+        outputs: output,
+      },
     });
   }
 }

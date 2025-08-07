@@ -63,8 +63,12 @@ export class ActionsService {
     return action;
   }
 
-  async update(id: string, updateActionDto: UpdateActionDto, tenant: TenantContext): Promise<Action> {
-    const action = await this.findOne(id, tenant);
+  async update(
+    id: string,
+    updateActionDto: UpdateActionDto,
+    tenant: TenantContext,
+  ): Promise<Action> {
+    await this.findOne(id, tenant);
 
     // If toolId is being updated, verify the new tool belongs to the organization
     if (updateActionDto.toolId) {
@@ -91,7 +95,7 @@ export class ActionsService {
   }
 
   async remove(id: string, tenant: TenantContext): Promise<Action> {
-    const action = await this.findOne(id, tenant);
+    await this.findOne(id, tenant);
 
     try {
       return await this.prisma.action.delete({

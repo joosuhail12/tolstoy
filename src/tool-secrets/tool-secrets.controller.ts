@@ -30,15 +30,21 @@ export class ToolSecretsController {
     @Body() storeCredentialsDto: StoreCredentialsDto,
     @Tenant('orgId') orgId: string,
   ): Promise<CredentialResponseDto> {
-    this.logger.info({ toolId, orgId, credentialKeys: Object.keys(storeCredentialsDto.credentials) }, 'Storing tool credentials');
-    
+    this.logger.info(
+      { toolId, orgId, credentialKeys: Object.keys(storeCredentialsDto.credentials) },
+      'Storing tool credentials',
+    );
+
     const result = await this.toolSecretsService.storeCredentials(
       orgId,
       toolId,
       storeCredentialsDto.credentials,
     );
 
-    this.logger.info({ toolId, orgId, toolName: result.toolName }, 'Tool credentials stored successfully');
+    this.logger.info(
+      { toolId, orgId, toolName: result.toolName },
+      'Tool credentials stored successfully',
+    );
 
     return {
       toolId: result.toolId,
@@ -57,14 +63,17 @@ export class ToolSecretsController {
   ): Promise<CredentialResponseDto | StoredCredentials> {
     const shouldUnmask = unmask === 'true';
     this.logger.debug({ toolId, orgId, shouldUnmask }, 'Retrieving tool credentials');
-    
+
     const result = await this.toolSecretsService.getCredentials(
       orgId,
       toolId,
       !shouldUnmask, // maskValues = !shouldUnmask
     );
 
-    this.logger.debug({ toolId, orgId, toolName: result.toolName, masked: !shouldUnmask }, 'Tool credentials retrieved');
+    this.logger.debug(
+      { toolId, orgId, toolName: result.toolName, masked: !shouldUnmask },
+      'Tool credentials retrieved',
+    );
 
     if (shouldUnmask) {
       // Return full credentials (be careful with this in production)
@@ -87,9 +96,9 @@ export class ToolSecretsController {
     @Tenant('orgId') orgId: string,
   ): Promise<void> {
     this.logger.warn({ toolId, orgId }, 'Deleting tool credentials');
-    
+
     await this.toolSecretsService.deleteCredentials(orgId, toolId);
-    
+
     this.logger.info({ toolId, orgId }, 'Tool credentials deleted successfully');
   }
 }
@@ -105,11 +114,18 @@ export class ToolSecretsListController {
   @Get()
   async listToolsWithCredentials(@Tenant('orgId') orgId: string) {
     this.logger.debug({ orgId }, 'Listing tools with credential status');
-    
+
     const tools = await this.toolSecretsService.listToolsWithCredentials(orgId);
-    
-    this.logger.debug({ orgId, toolCount: tools.length, toolsWithCredentials: tools.filter(t => t.hasCredentials).length }, 'Tools with credential status retrieved');
-    
+
+    this.logger.debug(
+      {
+        orgId,
+        toolCount: tools.length,
+        toolsWithCredentials: tools.filter(t => t.hasCredentials).length,
+      },
+      'Tools with credential status retrieved',
+    );
+
     return tools;
   }
 }

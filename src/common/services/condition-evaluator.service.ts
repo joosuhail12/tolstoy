@@ -34,7 +34,7 @@ export interface ConditionRule {
 
 /**
  * Service for evaluating conditional expressions used in executeIf rules
- * 
+ *
  * Supports multiple condition formats:
  * 1. JSONLogic - Standard JSONLogic expressions
  * 2. Simple expressions - Basic field comparisons
@@ -61,36 +61,44 @@ export class ConditionEvaluatorService {
 
     try {
       // Log condition evaluation for debugging
-      this.logger.debug({
-        rule,
-        contextKeys: Object.keys(context),
-        orgId: context.orgId,
-        executionId: context.meta?.executionId,
-      }, 'Evaluating executeIf condition');
+      this.logger.debug(
+        {
+          rule,
+          contextKeys: Object.keys(context),
+          orgId: context.orgId,
+          executionId: context.meta?.executionId,
+        },
+        'Evaluating executeIf condition',
+      );
 
       // Handle different rule formats
       const result = this.evaluateRule(rule, context);
 
-      this.logger.debug({
-        rule,
-        result,
-        orgId: context.orgId,
-        executionId: context.meta?.executionId,
-      }, 'Condition evaluation completed');
+      this.logger.debug(
+        {
+          rule,
+          result,
+          orgId: context.orgId,
+          executionId: context.meta?.executionId,
+        },
+        'Condition evaluation completed',
+      );
 
       return Boolean(result);
-
     } catch (error) {
-      this.logger.error({
-        rule,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        orgId: context.orgId,
-        executionId: context.meta?.executionId,
-      }, 'Failed to evaluate executeIf condition');
+      this.logger.error(
+        {
+          rule,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          orgId: context.orgId,
+          executionId: context.meta?.executionId,
+        },
+        'Failed to evaluate executeIf condition',
+      );
 
       throw new BadRequestException(
         `Invalid executeIf rule: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        'INVALID_CONDITION_RULE'
+        'INVALID_CONDITION_RULE',
       );
     }
   }
@@ -113,11 +121,10 @@ export class ConditionEvaluatorService {
 
       this.evaluateRule(rule, mockContext);
       return { valid: true };
-
     } catch (error) {
-      return { 
-        valid: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        valid: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
@@ -128,7 +135,7 @@ export class ConditionEvaluatorService {
   getAvailableVariables(): string[] {
     return [
       'inputs.*',
-      'variables.*', 
+      'variables.*',
       'stepOutputs.*',
       'currentStep.*',
       'orgId',
@@ -145,7 +152,7 @@ export class ConditionEvaluatorService {
   private evaluateRule(rule: any, context: ConditionContext): any {
     // Set current context for custom operations
     this.currentContext = context;
-    
+
     try {
       // Handle JSONLogic format
       if (this.isJSONLogicRule(rule)) {
@@ -180,15 +187,44 @@ export class ConditionEvaluatorService {
 
     // JSONLogic rules typically have operators as keys
     const operators = [
-      '==', '!=', '===', '!==', '<', '<=', '>', '>=',
-      'and', 'or', 'not', '!',
-      'if', '?:',
-      'var', 'missing', 'missing_some',
-      'in', 'cat', 'substr', 'merge',
-      '+', '-', '*', '/', '%',
-      'min', 'max', 'reduce', 'map', 'filter', 'all', 'none', 'some',
+      '==',
+      '!=',
+      '===',
+      '!==',
+      '<',
+      '<=',
+      '>',
+      '>=',
+      'and',
+      'or',
+      'not',
+      '!',
+      'if',
+      '?:',
+      'var',
+      'missing',
+      'missing_some',
+      'in',
+      'cat',
+      'substr',
+      'merge',
+      '+',
+      '-',
+      '*',
+      '/',
+      '%',
+      'min',
+      'max',
+      'reduce',
+      'map',
+      'filter',
+      'all',
+      'none',
+      'some',
       // Custom operations we've added
-      'exists', 'isEmpty', 'regex'
+      'exists',
+      'isEmpty',
+      'regex',
     ];
 
     return operators.some(op => op in rule);
@@ -198,21 +234,16 @@ export class ConditionEvaluatorService {
    * Check if rule is a simple comparison
    */
   private isSimpleComparisonRule(rule: any): boolean {
-    return rule && 
-           typeof rule === 'object' && 
-           'field' in rule && 
-           'operator' in rule && 
-           'value' in rule;
+    return (
+      rule && typeof rule === 'object' && 'field' in rule && 'operator' in rule && 'value' in rule
+    );
   }
 
   /**
    * Check if rule is custom DSL format
    */
   private isCustomDSLRule(rule: any): boolean {
-    return rule && 
-           typeof rule === 'object' && 
-           'type' in rule && 
-           rule.type === 'custom';
+    return rule && typeof rule === 'object' && 'type' in rule && rule.type === 'custom';
   }
 
   /**
@@ -221,9 +252,9 @@ export class ConditionEvaluatorService {
    */
   private evaluateSimpleComparison(rule: any, context: ConditionContext): boolean {
     const { field, operator, value } = rule;
-    
+
     const fieldValue = this.getFieldValue(field, context);
-    
+
     switch (operator) {
       case '==':
       case 'equals':
@@ -310,19 +341,31 @@ export class ConditionEvaluatorService {
   private registerCustomOperations(): void {
     // Add custom 'exists' operation
     jsonLogic.add_operation('exists', (field: string) => {
-      if (!this.currentContext) return false;
+      if (!this.currentContext) {
+        return false;
+      }
       const value = this.getFieldValue(field, this.currentContext);
       return value !== undefined && value !== null;
     });
 
     // Add custom 'isEmpty' operation
     jsonLogic.add_operation('isEmpty', (field: string) => {
-      if (!this.currentContext) return true;
+      if (!this.currentContext) {
+        return true;
+      }
       const value = this.getFieldValue(field, this.currentContext);
-      if (value === undefined || value === null) return true;
-      if (typeof value === 'string') return value.trim() === '';
-      if (Array.isArray(value)) return value.length === 0;
-      if (typeof value === 'object') return Object.keys(value).length === 0;
+      if (value === undefined || value === null) {
+        return true;
+      }
+      if (typeof value === 'string') {
+        return value.trim() === '';
+      }
+      if (Array.isArray(value)) {
+        return value.length === 0;
+      }
+      if (typeof value === 'object') {
+        return Object.keys(value).length === 0;
+      }
       return false;
     });
 
@@ -345,14 +388,14 @@ export class ConditionEvaluatorService {
   private evaluateTimeWindow(config: any, context: ConditionContext): boolean {
     const { start, end, timezone = 'UTC' } = config;
     const now = new Date();
-    
+
     // Implementation would depend on specific time window logic
     // This is a placeholder for custom time-based conditions
     return true;
   }
 
   /**
-   * Custom DSL: User role evaluation  
+   * Custom DSL: User role evaluation
    */
   private evaluateUserRole(config: any, context: ConditionContext): boolean {
     const { roles } = config;
@@ -367,13 +410,15 @@ export class ConditionEvaluatorService {
   private evaluateStepOutput(config: any, context: ConditionContext): boolean {
     const { stepId, condition } = config;
     const stepOutput = context.stepOutputs?.[stepId];
-    
-    if (!stepOutput) return false;
-    
+
+    if (!stepOutput) {
+      return false;
+    }
+
     // Apply condition to step output
-    return this.evaluateRule(condition, { 
-      ...context, 
-      inputs: stepOutput 
+    return this.evaluateRule(condition, {
+      ...context,
+      inputs: stepOutput,
     });
   }
 }

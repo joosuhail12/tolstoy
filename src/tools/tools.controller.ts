@@ -22,10 +22,7 @@ export class ToolsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(
-    @Body(ValidationPipe) createToolDto: CreateToolDto,
-    @Tenant() tenant: TenantContext,
-  ) {
+  create(@Body(ValidationPipe) createToolDto: CreateToolDto, @Tenant() tenant: TenantContext) {
     return this.toolsService.create(createToolDto, tenant);
   }
 

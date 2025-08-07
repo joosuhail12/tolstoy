@@ -27,19 +27,22 @@ export class FlowsService {
 
     // Invalidate flow list cache since a new flow was added
     await this.cacheService.del(CacheKeys.flowList(tenant.orgId));
-    
-    this.logger.info({ 
-      flowId: flow.id, 
-      orgId: tenant.orgId, 
-      version: flow.version 
-    }, 'Created new flow and invalidated flows list cache');
+
+    this.logger.info(
+      {
+        flowId: flow.id,
+        orgId: tenant.orgId,
+        version: flow.version,
+      },
+      'Created new flow and invalidated flows list cache',
+    );
 
     return flow;
   }
 
   async findAll(tenant: TenantContext): Promise<Flow[]> {
     const cacheKey = CacheKeys.flowList(tenant.orgId);
-    
+
     // Try cache first
     const cached = await this.cacheService.get(cacheKey);
     if (cached && Array.isArray(cached)) {
@@ -62,19 +65,22 @@ export class FlowsService {
 
     // Cache the flows list
     await this.cacheService.set(cacheKey, flows, { ttl: CacheKeys.TTL.FLOWS });
-    
-    this.logger.debug({ 
-      orgId: tenant.orgId, 
-      flowCount: flows.length, 
-      cached: false 
-    }, 'Retrieved and cached flows list');
+
+    this.logger.debug(
+      {
+        orgId: tenant.orgId,
+        flowCount: flows.length,
+        cached: false,
+      },
+      'Retrieved and cached flows list',
+    );
 
     return flows;
   }
 
   async findOne(id: string, tenant: TenantContext): Promise<Flow> {
     const cacheKey = CacheKeys.flow(tenant.orgId, id);
-    
+
     // Try cache first
     const cached = await this.cacheService.get(cacheKey);
     if (cached && typeof cached === 'object' && cached !== null) {
@@ -82,8 +88,11 @@ export class FlowsService {
       if ((cached as any).orgId !== tenant.orgId) {
         throw new ForbiddenException('Access denied: Flow belongs to different organization');
       }
-      
-      this.logger.debug({ flowId: id, orgId: tenant.orgId, cached: true }, 'Retrieved flow from cache');
+
+      this.logger.debug(
+        { flowId: id, orgId: tenant.orgId, cached: true },
+        'Retrieved flow from cache',
+      );
       return cached as any;
     }
 
@@ -119,13 +128,16 @@ export class FlowsService {
 
     // Cache the flow
     await this.cacheService.set(cacheKey, flow, { ttl: CacheKeys.TTL.FLOWS });
-    
-    this.logger.debug({ 
-      flowId: id, 
-      orgId: tenant.orgId, 
-      version: flow.version, 
-      cached: false 
-    }, 'Retrieved and cached flow');
+
+    this.logger.debug(
+      {
+        flowId: id,
+        orgId: tenant.orgId,
+        version: flow.version,
+        cached: false,
+      },
+      'Retrieved and cached flow',
+    );
 
     return flow;
   }
@@ -141,12 +153,15 @@ export class FlowsService {
 
       // Invalidate caches for this flow
       await this.invalidateFlowCaches(tenant.orgId, id);
-      
-      this.logger.info({ 
-        flowId: id, 
-        orgId: tenant.orgId, 
-        version: updatedFlow.version 
-      }, 'Updated flow and invalidated caches');
+
+      this.logger.info(
+        {
+          flowId: id,
+          orgId: tenant.orgId,
+          version: updatedFlow.version,
+        },
+        'Updated flow and invalidated caches',
+      );
 
       return updatedFlow;
     } catch (error) {
@@ -167,12 +182,15 @@ export class FlowsService {
 
       // Invalidate caches for this flow
       await this.invalidateFlowCaches(tenant.orgId, id);
-      
-      this.logger.info({ 
-        flowId: id, 
-        orgId: tenant.orgId, 
-        version: deletedFlow.version 
-      }, 'Deleted flow and invalidated caches');
+
+      this.logger.info(
+        {
+          flowId: id,
+          orgId: tenant.orgId,
+          version: deletedFlow.version,
+        },
+        'Deleted flow and invalidated caches',
+      );
 
       return deletedFlow;
     } catch (error) {
@@ -189,11 +207,14 @@ export class FlowsService {
    */
   async getFlowForExecution(id: string, orgId: string): Promise<Flow | null> {
     const cacheKey = CacheKeys.flow(orgId, id);
-    
+
     // Try cache first
     const cached = await this.cacheService.get(cacheKey);
     if (cached && typeof cached === 'object' && cached !== null) {
-      this.logger.debug({ flowId: id, orgId, cached: true }, 'Retrieved flow for execution from cache');
+      this.logger.debug(
+        { flowId: id, orgId, cached: true },
+        'Retrieved flow for execution from cache',
+      );
       return cached as any;
     }
 
@@ -212,13 +233,16 @@ export class FlowsService {
 
     // Cache the flow definition
     await this.cacheService.set(cacheKey, flow, { ttl: CacheKeys.TTL.FLOWS });
-    
-    this.logger.debug({ 
-      flowId: id, 
-      orgId, 
-      version: flow.version, 
-      cached: false 
-    }, 'Retrieved and cached flow for execution');
+
+    this.logger.debug(
+      {
+        flowId: id,
+        orgId,
+        version: flow.version,
+        cached: false,
+      },
+      'Retrieved and cached flow for execution',
+    );
 
     return flow;
   }
@@ -238,11 +262,14 @@ export class FlowsService {
 
       this.logger.debug({ orgId, flowId }, 'Invalidated flow caches');
     } catch (error) {
-      this.logger.error({ 
-        orgId, 
-        flowId, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      }, 'Failed to invalidate flow caches');
+      this.logger.error(
+        {
+          orgId,
+          flowId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        'Failed to invalidate flow caches',
+      );
     }
   }
 
@@ -254,17 +281,22 @@ export class FlowsService {
     try {
       const pattern = CacheKeys.flowsPattern(orgId);
       const deletedCount = await this.cacheService.delPattern(pattern);
-      
-      this.logger.info({ 
-        orgId, 
-        deletedKeys: deletedCount 
-      }, 'Invalidated all flow caches for organization');
-      
+
+      this.logger.info(
+        {
+          orgId,
+          deletedKeys: deletedCount,
+        },
+        'Invalidated all flow caches for organization',
+      );
     } catch (error) {
-      this.logger.error({ 
-        orgId, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      }, 'Failed to invalidate organization flow caches');
+      this.logger.error(
+        {
+          orgId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        'Failed to invalidate organization flow caches',
+      );
     }
   }
 
@@ -275,17 +307,20 @@ export class FlowsService {
   async warmupFlowsCache(orgId: string): Promise<void> {
     try {
       this.logger.info({ orgId }, 'Warming up flows cache');
-      
+
       // This will populate the flows list cache
       const tenant = { orgId, userId: 'system' } as TenantContext;
       await this.findAll(tenant);
-      
+
       this.logger.info({ orgId }, 'Flows cache warmup completed');
     } catch (error) {
-      this.logger.error({ 
-        orgId, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
-      }, 'Failed to warm up flows cache');
+      this.logger.error(
+        {
+          orgId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        'Failed to warm up flows cache',
+      );
     }
   }
 }

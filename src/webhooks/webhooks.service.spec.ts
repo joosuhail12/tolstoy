@@ -96,17 +96,13 @@ describe('WebhooksService', () => {
         eventTypes: ['invalid.event'],
       };
 
-      await expect(service.create(invalidDto, mockTenant)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.create(invalidDto, mockTenant)).rejects.toThrow(BadRequestException);
     });
 
     it('should throw error if webhook URL already exists', async () => {
       mockPrisma.webhook.findFirst.mockResolvedValue(mockWebhook);
 
-      await expect(service.create(createDto, mockTenant)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(service.create(createDto, mockTenant)).rejects.toThrow(BadRequestException);
     });
 
     it('should use default enabled value if not provided', async () => {
@@ -176,18 +172,14 @@ describe('WebhooksService', () => {
     it('should throw NotFoundException if webhook not found', async () => {
       mockPrisma.webhook.findUnique.mockResolvedValue(null);
 
-      await expect(service.findOne('webhook-123', mockTenant)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.findOne('webhook-123', mockTenant)).rejects.toThrow(NotFoundException);
     });
 
     it('should throw ForbiddenException if webhook belongs to different org', async () => {
       const differentOrgWebhook = { ...mockWebhook, orgId: 'org-456' };
       mockPrisma.webhook.findUnique.mockResolvedValue(differentOrgWebhook);
 
-      await expect(service.findOne('webhook-123', mockTenant)).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(service.findOne('webhook-123', mockTenant)).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -219,9 +211,9 @@ describe('WebhooksService', () => {
       };
       mockPrisma.webhook.findUnique.mockResolvedValue(mockWebhook);
 
-      await expect(
-        service.update('webhook-123', invalidUpdateDto, mockTenant),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.update('webhook-123', invalidUpdateDto, mockTenant)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should check for duplicate URL on update', async () => {
@@ -231,9 +223,9 @@ describe('WebhooksService', () => {
       mockPrisma.webhook.findUnique.mockResolvedValue(mockWebhook);
       mockPrisma.webhook.findFirst.mockResolvedValue({ id: 'another-webhook' });
 
-      await expect(
-        service.update('webhook-123', updateWithUrl, mockTenant),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.update('webhook-123', updateWithUrl, mockTenant)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 
@@ -283,9 +275,9 @@ describe('WebhooksService', () => {
       const disabledWebhook = { ...mockWebhook, enabled: false };
       mockPrisma.webhook.findUnique.mockResolvedValue(disabledWebhook);
 
-      await expect(
-        service.testWebhook('webhook-123', mockTenant),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.testWebhook('webhook-123', mockTenant)).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 

@@ -10,10 +10,10 @@ async function bootstrap() {
     new FastifyAdapter({ logger: false }),
     { bufferLogs: true },
   );
-  
+
   // Use Pino logger globally
   app.useLogger(app.get(Logger));
-  
+
   // Enable global validation
   app.useGlobalPipes(
     new ValidationPipe({
@@ -23,9 +23,9 @@ async function bootstrap() {
       disableErrorMessages: false, // Show validation error messages
     }),
   );
-  
+
   await app.listen(3000, '0.0.0.0');
-  
+
   const logger = app.get(Logger);
   logger.log('Application is running on: http://localhost:3000', 'Bootstrap');
 }

@@ -86,8 +86,14 @@ describe('RedisCacheService', () => {
       // Initialize service
       await service['initializeRedis']();
 
-      expect(mockAwsSecretsService.getSecret).toHaveBeenCalledWith('tolstoy/env', 'UPSTASH_REDIS_REST_URL');
-      expect(mockAwsSecretsService.getSecret).toHaveBeenCalledWith('tolstoy/env', 'UPSTASH_REDIS_REST_TOKEN');
+      expect(mockAwsSecretsService.getSecret).toHaveBeenCalledWith(
+        'tolstoy/env',
+        'UPSTASH_REDIS_REST_URL',
+      );
+      expect(mockAwsSecretsService.getSecret).toHaveBeenCalledWith(
+        'tolstoy/env',
+        'UPSTASH_REDIS_REST_TOKEN',
+      );
       expect(Redis).toHaveBeenCalledWith({
         url: 'https://redis-url.upstash.io',
         token: 'redis-token-123',
@@ -102,7 +108,7 @@ describe('RedisCacheService', () => {
         .mockReturnValueOnce('env-redis-token-123');
       mockRedis.ping.mockResolvedValue('PONG');
 
-      // Initialize service  
+      // Initialize service
       await service['initializeRedis']();
 
       expect(mockConfigService.get).toHaveBeenCalledWith('UPSTASH_REDIS_REST_URL');
@@ -122,7 +128,7 @@ describe('RedisCacheService', () => {
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({ error: expect.any(String) }),
-        'Failed to initialize Redis cache service - operating in fallback mode'
+        'Failed to initialize Redis cache service - operating in fallback mode',
       );
     });
   });
@@ -147,10 +153,7 @@ describe('RedisCacheService', () => {
 
         expect(mockRedis.get).toHaveBeenCalledWith(testKey);
         expect(result).toEqual(testValue);
-        expect(mockLogger.debug).toHaveBeenCalledWith(
-          { key: testKey, cached: true },
-          'Cache hit'
-        );
+        expect(mockLogger.debug).toHaveBeenCalledWith({ key: testKey, cached: true }, 'Cache hit');
       });
 
       it('should return null for cache miss', async () => {
@@ -162,7 +165,7 @@ describe('RedisCacheService', () => {
         expect(result).toBeNull();
         expect(mockLogger.debug).toHaveBeenCalledWith(
           { key: testKey, cached: false },
-          'Cache miss'
+          'Cache miss',
         );
       });
 
@@ -175,7 +178,7 @@ describe('RedisCacheService', () => {
         expect(result).toBeNull();
         expect(mockLogger.error).toHaveBeenCalledWith(
           { key: testKey, error: 'Redis connection failed' },
-          'Redis GET error'
+          'Redis GET error',
         );
       });
     });
@@ -188,7 +191,9 @@ describe('RedisCacheService', () => {
 
         await service.set(testKey, testValue);
 
-        expect(mockRedis.set).toHaveBeenCalledWith(testKey, testValue, { ex: CacheKeys.TTL.MEDIUM });
+        expect(mockRedis.set).toHaveBeenCalledWith(testKey, testValue, {
+          ex: CacheKeys.TTL.MEDIUM,
+        });
         expect(mockLogger.debug).toHaveBeenCalledWith(
           {
             key: testKey,
@@ -196,7 +201,7 @@ describe('RedisCacheService', () => {
             nx: undefined,
             cached: true,
           },
-          'Cache set'
+          'Cache set',
         );
       });
 
@@ -234,7 +239,7 @@ describe('RedisCacheService', () => {
 
         expect(mockLogger.error).toHaveBeenCalledWith(
           { key: testKey, error: 'Redis connection failed' },
-          'Redis SET error'
+          'Redis SET error',
         );
       });
     });
@@ -247,10 +252,7 @@ describe('RedisCacheService', () => {
         await service.del(testKey);
 
         expect(mockRedis.del).toHaveBeenCalledWith(testKey);
-        expect(mockLogger.debug).toHaveBeenCalledWith(
-          { key: testKey },
-          'Cache key deleted'
-        );
+        expect(mockLogger.debug).toHaveBeenCalledWith({ key: testKey }, 'Cache key deleted');
       });
 
       it('should handle Redis errors gracefully', async () => {
@@ -261,7 +263,7 @@ describe('RedisCacheService', () => {
 
         expect(mockLogger.error).toHaveBeenCalledWith(
           { key: testKey, error: 'Redis connection failed' },
-          'Redis DEL error'
+          'Redis DEL error',
         );
       });
     });
@@ -284,7 +286,7 @@ describe('RedisCacheService', () => {
             keysFound: 3,
             keysDeleted: 3,
           },
-          'Bulk cache invalidation completed'
+          'Bulk cache invalidation completed',
         );
       });
 
@@ -295,10 +297,7 @@ describe('RedisCacheService', () => {
         const deletedCount = await service.delPattern(pattern);
 
         expect(deletedCount).toBe(0);
-        expect(mockLogger.debug).toHaveBeenCalledWith(
-          { pattern },
-          'No keys found for pattern'
-        );
+        expect(mockLogger.debug).toHaveBeenCalledWith({ pattern }, 'No keys found for pattern');
       });
     });
 
@@ -318,7 +317,7 @@ describe('RedisCacheService', () => {
             hits: 2,
             misses: 1,
           },
-          'Batch cache get completed'
+          'Batch cache get completed',
         );
       });
 

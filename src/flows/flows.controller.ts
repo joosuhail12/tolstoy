@@ -36,11 +36,14 @@ export class FlowsController {
     @Tenant() tenant: TenantContext,
   ) {
     this.logger.info({ orgId: tenant.orgId, version: createFlowDto.version }, 'Creating flow');
-    
+
     const result = await this.flowsService.create(createFlowDto, tenant);
-    
-    this.logger.info({ orgId: tenant.orgId, flowId: result.id, version: result.version }, 'Flow created successfully');
-    
+
+    this.logger.info(
+      { orgId: tenant.orgId, flowId: result.id, version: result.version },
+      'Flow created successfully',
+    );
+
     return result;
   }
 
@@ -67,9 +70,9 @@ export class FlowsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     this.logger.warn({ flowId: id, orgId: tenant.orgId }, 'Deleting flow');
-    
+
     await this.flowsService.remove(id, tenant);
-    
+
     this.logger.info({ flowId: id, orgId: tenant.orgId }, 'Flow deleted successfully');
   }
 
@@ -81,54 +84,52 @@ export class FlowsController {
     @Tenant() tenant: TenantContext,
   ) {
     const { variables = {}, useDurable = true } = executionInput;
-    
-    this.logger.info({ 
-      flowId: id, 
-      orgId: tenant.orgId, 
-      variableCount: Object.keys(variables).length,
-      useDurable,
-    }, 'Starting flow execution');
-    
+
+    this.logger.info(
+      {
+        flowId: id,
+        orgId: tenant.orgId,
+        variableCount: Object.keys(variables).length,
+        useDurable,
+      },
+      'Starting flow execution',
+    );
+
     if (useDurable) {
       // Use Inngest for durable execution
-      const result = await this.inngestExecutionService.executeFlow(
-        id,
-        tenant,
-        variables
+      const result = await this.inngestExecutionService.executeFlow(id, tenant, variables);
+
+      this.logger.info(
+        {
+          flowId: id,
+          orgId: tenant.orgId,
+          executionId: result.executionId,
+          status: result.status,
+        },
+        'Durable flow execution enqueued',
       );
-      
-      this.logger.info({ 
-        flowId: id, 
-        orgId: tenant.orgId, 
-        executionId: result.executionId, 
-        status: result.status 
-      }, 'Durable flow execution enqueued');
-      
+
       return result;
     } else {
       // Use direct execution (legacy mode)
-      const result = await this.flowExecutorService.executeFlow(
-        id,
-        tenant,
-        variables
+      const result = await this.flowExecutorService.executeFlow(id, tenant, variables);
+
+      this.logger.info(
+        {
+          flowId: id,
+          orgId: tenant.orgId,
+          executionLogId: result.id,
+          status: result.status,
+        },
+        'Direct flow execution started',
       );
-      
-      this.logger.info({ 
-        flowId: id, 
-        orgId: tenant.orgId, 
-        executionLogId: result.id, 
-        status: result.status 
-      }, 'Direct flow execution started');
-      
+
       return result;
     }
   }
 
   @Get(':id/executions')
-  async getFlowExecutions(
-    @Param('id') id: string,
-    @Tenant() tenant: TenantContext,
-  ) {
+  async getFlowExecutions(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     return this.inngestExecutionService.getFlowExecutions(id, tenant);
   }
 
@@ -148,19 +149,25 @@ export class FlowsController {
     @Param('executionId') executionId: string,
     @Tenant() tenant: TenantContext,
   ) {
-    this.logger.warn({ 
-      flowId, 
-      executionId, 
-      orgId: tenant.orgId 
-    }, 'Cancelling flow execution');
-    
+    this.logger.warn(
+      {
+        flowId,
+        executionId,
+        orgId: tenant.orgId,
+      },
+      'Cancelling flow execution',
+    );
+
     await this.inngestExecutionService.cancelExecution(executionId, tenant);
-    
-    this.logger.info({ 
-      flowId, 
-      executionId, 
-      orgId: tenant.orgId 
-    }, 'Flow execution cancelled');
+
+    this.logger.info(
+      {
+        flowId,
+        executionId,
+        orgId: tenant.orgId,
+      },
+      'Flow execution cancelled',
+    );
   }
 
   @Post(':id/executions/:executionId/retry')
@@ -170,29 +177,32 @@ export class FlowsController {
     @Param('executionId') executionId: string,
     @Tenant() tenant: TenantContext,
   ) {
-    this.logger.info({ 
-      flowId, 
-      executionId, 
-      orgId: tenant.orgId 
-    }, 'Retrying failed flow execution');
-    
+    this.logger.info(
+      {
+        flowId,
+        executionId,
+        orgId: tenant.orgId,
+      },
+      'Retrying failed flow execution',
+    );
+
     const result = await this.inngestExecutionService.retryExecution(executionId, tenant);
-    
-    this.logger.info({ 
-      flowId, 
-      originalExecutionId: executionId,
-      newExecutionId: result.executionId,
-      orgId: tenant.orgId 
-    }, 'Flow execution retry initiated');
-    
+
+    this.logger.info(
+      {
+        flowId,
+        originalExecutionId: executionId,
+        newExecutionId: result.executionId,
+        orgId: tenant.orgId,
+      },
+      'Flow execution retry initiated',
+    );
+
     return result;
   }
 
   @Get(':id/metrics')
-  async getExecutionMetrics(
-    @Param('id') id: string,
-    @Tenant() tenant: TenantContext,
-  ) {
+  async getExecutionMetrics(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     return this.inngestExecutionService.getExecutionMetrics(id, tenant);
   }
 }

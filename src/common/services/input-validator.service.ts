@@ -60,7 +60,9 @@ export class InputValidatorService {
           break;
         case 'enum':
           if (!param.options || param.options.length === 0) {
-            throw new BadRequestException(`Enum parameter '${param.name}' must have options defined`);
+            throw new BadRequestException(
+              `Enum parameter '${param.name}' must have options defined`,
+            );
           }
           base = z.enum(param.options as [string, ...string[]]);
           break;
@@ -93,19 +95,19 @@ export class InputValidatorService {
         const formattedErrors = err.issues.map(issue => ({
           field: issue.path.join('.'),
           message: issue.message,
-          code: issue.code
+          code: issue.code,
         }));
 
         throw new BadRequestException({
           message: 'Input validation failed',
           errors: formattedErrors,
-          details: err.issues
+          details: err.issues,
         });
       }
 
       throw new BadRequestException({
         message: 'Input validation failed',
-        error: err.message || 'Unknown validation error'
+        error: err.message || 'Unknown validation error',
       });
     }
   }
@@ -120,18 +122,21 @@ export class InputValidatorService {
   }
 
   getSchemaDescription(paramList: InputParameter[]): Record<string, any> {
-    return paramList.reduce((acc, param) => {
-      acc[param.name] = {
-        type: param.type,
-        required: param.required,
-        description: param.description,
-        label: param.label,
-        control: param.control,
-        default: param.default,
-        options: param.options,
-        validation: param.validation
-      };
-      return acc;
-    }, {} as Record<string, any>);
+    return paramList.reduce(
+      (acc, param) => {
+        acc[param.name] = {
+          type: param.type,
+          required: param.required,
+          description: param.description,
+          label: param.label,
+          control: param.control,
+          default: param.default,
+          options: param.options,
+          validation: param.validation,
+        };
+        return acc;
+      },
+      {} as Record<string, any>,
+    );
   }
 }

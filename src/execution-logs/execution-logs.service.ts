@@ -9,7 +9,10 @@ import { TenantContext } from '../common/interfaces/tenant-context.interface';
 export class ExecutionLogsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(createExecutionLogDto: CreateExecutionLogDto, tenant: TenantContext): Promise<ExecutionLog> {
+  async create(
+    createExecutionLogDto: CreateExecutionLogDto,
+    tenant: TenantContext,
+  ): Promise<ExecutionLog> {
     // Verify the flow belongs to the organization
     const flow = await this.prisma.flow.findUnique({
       where: { id: createExecutionLogDto.flowId },
@@ -67,13 +70,19 @@ export class ExecutionLogsService {
     }
 
     if (executionLog.orgId !== tenant.orgId) {
-      throw new ForbiddenException('Access denied: Execution log belongs to different organization');
+      throw new ForbiddenException(
+        'Access denied: Execution log belongs to different organization',
+      );
     }
 
     return executionLog;
   }
 
-  async update(id: string, updateExecutionLogDto: UpdateExecutionLogDto, tenant: TenantContext): Promise<ExecutionLog> {
+  async update(
+    id: string,
+    updateExecutionLogDto: UpdateExecutionLogDto,
+    tenant: TenantContext,
+  ): Promise<ExecutionLog> {
     const executionLog = await this.findOne(id, tenant);
 
     // If flowId is being updated, verify the new flow belongs to the organization

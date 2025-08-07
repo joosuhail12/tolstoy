@@ -22,10 +22,7 @@ export class ActionsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(
-    @Body(ValidationPipe) createActionDto: CreateActionDto,
-    @Tenant() tenant: TenantContext,
-  ) {
+  create(@Body(ValidationPipe) createActionDto: CreateActionDto, @Tenant() tenant: TenantContext) {
     return this.actionsService.create(createActionDto, tenant);
   }
 

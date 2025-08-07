@@ -1,26 +1,26 @@
 import { Injectable, Inject, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AwsSecretsService } from '../aws-secrets.service';
-import { 
-  DaytonaClient, 
+import {
+  DaytonaClient,
   DaytonaClientConfig,
-  DaytonaRunRequest, 
-  DaytonaRunResponse, 
-  DaytonaSessionRequest, 
+  DaytonaRunRequest,
+  DaytonaRunResponse,
+  DaytonaSessionRequest,
   DaytonaSessionResponse,
-  DaytonaSessionResult 
+  DaytonaSessionResult,
 } from './interfaces/daytona-client.interface';
 
 /**
  * Daytona Client Implementation
- * 
+ *
  * This is a mock implementation of the Daytona client that matches the expected API.
  * When the actual @daytona/sdk package becomes available, this should be replaced
  * with the real client import.
- * 
+ *
  * Usage:
  * import { DaytonaClient } from '@daytona/sdk';
- * 
+ *
  * For now, this provides a working implementation for development and testing.
  */
 @Injectable()
@@ -32,7 +32,7 @@ export class DaytonaClientImpl implements DaytonaClient {
 
   constructor(
     private readonly configService: ConfigService,
-    @Optional() private readonly awsSecretsService?: AwsSecretsService
+    @Optional() private readonly awsSecretsService?: AwsSecretsService,
   ) {
     // Initialize config synchronously with fallback values, then load from AWS Secrets if available
     this.initializeConfig();
@@ -54,7 +54,7 @@ export class DaytonaClientImpl implements DaytonaClient {
     try {
       // Try to load from AWS Secrets Manager, fallback to environment variables if not available
       const useAwsSecrets = this.configService.get('USE_AWS_SECRETS') === 'true';
-      
+
       if (useAwsSecrets) {
         try {
           this.apiKey = await this.awsSecretsService.getDaytonaApiKey();
@@ -66,7 +66,7 @@ export class DaytonaClientImpl implements DaytonaClient {
           // console.log('Falling back to environment variables for Daytona config');
         }
       }
-      
+
       this.configInitialized = true;
     } catch (error) {
       // If all else fails, keep the defaults from environment variables
@@ -77,7 +77,7 @@ export class DaytonaClientImpl implements DaytonaClient {
   async run(request: DaytonaRunRequest): Promise<DaytonaRunResponse> {
     await this.loadConfigFromAwsSecrets();
     const startTime = Date.now();
-    
+
     try {
       // In a real implementation, this would make an HTTP request to Daytona API
       const response = await this.makeApiRequest('/run', {
@@ -101,7 +101,10 @@ export class DaytonaClientImpl implements DaytonaClient {
           output: null,
           error: {
             message: error instanceof Error ? error.message : 'Sandbox execution failed',
-            code: error instanceof Error && (error as any).code ? (error as any).code : 'EXECUTION_ERROR',
+            code:
+              error instanceof Error && (error as any).code
+                ? (error as any).code
+                : 'EXECUTION_ERROR',
           },
           executionTime,
         };
@@ -112,7 +115,8 @@ export class DaytonaClientImpl implements DaytonaClient {
         success: false,
         output: null,
         error: {
-          message: error instanceof Error ? error.message : 'Network error during sandbox execution',
+          message:
+            error instanceof Error ? error.message : 'Network error during sandbox execution',
           code: 'NETWORK_ERROR',
           stack: error instanceof Error ? error.stack : 'No stack trace',
         },
@@ -139,10 +143,14 @@ export class DaytonaClientImpl implements DaytonaClient {
         };
       } else {
         const error = await response.json();
-        throw new Error(`Failed to start session: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(
+          `Failed to start session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
       }
     } catch (error) {
-      throw new Error(`Failed to start async session: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to start async session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
@@ -166,10 +174,14 @@ export class DaytonaClientImpl implements DaytonaClient {
         };
       } else {
         const error = await response.json();
-        throw new Error(`Failed to get session result: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(
+          `Failed to get session result: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
       }
     } catch (error) {
-      throw new Error(`Failed to retrieve session result: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to retrieve session result: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
@@ -183,19 +195,23 @@ export class DaytonaClientImpl implements DaytonaClient {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(`Failed to cancel session: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        throw new Error(
+          `Failed to cancel session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
       }
     } catch (error) {
-      throw new Error(`Failed to cancel session: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to cancel session: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
   private async makeApiRequest(endpoint: string, options: RequestInit): Promise<Response> {
     const url = `${this.baseUrl}${endpoint}`;
-    
+
     const defaultHeaders = {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.apiKey}`,
+      Authorization: `Bearer ${this.apiKey}`,
       'User-Agent': 'tolstoy-daytona-client/1.0.0',
     };
 

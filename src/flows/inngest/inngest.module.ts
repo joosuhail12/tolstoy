@@ -6,7 +6,7 @@ import { InngestExecutionService } from './inngest-execution.service';
 
 /**
  * Inngest Integration Module
- * 
+ *
  * Configures Inngest for durable workflow orchestration with credentials
  * loaded from AWS Secrets Manager at runtime.
  */
@@ -19,7 +19,7 @@ import { InngestExecutionService } from './inngest-execution.service';
         try {
           // Fetch Inngest credentials from AWS Secrets Manager
           const config = await secretsService.getInngestConfig();
-          
+
           return {
             appId: 'tolstoy-workflow-engine',
             inngest: {
@@ -51,13 +51,13 @@ import { InngestExecutionService } from './inngest-execution.service';
           };
         } catch (error) {
           console.error('Failed to load Inngest configuration from AWS Secrets:', error);
-          
+
           // Fallback to environment variables if AWS Secrets fail
           return {
             appId: 'tolstoy-workflow-engine',
             inngest: {
               id: 'tolstoy',
-              name: 'Tolstoy Workflow Engine', 
+              name: 'Tolstoy Workflow Engine',
               eventKey: process.env.INNGEST_API_KEY || 'dev-key',
             },
             serve: {
@@ -86,12 +86,7 @@ import { InngestExecutionService } from './inngest-execution.service';
       },
     }),
   ],
-  providers: [
-    ExecuteFlowHandler,
-    InngestExecutionService,
-  ],
-  exports: [
-    InngestExecutionService,
-  ],
+  providers: [ExecuteFlowHandler, InngestExecutionService],
+  exports: [InngestExecutionService],
 })
 export class InngestModule {}

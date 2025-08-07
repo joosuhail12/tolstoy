@@ -131,7 +131,7 @@ describe('ExecuteFlowHandler', () => {
 
       // Test private method indirectly through public interface
       const result = await handler['executeStep'](stepConfig, context);
-      
+
       expect(result).toBeDefined();
       expect(typeof result.success).toBe('boolean');
     });
@@ -153,7 +153,7 @@ describe('ExecuteFlowHandler', () => {
       };
 
       const result = await handler['executeStep'](stepConfig, context);
-      
+
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
       expect(result.error?.message).toContain('Unknown step type');
@@ -190,7 +190,7 @@ describe('ExecuteFlowHandler', () => {
       };
 
       const result = await handler['executeStep'](stepConfig, context);
-      
+
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
       expect(result.metadata?.duration).toBeGreaterThanOrEqual(0);

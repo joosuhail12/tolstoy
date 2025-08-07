@@ -79,11 +79,11 @@ export class LoggingContextService {
   /**
    * Get tracing context (requestId, flowId, etc.) for operation tracing
    */
-  getTracingContext(): { 
-    requestId?: string; 
-    flowId?: string; 
-    stepId?: string; 
-    executionId?: string; 
+  getTracingContext(): {
+    requestId?: string;
+    flowId?: string;
+    stepId?: string;
+    executionId?: string;
   } {
     const context = this.getContext();
     return {

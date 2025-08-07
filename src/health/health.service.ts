@@ -25,27 +25,27 @@ export class HealthService {
   async getHealthStatus(): Promise<HealthCheck> {
     try {
       const dbCheck = await this.checkDatabaseConnection();
-      
+
       if (dbCheck.status === 'unhealthy') {
         return {
           status: 'unhealthy',
           message: 'Database connection failed',
           timestamp: new Date().toISOString(),
-          details: { database: dbCheck }
+          details: { database: dbCheck },
         };
       }
 
       return {
         status: 'healthy',
         message: 'All systems operational',
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         message: 'Health check failed',
         timestamp: new Date().toISOString(),
-        details: { error: error instanceof Error ? error.message : 'Unknown error' }
+        details: { error: error instanceof Error ? error.message : 'Unknown error' },
       };
     }
   }
@@ -57,30 +57,36 @@ export class HealthService {
     system: any;
   }> {
     const timestamp = new Date().toISOString();
-    
-    try {
-      const [dbCheck] = await Promise.allSettled([
-        this.checkDatabaseConnection()
-      ]);
 
-      const databaseResult = dbCheck.status === 'fulfilled' ? dbCheck.value : {
-        status: 'unhealthy' as const,
-        message: 'Database check failed',
-        timestamp,
-        details: { error: dbCheck.reason instanceof Error ? dbCheck.reason.message : 'Unknown error' }
-      };
+    try {
+      const [dbCheck] = await Promise.allSettled([this.checkDatabaseConnection()]);
+
+      const databaseResult =
+        dbCheck.status === 'fulfilled'
+          ? dbCheck.value
+          : {
+              status: 'unhealthy' as const,
+              message: 'Database check failed',
+              timestamp,
+              details: {
+                error: dbCheck.reason instanceof Error ? dbCheck.reason.message : 'Unknown error',
+              },
+            };
 
       const applicationStatus: HealthCheck = {
         status: databaseResult.status === 'healthy' ? 'healthy' : 'unhealthy',
-        message: databaseResult.status === 'healthy' ? 'Application is running properly' : 'Application has issues',
-        timestamp
+        message:
+          databaseResult.status === 'healthy'
+            ? 'Application is running properly'
+            : 'Application has issues',
+        timestamp,
       };
 
       return {
         application: applicationStatus,
         database: databaseResult,
         environment: this.getEnvironmentInfo(),
-        system: this.getSystemInfo()
+        system: this.getSystemInfo(),
       };
     } catch (error) {
       return {
@@ -88,26 +94,26 @@ export class HealthService {
           status: 'unhealthy',
           message: 'Detailed health check failed',
           timestamp,
-          details: { error: error instanceof Error ? error.message : 'Unknown error' }
+          details: { error: error instanceof Error ? error.message : 'Unknown error' },
         },
         database: {
           status: 'unhealthy',
           message: 'Unable to check database',
-          timestamp
+          timestamp,
         },
         environment: this.getEnvironmentInfo(),
-        system: this.getSystemInfo()
+        system: this.getSystemInfo(),
       };
     }
   }
 
   private async checkDatabaseConnection(): Promise<DatabaseHealthCheck> {
     const startTime = Date.now();
-    
+
     try {
       // Test basic connection
       await this.prisma.$queryRaw`SELECT 1`;
-      
+
       const connectionTime = Date.now() - startTime;
 
       // Get record counts for basic health metrics
@@ -115,7 +121,7 @@ export class HealthService {
         this.prisma.organization.count(),
         this.prisma.user.count(),
         this.prisma.tool.count(),
-        this.prisma.flow.count()
+        this.prisma.flow.count(),
       ]);
 
       return {
@@ -127,8 +133,8 @@ export class HealthService {
           organizations: orgCount,
           users: userCount,
           tools: toolCount,
-          flows: flowCount
-        }
+          flows: flowCount,
+        },
       };
     } catch (error) {
       return {
@@ -136,7 +142,7 @@ export class HealthService {
         message: 'Database connection failed',
         timestamp: new Date().toISOString(),
         connectionTime: Date.now() - startTime,
-        details: { error: error instanceof Error ? error.message : 'Unknown error' }
+        details: { error: error instanceof Error ? error.message : 'Unknown error' },
       };
     }
   }
@@ -150,7 +156,7 @@ export class HealthService {
       memoryUsage: process.memoryUsage(),
       hasAwsSecrets: process.env.USE_AWS_SECRETS === 'true',
       hasDatabase: !!process.env.DATABASE_URL,
-      port: process.env.PORT || 3000
+      port: process.env.PORT || 3000,
     };
   }
 
@@ -163,8 +169,8 @@ export class HealthService {
       deployment: {
         platform: process.env.VERCEL ? 'Vercel' : 'Local',
         region: process.env.VERCEL_REGION || 'local',
-        url: process.env.VERCEL_URL || 'localhost'
-      }
+        url: process.env.VERCEL_URL || 'localhost',
+      },
     };
   }
 }

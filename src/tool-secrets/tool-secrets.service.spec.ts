@@ -76,7 +76,10 @@ describe('ToolSecretsService', () => {
       prismaService.tool.findFirst.mockResolvedValue(mockTool);
       awsSecretsService.secretExists.mockResolvedValue(false);
       awsSecretsService.createSecret.mockResolvedValue();
-      prismaService.tool.update.mockResolvedValue({ ...mockTool, secretName: 'tolstoy/org-123/tool-123' });
+      prismaService.tool.update.mockResolvedValue({
+        ...mockTool,
+        secretName: 'tolstoy/org-123/tool-123',
+      });
 
       const result = await service.storeCredentials('org-123', 'tool-123', mockCredentials);
 
@@ -156,9 +159,9 @@ describe('ToolSecretsService', () => {
       const toolWithoutSecret = { ...mockTool, secretName: null };
       prismaService.tool.findFirst.mockResolvedValue(toolWithoutSecret);
 
-      await expect(
-        service.getCredentials('org-123', 'tool-123'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.getCredentials('org-123', 'tool-123')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -183,9 +186,9 @@ describe('ToolSecretsService', () => {
     it('should throw NotFoundException for non-existent tool', async () => {
       prismaService.tool.findFirst.mockResolvedValue(null);
 
-      await expect(
-        service.deleteCredentials('org-123', 'tool-123'),
-      ).rejects.toThrow(NotFoundException);
+      await expect(service.deleteCredentials('org-123', 'tool-123')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -193,7 +196,7 @@ describe('ToolSecretsService', () => {
     it('should list tools with credential status', async () => {
       const tools = [
         { ...mockTool, secretName: 'tolstoy/org-123/tool-123' },
-        { 
+        {
           id: 'tool-456',
           name: 'Tool Without Credentials',
           baseUrl: 'https://api2.example.com',
@@ -261,7 +264,9 @@ describe('ToolSecretsService', () => {
     it('should reject invalid credential values', () => {
       expect(() => service['validateCredentials']({ key: '' })).toThrow(BadRequestException);
       expect(() => service['validateCredentials']({ key: '  ' })).toThrow(BadRequestException);
-      expect(() => service['validateCredentials']({ key: null as any })).toThrow(BadRequestException);
+      expect(() => service['validateCredentials']({ key: null as any })).toThrow(
+        BadRequestException,
+      );
     });
   });
 });

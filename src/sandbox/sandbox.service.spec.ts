@@ -112,7 +112,7 @@ describe('SandboxService', () => {
     it('should log configuration on startup', async () => {
       // Clear existing mock calls
       jest.clearAllMocks();
-      
+
       // Create a fresh service instance to verify logging behavior
       await Test.createTestingModule({
         providers: [
@@ -122,7 +122,7 @@ describe('SandboxService', () => {
           { provide: `PinoLogger:${SandboxService.name}`, useValue: logger },
         ],
       }).compile();
-      
+
       // The log should have been called during construction above
       expect(logger.info).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -130,13 +130,15 @@ describe('SandboxService', () => {
           syncTimeout: 30000,
           asyncTimeout: 300000,
         }),
-        'Daytona sandbox service configured'
+        'Daytona sandbox service configured',
       );
     });
 
     it('should warn when API key is not configured', () => {
       configService.get.mockImplementation((key: string) => {
-        if (key === 'DAYTONA_API_KEY') return undefined;
+        if (key === 'DAYTONA_API_KEY') {
+          return undefined;
+        }
         return 'default-value';
       });
 
@@ -151,7 +153,7 @@ describe('SandboxService', () => {
       }).compile();
 
       expect(logger.warn).toHaveBeenCalledWith(
-        'DAYTONA_API_KEY not configured - sandbox execution will be disabled'
+        'DAYTONA_API_KEY not configured - sandbox execution will be disabled',
       );
     });
   });
@@ -189,7 +191,7 @@ describe('SandboxService', () => {
           mode: 'sync',
           executionTime: 1500,
         }),
-        'Synchronous sandbox execution completed successfully'
+        'Synchronous sandbox execution completed successfully',
       );
     });
 
@@ -217,7 +219,7 @@ describe('SandboxService', () => {
           error: 'Syntax error',
           mode: 'sync',
         }),
-        'Synchronous sandbox execution failed'
+        'Synchronous sandbox execution failed',
       );
     });
 
@@ -225,16 +227,16 @@ describe('SandboxService', () => {
       const error = new Error('Network timeout');
       daytonaClient.run.mockRejectedValue(error);
 
-      await expect(
-        service.runSync('console.log("test");', mockContext)
-      ).rejects.toThrow(InternalServerErrorException);
+      await expect(service.runSync('console.log("test");', mockContext)).rejects.toThrow(
+        InternalServerErrorException,
+      );
 
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           error: 'Network timeout',
           mode: 'sync',
         }),
-        'Synchronous sandbox execution error'
+        'Synchronous sandbox execution error',
       );
     });
 
@@ -244,19 +246,19 @@ describe('SandboxService', () => {
       // Test Python detection
       await service.runSync('print("hello")', mockContext);
       expect(daytonaClient.run).toHaveBeenLastCalledWith(
-        expect.objectContaining({ language: 'python' })
+        expect.objectContaining({ language: 'python' }),
       );
 
       // Test Go detection
       await service.runSync('fmt.Print("hello")', mockContext);
       expect(daytonaClient.run).toHaveBeenLastCalledWith(
-        expect.objectContaining({ language: 'go' })
+        expect.objectContaining({ language: 'go' }),
       );
 
       // Test Rust detection
       await service.runSync('println!("hello")', mockContext);
       expect(daytonaClient.run).toHaveBeenLastCalledWith(
-        expect.objectContaining({ language: 'rust' })
+        expect.objectContaining({ language: 'rust' }),
       );
     });
   });
@@ -284,7 +286,7 @@ describe('SandboxService', () => {
           sessionId: 'session-123',
           mode: 'async',
         }),
-        'Asynchronous sandbox session started'
+        'Asynchronous sandbox session started',
       );
     });
 
@@ -292,16 +294,16 @@ describe('SandboxService', () => {
       const error = new Error('Failed to start session');
       daytonaClient.startSession.mockRejectedValue(error);
 
-      await expect(
-        service.runAsync('console.log("test");', mockContext)
-      ).rejects.toThrow(InternalServerErrorException);
+      await expect(service.runAsync('console.log("test");', mockContext)).rejects.toThrow(
+        InternalServerErrorException,
+      );
 
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           error: 'Failed to start session',
           mode: 'async',
         }),
-        'Failed to start asynchronous sandbox execution'
+        'Failed to start asynchronous sandbox execution',
       );
     });
   });
@@ -331,7 +333,7 @@ describe('SandboxService', () => {
           status: 'completed',
           mode: 'async',
         }),
-        'Asynchronous sandbox execution completed'
+        'Asynchronous sandbox execution completed',
       );
     });
 
@@ -355,7 +357,7 @@ describe('SandboxService', () => {
           sessionId: 'session-123',
           status: 'running',
         }),
-        'Asynchronous sandbox execution still in progress'
+        'Asynchronous sandbox execution still in progress',
       );
     });
 
@@ -387,16 +389,16 @@ describe('SandboxService', () => {
       const error = new Error('Session not found');
       daytonaClient.getSessionResult.mockRejectedValue(error);
 
-      await expect(
-        service.getAsyncResult('invalid-session')
-      ).rejects.toThrow(InternalServerErrorException);
+      await expect(service.getAsyncResult('invalid-session')).rejects.toThrow(
+        InternalServerErrorException,
+      );
 
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           sessionId: 'invalid-session',
           error: 'Session not found',
         }),
-        'Failed to retrieve asynchronous sandbox result'
+        'Failed to retrieve asynchronous sandbox result',
       );
     });
   });
@@ -414,14 +416,14 @@ describe('SandboxService', () => {
           sessionId: 'session-123',
           mode: 'async',
         }),
-        'Cancelling asynchronous sandbox execution'
+        'Cancelling asynchronous sandbox execution',
       );
 
       expect(logger.info).toHaveBeenCalledWith(
         expect.objectContaining({
           sessionId: 'session-123',
         }),
-        'Asynchronous sandbox execution cancelled'
+        'Asynchronous sandbox execution cancelled',
       );
     });
 
@@ -429,15 +431,15 @@ describe('SandboxService', () => {
       const error = new Error('Cannot cancel completed session');
       daytonaClient.cancelSession.mockRejectedValue(error);
 
-      await expect(
-        service.cancelAsyncExecution('session-123')
-      ).rejects.toThrow(InternalServerErrorException);
+      await expect(service.cancelAsyncExecution('session-123')).rejects.toThrow(
+        InternalServerErrorException,
+      );
 
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           error: 'Cannot cancel completed session',
         }),
-        'Failed to cancel asynchronous sandbox execution'
+        'Failed to cancel asynchronous sandbox execution',
       );
     });
   });
@@ -458,7 +460,9 @@ describe('SandboxService', () => {
 
     it('should return unconfigured when API key is missing', async () => {
       configService.get.mockImplementation((key: string) => {
-        if (key === 'DAYTONA_API_KEY') return undefined;
+        if (key === 'DAYTONA_API_KEY') {
+          return undefined;
+        }
         return 'default-value';
       });
 
@@ -527,7 +531,7 @@ describe('SandboxService', () => {
       await service.runSync(jsCode, mockContext);
 
       expect(daytonaClient.run).toHaveBeenCalledWith(
-        expect.objectContaining({ language: 'javascript' })
+        expect.objectContaining({ language: 'javascript' }),
       );
     });
 
@@ -538,7 +542,7 @@ describe('SandboxService', () => {
       await service.runSync(pythonCode, mockContext);
 
       expect(daytonaClient.run).toHaveBeenCalledWith(
-        expect.objectContaining({ language: 'python' })
+        expect.objectContaining({ language: 'python' }),
       );
     });
 
@@ -549,7 +553,7 @@ describe('SandboxService', () => {
       await service.runSync(unknownCode, mockContext);
 
       expect(daytonaClient.run).toHaveBeenCalledWith(
-        expect.objectContaining({ language: 'javascript' })
+        expect.objectContaining({ language: 'javascript' }),
       );
     });
   });

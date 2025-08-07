@@ -11,16 +11,16 @@ export class TenantMiddleware implements NestMiddleware {
 
     if (!orgId || !userId) {
       throw new BadRequestException(
-        'Missing required headers: X-Org-ID and X-User-ID are required for multi-tenant operations'
+        'Missing required headers: X-Org-ID and X-User-ID are required for multi-tenant operations',
       );
     }
 
     // Generate or use existing request ID for traceability
     const requestId = (req.headers['x-request-id'] as string) || randomUUID();
-    
+
     // Attach request ID to request for Fastify compatibility
     (req as any).id = requestId;
-    
+
     // Set response header for client traceability
     res.setHeader('x-request-id', requestId);
 

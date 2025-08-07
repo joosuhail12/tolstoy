@@ -131,7 +131,7 @@ describe('FlowExecutorService - Sandbox Integration', () => {
           executionId: 'exec-123',
           variables: mockContext.variables,
           stepOutputs: mockContext.stepOutputs,
-        })
+        }),
       );
 
       expect(result).toMatchObject({
@@ -214,7 +214,7 @@ describe('FlowExecutorService - Sandbox Integration', () => {
         'console.log("Async execution"); return { result: "async success" };',
         expect.objectContaining({
           stepId: 'step-sandbox-async',
-        })
+        }),
       );
 
       expect(result).toMatchObject({
@@ -244,7 +244,7 @@ describe('FlowExecutorService - Sandbox Integration', () => {
       };
 
       sandboxService.runAsync.mockResolvedValue('session-456');
-      
+
       // Mock the polling sequence: running -> completed
       sandboxService.getAsyncResult
         .mockResolvedValueOnce({
@@ -291,7 +291,7 @@ describe('FlowExecutorService - Sandbox Integration', () => {
       };
 
       sandboxService.runAsync.mockResolvedValue('session-timeout');
-      
+
       // Always return 'running' to trigger timeout
       sandboxService.getAsyncResult.mockResolvedValue({
         sessionId: 'session-timeout',
@@ -431,7 +431,7 @@ describe('FlowExecutorService - Sandbox Integration', () => {
         expect.stringContaining('return input.previousStep.result.toUpperCase();'),
         expect.objectContaining({
           stepId: 'step-transform-sandbox',
-        })
+        }),
       );
 
       expect(result).toMatchObject({
@@ -496,7 +496,7 @@ describe('FlowExecutorService - Sandbox Integration', () => {
         expect.stringContaining('context.variables.testVar === "testValue"'),
         expect.objectContaining({
           stepId: 'step-conditional-sandbox',
-        })
+        }),
       );
 
       expect(result).toMatchObject({

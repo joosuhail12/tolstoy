@@ -76,9 +76,9 @@ describe('InngestExecutionService', () => {
         InngestExecutionService,
         { provide: InngestService, useValue: mockInngestService },
         { provide: PrismaService, useValue: mockPrismaService },
-        { 
-          provide: `PinoLogger:${InngestExecutionService.name}`, 
-          useValue: mockLogger 
+        {
+          provide: `PinoLogger:${InngestExecutionService.name}`,
+          useValue: mockLogger,
         },
       ],
     }).compile();
@@ -100,11 +100,9 @@ describe('InngestExecutionService', () => {
       (prismaService.executionLog.create as jest.Mock).mockResolvedValue(mockExecutionLog);
 
       // Execute
-      const result = await service.executeFlow(
-        'test-flow-789',
-        mockTenant,
-        { testVar: 'testValue' }
-      );
+      const result = await service.executeFlow('test-flow-789', mockTenant, {
+        testVar: 'testValue',
+      });
 
       // Assertions
       expect(prismaService.flow.findUnique).toHaveBeenCalledWith({
@@ -122,9 +120,9 @@ describe('InngestExecutionService', () => {
     it('should throw error when flow not found', async () => {
       (prismaService.flow.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(
-        service.executeFlow('nonexistent-flow', mockTenant, {})
-      ).rejects.toThrow('Flow nonexistent-flow not found or access denied');
+      await expect(service.executeFlow('nonexistent-flow', mockTenant, {})).rejects.toThrow(
+        'Flow nonexistent-flow not found or access denied',
+      );
 
       expect(prismaService.executionLog.create).not.toHaveBeenCalled();
       expect(inngestService.send).not.toHaveBeenCalled();
@@ -153,9 +151,9 @@ describe('InngestExecutionService', () => {
     it('should throw error when execution not found', async () => {
       (prismaService.executionLog.findUnique as jest.Mock).mockResolvedValue(null);
 
-      await expect(
-        service.getExecutionStatus('nonexistent-exec', mockTenant)
-      ).rejects.toThrow('Execution nonexistent-exec not found or access denied');
+      await expect(service.getExecutionStatus('nonexistent-exec', mockTenant)).rejects.toThrow(
+        'Execution nonexistent-exec not found or access denied',
+      );
     });
   });
 
@@ -200,9 +198,9 @@ describe('InngestExecutionService', () => {
     it('should throw error when execution cannot be cancelled', async () => {
       (prismaService.executionLog.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
 
-      await expect(
-        service.cancelExecution('exec_123456_abc123', mockTenant)
-      ).rejects.toThrow('Execution exec_123456_abc123 not found or cannot be cancelled');
+      await expect(service.cancelExecution('exec_123456_abc123', mockTenant)).rejects.toThrow(
+        'Execution exec_123456_abc123 not found or cannot be cancelled',
+      );
     });
   });
 
@@ -216,8 +214,8 @@ describe('InngestExecutionService', () => {
 
       (prismaService.executionLog.findUnique as jest.Mock).mockResolvedValue(failedExecution);
       (prismaService.flow.findUnique as jest.Mock).mockResolvedValue(mockFlow);
-      (prismaService.executionLog.create as jest.Mock).mockResolvedValue({ 
-        ...mockExecutionLog, 
+      (prismaService.executionLog.create as jest.Mock).mockResolvedValue({
+        ...mockExecutionLog,
         id: 'exec_retry_123',
       });
 
@@ -234,9 +232,9 @@ describe('InngestExecutionService', () => {
 
       (prismaService.executionLog.findUnique as jest.Mock).mockResolvedValue(runningExecution);
 
-      await expect(
-        service.retryExecution('exec_123456_abc123', mockTenant)
-      ).rejects.toThrow('Execution exec_123456_abc123 is not in failed state');
+      await expect(service.retryExecution('exec_123456_abc123', mockTenant)).rejects.toThrow(
+        'Execution exec_123456_abc123 is not in failed state',
+      );
     });
   });
 

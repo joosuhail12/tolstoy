@@ -34,14 +34,17 @@ import { InngestModule } from './flows/inngest/inngest.module';
     LoggerModule.forRoot({
       pinoHttp: {
         level: process.env.LOG_LEVEL || 'info',
-        transport: process.env.NODE_ENV !== 'production' ? {
-          target: 'pino-pretty',
-          options: {
-            colorize: true,
-            translateTime: 'SYS:standard',
-            ignore: 'pid,hostname',
-          },
-        } : undefined,
+        transport:
+          process.env.NODE_ENV !== 'production'
+            ? {
+                target: 'pino-pretty',
+                options: {
+                  colorize: true,
+                  translateTime: 'SYS:standard',
+                  ignore: 'pid,hostname',
+                },
+              }
+            : undefined,
         formatters: {
           level(level) {
             return { level };
@@ -88,19 +91,8 @@ import { InngestModule } from './flows/inngest/inngest.module';
     InngestModule,
   ],
   controllers: [AppController],
-  providers: [
-    AppService,
-    AwsSecretsService,
-    SecretsResolver,
-    OAuthTokenService,
-    AblyService
-  ],
-  exports: [
-    AwsSecretsService,
-    SecretsResolver,
-    OAuthTokenService,
-    AblyService
-  ],
+  providers: [AppService, AwsSecretsService, SecretsResolver, OAuthTokenService, AblyService],
+  exports: [AwsSecretsService, SecretsResolver, OAuthTokenService, AblyService],
 })
 export class AppModule implements NestModule, OnModuleInit {
   constructor(
@@ -117,6 +109,14 @@ export class AppModule implements NestModule, OnModuleInit {
     consumer
       .apply(TenantMiddleware)
       .exclude('organizations/(.*)', '/', '/health', '/status', 'webhooks/event-types')
-      .forRoutes('users', 'tools', 'actions', 'flows', 'execution-logs', 'webhooks', 'tools/:toolId/secrets');
+      .forRoutes(
+        'users',
+        'tools',
+        'actions',
+        'flows',
+        'execution-logs',
+        'webhooks',
+        'tools/:toolId/secrets',
+      );
   }
 }

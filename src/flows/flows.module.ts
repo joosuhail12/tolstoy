@@ -13,13 +13,13 @@ import { InngestExecutionService } from './inngest/inngest-execution.service';
   imports: [SandboxModule],
   controllers: [FlowsController],
   providers: [
-    FlowsService, 
+    FlowsService,
     FlowExecutorService,
     InngestExecutionService,
     AblyService,
     SecretsResolver,
     OAuthTokenService,
-    AwsSecretsService
+    AwsSecretsService,
   ],
   exports: [FlowsService, FlowExecutorService, InngestExecutionService],
 })

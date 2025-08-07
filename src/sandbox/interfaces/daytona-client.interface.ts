@@ -1,6 +1,6 @@
 /**
  * Daytona SDK Client Interface
- * 
+ *
  * This interface defines the expected structure of the Daytona SDK client.
  * When the actual @daytona/sdk package becomes available, this interface
  * should match the real API.

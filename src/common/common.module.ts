@@ -7,7 +7,19 @@ import { ConditionEvaluatorService } from './services/condition-evaluator.servic
 
 @Global()
 @Module({
-  providers: [PrismaService, AwsSecretsService, InputValidatorService, LoggingContextService, ConditionEvaluatorService],
-  exports: [PrismaService, AwsSecretsService, InputValidatorService, LoggingContextService, ConditionEvaluatorService],
+  providers: [
+    PrismaService,
+    AwsSecretsService,
+    InputValidatorService,
+    LoggingContextService,
+    ConditionEvaluatorService,
+  ],
+  exports: [
+    PrismaService,
+    AwsSecretsService,
+    InputValidatorService,
+    LoggingContextService,
+    ConditionEvaluatorService,
+  ],
 })
 export class CommonModule {}

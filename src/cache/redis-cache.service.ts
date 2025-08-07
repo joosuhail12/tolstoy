@@ -19,7 +19,7 @@ export interface CacheMetrics {
 export interface CacheSetOptions {
   ttl?: number;
   nx?: boolean; // Set only if key doesn't exist
-  px?: number;  // TTL in milliseconds
+  px?: number; // TTL in milliseconds
 }
 
 @Injectable()
@@ -27,7 +27,7 @@ export class RedisCacheService {
   private redis: Redis | null = null;
   private isConnected = false;
   private connectionError: Error | null = null;
-  
+
   // Performance metrics
   private metrics: CacheMetrics = {
     hits: 0,
@@ -60,7 +60,10 @@ export class RedisCacheService {
 
       try {
         redisUrl = await this.awsSecretsService.getSecret('tolstoy/env', 'UPSTASH_REDIS_REST_URL');
-        redisToken = await this.awsSecretsService.getSecret('tolstoy/env', 'UPSTASH_REDIS_REST_TOKEN');
+        redisToken = await this.awsSecretsService.getSecret(
+          'tolstoy/env',
+          'UPSTASH_REDIS_REST_TOKEN',
+        );
         this.logger.info('Retrieved Redis credentials from AWS Secrets Manager');
       } catch (error) {
         // Fallback to environment variables
@@ -82,16 +85,16 @@ export class RedisCacheService {
       await this.redis.ping();
       this.isConnected = true;
       this.connectionError = null;
-      
+
       this.logger.info('Redis cache service initialized successfully');
     } catch (error) {
       this.connectionError = error as Error;
       this.isConnected = false;
       this.logger.error(
-        { error: error instanceof Error ? error.message : 'Unknown initialization error' }, 
-        'Failed to initialize Redis cache service - operating in fallback mode'
+        { error: error instanceof Error ? error.message : 'Unknown initialization error' },
+        'Failed to initialize Redis cache service - operating in fallback mode',
       );
-      
+
       // Don't throw error - allow service to operate without cache
     }
   }
@@ -108,9 +111,9 @@ export class RedisCacheService {
 
     try {
       this.metrics.operations.get++;
-      
+
       const value = await this.redis!.get(key);
-      
+
       if (value !== null) {
         this.metrics.hits++;
         this.updateHitRate();
@@ -144,32 +147,34 @@ export class RedisCacheService {
 
     try {
       this.metrics.operations.set++;
-      
+
       const { ttl = CacheKeys.TTL.MEDIUM, nx, px } = options;
-      
+
       const redisOptions: any = {};
-      
+
       // Set TTL (prefer px for milliseconds, fallback to ex for seconds)
       if (px) {
         redisOptions.px = px;
       } else {
         redisOptions.ex = ttl;
       }
-      
+
       // Set only if key doesn't exist
       if (nx) {
         redisOptions.nx = true;
       }
 
       await this.redis!.set(key, value, redisOptions);
-      
-      this.logger.debug({ 
-        key, 
-        ttl: px ? `${px}ms` : `${ttl}s`, 
-        nx,
-        cached: true 
-      }, 'Cache set');
-      
+
+      this.logger.debug(
+        {
+          key,
+          ttl: px ? `${px}ms` : `${ttl}s`,
+          nx,
+          cached: true,
+        },
+        'Cache set',
+      );
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown Redis SET error';
       this.logger.error({ key, error: errorMsg }, 'Redis SET error');
@@ -188,9 +193,9 @@ export class RedisCacheService {
 
     try {
       this.metrics.operations.delete++;
-      
+
       await this.redis!.del(key);
-      
+
       this.logger.debug({ key }, 'Cache key deleted');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown Redis DEL error';
@@ -210,7 +215,7 @@ export class RedisCacheService {
     try {
       // Get all keys matching the pattern
       const keys = await this.redis!.keys(pattern);
-      
+
       if (keys.length === 0) {
         this.logger.debug({ pattern }, 'No keys found for pattern');
         return 0;
@@ -218,16 +223,20 @@ export class RedisCacheService {
 
       // Delete all matching keys
       const deletedCount = await this.redis!.del(...keys);
-      
-      this.logger.info({ 
-        pattern, 
-        keysFound: keys.length, 
-        keysDeleted: deletedCount 
-      }, 'Bulk cache invalidation completed');
-      
+
+      this.logger.info(
+        {
+          pattern,
+          keysFound: keys.length,
+          keysDeleted: deletedCount,
+        },
+        'Bulk cache invalidation completed',
+      );
+
       return deletedCount;
     } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown Redis pattern delete error';
+      const errorMsg =
+        error instanceof Error ? error.message : 'Unknown Redis pattern delete error';
       this.logger.error({ pattern, error: errorMsg }, 'Redis pattern delete error');
       return 0;
     }
@@ -284,23 +293,26 @@ export class RedisCacheService {
 
     try {
       this.metrics.operations.get += keys.length;
-      
+
       const values = await this.redis!.mget(...keys);
-      
+
       // Count hits and misses
       const hits = values.filter(v => v !== null).length;
       const misses = values.length - hits;
-      
+
       this.metrics.hits += hits;
       this.metrics.misses += misses;
       this.updateHitRate();
-      
-      this.logger.debug({ 
-        keys: keys.length, 
-        hits, 
-        misses 
-      }, 'Batch cache get completed');
-      
+
+      this.logger.debug(
+        {
+          keys: keys.length,
+          hits,
+          misses,
+        },
+        'Batch cache get completed',
+      );
+
       return values;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown Redis MGET error';
@@ -323,7 +335,7 @@ export class RedisCacheService {
     try {
       // Use pipeline for better performance
       const pipeline = this.redis!.pipeline();
-      
+
       keyValuePairs.forEach(([key, value, ttl]) => {
         if (ttl) {
           pipeline.setex(key, ttl, value);
@@ -333,18 +345,23 @@ export class RedisCacheService {
       });
 
       await pipeline.exec();
-      
+
       this.metrics.operations.set += keyValuePairs.length;
-      
-      this.logger.debug({ 
-        pairs: keyValuePairs.length 
-      }, 'Batch cache set completed');
-      
+
+      this.logger.debug(
+        {
+          pairs: keyValuePairs.length,
+        },
+        'Batch cache set completed',
+      );
     } catch (error) {
-      this.logger.error({ 
-        pairs: keyValuePairs.length, 
-        error: error instanceof Error ? error.message : 'Unknown Redis MSET error' 
-      }, 'Redis MSET error');
+      this.logger.error(
+        {
+          pairs: keyValuePairs.length,
+          error: error instanceof Error ? error.message : 'Unknown Redis MSET error',
+        },
+        'Redis MSET error',
+      );
     }
   }
 

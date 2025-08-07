@@ -22,10 +22,7 @@ export class UsersController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(
-    @Body(ValidationPipe) createUserDto: CreateUserDto,
-    @Tenant() tenant: TenantContext,
-  ) {
+  create(@Body(ValidationPipe) createUserDto: CreateUserDto, @Tenant() tenant: TenantContext) {
     return this.usersService.create(createUserDto, tenant);
   }
 

@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { Webhook } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { CreateWebhookDto } from './dto/create-webhook.dto';
@@ -26,7 +31,7 @@ export class WebhooksService {
     const invalidTypes = eventTypes.filter(type => !this.VALID_EVENT_TYPES.includes(type));
     if (invalidTypes.length > 0) {
       throw new BadRequestException(
-        `Invalid event types: ${invalidTypes.join(', ')}. Valid types are: ${this.VALID_EVENT_TYPES.join(', ')}`
+        `Invalid event types: ${invalidTypes.join(', ')}. Valid types are: ${this.VALID_EVENT_TYPES.join(', ')}`,
       );
     }
   }
@@ -88,7 +93,11 @@ export class WebhooksService {
     return webhook;
   }
 
-  async update(id: string, updateWebhookDto: UpdateWebhookDto, tenant: TenantContext): Promise<Webhook> {
+  async update(
+    id: string,
+    updateWebhookDto: UpdateWebhookDto,
+    tenant: TenantContext,
+  ): Promise<Webhook> {
     const webhook = await this.findOne(id, tenant);
 
     if (updateWebhookDto.eventTypes) {
@@ -105,7 +114,9 @@ export class WebhooksService {
       });
 
       if (existingWebhook) {
-        throw new BadRequestException('A webhook with this URL already exists for your organization');
+        throw new BadRequestException(
+          'A webhook with this URL already exists for your organization',
+        );
       }
     }
 
@@ -116,7 +127,7 @@ export class WebhooksService {
   }
 
   async remove(id: string, tenant: TenantContext): Promise<Webhook> {
-    const webhook = await this.findOne(id, tenant);
+    await this.findOne(id, tenant);
 
     return this.prisma.webhook.delete({
       where: { id },
@@ -142,7 +153,10 @@ export class WebhooksService {
     });
   }
 
-  async testWebhook(id: string, tenant: TenantContext): Promise<{ success: boolean; message: string }> {
+  async testWebhook(
+    id: string,
+    tenant: TenantContext,
+  ): Promise<{ success: boolean; message: string }> {
     const webhook = await this.findOne(id, tenant);
 
     if (!webhook.enabled) {

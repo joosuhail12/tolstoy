@@ -79,7 +79,7 @@ describe('SecretsResolver - Cache Integration', () => {
       expect(result).toEqual(mockCredentials);
       expect(mockLogger.debug).toHaveBeenCalledWith(
         { toolName, orgId, cached: true },
-        'Retrieved credentials from cache'
+        'Retrieved credentials from cache',
       );
     });
 
@@ -92,15 +92,13 @@ describe('SecretsResolver - Cache Integration', () => {
 
       expect(mockCacheService.get).toHaveBeenCalledWith(cacheKey);
       expect(mockAwsSecretsService.getSecretAsJson).toHaveBeenCalledWith('tolstoy/github/org-123');
-      expect(mockCacheService.set).toHaveBeenCalledWith(
-        cacheKey,
-        mockCredentials,
-        { ttl: CacheKeys.TTL.SECRETS }
-      );
+      expect(mockCacheService.set).toHaveBeenCalledWith(cacheKey, mockCredentials, {
+        ttl: CacheKeys.TTL.SECRETS,
+      });
       expect(result).toEqual(mockCredentials);
       expect(mockLogger.debug).toHaveBeenCalledWith(
         { toolName, orgId, cached: false },
-        'Retrieving credentials from AWS Secrets Manager'
+        'Retrieving credentials from AWS Secrets Manager',
       );
     });
 
@@ -109,13 +107,13 @@ describe('SecretsResolver - Cache Integration', () => {
       mockAwsSecretsService.getSecretAsJson.mockRejectedValue(new Error('Secret not found'));
 
       await expect(service.getToolCredentials(toolName, orgId)).rejects.toThrow(
-        'Tool credentials not found for github'
+        'Tool credentials not found for github',
       );
 
       expect(mockCacheService.set).not.toHaveBeenCalled();
       expect(mockLogger.error).toHaveBeenCalledWith(
         { toolName, orgId, error: 'Secret not found' },
-        'Failed to retrieve credentials for tool'
+        'Failed to retrieve credentials for tool',
       );
     });
 
@@ -146,12 +144,12 @@ describe('SecretsResolver - Cache Integration', () => {
 
       expect(mockAwsSecretsService.updateSecret).toHaveBeenCalledWith(
         'tolstoy/github/org-123',
-        mockCredentials
+        mockCredentials,
       );
       expect(mockCacheService.del).toHaveBeenCalledWith(cacheKey);
       expect(mockLogger.info).toHaveBeenCalledWith(
         { toolName, orgId },
-        'Successfully stored credentials and invalidated cache'
+        'Successfully stored credentials and invalidated cache',
       );
     });
 
@@ -165,7 +163,7 @@ describe('SecretsResolver - Cache Integration', () => {
       expect(mockAwsSecretsService.createSecret).toHaveBeenCalledWith(
         'tolstoy/github/org-123',
         mockCredentials,
-        'Credentials for github - Organization org-123'
+        'Credentials for github - Organization org-123',
       );
       expect(mockCacheService.del).toHaveBeenCalledWith(cacheKey);
     });
@@ -194,7 +192,7 @@ describe('SecretsResolver - Cache Integration', () => {
       expect(mockCacheService.del).toHaveBeenCalledWith(cacheKey);
       expect(mockLogger.info).toHaveBeenCalledWith(
         { toolName, orgId },
-        'Successfully updated OAuth tokens and invalidated cache'
+        'Successfully updated OAuth tokens and invalidated cache',
       );
     });
   });
@@ -212,7 +210,7 @@ describe('SecretsResolver - Cache Integration', () => {
       expect(mockCacheService.del).toHaveBeenCalledWith(cacheKey);
       expect(mockLogger.warn).toHaveBeenCalledWith(
         { toolName, orgId },
-        'Deleting credentials - AWS Secrets Manager will schedule deletion, not immediate'
+        'Deleting credentials - AWS Secrets Manager will schedule deletion, not immediate',
       );
     });
 
@@ -223,7 +221,7 @@ describe('SecretsResolver - Cache Integration', () => {
 
       expect(mockLogger.error).toHaveBeenCalledWith(
         { toolName, orgId, error: 'Cache deletion failed' },
-        'Failed to invalidate cache during credential deletion'
+        'Failed to invalidate cache during credential deletion',
       );
     });
   });
@@ -241,7 +239,7 @@ describe('SecretsResolver - Cache Integration', () => {
         expect(mockCacheService.delPattern).toHaveBeenCalledWith(pattern);
         expect(mockLogger.info).toHaveBeenCalledWith(
           { orgId, deletedKeys: 5 },
-          'Invalidated all cached secrets for organization'
+          'Invalidated all cached secrets for organization',
         );
       });
 
@@ -252,7 +250,7 @@ describe('SecretsResolver - Cache Integration', () => {
 
         expect(mockLogger.error).toHaveBeenCalledWith(
           { orgId, error: 'Bulk delete failed' },
-          'Failed to invalidate organization secrets cache'
+          'Failed to invalidate organization secrets cache',
         );
       });
     });
@@ -271,10 +269,7 @@ describe('SecretsResolver - Cache Integration', () => {
 
         expect(mockAwsSecretsService.getSecretAsJson).toHaveBeenCalledTimes(3);
         expect(mockCacheService.set).toHaveBeenCalledTimes(3);
-        expect(mockLogger.info).toHaveBeenCalledWith(
-          { orgId, tools: 3 },
-          'Cache warmup completed'
-        );
+        expect(mockLogger.info).toHaveBeenCalledWith({ orgId, tools: 3 }, 'Cache warmup completed');
       });
 
       it('should skip tools without credentials during warmup', async () => {
@@ -293,7 +288,7 @@ describe('SecretsResolver - Cache Integration', () => {
             orgId,
             error: 'Secret not found',
           },
-          'Skipped warmup for tool without credentials'
+          'Skipped warmup for tool without credentials',
         );
       });
     });

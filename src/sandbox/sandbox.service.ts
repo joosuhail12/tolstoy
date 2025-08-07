@@ -34,10 +34,10 @@ export interface AsyncSandboxResult {
 
 /**
  * SandboxService - Daytona Integration Layer
- * 
+ *
  * Provides a clean interface for executing code in Daytona sandboxes
  * with both synchronous and asynchronous execution modes.
- * 
+ *
  * Features:
  * - Sync execution: runSync() - blocks until completion
  * - Async execution: runAsync() + getAsyncResult() - session-based
@@ -47,7 +47,6 @@ export interface AsyncSandboxResult {
  */
 @Injectable()
 export class SandboxService {
-  
   constructor(
     private readonly configService: ConfigService,
     private readonly client: DaytonaClientImpl,
@@ -60,23 +59,26 @@ export class SandboxService {
 
   /**
    * Execute code synchronously in a Daytona sandbox
-   * 
+   *
    * @param code - The code to execute (JavaScript, Python, etc.)
    * @param context - Execution context with tenant info and variables
    * @returns Promise<SandboxExecutionResult> - Execution result with output or error
    */
   async runSync(code: string, context: SandboxExecutionContext): Promise<SandboxExecutionResult> {
     const { orgId, userId, flowId, stepId, executionId } = context;
-    
-    this.logger.info({
-      orgId,
-      userId,
-      flowId,
-      stepId,
-      executionId,
-      codeLength: code.length,
-      mode: 'sync'
-    }, 'Starting synchronous sandbox execution');
+
+    this.logger.info(
+      {
+        orgId,
+        userId,
+        flowId,
+        stepId,
+        executionId,
+        codeLength: code.length,
+        mode: 'sync',
+      },
+      'Starting synchronous sandbox execution',
+    );
 
     try {
       const daytonaResult = await this.client.run({
@@ -94,67 +96,78 @@ export class SandboxService {
       };
 
       if (result.success) {
-        this.logger.info({
-          orgId,
-          userId,
-          flowId,
-          stepId,
-          executionId,
-          executionTime: result.executionTime,
-          mode: 'sync'
-        }, 'Synchronous sandbox execution completed successfully');
+        this.logger.info(
+          {
+            orgId,
+            userId,
+            flowId,
+            stepId,
+            executionId,
+            executionTime: result.executionTime,
+            mode: 'sync',
+          },
+          'Synchronous sandbox execution completed successfully',
+        );
       } else {
-        this.logger.warn({
-          orgId,
-          userId,
-          flowId,
-          stepId,
-          executionId,
-          error: result.error?.message,
-          executionTime: result.executionTime,
-          mode: 'sync'
-        }, 'Synchronous sandbox execution failed');
+        this.logger.warn(
+          {
+            orgId,
+            userId,
+            flowId,
+            stepId,
+            executionId,
+            error: result.error?.message,
+            executionTime: result.executionTime,
+            mode: 'sync',
+          },
+          'Synchronous sandbox execution failed',
+        );
       }
 
       return result;
-
     } catch (error) {
-      this.logger.error({
-        orgId,
-        userId,
-        flowId,
-        stepId,
-        executionId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        mode: 'sync'
-      }, 'Synchronous sandbox execution error');
+      this.logger.error(
+        {
+          orgId,
+          userId,
+          flowId,
+          stepId,
+          executionId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          mode: 'sync',
+        },
+        'Synchronous sandbox execution error',
+      );
 
       throw new InternalServerErrorException(
         `Sandbox sync execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error
+        error,
       );
     }
   }
 
   /**
    * Start asynchronous code execution in a Daytona sandbox
-   * 
+   *
    * @param code - The code to execute
    * @param context - Execution context with tenant info and variables
    * @returns Promise<string> - Session ID for tracking the execution
    */
   async runAsync(code: string, context: SandboxExecutionContext): Promise<string> {
     const { orgId, userId, flowId, stepId, executionId } = context;
-    
-    this.logger.info({
-      orgId,
-      userId,
-      flowId,
-      stepId,
-      executionId,
-      codeLength: code.length,
-      mode: 'async'
-    }, 'Starting asynchronous sandbox execution');
+
+    this.logger.info(
+      {
+        orgId,
+        userId,
+        flowId,
+        stepId,
+        executionId,
+        codeLength: code.length,
+        mode: 'async',
+      },
+      'Starting asynchronous sandbox execution',
+    );
 
     try {
       const sessionResponse = await this.client.startSession({
@@ -164,60 +177,70 @@ export class SandboxService {
         timeout: await this.getAsyncTimeout(),
       });
 
-      this.logger.info({
-        orgId,
-        userId,
-        flowId,
-        stepId,
-        executionId,
-        sessionId: sessionResponse.sessionId,
-        mode: 'async'
-      }, 'Asynchronous sandbox session started');
+      this.logger.info(
+        {
+          orgId,
+          userId,
+          flowId,
+          stepId,
+          executionId,
+          sessionId: sessionResponse.sessionId,
+          mode: 'async',
+        },
+        'Asynchronous sandbox session started',
+      );
 
       return sessionResponse.sessionId;
-
     } catch (error) {
-      this.logger.error({
-        orgId,
-        userId,
-        flowId,
-        stepId,
-        executionId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        mode: 'async'
-      }, 'Failed to start asynchronous sandbox execution');
+      this.logger.error(
+        {
+          orgId,
+          userId,
+          flowId,
+          stepId,
+          executionId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          mode: 'async',
+        },
+        'Failed to start asynchronous sandbox execution',
+      );
 
       throw new InternalServerErrorException(
         `Sandbox async execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error
+        error,
       );
     }
   }
 
   /**
    * Get the result of an asynchronous sandbox execution
-   * 
+   *
    * @param sessionId - The session ID returned from runAsync()
    * @param context - Optional context for logging (recommended)
    * @returns Promise<AsyncSandboxResult> - Current status and result if completed
    */
   async getAsyncResult(
-    sessionId: string, 
-    context?: Partial<SandboxExecutionContext>
+    sessionId: string,
+    context?: Partial<SandboxExecutionContext>,
   ): Promise<AsyncSandboxResult> {
-    const logContext = context ? {
-      orgId: context.orgId,
-      userId: context.userId,
-      flowId: context.flowId,
-      stepId: context.stepId,
-      executionId: context.executionId,
-    } : {};
+    const logContext = context
+      ? {
+          orgId: context.orgId,
+          userId: context.userId,
+          flowId: context.flowId,
+          stepId: context.stepId,
+          executionId: context.executionId,
+        }
+      : {};
 
-    this.logger.debug({
-      ...logContext,
-      sessionId,
-      mode: 'async'
-    }, 'Retrieving asynchronous sandbox result');
+    this.logger.debug(
+      {
+        ...logContext,
+        sessionId,
+        mode: 'async',
+      },
+      'Retrieving asynchronous sandbox result',
+    );
 
     try {
       const sessionResult = await this.client.getSessionResult(sessionId);
@@ -236,83 +259,101 @@ export class SandboxService {
           sessionId: sessionResult.sessionId,
         };
 
-        this.logger.info({
-          ...logContext,
-          sessionId,
-          status: sessionResult.status,
-          executionTime: sessionResult.executionTime,
-          mode: 'async'
-        }, 'Asynchronous sandbox execution completed');
+        this.logger.info(
+          {
+            ...logContext,
+            sessionId,
+            status: sessionResult.status,
+            executionTime: sessionResult.executionTime,
+            mode: 'async',
+          },
+          'Asynchronous sandbox execution completed',
+        );
       } else {
-        this.logger.debug({
-          ...logContext,
-          sessionId,
-          status: sessionResult.status,
-          mode: 'async'
-        }, 'Asynchronous sandbox execution still in progress');
+        this.logger.debug(
+          {
+            ...logContext,
+            sessionId,
+            status: sessionResult.status,
+            mode: 'async',
+          },
+          'Asynchronous sandbox execution still in progress',
+        );
       }
 
       return result;
-
     } catch (error) {
-      this.logger.error({
-        ...logContext,
-        sessionId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        mode: 'async'
-      }, 'Failed to retrieve asynchronous sandbox result');
+      this.logger.error(
+        {
+          ...logContext,
+          sessionId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          mode: 'async',
+        },
+        'Failed to retrieve asynchronous sandbox result',
+      );
 
       throw new InternalServerErrorException(
         `Fetching sandbox async result failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error
+        error,
       );
     }
   }
 
   /**
    * Cancel an ongoing asynchronous sandbox execution
-   * 
+   *
    * @param sessionId - The session ID to cancel
    * @param context - Optional context for logging
    */
   async cancelAsyncExecution(
-    sessionId: string, 
-    context?: Partial<SandboxExecutionContext>
+    sessionId: string,
+    context?: Partial<SandboxExecutionContext>,
   ): Promise<void> {
-    const logContext = context ? {
-      orgId: context.orgId,
-      userId: context.userId,
-      flowId: context.flowId,
-      stepId: context.stepId,
-      executionId: context.executionId,
-    } : {};
+    const logContext = context
+      ? {
+          orgId: context.orgId,
+          userId: context.userId,
+          flowId: context.flowId,
+          stepId: context.stepId,
+          executionId: context.executionId,
+        }
+      : {};
 
-    this.logger.warn({
-      ...logContext,
-      sessionId,
-      mode: 'async'
-    }, 'Cancelling asynchronous sandbox execution');
+    this.logger.warn(
+      {
+        ...logContext,
+        sessionId,
+        mode: 'async',
+      },
+      'Cancelling asynchronous sandbox execution',
+    );
 
     try {
       await this.client.cancelSession(sessionId);
 
-      this.logger.info({
-        ...logContext,
-        sessionId,
-        mode: 'async'
-      }, 'Asynchronous sandbox execution cancelled');
-
+      this.logger.info(
+        {
+          ...logContext,
+          sessionId,
+          mode: 'async',
+        },
+        'Asynchronous sandbox execution cancelled',
+      );
     } catch (error) {
-      this.logger.error({
-        ...logContext,
-        sessionId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        mode: 'async'
-      }, 'Failed to cancel asynchronous sandbox execution');
+      this.logger.error(
+        {
+          ...logContext,
+          sessionId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+          mode: 'async',
+        },
+        'Failed to cancel asynchronous sandbox execution',
+      );
 
       throw new InternalServerErrorException(
         `Failed to cancel sandbox execution: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error
+        error,
       );
     }
   }
@@ -345,15 +386,18 @@ export class SandboxService {
 
   private validateConfiguration(): void {
     const apiKey = this.configService.get('DAYTONA_API_KEY');
-    
+
     if (!apiKey) {
       this.logger.warn('DAYTONA_API_KEY not configured - sandbox execution will be disabled');
     } else {
-      this.logger.info({
-        baseUrl: this.configService.get('DAYTONA_BASE_URL') || 'https://api.daytona.dev',
-        syncTimeout: this.configService.get('DAYTONA_SYNC_TIMEOUT') || 30000,
-        asyncTimeout: this.configService.get('DAYTONA_ASYNC_TIMEOUT') || 300000,
-      }, 'Daytona sandbox service configured');
+      this.logger.info(
+        {
+          baseUrl: this.configService.get('DAYTONA_BASE_URL') || 'https://api.daytona.dev',
+          syncTimeout: this.configService.get('DAYTONA_SYNC_TIMEOUT') || 30000,
+          asyncTimeout: this.configService.get('DAYTONA_ASYNC_TIMEOUT') || 300000,
+        },
+        'Daytona sandbox service configured',
+      );
     }
   }
 
@@ -362,7 +406,7 @@ export class SandboxService {
       // Provide access to flow variables and step outputs
       variables: context.variables || {},
       stepOutputs: context.stepOutputs || {},
-      
+
       // Metadata for the execution
       meta: {
         orgId: context.orgId,
@@ -372,12 +416,27 @@ export class SandboxService {
         executionId: context.executionId,
         timestamp: new Date().toISOString(),
       },
-      
+
       // Utility functions available in sandbox
       utils: {
-        log: (message: string, data?: any) => ({ type: 'log', message, data, timestamp: new Date().toISOString() }),
-        error: (message: string, data?: any) => ({ type: 'error', message, data, timestamp: new Date().toISOString() }),
-        warn: (message: string, data?: any) => ({ type: 'warn', message, data, timestamp: new Date().toISOString() }),
+        log: (message: string, data?: any) => ({
+          type: 'log',
+          message,
+          data,
+          timestamp: new Date().toISOString(),
+        }),
+        error: (message: string, data?: any) => ({
+          type: 'error',
+          message,
+          data,
+          timestamp: new Date().toISOString(),
+        }),
+        warn: (message: string, data?: any) => ({
+          type: 'warn',
+          message,
+          data,
+          timestamp: new Date().toISOString(),
+        }),
       },
     };
   }
@@ -396,7 +455,7 @@ export class SandboxService {
     if (code.includes('fn ') || code.includes('let mut ') || code.includes('println!')) {
       return 'rust';
     }
-    
+
     // Default to JavaScript for web-based execution
     return 'javascript';
   }

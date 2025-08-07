@@ -33,20 +33,20 @@ export class WebhooksController {
     @Body(ValidationPipe) createWebhookDto: CreateWebhookDto,
     @Tenant() tenant: TenantContext,
   ) {
-    this.logger.info({ orgId: tenant.orgId, url: createWebhookDto.url, eventTypes: createWebhookDto.eventTypes }, 'Creating webhook');
-    
+    this.logger.info(
+      { orgId: tenant.orgId, url: createWebhookDto.url, eventTypes: createWebhookDto.eventTypes },
+      'Creating webhook',
+    );
+
     const result = await this.webhooksService.create(createWebhookDto, tenant);
-    
+
     this.logger.info({ orgId: tenant.orgId, webhookId: result.id }, 'Webhook created successfully');
-    
+
     return result;
   }
 
   @Get()
-  findAll(
-    @Query('eventType') eventType: string,
-    @Tenant() tenant: TenantContext,
-  ) {
+  findAll(@Query('eventType') eventType: string, @Tenant() tenant: TenantContext) {
     if (eventType) {
       return this.webhooksService.findByEventType(eventType, tenant);
     }
@@ -78,20 +78,23 @@ export class WebhooksController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async remove(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     this.logger.warn({ webhookId: id, orgId: tenant.orgId }, 'Deleting webhook');
-    
+
     await this.webhooksService.remove(id, tenant);
-    
+
     this.logger.info({ webhookId: id, orgId: tenant.orgId }, 'Webhook deleted successfully');
   }
 
   @Patch(':id/toggle')
   async toggle(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     this.logger.info({ webhookId: id, orgId: tenant.orgId }, 'Toggling webhook enabled status');
-    
+
     const result = await this.webhooksService.toggle(id, tenant);
-    
-    this.logger.info({ webhookId: id, orgId: tenant.orgId, enabled: result.enabled }, 'Webhook status toggled');
-    
+
+    this.logger.info(
+      { webhookId: id, orgId: tenant.orgId, enabled: result.enabled },
+      'Webhook status toggled',
+    );
+
     return result;
   }
 
@@ -99,11 +102,14 @@ export class WebhooksController {
   @HttpCode(HttpStatus.ACCEPTED)
   async testWebhook(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     this.logger.info({ webhookId: id, orgId: tenant.orgId }, 'Testing webhook');
-    
+
     const result = await this.webhooksService.testWebhook(id, tenant);
-    
-    this.logger.info({ webhookId: id, orgId: tenant.orgId, success: result.success }, 'Webhook test completed');
-    
+
+    this.logger.info(
+      { webhookId: id, orgId: tenant.orgId, success: result.success },
+      'Webhook test completed',
+    );
+
     return result;
   }
 }

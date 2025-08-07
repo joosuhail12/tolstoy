@@ -10,10 +10,10 @@ class DynamicPrismaClient extends PrismaClient {
     super({
       datasources: {
         db: {
-          url: databaseUrl || process.env.DATABASE_URL
-        }
+          url: databaseUrl || process.env.DATABASE_URL,
+        },
       },
-      log: ['query', 'info', 'warn', 'error']
+      log: ['query', 'info', 'warn', 'error'],
     });
   }
 }
@@ -34,10 +34,13 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     const nodeEnv = this.configService.get('NODE_ENV');
     const useAwsSecretsRaw = this.configService.get('USE_AWS_SECRETS', 'false');
     const useAwsSecrets = useAwsSecretsRaw?.toLowerCase() === 'true';
-    
+
     this.useSecretsManager = nodeEnv === 'production' || useAwsSecrets;
-    
-    this.logger.info({ useSecretsManager: this.useSecretsManager, nodeEnv }, 'Prisma service initialized');
+
+    this.logger.info(
+      { useSecretsManager: this.useSecretsManager, nodeEnv },
+      'Prisma service initialized',
+    );
   }
 
   async onModuleInit(): Promise<void> {
@@ -51,30 +54,33 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       if (this.useSecretsManager) {
         const secretName = this.configService.get('AWS_SECRET_NAME', 'conductor-db-secret');
         this.logger.info({ secretName }, 'Using AWS Secrets Manager for database credentials');
-        
+
         // Validate secret access first
         const canAccessSecret = await this.awsSecretsService.validateSecretAccess(secretName);
         if (!canAccessSecret) {
           throw new Error(`Cannot access AWS secret: ${secretName}`);
         }
-        
+
         // Get database URL from AWS Secrets Manager with retry
         databaseUrl = await this.awsSecretsService.getDatabaseUrl(secretName);
-        
+
         if (!databaseUrl) {
           throw new Error(`DATABASE_URL not found in secret: ${secretName}`);
         }
-        
+
         // Validate the database URL format
         if (!databaseUrl.startsWith('postgresql://')) {
           throw new Error(`Invalid DATABASE_URL format: ${databaseUrl.substring(0, 20)}...`);
         }
-        
-        this.logger.info({ databaseUrlLength: databaseUrl.length }, 'Database URL retrieved from AWS Secrets Manager');
+
+        this.logger.info(
+          { databaseUrlLength: databaseUrl.length },
+          'Database URL retrieved from AWS Secrets Manager',
+        );
       } else {
         this.logger.info('Using local environment variables for database credentials');
         databaseUrl = this.configService.get('DATABASE_URL');
-        
+
         if (!databaseUrl) {
           throw new Error('DATABASE_URL environment variable not found');
         }
@@ -82,21 +88,29 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
       // Create Prisma client with the database URL
       this.prismaClient = new DynamicPrismaClient(databaseUrl);
-      
+
       // Test the connection
       await this.prismaClient.$connect();
-      
+
       // Verify connection with a simple query
       await this.prismaClient.$queryRaw`SELECT 1 as test`;
-      
+
       const connectionType = this.useSecretsManager ? 'AWS Secrets Manager' : 'local environment';
-      this.logger.info({ connectionType, isInitialized: true }, 'Successfully connected to Neon DB');
-      
+      this.logger.info(
+        { connectionType, isInitialized: true },
+        'Successfully connected to Neon DB',
+      );
+
       this.isInitialized = true;
-      
     } catch (error) {
-      this.logger.error({ error: error instanceof Error ? error.message : 'Unknown error', useSecretsManager: this.useSecretsManager }, 'Failed to initialize database connection');
-      
+      this.logger.error(
+        {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          useSecretsManager: this.useSecretsManager,
+        },
+        'Failed to initialize database connection',
+      );
+
       // If we're using secrets manager, try falling back to env vars
       if (this.useSecretsManager && !this.isInitialized) {
         this.logger.warn('Attempting fallback to environment variables');
@@ -111,10 +125,13 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
             return;
           }
         } catch (fallbackError) {
-          this.logger.error({ error: fallbackError instanceof Error ? fallbackError.message : 'Unknown error' }, 'Fallback connection also failed');
+          this.logger.error(
+            { error: fallbackError instanceof Error ? fallbackError.message : 'Unknown error' },
+            'Fallback connection also failed',
+          );
         }
       }
-      
+
       throw error;
     }
   }
@@ -128,7 +145,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   // Proxy all Prisma client methods
   get $connect() {
-    return this.prismaClient?.$connect.bind(this.prismaClient) || (() => Promise.reject(new Error('Prisma client not initialized')));
+    return (
+      this.prismaClient?.$connect.bind(this.prismaClient) ||
+      (() => Promise.reject(new Error('Prisma client not initialized')))
+    );
   }
 
   get $disconnect() {
@@ -136,15 +156,24 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
   }
 
   get $queryRaw() {
-    return this.prismaClient?.$queryRaw.bind(this.prismaClient) || (() => Promise.reject(new Error('Prisma client not initialized')));
+    return (
+      this.prismaClient?.$queryRaw.bind(this.prismaClient) ||
+      (() => Promise.reject(new Error('Prisma client not initialized')))
+    );
   }
 
   get $executeRaw() {
-    return this.prismaClient?.$executeRaw.bind(this.prismaClient) || (() => Promise.reject(new Error('Prisma client not initialized')));
+    return (
+      this.prismaClient?.$executeRaw.bind(this.prismaClient) ||
+      (() => Promise.reject(new Error('Prisma client not initialized')))
+    );
   }
 
   get $transaction() {
-    return this.prismaClient?.$transaction.bind(this.prismaClient) || (() => Promise.reject(new Error('Prisma client not initialized')));
+    return (
+      this.prismaClient?.$transaction.bind(this.prismaClient) ||
+      (() => Promise.reject(new Error('Prisma client not initialized')))
+    );
   }
 
   // Proxy all model accessors
@@ -185,7 +214,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       await this.prismaClient.$queryRaw`SELECT 1 as health_check`;
       return true;
     } catch (error) {
-      this.logger.error({ error: error instanceof Error ? error.message : 'Unknown error' }, 'Database health check failed');
+      this.logger.error(
+        { error: error instanceof Error ? error.message : 'Unknown error' },
+        'Database health check failed',
+      );
       return false;
     }
   }

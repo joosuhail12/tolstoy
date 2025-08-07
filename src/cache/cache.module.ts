@@ -5,7 +5,7 @@ import { AwsSecretsService } from '../aws-secrets.service';
 
 /**
  * Cache Module
- * 
+ *
  * Provides Redis caching functionality across the application.
  * Global module - no need to import in other modules.
  */

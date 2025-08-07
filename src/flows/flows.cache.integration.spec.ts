@@ -131,7 +131,7 @@ describe('FlowsService - Cache Integration', () => {
           orgId: mockTenant.orgId,
           version: mockFlow.version,
         },
-        'Created new flow and invalidated flows list cache'
+        'Created new flow and invalidated flows list cache',
       );
     });
   });
@@ -148,7 +148,7 @@ describe('FlowsService - Cache Integration', () => {
       expect(result).toEqual(cachedFlows);
       expect(mockLogger.debug).toHaveBeenCalledWith(
         { orgId: mockTenant.orgId, cached: true },
-        'Retrieved flows list from cache'
+        'Retrieved flows list from cache',
       );
     });
 
@@ -172,12 +172,12 @@ describe('FlowsService - Cache Integration', () => {
       expect(mockCacheService.set).toHaveBeenCalledWith(
         CacheKeys.flowList(mockTenant.orgId),
         flows,
-        { ttl: CacheKeys.TTL.FLOWS }
+        { ttl: CacheKeys.TTL.FLOWS },
       );
       expect(result).toEqual(flows);
       expect(mockLogger.debug).toHaveBeenCalledWith(
         { orgId: mockTenant.orgId, flowCount: 1, cached: false },
-        'Retrieved and cached flows list'
+        'Retrieved and cached flows list',
       );
     });
   });
@@ -195,7 +195,7 @@ describe('FlowsService - Cache Integration', () => {
       expect(result).toEqual(mockFlowWithRelations);
       expect(mockLogger.debug).toHaveBeenCalledWith(
         { flowId, orgId: mockTenant.orgId, cached: true },
-        'Retrieved flow from cache'
+        'Retrieved flow from cache',
       );
     });
 
@@ -227,7 +227,7 @@ describe('FlowsService - Cache Integration', () => {
       expect(mockCacheService.set).toHaveBeenCalledWith(
         CacheKeys.flow(mockTenant.orgId, flowId),
         mockFlowWithRelations,
-        { ttl: CacheKeys.TTL.FLOWS }
+        { ttl: CacheKeys.TTL.FLOWS },
       );
       expect(result).toEqual(mockFlowWithRelations);
       expect(mockLogger.debug).toHaveBeenCalledWith(
@@ -237,7 +237,7 @@ describe('FlowsService - Cache Integration', () => {
           version: mockFlowWithRelations.version,
           cached: false,
         },
-        'Retrieved and cached flow'
+        'Retrieved and cached flow',
       );
     });
 
@@ -246,7 +246,7 @@ describe('FlowsService - Cache Integration', () => {
       mockFlowMethods.findUnique.mockResolvedValue(null);
 
       await expect(service.findOne(flowId, mockTenant)).rejects.toThrow(
-        `Flow with ID ${flowId} not found`
+        `Flow with ID ${flowId} not found`,
       );
 
       expect(mockCacheService.set).not.toHaveBeenCalled();
@@ -257,7 +257,7 @@ describe('FlowsService - Cache Integration', () => {
       mockCacheService.get.mockResolvedValue(wrongOrgFlow);
 
       await expect(service.findOne(flowId, mockTenant)).rejects.toThrow(
-        'Access denied: Flow belongs to different organization'
+        'Access denied: Flow belongs to different organization',
       );
     });
 
@@ -266,7 +266,7 @@ describe('FlowsService - Cache Integration', () => {
       mockCacheService.get.mockResolvedValue(wrongOrgFlow);
 
       await expect(service.findOne(flowId, mockTenant)).rejects.toThrow(
-        'Access denied: Flow belongs to different organization'
+        'Access denied: Flow belongs to different organization',
       );
 
       expect(mockFlowMethods.findUnique).not.toHaveBeenCalled();
@@ -302,7 +302,7 @@ describe('FlowsService - Cache Integration', () => {
           orgId: mockTenant.orgId,
           version: updatedFlow.version,
         },
-        'Updated flow and invalidated caches'
+        'Updated flow and invalidated caches',
       );
     });
   });
@@ -330,7 +330,7 @@ describe('FlowsService - Cache Integration', () => {
           orgId: mockTenant.orgId,
           version: mockFlow.version,
         },
-        'Deleted flow and invalidated caches'
+        'Deleted flow and invalidated caches',
       );
     });
   });
@@ -353,7 +353,7 @@ describe('FlowsService - Cache Integration', () => {
       expect(result).toEqual(executionFlow);
       expect(mockLogger.debug).toHaveBeenCalledWith(
         { flowId, orgId, cached: true },
-        'Retrieved flow for execution from cache'
+        'Retrieved flow for execution from cache',
       );
     });
 
@@ -377,7 +377,7 @@ describe('FlowsService - Cache Integration', () => {
       expect(mockCacheService.set).toHaveBeenCalledWith(
         CacheKeys.flow(orgId, flowId),
         executionFlow,
-        { ttl: CacheKeys.TTL.FLOWS }
+        { ttl: CacheKeys.TTL.FLOWS },
       );
       expect(result).toEqual(executionFlow);
     });
@@ -406,7 +406,7 @@ describe('FlowsService - Cache Integration', () => {
         expect(mockCacheService.delPattern).toHaveBeenCalledWith(pattern);
         expect(mockLogger.info).toHaveBeenCalledWith(
           { orgId, deletedKeys: 10 },
-          'Invalidated all flow caches for organization'
+          'Invalidated all flow caches for organization',
         );
       });
 
@@ -417,7 +417,7 @@ describe('FlowsService - Cache Integration', () => {
 
         expect(mockLogger.error).toHaveBeenCalledWith(
           { orgId, error: 'Bulk delete failed' },
-          'Failed to invalidate organization flow caches'
+          'Failed to invalidate organization flow caches',
         );
       });
     });
@@ -432,15 +432,10 @@ describe('FlowsService - Cache Integration', () => {
         await service.warmupFlowsCache(orgId);
 
         expect(mockFlowMethods.findMany).toHaveBeenCalled();
-        expect(mockCacheService.set).toHaveBeenCalledWith(
-          CacheKeys.flowList(orgId),
-          flows,
-          { ttl: CacheKeys.TTL.FLOWS }
-        );
-        expect(mockLogger.info).toHaveBeenCalledWith(
-          { orgId },
-          'Flows cache warmup completed'
-        );
+        expect(mockCacheService.set).toHaveBeenCalledWith(CacheKeys.flowList(orgId), flows, {
+          ttl: CacheKeys.TTL.FLOWS,
+        });
+        expect(mockLogger.info).toHaveBeenCalledWith({ orgId }, 'Flows cache warmup completed');
       });
 
       it('should handle warmup errors', async () => {
@@ -450,7 +445,7 @@ describe('FlowsService - Cache Integration', () => {
 
         expect(mockLogger.error).toHaveBeenCalledWith(
           { orgId, error: 'Cache error' },
-          'Failed to warm up flows cache'
+          'Failed to warm up flows cache',
         );
       });
     });

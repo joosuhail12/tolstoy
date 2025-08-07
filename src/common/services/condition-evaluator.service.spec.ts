@@ -23,7 +23,7 @@ describe('ConditionEvaluatorService', () => {
     },
     stepOutputs: {
       'fetch-data': { records: 25, success: true },
-      'validate': { isValid: true, score: 0.85 },
+      validate: { isValid: true, score: 0.85 },
     },
     currentStep: {
       id: 'current-step',
@@ -93,10 +93,7 @@ describe('ConditionEvaluatorService', () => {
       expect(service.evaluate(andRule, mockContext)).toBe(true);
 
       const orRule = {
-        or: [
-          { '==': [{ var: 'inputs.priority' }, 'low'] },
-          { '>': [{ var: 'inputs.count' }, 5] },
-        ],
+        or: [{ '==': [{ var: 'inputs.priority' }, 'low'] }, { '>': [{ var: 'inputs.count' }, 5] }],
       };
       expect(service.evaluate(orRule, mockContext)).toBe(true);
     });
@@ -140,47 +137,47 @@ describe('ConditionEvaluatorService', () => {
     });
 
     it('should evaluate string operations', () => {
-      const containsRule = { 
-        field: 'inputs.email', 
-        operator: 'contains', 
-        value: '@example.com' 
+      const containsRule = {
+        field: 'inputs.email',
+        operator: 'contains',
+        value: '@example.com',
       };
       expect(service.evaluate(containsRule, mockContext)).toBe(true);
 
-      const startsWithRule = { 
-        field: 'inputs.email', 
-        operator: 'startsWith', 
-        value: 'user' 
+      const startsWithRule = {
+        field: 'inputs.email',
+        operator: 'startsWith',
+        value: 'user',
       };
       expect(service.evaluate(startsWithRule, mockContext)).toBe(true);
     });
 
     it('should evaluate array operations', () => {
-      const inRule = { 
-        field: 'inputs.priority', 
-        operator: 'in', 
-        value: ['high', 'medium'] 
+      const inRule = {
+        field: 'inputs.priority',
+        operator: 'in',
+        value: ['high', 'medium'],
       };
       expect(service.evaluate(inRule, mockContext)).toBe(true);
 
-      const notInRule = { 
-        field: 'inputs.priority', 
-        operator: 'notIn', 
-        value: ['low', 'urgent'] 
+      const notInRule = {
+        field: 'inputs.priority',
+        operator: 'notIn',
+        value: ['low', 'urgent'],
       };
       expect(service.evaluate(notInRule, mockContext)).toBe(true);
     });
 
     it('should evaluate existence checks', () => {
-      const existsRule = { 
-        field: 'inputs.priority', 
-        operator: 'exists' 
+      const existsRule = {
+        field: 'inputs.priority',
+        operator: 'exists',
       };
       expect(service.evaluate(existsRule, mockContext)).toBe(true);
 
-      const notExistsRule = { 
-        field: 'inputs.nonexistent', 
-        operator: 'notExists' 
+      const notExistsRule = {
+        field: 'inputs.nonexistent',
+        operator: 'notExists',
       };
       expect(service.evaluate(notExistsRule, mockContext)).toBe(true);
     });
@@ -265,15 +262,15 @@ describe('ConditionEvaluatorService', () => {
           orgId: 'org-123',
           executionId: 'exec_123',
         }),
-        'Evaluating executeIf condition'
+        'Evaluating executeIf condition',
       );
     });
 
     it('should log errors for failed evaluations', () => {
       const invalidRule = { invalidOperator: 'test' };
-      
+
       expect(() => service.evaluate(invalidRule, mockContext)).toThrow();
-      
+
       expect(mockLogger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           rule: invalidRule,
@@ -281,7 +278,7 @@ describe('ConditionEvaluatorService', () => {
           orgId: 'org-123',
           executionId: 'exec_123',
         }),
-        'Failed to evaluate executeIf condition'
+        'Failed to evaluate executeIf condition',
       );
     });
   });
@@ -349,7 +346,7 @@ describe('ConditionEvaluatorService', () => {
           {
             and: [
               { '>=': [{ var: 'inputs.amount' }, 100] },
-              { 'in': [{ var: 'inputs.status' }, ['active', 'pending']] },
+              { in: [{ var: 'inputs.status' }, ['active', 'pending']] },
             ],
           },
         ],

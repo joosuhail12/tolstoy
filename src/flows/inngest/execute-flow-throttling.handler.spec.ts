@@ -106,9 +106,9 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
   describe('Step Configuration for Throttling', () => {
     it('should return strict rate limiting for HTTP request steps', () => {
       const httpStep = { id: 'test-http', type: 'http_request', config: { critical: false } };
-      
+
       const config = (handler as any).getStepConfiguration(httpStep);
-      
+
       expect(config).toEqual({
         concurrency: 5,
         rateLimit: {
@@ -126,23 +126,23 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
     });
 
     it('should return stricter settings for critical HTTP request steps', () => {
-      const criticalHttpStep = { 
-        id: 'critical-http', 
-        type: 'http_request', 
-        config: { critical: true } 
+      const criticalHttpStep = {
+        id: 'critical-http',
+        type: 'http_request',
+        config: { critical: true },
       };
-      
+
       const config = (handler as any).getStepConfiguration(criticalHttpStep);
-      
+
       expect(config.concurrency).toBe(2); // Lower concurrency for critical steps
       expect(config.retry.maxAttempts).toBe(5); // More retries for critical steps
     });
 
     it('should return moderate settings for sandbox operations', () => {
       const sandboxStep = { id: 'test-sandbox', type: 'sandbox_sync', config: {} };
-      
+
       const config = (handler as any).getStepConfiguration(sandboxStep);
-      
+
       expect(config).toEqual({
         concurrency: 3,
         rateLimit: {
@@ -161,9 +161,9 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
 
     it('should return generous settings for lightweight operations', () => {
       const transformStep = { id: 'test-transform', type: 'data_transform', config: {} };
-      
+
       const config = (handler as any).getStepConfiguration(transformStep);
-      
+
       expect(config).toEqual({
         concurrency: 15,
         rateLimit: {
@@ -182,9 +182,9 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
 
     it('should return conservative settings for unknown step types', () => {
       const unknownStep = { id: 'test-unknown', type: 'unknown_type', config: {} };
-      
+
       const config = (handler as any).getStepConfiguration(unknownStep);
-      
+
       expect(config).toEqual({
         concurrency: 2,
         rateLimit: {
@@ -199,21 +199,21 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
           },
         },
       });
-      
+
       expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.objectContaining({
           stepId: 'test-unknown',
           stepType: 'unknown_type',
         }),
-        'Unknown step type, using conservative throttling configuration'
+        'Unknown step type, using conservative throttling configuration',
       );
     });
 
     it('should return empty config for delay steps', () => {
       const delayStep = { id: 'test-delay', type: 'delay', config: {} };
-      
+
       const config = (handler as any).getStepConfiguration(delayStep);
-      
+
       expect(config).toEqual({});
     });
   });
@@ -221,7 +221,7 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
   describe('Event Publishing Configuration', () => {
     it('should return optimized settings for event publishing', () => {
       const config = (handler as any).getEventPublishingConfiguration();
-      
+
       expect(config).toEqual({
         concurrency: 20,
         rateLimit: {
@@ -248,9 +248,9 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
         { type: 'sandbox_sync' },
         { type: 'http_request' },
       ];
-      
+
       const distribution = (handler as any).getStepTypeDistribution(steps);
-      
+
       expect(distribution).toEqual({
         http_request: 3,
         data_transform: 1,
@@ -260,7 +260,7 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
 
     it('should handle empty step array', () => {
       const distribution = (handler as any).getStepTypeDistribution([]);
-      
+
       expect(distribution).toEqual({});
     });
   });
@@ -293,13 +293,11 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
 
       // Verify step.run was called with different configurations for different step types
       const stepRunCalls = mockStep.run.mock.calls;
-      
+
       // Note: Only HTTP step executes since it fails and stops the flow
-      
+
       // Find the HTTP request step call (should have strict throttling for critical by default)
-      const httpStepCall = stepRunCalls.find(call => 
-        call[0] === 'execute-step-http-step'
-      );
+      const httpStepCall = stepRunCalls.find(call => call[0] === 'execute-step-http-step');
       if (httpStepCall) {
         expect(httpStepCall[2]).toMatchObject({
           concurrency: 2, // Critical by default
@@ -308,8 +306,8 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
       }
 
       // Find the data transform step call (should have generous throttling)
-      const transformStepCall = stepRunCalls.find(call => 
-        call[0] === 'execute-step-transform-step'
+      const transformStepCall = stepRunCalls.find(
+        call => call[0] === 'execute-step-transform-step',
       );
       if (transformStepCall) {
         expect(transformStepCall[2]).toMatchObject({
@@ -327,7 +325,12 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
           flowId: 'test-flow',
           executionId: 'test-execution',
           steps: [
-            { id: 'test-step', type: 'sandbox_sync', config: { code: 'return 42;' }, name: 'Test Step' },
+            {
+              id: 'test-step',
+              type: 'sandbox_sync',
+              config: { code: 'return 42;' },
+              name: 'Test Step',
+            },
           ],
           variables: {},
         },
@@ -348,7 +351,7 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
           retryCount: 0, // No retries for successful step
           throttlingOverhead: expect.any(Number),
         }),
-        'Step completed successfully with throttling metrics'
+        'Step completed successfully with throttling metrics',
       );
     });
 
@@ -384,7 +387,7 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
             },
           }),
         }),
-        expect.stringMatching(/Flow execution .* with throttling analytics/)
+        expect.stringMatching(/Flow execution .* with throttling analytics/),
       );
     });
   });
@@ -427,7 +430,7 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
       mockStep.run.mockImplementation(async (name, fn, config) => {
         const maxAttempts = config?.retry?.maxAttempts || 3;
         let lastError;
-        
+
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           try {
             const result = await fn();
@@ -454,7 +457,12 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
           flowId: 'test-flow',
           executionId: 'test-execution',
           steps: [
-            { id: 'retry-step', type: 'sandbox_sync', config: { code: 'return 42;' }, name: 'Retry Step' },
+            {
+              id: 'retry-step',
+              type: 'sandbox_sync',
+              config: { code: 'return 42;' },
+              name: 'Retry Step',
+            },
           ],
           variables: {},
         },

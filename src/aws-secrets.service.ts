@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { ConfigService } from '@nestjs/config';
-import { 
-  SecretsManagerClient, 
-  GetSecretValueCommand, 
+import {
+  SecretsManagerClient,
+  GetSecretValueCommand,
   PutSecretValueCommand,
   CreateSecretCommand,
   DescribeSecretCommand,
   DeleteSecretCommand,
-  ResourceNotFoundException 
+  ResourceNotFoundException,
 } from '@aws-sdk/client-secrets-manager';
 import { RedisCacheService } from './cache/redis-cache.service';
 import CacheKeys from './cache/cache-keys';
@@ -25,14 +25,13 @@ export class AwsSecretsService {
     @InjectPinoLogger(AwsSecretsService.name)
     private readonly logger: PinoLogger,
   ) {
-
     this.region = this.configService.get('AWS_REGION', 'us-east-1');
-    this.client = new SecretsManagerClient({ 
+    this.client = new SecretsManagerClient({
       region: this.region,
       maxAttempts: 3,
-      retryMode: 'adaptive'
+      retryMode: 'adaptive',
     });
-    
+
     this.logger.info({ region: this.region }, 'AWS Secrets Manager client initialized');
   }
 
@@ -47,7 +46,7 @@ export class AwsSecretsService {
 
   async getSecret(secretId: string, key?: string): Promise<string> {
     const cacheKey = CacheKeys.awsSecret(secretId, key);
-    
+
     // Check Redis cache first if available
     if (this.cacheService) {
       const cached = await this.cacheService.get(cacheKey);
@@ -59,14 +58,14 @@ export class AwsSecretsService {
 
     try {
       this.logger.info({ secretId, key }, 'Retrieving secret from AWS');
-      
+
       // Add retry logic with exponential backoff
       let lastError: Error;
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           const command = new GetSecretValueCommand({ SecretId: secretId });
           const response = await this.client.send(command);
-          
+
           if (!response.SecretString) {
             throw new Error(`Secret ${secretId} has no SecretString value`);
           }
@@ -80,13 +79,18 @@ export class AwsSecretsService {
           } else {
             // Parse JSON and extract specific key
             const secrets = JSON.parse(response.SecretString);
-            
-            if (!secrets.hasOwnProperty(key)) {
-              throw new Error(`Key '${key}' not found in secret ${secretId}. Available keys: ${Object.keys(secrets).join(', ')}`);
+
+            if (!Object.prototype.hasOwnProperty.call(secrets, key)) {
+              throw new Error(
+                `Key '${key}' not found in secret ${secretId}. Available keys: ${Object.keys(secrets).join(', ')}`,
+              );
             }
 
             resultValue = secrets[key];
-            this.logger.info({ secretId, key, fromCache: false }, 'Successfully retrieved secret key');
+            this.logger.info(
+              { secretId, key, fromCache: false },
+              'Successfully retrieved secret key',
+            );
           }
 
           // Cache the result in Redis
@@ -95,38 +99,47 @@ export class AwsSecretsService {
           }
 
           return resultValue;
-
         } catch (error) {
           lastError = error as Error;
           if (attempt < 3) {
             const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-            const errorMsg = error instanceof Error ? error.message : 'Unknown secret retrieval error';
-          this.logger.warn({ secretId, key, attempt, delay, error: errorMsg }, 'Secret retrieval failed, retrying');
+            const errorMsg =
+              error instanceof Error ? error.message : 'Unknown secret retrieval error';
+            this.logger.warn(
+              { secretId, key, attempt, delay, error: errorMsg },
+              'Secret retrieval failed, retrying',
+            );
             await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
       }
 
       throw lastError!;
-      
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown secret retrieval error';
-      this.logger.error({ secretId, key, error: errorMsg, attempts: 3 }, 'Failed to retrieve secret after all attempts');
-      
+      this.logger.error(
+        { secretId, key, error: errorMsg, attempts: 3 },
+        'Failed to retrieve secret after all attempts',
+      );
+
       // Try to get stale cached value from Redis as fallback
       if (this.cacheService) {
         try {
           const staleCache = await this.cacheService.get(cacheKey);
           if (staleCache) {
-            this.logger.warn({ secretId, key, cached: true, stale: true }, 'Using stale cached value from Redis due to error');
+            this.logger.warn(
+              { secretId, key, cached: true, stale: true },
+              'Using stale cached value from Redis due to error',
+            );
             return staleCache;
           }
         } catch (cacheError) {
-          const cacheErrorMsg = cacheError instanceof Error ? cacheError.message : 'Unknown cache error';
+          const cacheErrorMsg =
+            cacheError instanceof Error ? cacheError.message : 'Unknown cache error';
           this.logger.debug({ error: cacheErrorMsg }, 'Could not retrieve stale cache value');
         }
       }
-      
+
       throw error;
     }
   }
@@ -204,17 +217,16 @@ export class AwsSecretsService {
     try {
       this.logger.info({ secretId }, 'Updating secret value');
 
-      const secretString = typeof secretValue === 'string' 
-        ? secretValue 
-        : JSON.stringify(secretValue);
+      const secretString =
+        typeof secretValue === 'string' ? secretValue : JSON.stringify(secretValue);
 
       const command = new PutSecretValueCommand({
         SecretId: secretId,
-        SecretString: secretString
+        SecretString: secretString,
       });
 
       await this.client.send(command);
-      
+
       // Clear Redis cache for this secret
       if (this.cacheService) {
         const pattern = CacheKeys.awsSecret(secretId, '*');
@@ -229,18 +241,21 @@ export class AwsSecretsService {
     }
   }
 
-  async createSecret(secretName: string, secretValue: string | any, description?: string): Promise<void> {
+  async createSecret(
+    secretName: string,
+    secretValue: string | any,
+    description?: string,
+  ): Promise<void> {
     try {
       this.logger.info({ secretName, description }, 'Creating new secret');
 
-      const secretString = typeof secretValue === 'string' 
-        ? secretValue 
-        : JSON.stringify(secretValue);
+      const secretString =
+        typeof secretValue === 'string' ? secretValue : JSON.stringify(secretValue);
 
       const command = new CreateSecretCommand({
         Name: secretName,
         SecretString: secretString,
-        Description: description
+        Description: description,
       });
 
       await this.client.send(command);
@@ -284,11 +299,11 @@ export class AwsSecretsService {
 
       const command = new DeleteSecretCommand({
         SecretId: secretId,
-        ForceDeleteWithoutRecovery: forceDelete
+        ForceDeleteWithoutRecovery: forceDelete,
       });
 
       await this.client.send(command);
-      
+
       // Clear Redis cache for this secret
       if (this.cacheService) {
         const pattern = CacheKeys.awsSecret(secretId, '*');
@@ -312,7 +327,10 @@ export class AwsSecretsService {
       try {
         const pattern = 'aws-secret:*';
         const deletedCount = await this.cacheService.delPattern(pattern);
-        this.logger.info({ deletedKeys: deletedCount }, 'AWS Secrets Manager cache cleared from Redis');
+        this.logger.info(
+          { deletedKeys: deletedCount },
+          'AWS Secrets Manager cache cleared from Redis',
+        );
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown cache clearing error';
         this.logger.error({ error: errorMsg }, 'Failed to clear AWS Secrets Manager cache');

@@ -13,7 +13,7 @@ export interface InngestFlowExecution {
 
 /**
  * Inngest Execution Service
- * 
+ *
  * Handles enqueueing flows for durable execution via Inngest.
  * Provides methods to start, monitor, and manage workflow executions.
  */
@@ -32,17 +32,20 @@ export class InngestExecutionService {
   async executeFlow(
     flowId: string,
     tenant: TenantContext,
-    inputVariables: any = {}
+    inputVariables: any = {},
   ): Promise<InngestFlowExecution> {
     const executionId = this.generateExecutionId();
 
-    this.logger.info({
-      flowId,
-      executionId,
-      orgId: tenant.orgId,
-      userId: tenant.userId,
-      variableCount: Object.keys(inputVariables).length,
-    }, 'Enqueueing flow for durable execution');
+    this.logger.info(
+      {
+        flowId,
+        executionId,
+        orgId: tenant.orgId,
+        userId: tenant.userId,
+        variableCount: Object.keys(inputVariables).length,
+      },
+      'Enqueueing flow for durable execution',
+    );
 
     // Fetch flow definition
     const flow = await this.prisma.flow.findUnique({
@@ -84,19 +87,21 @@ export class InngestExecutionService {
         },
       });
 
-      this.logger.info({
-        flowId,
-        executionId,
-        orgId: tenant.orgId,
-        stepCount: steps.length,
-      }, 'Flow enqueued successfully for durable execution');
+      this.logger.info(
+        {
+          flowId,
+          executionId,
+          orgId: tenant.orgId,
+          stepCount: steps.length,
+        },
+        'Flow enqueued successfully for durable execution',
+      );
 
       return {
         executionId,
         flowId,
         status: 'queued',
       };
-
     } catch (error) {
       // Update execution log to failed if enqueueing fails
       await this.prisma.executionLog.update({
@@ -104,23 +109,25 @@ export class InngestExecutionService {
         data: { status: 'failed' },
       });
 
-      this.logger.error({
-        flowId,
-        executionId,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      }, 'Failed to enqueue flow for execution');
+      this.logger.error(
+        {
+          flowId,
+          executionId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        'Failed to enqueue flow for execution',
+      );
 
-      throw new Error(`Failed to start flow execution: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to start flow execution: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      );
     }
   }
 
   /**
    * Get execution status and details
    */
-  async getExecutionStatus(
-    executionId: string,
-    tenant: TenantContext
-  ): Promise<any> {
+  async getExecutionStatus(executionId: string, tenant: TenantContext): Promise<any> {
     const executionLog = await this.prisma.executionLog.findUnique({
       where: {
         id: executionId,
@@ -152,7 +159,7 @@ export class InngestExecutionService {
       limit?: number;
       offset?: number;
       status?: string;
-    } = {}
+    } = {},
   ): Promise<any[]> {
     const { limit = 50, offset = 0, status } = options;
 
@@ -192,14 +199,14 @@ export class InngestExecutionService {
   /**
    * Cancel a running execution (if supported by Inngest)
    */
-  async cancelExecution(
-    executionId: string,
-    tenant: TenantContext
-  ): Promise<void> {
-    this.logger.warn({
-      executionId,
-      orgId: tenant.orgId,
-    }, 'Attempting to cancel execution');
+  async cancelExecution(executionId: string, tenant: TenantContext): Promise<void> {
+    this.logger.warn(
+      {
+        executionId,
+        orgId: tenant.orgId,
+      },
+      'Attempting to cancel execution',
+    );
 
     // Update execution log to cancelled
     const updated = await this.prisma.executionLog.updateMany({
@@ -217,20 +224,20 @@ export class InngestExecutionService {
 
     // Note: Actual Inngest function cancellation would require additional implementation
     // depending on the specific Inngest SDK features available
-    
-    this.logger.info({
-      executionId,
-      orgId: tenant.orgId,
-    }, 'Execution marked as cancelled');
+
+    this.logger.info(
+      {
+        executionId,
+        orgId: tenant.orgId,
+      },
+      'Execution marked as cancelled',
+    );
   }
 
   /**
    * Retry a failed execution
    */
-  async retryExecution(
-    executionId: string,
-    tenant: TenantContext
-  ): Promise<InngestFlowExecution> {
+  async retryExecution(executionId: string, tenant: TenantContext): Promise<InngestFlowExecution> {
     const originalExecution = await this.prisma.executionLog.findUnique({
       where: {
         id: executionId,
@@ -246,17 +253,20 @@ export class InngestExecutionService {
       throw new Error(`Execution ${executionId} is not in failed state`);
     }
 
-    this.logger.info({
-      originalExecutionId: executionId,
-      flowId: originalExecution.flowId,
-      orgId: tenant.orgId,
-    }, 'Retrying failed execution');
+    this.logger.info(
+      {
+        originalExecutionId: executionId,
+        flowId: originalExecution.flowId,
+        orgId: tenant.orgId,
+      },
+      'Retrying failed execution',
+    );
 
     // Start a new execution with the same inputs
     return this.executeFlow(
       originalExecution.flowId,
       tenant,
-      originalExecution.inputs as any || {}
+      (originalExecution.inputs as any) || {},
     );
   }
 
@@ -269,7 +279,7 @@ export class InngestExecutionService {
     timeRange: {
       startDate?: Date;
       endDate?: Date;
-    } = {}
+    } = {},
   ): Promise<any> {
     const { startDate, endDate } = timeRange;
 
@@ -308,9 +318,7 @@ export class InngestExecutionService {
     return {
       totalExecutions: totalCount,
       statusBreakdown: statusCounts,
-      successRate: statusCounts.completed 
-        ? (statusCounts.completed / totalCount) * 100 
-        : 0,
+      successRate: statusCounts.completed ? (statusCounts.completed / totalCount) * 100 : 0,
     };
   }
 
@@ -318,11 +326,11 @@ export class InngestExecutionService {
     if (Array.isArray(stepsData)) {
       return stepsData;
     }
-    
+
     if (typeof stepsData === 'string') {
       return JSON.parse(stepsData);
     }
-    
+
     return [];
   }
 

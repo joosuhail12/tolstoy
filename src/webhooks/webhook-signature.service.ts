@@ -26,9 +26,7 @@ export class WebhookSignatureService {
   private readonly TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000; // 5 minutes
 
   generateSignature(payload: any, secret: string): string {
-    const payloadString = typeof payload === 'string' 
-      ? payload 
-      : JSON.stringify(payload);
+    const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
 
     const signature = crypto
       .createHmac(this.SIGNATURE_ALGORITHM, secret)
@@ -38,34 +36,23 @@ export class WebhookSignatureService {
     return `${this.SIGNATURE_PREFIX}${signature}`;
   }
 
-  verifySignature(
-    payload: any,
-    signature: string,
-    secret: string,
-  ): boolean {
+  verifySignature(payload: any, signature: string, secret: string): boolean {
     if (!signature || !secret) {
       return false;
     }
 
     const expectedSignature = this.generateSignature(payload, secret);
-    
+
     // Ensure both buffers have the same length for timing-safe comparison
     if (signature.length !== expectedSignature.length) {
       return false;
     }
-    
+
     // Use timing-safe comparison to prevent timing attacks
-    return crypto.timingSafeEqual(
-      Buffer.from(signature),
-      Buffer.from(expectedSignature),
-    );
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
   }
 
-  generateWebhookHeaders(
-    eventType: string,
-    payload: any,
-    secret?: string,
-  ): WebhookHeaders {
+  generateWebhookHeaders(eventType: string, payload: any, secret?: string): WebhookHeaders {
     const timestamp = Date.now();
     const deliveryId = this.generateDeliveryId();
 
@@ -80,10 +67,7 @@ export class WebhookSignatureService {
         timestamp,
         ...payload,
       };
-      headers['x-webhook-signature'] = this.generateSignature(
-        payloadWithTimestamp,
-        secret,
-      );
+      headers['x-webhook-signature'] = this.generateSignature(payloadWithTimestamp, secret);
     }
 
     return headers;
@@ -103,7 +87,7 @@ export class WebhookSignatureService {
     }
 
     const timestamp = parseInt(headers['x-webhook-timestamp'], 10);
-    
+
     if (isNaN(timestamp)) {
       return { valid: false, error: 'Invalid timestamp format' };
     }
@@ -111,9 +95,9 @@ export class WebhookSignatureService {
     // Check timestamp to prevent replay attacks
     const currentTime = Date.now();
     if (Math.abs(currentTime - timestamp) > this.TIMESTAMP_TOLERANCE_MS) {
-      return { 
-        valid: false, 
-        error: 'Timestamp outside of tolerance window (possible replay attack)' 
+      return {
+        valid: false,
+        error: 'Timestamp outside of tolerance window (possible replay attack)',
       };
     }
 
@@ -154,18 +138,17 @@ export class WebhookSignatureService {
       eventType,
       timestamp: Date.now(),
       data,
-      metadata: metadata ? {
-        ...metadata,
-        deliveryId,
-      } : undefined,
+      metadata: metadata
+        ? {
+            ...metadata,
+            deliveryId,
+          }
+        : undefined,
     };
   }
 
   hashSecret(secret: string): string {
-    return crypto
-      .createHash('sha256')
-      .update(secret)
-      .digest('hex');
+    return crypto.createHash('sha256').update(secret).digest('hex');
   }
 
   generateWebhookSecret(): string {
@@ -175,7 +158,7 @@ export class WebhookSignatureService {
   isValidWebhookUrl(url: string): boolean {
     try {
       const parsedUrl = new URL(url);
-      
+
       // Only allow http/https protocols
       if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
         return false;

@@ -1,6 +1,6 @@
 /**
  * Centralized cache key management and TTL configuration
- * 
+ *
  * This file defines all cache key patterns and their associated TTL values
  * to ensure consistency across the application and make cache management easier.
  */
@@ -10,22 +10,22 @@ export class CacheKeys {
   static readonly TTL = {
     // Short-lived cache (5 minutes)
     SHORT: 300,
-    
-    // Medium-lived cache (10 minutes) 
+
+    // Medium-lived cache (10 minutes)
     MEDIUM: 600,
-    
+
     // Long-lived cache (30 minutes)
     LONG: 1800,
-    
+
     // Very long-lived cache (1 hour)
     VERY_LONG: 3600,
-    
+
     // Specific TTLs for different data types
-    SECRETS: 600,       // 10 minutes - balance security vs performance
-    FLOWS: 300,         // 5 minutes - flows change frequently during development  
-    TOOLS: 300,         // 5 minutes - tool metadata is fairly stable
-    TOOL_META: 600,     // 10 minutes - individual tool metadata
-    CONFIG: 1800,       // 30 minutes - platform config changes rarely
+    SECRETS: 600, // 10 minutes - balance security vs performance
+    FLOWS: 300, // 5 minutes - flows change frequently during development
+    TOOLS: 300, // 5 minutes - tool metadata is fairly stable
+    TOOL_META: 600, // 10 minutes - individual tool metadata
+    CONFIG: 1800, // 30 minutes - platform config changes rarely
     USER_SESSIONS: 3600, // 1 hour - user session data
   } as const;
 
@@ -163,7 +163,7 @@ export class CacheKeys {
 
   /**
    * Get pattern to invalidate all flows for an organization
-   * @param orgId Organization ID  
+   * @param orgId Organization ID
    * @returns Pattern: flow*:{orgId}*
    */
   static flowsPattern(orgId: string): string {
