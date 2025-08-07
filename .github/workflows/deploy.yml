@@ -54,7 +54,10 @@ jobs:
             cd /home/ubuntu/tolstoy
             
             echo "📥 Pulling latest code from GitHub..."
+            # Stash any local changes to avoid merge conflicts
+            git stash push -u -m "Auto-stash before deployment $(date)"
             git pull origin main
+            # Note: We don't pop the stash as deployment should use the latest repo code
             
             echo "📦 Installing dependencies..."
             yarn install --production=false
