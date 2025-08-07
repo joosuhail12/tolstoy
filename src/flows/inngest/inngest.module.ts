@@ -31,6 +31,23 @@ import { InngestExecutionService } from './inngest-execution.service';
               servePort: process.env.PORT || 3000,
               serveHost: process.env.HOST || 'localhost',
             },
+            defaults: {
+              // Global concurrency limit: max 10 concurrent step executions across all functions
+              concurrency: 10,
+              // Global rate limiting: max 100 steps per minute to respect external API limits
+              rateLimit: {
+                maxExecutions: 100,
+                perMilliseconds: 60_000, // 60 seconds
+              },
+              // Global retry policy: exponential backoff for resilient error handling
+              retry: {
+                maxAttempts: 3,
+                backoff: {
+                  type: 'exponential',
+                  delay: 2000, // Start with 2s, then 4s, 8s
+                },
+              },
+            },
           };
         } catch (error) {
           console.error('Failed to load Inngest configuration from AWS Secrets:', error);
@@ -46,6 +63,23 @@ import { InngestExecutionService } from './inngest-execution.service';
             serve: {
               servePort: process.env.PORT || 3000,
               serveHost: process.env.HOST || 'localhost',
+            },
+            defaults: {
+              // Global concurrency limit: max 10 concurrent step executions across all functions
+              concurrency: 10,
+              // Global rate limiting: max 100 steps per minute to respect external API limits
+              rateLimit: {
+                maxExecutions: 100,
+                perMilliseconds: 60_000, // 60 seconds
+              },
+              // Global retry policy: exponential backoff for resilient error handling
+              retry: {
+                maxAttempts: 3,
+                backoff: {
+                  type: 'exponential',
+                  delay: 2000, // Start with 2s, then 4s, 8s
+                },
+              },
             },
           };
         }

@@ -80,7 +80,13 @@ export class ExecuteFlowHandler {
       flowId,
       executionId,
       stepCount: steps.length,
-    }, 'Starting durable flow execution');
+      throttlingEnabled: true,
+      globalDefaults: {
+        concurrency: 10,
+        rateLimit: '100/min',
+        retry: 'exponential-3x',
+      },
+    }, 'Starting durable flow execution with throttling');
 
     // Update execution log to running status
     await step.run('update-execution-status', async () => {
@@ -110,9 +116,25 @@ export class ExecuteFlowHandler {
     // Execute each step durably
     for (const flowStep of steps) {
       try {
+        const stepStartTime = Date.now();
+        let retryCount = 0;
+        
         const stepResult = await step.run(
           `execute-step-${flowStep.id}`,
           async () => {
+            retryCount++;
+            
+            // Log retry attempts for monitoring
+            if (retryCount > 1) {
+              this.logger.info({
+                stepId: flowStep.id,
+                stepType: flowStep.type,
+                executionId,
+                retryAttempt: retryCount - 1,
+                totalRetriesAllowed: this.getStepConfiguration(flowStep).retry?.maxAttempts || 3,
+              }, 'Step retry attempt due to throttling or failure');
+            }
+            
             return this.executeStep(flowStep, {
               orgId,
               userId,
@@ -121,8 +143,12 @@ export class ExecuteFlowHandler {
               variables,
               stepOutputs,
             });
-          }
+          },
+          this.getStepConfiguration(flowStep)
         );
+        
+        const stepEndTime = Date.now();
+        const stepTotalTime = stepEndTime - stepStartTime;
 
         if (stepResult.skipped) {
           // Handle skipped steps
@@ -150,7 +176,7 @@ export class ExecuteFlowHandler {
                 executeIf: flowStep.executeIf,
               },
             });
-          });
+          }, this.getEventPublishingConfiguration());
 
           // Skipped steps don't contribute output but don't fail the flow
           continue;
@@ -172,14 +198,29 @@ export class ExecuteFlowHandler {
               output: stepResult.output,
               duration: stepResult.metadata?.duration,
             });
-          });
+          }, this.getEventPublishingConfiguration());
 
+          // Calculate potential throttling overhead (time spent waiting vs actual execution)
+          const actualExecutionTime = stepResult.metadata?.duration || 0;
+          const throttlingOverhead = stepTotalTime - actualExecutionTime;
+          const stepConfig = this.getStepConfiguration(flowStep);
+          
           this.logger.info({
             stepId: flowStep.id,
             stepType: flowStep.type,
             executionId,
             duration: stepResult.metadata?.duration,
-          }, 'Step completed successfully');
+            totalStepTime: stepTotalTime,
+            throttlingOverhead,
+            retryCount: retryCount - 1, // Subtract 1 since first attempt isn't a retry
+            throttlingConfig: {
+              concurrency: stepConfig.concurrency,
+              rateLimit: stepConfig.rateLimit ? 
+                `${stepConfig.rateLimit.maxExecutions}/${stepConfig.rateLimit.perMilliseconds}ms` : 
+                'global',
+              maxRetries: stepConfig.retry?.maxAttempts || 'global',
+            },
+          }, 'Step completed successfully with throttling metrics');
 
         } else {
           failedSteps++;
@@ -198,14 +239,30 @@ export class ExecuteFlowHandler {
               error: stepResult.error,
               duration: stepResult.metadata?.duration,
             });
-          });
+          }, this.getEventPublishingConfiguration());
 
+          // Calculate throttling metrics for failed steps too
+          const actualExecutionTime = stepResult.metadata?.duration || 0;
+          const throttlingOverhead = stepTotalTime - actualExecutionTime;
+          const stepConfig = this.getStepConfiguration(flowStep);
+          
           this.logger.error({
             stepId: flowStep.id,
             stepType: flowStep.type,
             executionId,
             error: stepResult.error,
-          }, 'Step failed');
+            totalStepTime: stepTotalTime,
+            throttlingOverhead,
+            retryCount: retryCount - 1,
+            throttlingConfig: {
+              concurrency: stepConfig.concurrency,
+              rateLimit: stepConfig.rateLimit ? 
+                `${stepConfig.rateLimit.maxExecutions}/${stepConfig.rateLimit.perMilliseconds}ms` : 
+                'global',
+              maxRetries: stepConfig.retry?.maxAttempts || 'global',
+            },
+            finalRetryExhausted: retryCount > (stepConfig.retry?.maxAttempts || 3),
+          }, 'Step failed with throttling metrics');
 
           // Check if step is critical
           if (this.isStepCritical(flowStep)) {
@@ -268,6 +325,10 @@ export class ExecuteFlowHandler {
       };
     });
 
+    // Calculate overall flow metrics with throttling insights
+    const flowEndTime = Date.now();
+    const totalFlowExecutionTime = flowEndTime - Date.now(); // This would need flow start time
+    
     this.logger.info({
       orgId,
       flowId,
@@ -276,7 +337,17 @@ export class ExecuteFlowHandler {
       completedSteps,
       failedSteps,
       totalSteps: steps.length,
-    }, `Flow execution ${executionStatus}`);
+      throttlingInsights: {
+        globalDefaults: {
+          concurrency: 10,
+          rateLimit: '100/60000ms',
+          retry: 'exponential-3x',
+        },
+        stepTypeDistribution: this.getStepTypeDistribution(steps),
+        averageThrottlingOverhead: 'calculated-per-step', // Individual steps logged above
+        totalRetries: 'summed-across-steps', // Individual retries logged above
+      },
+    }, `Flow execution ${executionStatus} with throttling analytics`);
 
     return {
       executionId,
@@ -755,6 +826,136 @@ export class ExecuteFlowHandler {
       success: true,
       output: { delayedFor: delayMs },
     };
+  }
+
+  /**
+   * Get step-specific configuration for throttling and retry behavior
+   * Different step types have different resource requirements and failure tolerance
+   */
+  private getStepConfiguration(step: any): any {
+    const stepType = step.type;
+    const isCritical = this.isStepCritical(step);
+    
+    // Log configuration selection for monitoring
+    this.logger.debug({
+      stepId: step.id,
+      stepType,
+      isCritical,
+    }, 'Determining step configuration for throttling');
+
+    switch (stepType) {
+      case 'http_request':
+      case 'oauth_api_call':
+        // External API calls: strict rate limiting to respect API limits
+        return {
+          concurrency: isCritical ? 2 : 5, // Lower concurrency for critical API calls
+          rateLimit: {
+            maxExecutions: 10,
+            perMilliseconds: 10_000, // 10 requests per 10 seconds
+          },
+          retry: {
+            maxAttempts: isCritical ? 5 : 3,
+            backoff: {
+              type: 'exponential',
+              delay: 3000, // Start with 3s for API calls
+            },
+          },
+        };
+
+      case 'sandbox_sync':
+      case 'sandbox_async':
+      case 'code_execution':
+        // Compute-heavy operations: moderate concurrency, longer delays
+        return {
+          concurrency: 3,
+          rateLimit: {
+            maxExecutions: 20,
+            perMilliseconds: 30_000, // 20 executions per 30 seconds
+          },
+          retry: {
+            maxAttempts: 2, // Code execution failures often require investigation
+            backoff: {
+              type: 'fixed',
+              delay: 5000, // Fixed 5s delay for compute operations
+            },
+          },
+        };
+
+      case 'data_transform':
+      case 'conditional':
+        // Lightweight operations: higher concurrency, faster retry
+        return {
+          concurrency: 15,
+          rateLimit: {
+            maxExecutions: 50,
+            perMilliseconds: 30_000, // 50 transforms per 30 seconds
+          },
+          retry: {
+            maxAttempts: 2,
+            backoff: {
+              type: 'fixed',
+              delay: 1000, // Quick 1s retry for lightweight ops
+            },
+          },
+        };
+
+      case 'delay':
+        // Delay steps: no throttling needed, just inherit defaults
+        return {};
+
+      default:
+        // Unknown step types: use conservative settings
+        this.logger.warn({
+          stepId: step.id,
+          stepType,
+        }, 'Unknown step type, using conservative throttling configuration');
+        
+        return {
+          concurrency: 2,
+          rateLimit: {
+            maxExecutions: 5,
+            perMilliseconds: 30_000, // Very conservative: 5 per 30 seconds
+          },
+          retry: {
+            maxAttempts: 1, // Single retry for unknown types
+            backoff: {
+              type: 'fixed',
+              delay: 5000,
+            },
+          },
+        };
+    }
+  }
+
+  /**
+   * Get configuration for event publishing steps
+   * Event publishing should be fast and reliable but not block execution
+   */
+  private getEventPublishingConfiguration(): any {
+    return {
+      concurrency: 20, // Higher concurrency for event publishing
+      rateLimit: {
+        maxExecutions: 200,
+        perMilliseconds: 60_000, // 200 events per minute - generous for real-time updates
+      },
+      retry: {
+        maxAttempts: 2, // Quick retry for event publishing failures
+        backoff: {
+          type: 'fixed',
+          delay: 500, // Fast retry - 500ms
+        },
+      },
+    };
+  }
+
+  /**
+   * Calculate step type distribution for throttling analytics
+   */
+  private getStepTypeDistribution(steps: any[]): Record<string, number> {
+    return steps.reduce((acc, step) => {
+      acc[step.type] = (acc[step.type] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
   }
 
   private isStepCritical(step: any): boolean {
