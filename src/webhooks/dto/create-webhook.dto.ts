@@ -44,5 +44,5 @@ export class CreateWebhookDto {
 
   @IsObject()
   @IsOptional()
-  headers?: Record<string, string>;
+  headers?: any;
 }

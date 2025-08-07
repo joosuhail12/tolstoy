@@ -32,7 +32,7 @@ export class InngestExecutionService {
   async executeFlow(
     flowId: string,
     tenant: TenantContext,
-    inputVariables: Record<string, any> = {}
+    inputVariables: any = {}
   ): Promise<InngestFlowExecution> {
     const executionId = this.generateExecutionId();
 
@@ -107,10 +107,10 @@ export class InngestExecutionService {
       this.logger.error({
         flowId,
         executionId,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
       }, 'Failed to enqueue flow for execution');
 
-      throw new Error(`Failed to start flow execution: ${error.message}`);
+      throw new Error(`Failed to start flow execution: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -256,7 +256,7 @@ export class InngestExecutionService {
     return this.executeFlow(
       originalExecution.flowId,
       tenant,
-      originalExecution.inputs as Record<string, any> || {}
+      originalExecution.inputs as any || {}
     );
   }
 
@@ -303,7 +303,7 @@ export class InngestExecutionService {
     const statusCounts = executions.reduce((acc, item) => {
       acc[item.status] = item._count.status;
       return acc;
-    }, {} as Record<string, number>);
+    }, {} as any);
 
     return {
       totalExecutions: totalCount,

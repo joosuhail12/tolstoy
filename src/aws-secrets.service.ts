@@ -26,7 +26,7 @@ export class AwsSecretsService {
     private readonly logger: PinoLogger,
   ) {
 
-    this.region = this.configService.get<string>('AWS_REGION', 'us-east-1');
+    this.region = this.configService.get('AWS_REGION', 'us-east-1');
     this.client = new SecretsManagerClient({ 
       region: this.region,
       maxAttempts: 3,
@@ -50,7 +50,7 @@ export class AwsSecretsService {
     
     // Check Redis cache first if available
     if (this.cacheService) {
-      const cached = await this.cacheService.get<string>(cacheKey);
+      const cached = await this.cacheService.get(cacheKey);
       if (cached) {
         this.logger.debug({ secretId, key, cached: true }, 'Using cached secret from Redis');
         return cached;
@@ -116,7 +116,7 @@ export class AwsSecretsService {
       // Try to get stale cached value from Redis as fallback
       if (this.cacheService) {
         try {
-          const staleCache = await this.cacheService.get<string>(cacheKey);
+          const staleCache = await this.cacheService.get(cacheKey);
           if (staleCache) {
             this.logger.warn({ secretId, key, cached: true, stale: true }, 'Using stale cached value from Redis due to error');
             return staleCache;
@@ -131,7 +131,7 @@ export class AwsSecretsService {
     }
   }
 
-  async getSecretAsJson(secretId: string): Promise<Record<string, any>> {
+  async getSecretAsJson(secretId: string): Promise<any> {
     try {
       const secretString = await this.getSecret(secretId);
       return JSON.parse(secretString);
@@ -200,7 +200,7 @@ export class AwsSecretsService {
     }
   }
 
-  async updateSecret(secretId: string, secretValue: string | Record<string, any>): Promise<void> {
+  async updateSecret(secretId: string, secretValue: string | any): Promise<void> {
     try {
       this.logger.info({ secretId }, 'Updating secret value');
 
@@ -229,7 +229,7 @@ export class AwsSecretsService {
     }
   }
 
-  async createSecret(secretName: string, secretValue: string | Record<string, any>, description?: string): Promise<void> {
+  async createSecret(secretName: string, secretValue: string | any, description?: string): Promise<void> {
     try {
       this.logger.info({ secretName, description }, 'Creating new secret');
 

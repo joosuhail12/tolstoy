@@ -10,7 +10,7 @@ describe('InputValidatorService', () => {
       providers: [InputValidatorService],
     }).compile();
 
-    service = module.get<InputValidatorService>(InputValidatorService);
+    service = module.get(InputValidatorService);
   });
 
   it('should be defined', () => {

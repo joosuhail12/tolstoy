@@ -11,13 +11,13 @@ import { PrismaService } from '../../prisma.service';
 
 describe('ExecuteFlowHandler - Throttling & Queuing', () => {
   let handler: ExecuteFlowHandler;
-  let mockSandboxService: jest.Mocked<SandboxService>;
-  let mockSecretsResolver: jest.Mocked<SecretsResolver>;
-  let mockAblyService: jest.Mocked<AblyService>;
-  let mockInputValidator: jest.Mocked<InputValidatorService>;
-  let mockConditionEvaluator: jest.Mocked<ConditionEvaluatorService>;
-  let mockPrismaService: jest.Mocked<PrismaService>;
-  let mockLogger: jest.Mocked<PinoLogger>;
+  let mockSandboxService: any;
+  let mockSecretsResolver: any;
+  let mockAblyService: any;
+  let mockInputValidator: any;
+  let mockConditionEvaluator: any;
+  let mockPrismaService: any;
+  let mockLogger: any;
 
   const mockStep = {
     run: jest.fn().mockImplementation(async (name, fn, config) => {
@@ -100,7 +100,7 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
       ],
     }).compile();
 
-    handler = module.get<ExecuteFlowHandler>(ExecuteFlowHandler);
+    handler = module.get(ExecuteFlowHandler);
   });
 
   describe('Step Configuration for Throttling', () => {

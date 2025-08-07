@@ -11,11 +11,11 @@ export class CreateExecutionLogDto {
 
   @IsObject()
   @IsNotEmpty()
-  inputs: Record<string, any>;
+  inputs: any;
 
   @IsObject()
   @IsOptional()
-  outputs?: Record<string, any>;
+  outputs?: any;
 
   @IsString()
   @IsNotEmpty()

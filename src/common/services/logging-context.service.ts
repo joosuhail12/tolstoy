@@ -13,12 +13,12 @@ export interface LoggingContext {
 
 @Injectable({ scope: Scope.DEFAULT })
 export class LoggingContextService {
-  private readonly asyncLocalStorage = new AsyncLocalStorage<LoggingContext>();
+  private readonly asyncLocalStorage = new AsyncLocalStorage();
 
   /**
    * Run callback within a new logging context
    */
-  run<T>(context: LoggingContext, callback: () => T): T {
+  run(context: LoggingContext, callback: () => any): any {
     return this.asyncLocalStorage.run(context, callback);
   }
 
@@ -42,9 +42,9 @@ export class LoggingContextService {
   /**
    * Get a specific value from the current context
    */
-  get<T>(key: keyof LoggingContext): T | undefined {
+  get(key: keyof LoggingContext): any {
     const context = this.getContext();
-    return context?.[key] as T;
+    return context?.[key] as any;
   }
 
   /**

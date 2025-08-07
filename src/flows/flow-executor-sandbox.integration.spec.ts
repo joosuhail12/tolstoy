@@ -11,10 +11,10 @@ import { PinoLogger } from 'nestjs-pino';
 
 describe('FlowExecutorService - Sandbox Integration', () => {
   let flowExecutorService: FlowExecutorService;
-  let sandboxService: jest.Mocked<SandboxService>;
-  let prismaService: jest.Mocked<PrismaService>;
-  let ablyService: jest.Mocked<AblyService>;
-  let logger: jest.Mocked<PinoLogger>;
+  let sandboxService: any;
+  let prismaService: any;
+  let ablyService: any;
+  let logger: any;
 
   const mockContext: FlowExecutionContext = {
     executionId: 'exec-123',
@@ -90,7 +90,7 @@ describe('FlowExecutorService - Sandbox Integration', () => {
       ],
     }).compile();
 
-    flowExecutorService = module.get<FlowExecutorService>(FlowExecutorService);
+    flowExecutorService = module.get(FlowExecutorService);
     sandboxService = module.get(SandboxService);
     prismaService = module.get(PrismaService);
     ablyService = module.get(AblyService);

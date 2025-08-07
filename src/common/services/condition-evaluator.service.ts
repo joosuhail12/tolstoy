@@ -83,13 +83,13 @@ export class ConditionEvaluatorService {
     } catch (error) {
       this.logger.error({
         rule,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         orgId: context.orgId,
         executionId: context.meta?.executionId,
       }, 'Failed to evaluate executeIf condition');
 
       throw new BadRequestException(
-        `Invalid executeIf rule: ${error.message}`,
+        `Invalid executeIf rule: ${error instanceof Error ? error.message : 'Unknown error'}`,
         'INVALID_CONDITION_RULE'
       );
     }
@@ -117,7 +117,7 @@ export class ConditionEvaluatorService {
     } catch (error) {
       return { 
         valid: false, 
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown error' 
       };
     }
   }

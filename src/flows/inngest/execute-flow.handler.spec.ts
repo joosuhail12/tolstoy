@@ -94,7 +94,7 @@ describe('ExecuteFlowHandler', () => {
       ],
     }).compile();
 
-    handler = module.get<ExecuteFlowHandler>(ExecuteFlowHandler);
+    handler = module.get(ExecuteFlowHandler);
   });
 
   afterEach(() => {

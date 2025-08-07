@@ -83,7 +83,7 @@ describe('InngestExecutionService', () => {
       ],
     }).compile();
 
-    service = module.get<InngestExecutionService>(InngestExecutionService);
+    service = module.get(InngestExecutionService);
     inngestService = module.get(InngestService);
     prismaService = module.get(PrismaService);
     logger = module.get(`PinoLogger:${InngestExecutionService.name}`);

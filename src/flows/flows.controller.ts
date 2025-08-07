@@ -77,7 +77,7 @@ export class FlowsController {
   @HttpCode(HttpStatus.ACCEPTED)
   async executeFlow(
     @Param('id') id: string,
-    @Body() executionInput: { variables?: Record<string, any>; useDurable?: boolean },
+    @Body() executionInput: { variables?: any; useDurable?: boolean },
     @Tenant() tenant: TenantContext,
   ) {
     const { variables = {}, useDurable = true } = executionInput;

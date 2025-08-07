@@ -45,7 +45,7 @@ export class HealthService {
         status: 'unhealthy',
         message: 'Health check failed',
         timestamp: new Date().toISOString(),
-        details: { error: error.message }
+        details: { error: error instanceof Error ? error.message : 'Unknown error' }
       };
     }
   }
@@ -67,7 +67,7 @@ export class HealthService {
         status: 'unhealthy' as const,
         message: 'Database check failed',
         timestamp,
-        details: { error: dbCheck.reason?.message }
+        details: { error: dbCheck.reason instanceof Error ? dbCheck.reason.message : 'Unknown error' }
       };
 
       const applicationStatus: HealthCheck = {
@@ -88,7 +88,7 @@ export class HealthService {
           status: 'unhealthy',
           message: 'Detailed health check failed',
           timestamp,
-          details: { error: error.message }
+          details: { error: error instanceof Error ? error.message : 'Unknown error' }
         },
         database: {
           status: 'unhealthy',
@@ -136,7 +136,7 @@ export class HealthService {
         message: 'Database connection failed',
         timestamp: new Date().toISOString(),
         connectionTime: Date.now() - startTime,
-        details: { error: error.message }
+        details: { error: error instanceof Error ? error.message : 'Unknown error' }
       };
     }
   }

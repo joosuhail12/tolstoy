@@ -83,7 +83,7 @@ export class ActionsService {
         data: updateActionDto,
       });
     } catch (error) {
-      if (error.code === 'P2025') {
+      if (error instanceof Error && (error as any).code === 'P2025') {
         throw new NotFoundException(`Action with ID ${id} not found`);
       }
       throw error;
@@ -98,7 +98,7 @@ export class ActionsService {
         where: { id },
       });
     } catch (error) {
-      if (error.code === 'P2025') {
+      if (error instanceof Error && (error as any).code === 'P2025') {
         throw new NotFoundException(`Action with ID ${id} not found`);
       }
       throw error;

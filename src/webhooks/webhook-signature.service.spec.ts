@@ -9,7 +9,7 @@ describe('WebhookSignatureService', () => {
       providers: [WebhookSignatureService],
     }).compile();
 
-    service = module.get<WebhookSignatureService>(WebhookSignatureService);
+    service = module.get(WebhookSignatureService);
   });
 
   it('should be defined', () => {

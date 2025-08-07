@@ -48,8 +48,8 @@ describe('WebhooksService', () => {
       ],
     }).compile();
 
-    service = module.get<WebhooksService>(WebhooksService);
-    prisma = module.get<PrismaService>(PrismaService);
+    service = module.get(WebhooksService);
+    prisma = module.get(PrismaService);
 
     // Reset all mocks before each test
     jest.clearAllMocks();

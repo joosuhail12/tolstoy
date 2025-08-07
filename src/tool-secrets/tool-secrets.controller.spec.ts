@@ -7,7 +7,7 @@ import { PinoLogger } from 'nestjs-pino';
 describe('ToolSecretsController', () => {
   let controller: ToolSecretsController;
   let listController: ToolSecretsListController;
-  let service: jest.Mocked<ToolSecretsService>;
+  let service: any;
 
   const mockStoredCredentials = {
     toolId: 'tool-123',
@@ -58,8 +58,8 @@ describe('ToolSecretsController', () => {
       ],
     }).compile();
 
-    controller = module.get<ToolSecretsController>(ToolSecretsController);
-    listController = module.get<ToolSecretsListController>(ToolSecretsListController);
+    controller = module.get(ToolSecretsController);
+    listController = module.get(ToolSecretsListController);
     service = module.get(ToolSecretsService);
   });
 
@@ -213,7 +213,7 @@ describe('ToolSecretsController', () => {
 
 describe('ToolSecretsListController', () => {
   let controller: ToolSecretsListController;
-  let service: jest.Mocked<ToolSecretsService>;
+  let service: any;
 
   const mockToolsList = [
     {
@@ -255,7 +255,7 @@ describe('ToolSecretsListController', () => {
       ],
     }).compile();
 
-    controller = module.get<ToolSecretsListController>(ToolSecretsListController);
+    controller = module.get(ToolSecretsListController);
     service = module.get(ToolSecretsService);
   });
 

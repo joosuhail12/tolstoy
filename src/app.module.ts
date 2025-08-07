@@ -65,7 +65,7 @@ import { InngestModule } from './flows/inngest/inngest.module';
         customSuccessMessage: (req: any, res: any, responseTime: number) =>
           `${req.method} ${req.url} completed in ${responseTime}ms`,
         customErrorMessage: (req: any, res: any, error: Error) =>
-          `Error on ${req.method} ${req.url}: ${error.message}`,
+          `Error on ${req.method} ${req.url}: ${error instanceof Error ? error.message : 'Unknown error'}`,
         customProps: (req: any) => ({
           orgId: req.headers['x-org-id'],
           userId: req.headers['x-user-id'],

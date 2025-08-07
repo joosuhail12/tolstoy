@@ -13,10 +13,10 @@ jest.mock('@upstash/redis', () => ({
 
 describe('RedisCacheService', () => {
   let service: RedisCacheService;
-  let mockRedis: jest.Mocked<Redis>;
-  let mockConfigService: jest.Mocked<ConfigService>;
-  let mockAwsSecretsService: jest.Mocked<AwsSecretsService>;
-  let mockLogger: jest.Mocked<PinoLogger>;
+  let mockRedis: any;
+  let mockConfigService: any;
+  let mockAwsSecretsService: any;
+  let mockLogger: any;
 
   beforeEach(async () => {
     // Create mock Redis instance

@@ -30,8 +30,8 @@ export interface FlowExecutionContext {
   orgId: string;
   userId: string;
   startTime: Date;
-  variables: Record<string, any>;
-  stepOutputs: Record<string, any>;
+  variables: any;
+  stepOutputs: any;
 }
 
 export interface StepExecutionResult {
@@ -68,7 +68,7 @@ export class FlowExecutorService {
   async executeFlow(
     flowId: string,
     tenant: TenantContext,
-    inputVariables: Record<string, any> = {}
+    inputVariables: any = {}
   ): Promise<ExecutionLog> {
     const startTime = new Date();
     const executionId = this.generateExecutionId();
@@ -145,13 +145,13 @@ export class FlowExecutorService {
           }
         } catch (error) {
           failedSteps++;
-          this.logger.error({ stepId: step.id, stepType: step.type, flowId: flowId, executionId: executionId, error: error.message }, 'Unexpected error in step execution');
+          this.logger.error({ stepId: step.id, stepType: step.type, flowId: flowId, executionId: executionId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Unexpected error in step execution');
           
           if (this.isStepCritical(step)) {
             executionStatus = 'failed';
             executionError = { 
-              message: error.message, 
-              code: error.code || 'EXECUTION_ERROR' 
+              message: error instanceof Error ? error.message : 'Unknown error', 
+              code: error instanceof Error && (error as any).code ? (error as any).code : 'EXECUTION_ERROR' 
             };
             break;
           }
@@ -208,7 +208,7 @@ export class FlowExecutorService {
           failedSteps: failedSteps + 1,
           skippedSteps,
           duration,
-          error: { message: error.message, code: error.code || 'EXECUTION_ERROR' }
+          error: { message: error instanceof Error ? error.message : 'Unknown error', code: error instanceof Error && (error as any).code ? (error as any).code : 'EXECUTION_ERROR' }
         }
       );
 
@@ -216,10 +216,10 @@ export class FlowExecutorService {
         executionLog.id,
         'failed',
         executionContext.stepOutputs,
-        error.message
+        error instanceof Error ? error.message : 'Unknown error'
       );
 
-      this.logger.error({ flowId, executionId, error: error.message }, 'Flow execution failed');
+      this.logger.error({ flowId, executionId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Flow execution failed');
       return updatedLog;
     }
   }
@@ -285,7 +285,7 @@ export class FlowExecutorService {
           flowId: context.flowId, 
           executionId: context.executionId,
           executeIf: step.executeIf,
-          error: error.message 
+          error: error instanceof Error ? error.message : 'Unknown error' 
         }, 'Failed to evaluate executeIf condition, proceeding with step execution');
         
         // If condition evaluation fails, proceed with step execution to be safe
@@ -321,9 +321,9 @@ export class FlowExecutorService {
       const stepResult: StepExecutionResult = {
         success: false,
         error: {
-          message: error.message,
-          code: error.code || 'STEP_EXECUTION_ERROR',
-          stack: error.stack
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: error instanceof Error && (error as any).code ? (error as any).code : 'STEP_EXECUTION_ERROR',
+          stack: error instanceof Error ? error.stack : 'No stack trace'
         },
         metadata: { duration }
       };
@@ -411,7 +411,7 @@ export class FlowExecutorService {
       return {
         success: false,
         error: {
-          message: error.message,
+          message: error instanceof Error ? error.message : 'Unknown error',
           code: 'NETWORK_ERROR'
         }
       };
@@ -463,7 +463,7 @@ export class FlowExecutorService {
       return {
         success: false,
         error: {
-          message: `OAuth API call failed: ${error.message}`,
+          message: `OAuth API call failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
           code: 'OAUTH_ERROR'
         }
       };
@@ -518,7 +518,7 @@ export class FlowExecutorService {
         return {
           success: false,
           error: {
-            message: `Sandbox data transform failed: ${error.message}`,
+            message: `Sandbox data transform failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
             code: 'SANDBOX_TRANSFORM_ERROR'
           }
         };
@@ -541,7 +541,7 @@ export class FlowExecutorService {
         return {
           success: false,
           error: {
-            message: `Data transform failed: ${error.message}`,
+            message: `Data transform failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
             code: 'TRANSFORM_ERROR'
           }
         };
@@ -588,7 +588,7 @@ export class FlowExecutorService {
         return {
           success: false,
           error: {
-            message: `Sandbox condition evaluation failed: ${error.message}`,
+            message: `Sandbox condition evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
             code: 'SANDBOX_CONDITION_ERROR'
           }
         };
@@ -611,7 +611,7 @@ export class FlowExecutorService {
         return {
           success: false,
           error: {
-            message: `Condition evaluation failed: ${error.message}`,
+            message: `Condition evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
             code: 'CONDITION_ERROR'
           }
         };
@@ -670,7 +670,7 @@ export class FlowExecutorService {
           return {
             success: false,
             error: {
-              message: `Input validation failed: ${validationError.message}`,
+              message: `Input validation failed: ${validationError instanceof Error ? validationError.message : 'Unknown validation error'}`,
               code: 'INPUT_VALIDATION_ERROR'
             }
           };
@@ -690,7 +690,7 @@ export class FlowExecutorService {
       return {
         success: false,
         error: {
-          message: `Action execution failed: ${error.message}`,
+          message: `Action execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
           code: 'ACTION_EXECUTION_ERROR'
         }
       };
@@ -789,7 +789,7 @@ export class FlowExecutorService {
       return {
         success: false,
         error: {
-          message: `Action request failed: ${error.message}`,
+          message: `Action request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
           code: 'ACTION_NETWORK_ERROR'
         }
       };
@@ -845,7 +845,7 @@ export class FlowExecutorService {
       return {
         success: false,
         error: {
-          message: `Sandbox sync execution failed: ${error.message}`,
+          message: `Sandbox sync execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
           code: 'SANDBOX_SYNC_ERROR'
         }
       };
@@ -951,7 +951,7 @@ export class FlowExecutorService {
       return {
         success: false,
         error: {
-          message: `Sandbox async execution failed: ${error.message}`,
+          message: `Sandbox async execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
           code: 'SANDBOX_ASYNC_ERROR'
         }
       };

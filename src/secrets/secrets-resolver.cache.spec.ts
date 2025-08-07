@@ -7,9 +7,9 @@ import CacheKeys from '../cache/cache-keys';
 
 describe('SecretsResolver - Cache Integration', () => {
   let service: SecretsResolver;
-  let mockAwsSecretsService: jest.Mocked<AwsSecretsService>;
-  let mockCacheService: jest.Mocked<RedisCacheService>;
-  let mockLogger: jest.Mocked<PinoLogger>;
+  let mockAwsSecretsService: any;
+  let mockCacheService: any;
+  let mockLogger: any;
 
   const mockCredentials = {
     accessToken: 'token-123',

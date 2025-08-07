@@ -13,7 +13,7 @@ export interface DaytonaClientConfig {
 
 export interface DaytonaRunRequest {
   code: string;
-  context: Record<string, any>;
+  context: any;
   language?: string;
   timeout?: number;
 }
@@ -31,7 +31,7 @@ export interface DaytonaRunResponse {
 
 export interface DaytonaSessionRequest {
   code: string;
-  context: Record<string, any>;
+  context: any;
   language?: string;
   timeout?: number;
 }

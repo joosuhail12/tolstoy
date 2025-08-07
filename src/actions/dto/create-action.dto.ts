@@ -23,7 +23,7 @@ export class CreateActionDto {
 
   @IsObject()
   @IsNotEmpty()
-  headers: Record<string, any>;
+  headers: any;
 
   @IsArray()
   @IsNotEmpty()
@@ -31,7 +31,7 @@ export class CreateActionDto {
 
   @IsObject()
   @IsOptional()
-  executeIf?: Record<string, any>;
+  executeIf?: any;
 
   @IsNumber()
   @IsOptional()

@@ -8,7 +8,7 @@ import { PinoLogger } from 'nestjs-pino';
 describe('ToolSecretsService', () => {
   let service: ToolSecretsService;
   let prismaService: any;
-  let awsSecretsService: jest.Mocked<AwsSecretsService>;
+  let awsSecretsService: any;
 
   const mockTool = {
     id: 'tool-123',
@@ -62,7 +62,7 @@ describe('ToolSecretsService', () => {
       ],
     }).compile();
 
-    service = module.get<ToolSecretsService>(ToolSecretsService);
+    service = module.get(ToolSecretsService);
     prismaService = module.get(PrismaService);
     awsSecretsService = module.get(AwsSecretsService);
   });

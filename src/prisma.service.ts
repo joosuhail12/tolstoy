@@ -31,8 +31,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     private readonly logger: PinoLogger,
   ) {
     // Check if we should use AWS Secrets Manager (enabled by default in production)
-    const nodeEnv = this.configService.get<string>('NODE_ENV');
-    const useAwsSecretsRaw = this.configService.get<string>('USE_AWS_SECRETS', 'false');
+    const nodeEnv = this.configService.get('NODE_ENV');
+    const useAwsSecretsRaw = this.configService.get('USE_AWS_SECRETS', 'false');
     const useAwsSecrets = useAwsSecretsRaw?.toLowerCase() === 'true';
     
     this.useSecretsManager = nodeEnv === 'production' || useAwsSecrets;
@@ -49,7 +49,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       let databaseUrl: string;
 
       if (this.useSecretsManager) {
-        const secretName = this.configService.get<string>('AWS_SECRET_NAME', 'conductor-db-secret');
+        const secretName = this.configService.get('AWS_SECRET_NAME', 'conductor-db-secret');
         this.logger.info({ secretName }, 'Using AWS Secrets Manager for database credentials');
         
         // Validate secret access first
@@ -73,7 +73,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         this.logger.info({ databaseUrlLength: databaseUrl.length }, 'Database URL retrieved from AWS Secrets Manager');
       } else {
         this.logger.info('Using local environment variables for database credentials');
-        databaseUrl = this.configService.get<string>('DATABASE_URL');
+        databaseUrl = this.configService.get('DATABASE_URL');
         
         if (!databaseUrl) {
           throw new Error('DATABASE_URL environment variable not found');
@@ -95,13 +95,13 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       this.isInitialized = true;
       
     } catch (error) {
-      this.logger.error({ error: error.message, useSecretsManager: this.useSecretsManager }, 'Failed to initialize database connection');
+      this.logger.error({ error: error instanceof Error ? error.message : 'Unknown error', useSecretsManager: this.useSecretsManager }, 'Failed to initialize database connection');
       
       // If we're using secrets manager, try falling back to env vars
       if (this.useSecretsManager && !this.isInitialized) {
         this.logger.warn('Attempting fallback to environment variables');
         try {
-          const fallbackUrl = this.configService.get<string>('DATABASE_URL');
+          const fallbackUrl = this.configService.get('DATABASE_URL');
           if (fallbackUrl) {
             this.prismaClient = new DynamicPrismaClient(fallbackUrl);
             await this.prismaClient.$connect();
@@ -111,7 +111,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
             return;
           }
         } catch (fallbackError) {
-          this.logger.error({ error: fallbackError.message }, 'Fallback connection also failed');
+          this.logger.error({ error: fallbackError instanceof Error ? fallbackError.message : 'Unknown error' }, 'Fallback connection also failed');
         }
       }
       
@@ -185,7 +185,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       await this.prismaClient.$queryRaw`SELECT 1 as health_check`;
       return true;
     } catch (error) {
-      this.logger.error({ error: error.message }, 'Database health check failed');
+      this.logger.error({ error: error instanceof Error ? error.message : 'Unknown error' }, 'Database health check failed');
       return false;
     }
   }

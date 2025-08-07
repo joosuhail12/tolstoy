@@ -7,9 +7,9 @@ import { DaytonaClientImpl } from './daytona-client';
 
 describe('SandboxService', () => {
   let service: SandboxService;
-  let configService: jest.Mocked<ConfigService>;
-  let daytonaClient: jest.Mocked<DaytonaClientImpl>;
-  let logger: jest.Mocked<PinoLogger>;
+  let configService: any;
+  let daytonaClient: any;
+  let logger: any;
 
   const mockContext: SandboxExecutionContext = {
     orgId: 'org-123',
@@ -78,7 +78,7 @@ describe('SandboxService', () => {
       ],
     }).compile();
 
-    service = module.get<SandboxService>(SandboxService);
+    service = module.get(SandboxService);
     configService = module.get(ConfigService);
     daytonaClient = module.get(DaytonaClientImpl);
     logger = module.get(`PinoLogger:${SandboxService.name}`);

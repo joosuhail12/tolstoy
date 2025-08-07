@@ -241,7 +241,7 @@ export class FlowsService {
       this.logger.error({ 
         orgId, 
         flowId, 
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown error' 
       }, 'Failed to invalidate flow caches');
     }
   }
@@ -263,7 +263,7 @@ export class FlowsService {
     } catch (error) {
       this.logger.error({ 
         orgId, 
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown error' 
       }, 'Failed to invalidate organization flow caches');
     }
   }
@@ -284,7 +284,7 @@ export class FlowsService {
     } catch (error) {
       this.logger.error({ 
         orgId, 
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown error' 
       }, 'Failed to warm up flows cache');
     }
   }

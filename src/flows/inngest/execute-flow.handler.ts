@@ -21,7 +21,7 @@ interface FlowExecutionEvent {
       config: any;
       dependsOn?: string[];
     }>;
-    variables: Record<string, any>;
+    variables: any;
   };
 }
 
@@ -108,7 +108,7 @@ export class ExecuteFlowHandler {
       return { status: 'execution_started' };
     });
 
-    const stepOutputs: Record<string, any> = {};
+    const stepOutputs: any = {};
     let completedSteps = 0;
     let failedSteps = 0;
     let executionError: any = null;
@@ -276,14 +276,14 @@ export class ExecuteFlowHandler {
       } catch (error) {
         failedSteps++;
         executionError = {
-          message: error.message,
-          code: error.code || 'STEP_EXECUTION_ERROR',
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: error instanceof Error && (error as any).code ? (error as any).code : 'STEP_EXECUTION_ERROR',
         };
 
         this.logger.error({
           stepId: flowStep.id,
           executionId,
-          error: error.message,
+          error: error instanceof Error ? error.message : 'Unknown error',
         }, 'Unexpected error during step execution');
 
         if (this.isStepCritical(flowStep)) {
@@ -370,7 +370,7 @@ export class ExecuteFlowHandler {
       userId: string;
       flowId: string;
       executionId: string;
-      variables: Record<string, any>;
+      variables: any;
       stepOutputs: Record<string, any>;
     }
   ): Promise<StepExecutionResult> {
@@ -428,7 +428,7 @@ export class ExecuteFlowHandler {
           flowId: context.flowId, 
           executionId: context.executionId,
           executeIf: step.executeIf,
-          error: error.message 
+          error: error instanceof Error ? error.message : 'Unknown error' 
         }, 'Failed to evaluate executeIf condition in durable workflow, proceeding with step execution');
         
         // If condition evaluation fails, proceed with step execution to be safe
@@ -493,9 +493,9 @@ export class ExecuteFlowHandler {
       return {
         success: false,
         error: {
-          message: error.message,
-          code: error.code || 'STEP_EXECUTION_ERROR',
-          stack: error.stack,
+          message: error instanceof Error ? error.message : 'Unknown error',
+          code: error instanceof Error && (error as any).code ? (error as any).code : 'STEP_EXECUTION_ERROR',
+          stack: error instanceof Error ? error.stack : 'No stack trace',
         },
         metadata: { duration },
       };
@@ -696,7 +696,7 @@ export class ExecuteFlowHandler {
         return {
           success: false,
           error: {
-            message: `Data transform failed: ${error.message}`,
+            message: `Data transform failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
             code: 'TRANSFORM_ERROR',
           },
         };
@@ -757,7 +757,7 @@ export class ExecuteFlowHandler {
         return {
           success: false,
           error: {
-            message: `Condition evaluation failed: ${error.message}`,
+            message: `Condition evaluation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
             code: 'CONDITION_ERROR',
           },
         };
@@ -807,7 +807,7 @@ export class ExecuteFlowHandler {
       return {
         success: false,
         error: {
-          message: error.message,
+          message: error instanceof Error ? error.message : 'Unknown error',
           code: 'NETWORK_ERROR',
         },
       };
@@ -951,11 +951,11 @@ export class ExecuteFlowHandler {
   /**
    * Calculate step type distribution for throttling analytics
    */
-  private getStepTypeDistribution(steps: any[]): Record<string, number> {
+  private getStepTypeDistribution(steps: any[]): any {
     return steps.reduce((acc, step) => {
       acc[step.type] = (acc[step.type] || 0) + 1;
       return acc;
-    }, {} as Record<string, number>);
+    }, {} as any);
   }
 
   private isStepCritical(step: any): boolean {

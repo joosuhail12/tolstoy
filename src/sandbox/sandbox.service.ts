@@ -10,8 +10,8 @@ export interface SandboxExecutionContext {
   flowId: string;
   stepId: string;
   executionId: string;
-  variables?: Record<string, any>;
-  stepOutputs?: Record<string, any>;
+  variables?: any;
+  stepOutputs?: any;
 }
 
 export interface SandboxExecutionResult {
@@ -125,12 +125,12 @@ export class SandboxService {
         flowId,
         stepId,
         executionId,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         mode: 'sync'
       }, 'Synchronous sandbox execution error');
 
       throw new InternalServerErrorException(
-        `Sandbox sync execution failed: ${error.message}`,
+        `Sandbox sync execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         error
       );
     }
@@ -183,12 +183,12 @@ export class SandboxService {
         flowId,
         stepId,
         executionId,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         mode: 'async'
       }, 'Failed to start asynchronous sandbox execution');
 
       throw new InternalServerErrorException(
-        `Sandbox async execution failed: ${error.message}`,
+        `Sandbox async execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         error
       );
     }
@@ -258,12 +258,12 @@ export class SandboxService {
       this.logger.error({
         ...logContext,
         sessionId,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         mode: 'async'
       }, 'Failed to retrieve asynchronous sandbox result');
 
       throw new InternalServerErrorException(
-        `Fetching sandbox async result failed: ${error.message}`,
+        `Fetching sandbox async result failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         error
       );
     }
@@ -306,12 +306,12 @@ export class SandboxService {
       this.logger.error({
         ...logContext,
         sessionId,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         mode: 'async'
       }, 'Failed to cancel asynchronous sandbox execution');
 
       throw new InternalServerErrorException(
-        `Failed to cancel sandbox execution: ${error.message}`,
+        `Failed to cancel sandbox execution: ${error instanceof Error ? error.message : 'Unknown error'}`,
         error
       );
     }
@@ -321,7 +321,7 @@ export class SandboxService {
    * Check if the sandbox service is properly configured
    */
   isConfigured(): boolean {
-    return !!this.configService.get<string>('DAYTONA_API_KEY');
+    return !!this.configService.get('DAYTONA_API_KEY');
   }
 
   /**
@@ -336,28 +336,28 @@ export class SandboxService {
   }> {
     return {
       configured: this.isConfigured(),
-      apiKeyPresent: !!this.configService.get<string>('DAYTONA_API_KEY'),
-      baseUrl: this.configService.get<string>('DAYTONA_BASE_URL') || 'https://api.daytona.dev',
+      apiKeyPresent: !!this.configService.get('DAYTONA_API_KEY'),
+      baseUrl: this.configService.get('DAYTONA_BASE_URL') || 'https://api.daytona.dev',
       syncTimeout: await this.getSyncTimeout(),
       asyncTimeout: await this.getAsyncTimeout(),
     };
   }
 
   private validateConfiguration(): void {
-    const apiKey = this.configService.get<string>('DAYTONA_API_KEY');
+    const apiKey = this.configService.get('DAYTONA_API_KEY');
     
     if (!apiKey) {
       this.logger.warn('DAYTONA_API_KEY not configured - sandbox execution will be disabled');
     } else {
       this.logger.info({
-        baseUrl: this.configService.get<string>('DAYTONA_BASE_URL') || 'https://api.daytona.dev',
-        syncTimeout: this.configService.get<number>('DAYTONA_SYNC_TIMEOUT') || 30000,
-        asyncTimeout: this.configService.get<number>('DAYTONA_ASYNC_TIMEOUT') || 300000,
+        baseUrl: this.configService.get('DAYTONA_BASE_URL') || 'https://api.daytona.dev',
+        syncTimeout: this.configService.get('DAYTONA_SYNC_TIMEOUT') || 30000,
+        asyncTimeout: this.configService.get('DAYTONA_ASYNC_TIMEOUT') || 300000,
       }, 'Daytona sandbox service configured');
     }
   }
 
-  private buildExecutionContext(context: SandboxExecutionContext): Record<string, any> {
+  private buildExecutionContext(context: SandboxExecutionContext): any {
     return {
       // Provide access to flow variables and step outputs
       variables: context.variables || {},
@@ -403,7 +403,7 @@ export class SandboxService {
 
   private async getSyncTimeout(): Promise<number> {
     try {
-      const useAwsSecrets = this.configService.get<string>('USE_AWS_SECRETS') === 'true';
+      const useAwsSecrets = this.configService.get('USE_AWS_SECRETS') === 'true';
       if (useAwsSecrets && this.awsSecretsService) {
         const timeout = await this.awsSecretsService.getDaytonaSyncTimeout();
         return parseInt(timeout, 10);
@@ -411,12 +411,12 @@ export class SandboxService {
     } catch (error) {
       // Fall back to environment variable
     }
-    return this.configService.get<number>('DAYTONA_SYNC_TIMEOUT') || 30000;
+    return this.configService.get('DAYTONA_SYNC_TIMEOUT') || 30000;
   }
 
   private async getAsyncTimeout(): Promise<number> {
     try {
-      const useAwsSecrets = this.configService.get<string>('USE_AWS_SECRETS') === 'true';
+      const useAwsSecrets = this.configService.get('USE_AWS_SECRETS') === 'true';
       if (useAwsSecrets && this.awsSecretsService) {
         const timeout = await this.awsSecretsService.getDaytonaAsyncTimeout();
         return parseInt(timeout, 10);
@@ -424,6 +424,6 @@ export class SandboxService {
     } catch (error) {
       // Fall back to environment variable
     }
-    return this.configService.get<number>('DAYTONA_ASYNC_TIMEOUT') || 300000;
+    return this.configService.get('DAYTONA_ASYNC_TIMEOUT') || 300000;
   }
 }

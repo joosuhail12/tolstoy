@@ -58,7 +58,7 @@ export class OrganizationsService {
         data: updateOrganizationDto,
       });
     } catch (error) {
-      if (error.code === 'P2025') {
+      if (error instanceof Error && (error as any).code === 'P2025') {
         throw new NotFoundException(`Organization with ID ${id} not found`);
       }
       throw error;
@@ -71,7 +71,7 @@ export class OrganizationsService {
         where: { id },
       });
     } catch (error) {
-      if (error.code === 'P2025') {
+      if (error instanceof Error && (error as any).code === 'P2025') {
         throw new NotFoundException(`Organization with ID ${id} not found`);
       }
       throw error;

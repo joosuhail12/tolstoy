@@ -8,5 +8,5 @@ export class CreateFlowDto {
 
   @IsObject()
   @IsNotEmpty()
-  steps: Record<string, any>;
+  steps: any;
 }

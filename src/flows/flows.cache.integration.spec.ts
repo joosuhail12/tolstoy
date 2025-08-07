@@ -11,10 +11,10 @@ import CacheKeys from '../cache/cache-keys';
 
 describe('FlowsService - Cache Integration', () => {
   let service: FlowsService;
-  let mockPrismaService: jest.Mocked<PrismaService>;
+  let mockPrismaService: any;
   let mockFlowMethods: any;
-  let mockCacheService: jest.Mocked<RedisCacheService>;
-  let mockLogger: jest.Mocked<PinoLogger>;
+  let mockCacheService: any;
+  let mockLogger: any;
 
   const mockTenant: TenantContext = {
     orgId: 'org-123',

@@ -13,7 +13,7 @@ export interface StoredCredentials {
   toolId: string;
   toolName: string;
   credentials: ToolCredentials;
-  maskedCredentials: Record<string, string>;
+  maskedCredentials: any;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,8 +39,8 @@ export class ToolSecretsService {
     return value.substring(0, 4) + '*'.repeat(value.length - 8) + value.substring(value.length - 4);
   }
 
-  private maskCredentials(credentials: ToolCredentials): Record<string, string> {
-    const masked: Record<string, string> = {};
+  private maskCredentials(credentials: ToolCredentials): any {
+    const masked: any = {};
     Object.keys(credentials).forEach(key => {
       masked[key] = this.maskCredential(credentials[key]);
     });

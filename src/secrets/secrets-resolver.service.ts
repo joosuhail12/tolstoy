@@ -36,7 +36,7 @@ export class SecretsResolver {
     const cacheKey = CacheKeys.secrets(orgId, toolName);
     
     // Try cache first
-    const cached = await this.cacheService.get<ToolCredentials>(cacheKey);
+    const cached = await this.cacheService.get(cacheKey);
     if (cached) {
       this.logger.debug({ toolName, orgId, cached: true }, 'Retrieved credentials from cache');
       return cached;
@@ -53,7 +53,7 @@ export class SecretsResolver {
       
       return credentials as ToolCredentials;
     } catch (error) {
-      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to retrieve credentials for tool');
+      this.logger.error({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to retrieve credentials for tool');
       throw new Error(`Tool credentials not found for ${toolName}`);
     }
   }
@@ -82,7 +82,7 @@ export class SecretsResolver {
       
       this.logger.info({ toolName, orgId }, 'Successfully stored credentials and invalidated cache');
     } catch (error) {
-      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to store credentials');
+      this.logger.error({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to store credentials');
       throw error;
     }
   }
@@ -135,7 +135,7 @@ export class SecretsResolver {
       
       this.logger.info({ toolName, orgId }, 'Successfully updated OAuth tokens and invalidated cache');
     } catch (error) {
-      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to update OAuth tokens');
+      this.logger.error({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to update OAuth tokens');
       throw error;
     }
   }
@@ -148,7 +148,7 @@ export class SecretsResolver {
       
       return tokens.expiresAt > 0 && (tokens.expiresAt - bufferTime) <= now;
     } catch (error) {
-      this.logger.debug({ toolName, orgId, error: error.message }, 'Could not check token expiration');
+      this.logger.debug({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Could not check token expiration');
       return true;
     }
   }
@@ -205,7 +205,7 @@ export class SecretsResolver {
       // The cache invalidation ensures stale data isn't served
       
     } catch (error) {
-      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to invalidate cache during credential deletion');
+      this.logger.error({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to invalidate cache during credential deletion');
     }
   }
 
@@ -237,7 +237,7 @@ export class SecretsResolver {
     } catch (error) {
       this.logger.error({ 
         orgId, 
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown error' 
       }, 'Failed to invalidate organization secrets cache');
     }
   }

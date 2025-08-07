@@ -39,7 +39,7 @@ export class OAuthTokenService {
       const tokens = await this.secretsResolver.getOAuthTokens(toolName, orgId);
       return tokens.accessToken;
     } catch (error) {
-      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to get valid access token');
+      this.logger.error({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to get valid access token');
       throw new Error(`Unable to obtain valid access token for ${toolName}`);
     }
   }
@@ -85,7 +85,7 @@ export class OAuthTokenService {
       this.logger.info({ toolName, orgId, expiresIn: refreshedTokens.expires_in }, 'Successfully refreshed token');
       return newTokens;
     } catch (error) {
-      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to refresh token');
+      this.logger.error({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to refresh token');
       throw error;
     }
   }
@@ -127,7 +127,7 @@ export class OAuthTokenService {
         this.logger.error({
           status: error.response?.status,
           responseData: error.response?.data,
-          message: error.message
+          message: error instanceof Error ? error.message : 'Unknown error'
         }, 'Token refresh HTTP error');
       }
       throw error;
@@ -158,7 +158,7 @@ export class OAuthTokenService {
       await this.secretsResolver.setToolCredentials(toolName, orgId, credentials);
       this.logger.info({ toolName, orgId }, 'Successfully stored initial tokens');
     } catch (error) {
-      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to store initial tokens');
+      this.logger.error({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to store initial tokens');
       throw error;
     }
   }
@@ -186,14 +186,14 @@ export class OAuthTokenService {
           });
           this.logger.info({ toolName, orgId }, 'Successfully revoked token at provider');
         } catch (error) {
-          this.logger.warn({ toolName, orgId, error: error.message }, 'Failed to revoke token at provider');
+          this.logger.warn({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to revoke token at provider');
         }
       }
 
       await this.secretsResolver.deleteToolCredentials(toolName, orgId);
       this.logger.info({ toolName, orgId }, 'Successfully removed stored tokens');
     } catch (error) {
-      this.logger.error({ toolName, orgId, error: error.message }, 'Failed to revoke token');
+      this.logger.error({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Failed to revoke token');
       throw error;
     }
   }
@@ -241,7 +241,7 @@ export class OAuthTokenService {
 
       return true;
     } catch (error) {
-      this.logger.debug({ toolName, orgId, error: error.message }, 'Token health check failed');
+      this.logger.debug({ toolName, orgId, error: error instanceof Error ? error.message : 'Unknown error' }, 'Token health check failed');
       return false;
     }
   }

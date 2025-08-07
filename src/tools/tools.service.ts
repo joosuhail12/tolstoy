@@ -63,7 +63,7 @@ export class ToolsService {
         data: updateToolDto,
       });
     } catch (error) {
-      if (error.code === 'P2025') {
+      if (error instanceof Error && (error as any).code === 'P2025') {
         throw new NotFoundException(`Tool with ID ${id} not found`);
       }
       throw error;
@@ -78,7 +78,7 @@ export class ToolsService {
         where: { id },
       });
     } catch (error) {
-      if (error.code === 'P2025') {
+      if (error instanceof Error && (error as any).code === 'P2025') {
         throw new NotFoundException(`Tool with ID ${id} not found`);
       }
       throw error;

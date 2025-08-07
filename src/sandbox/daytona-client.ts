@@ -40,9 +40,9 @@ export class DaytonaClientImpl implements DaytonaClient {
 
   private initializeConfig(): void {
     // Set defaults from environment variables first
-    this.apiKey = this.configService.get<string>('DAYTONA_API_KEY') || '';
-    this.baseUrl = this.configService.get<string>('DAYTONA_BASE_URL') || 'https://api.daytona.dev';
-    this.timeout = this.configService.get<number>('DAYTONA_TIMEOUT') || 30000;
+    this.apiKey = this.configService.get('DAYTONA_API_KEY') || '';
+    this.baseUrl = this.configService.get('DAYTONA_BASE_URL') || 'https://api.daytona.dev';
+    this.timeout = this.configService.get('DAYTONA_TIMEOUT') || 30000;
     this.configInitialized = false;
   }
 
@@ -53,7 +53,7 @@ export class DaytonaClientImpl implements DaytonaClient {
 
     try {
       // Try to load from AWS Secrets Manager, fallback to environment variables if not available
-      const useAwsSecrets = this.configService.get<string>('USE_AWS_SECRETS') === 'true';
+      const useAwsSecrets = this.configService.get('USE_AWS_SECRETS') === 'true';
       
       if (useAwsSecrets) {
         try {
@@ -100,8 +100,8 @@ export class DaytonaClientImpl implements DaytonaClient {
           success: false,
           output: null,
           error: {
-            message: error.message || 'Sandbox execution failed',
-            code: error.code || 'EXECUTION_ERROR',
+            message: error instanceof Error ? error.message : 'Sandbox execution failed',
+            code: error instanceof Error && (error as any).code ? (error as any).code : 'EXECUTION_ERROR',
           },
           executionTime,
         };
@@ -112,9 +112,9 @@ export class DaytonaClientImpl implements DaytonaClient {
         success: false,
         output: null,
         error: {
-          message: error.message || 'Network error during sandbox execution',
+          message: error instanceof Error ? error.message : 'Network error during sandbox execution',
           code: 'NETWORK_ERROR',
-          stack: error.stack,
+          stack: error instanceof Error ? error.stack : 'No stack trace',
         },
         executionTime,
       };
@@ -139,10 +139,10 @@ export class DaytonaClientImpl implements DaytonaClient {
         };
       } else {
         const error = await response.json();
-        throw new Error(`Failed to start session: ${error.message}`);
+        throw new Error(`Failed to start session: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     } catch (error) {
-      throw new Error(`Failed to start async session: ${error.message}`);
+      throw new Error(`Failed to start async session: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -166,10 +166,10 @@ export class DaytonaClientImpl implements DaytonaClient {
         };
       } else {
         const error = await response.json();
-        throw new Error(`Failed to get session result: ${error.message}`);
+        throw new Error(`Failed to get session result: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     } catch (error) {
-      throw new Error(`Failed to retrieve session result: ${error.message}`);
+      throw new Error(`Failed to retrieve session result: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -183,10 +183,10 @@ export class DaytonaClientImpl implements DaytonaClient {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(`Failed to cancel session: ${error.message}`);
+        throw new Error(`Failed to cancel session: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     } catch (error) {
-      throw new Error(`Failed to cancel session: ${error.message}`);
+      throw new Error(`Failed to cancel session: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -219,7 +219,7 @@ export class DaytonaClientImpl implements DaytonaClient {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 400));
 
-    const mockResponses: Record<string, any> = {
+    const mockResponses: any = {
       '/run': {
         status: 200,
         json: async () => ({

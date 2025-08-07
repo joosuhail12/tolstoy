@@ -64,8 +64,8 @@ export class RedisCacheService {
         this.logger.info('Retrieved Redis credentials from AWS Secrets Manager');
       } catch (error) {
         // Fallback to environment variables
-        redisUrl = this.configService.get<string>('UPSTASH_REDIS_REST_URL');
-        redisToken = this.configService.get<string>('UPSTASH_REDIS_REST_TOKEN');
+        redisUrl = this.configService.get('UPSTASH_REDIS_REST_URL');
+        redisToken = this.configService.get('UPSTASH_REDIS_REST_TOKEN');
         this.logger.info('Using Redis credentials from environment variables');
       }
 
@@ -101,7 +101,7 @@ export class RedisCacheService {
    * @param key Cache key
    * @returns Cached value or null if not found/error
    */
-  async get<T>(key: string): Promise<T | null> {
+  async get(key: string): Promise<any> {
     if (!this.isRedisAvailable()) {
       return null;
     }
@@ -115,7 +115,7 @@ export class RedisCacheService {
         this.metrics.hits++;
         this.updateHitRate();
         this.logger.debug({ key, cached: true }, 'Cache hit');
-        return value as T;
+        return value as any;
       } else {
         this.metrics.misses++;
         this.updateHitRate();
@@ -315,7 +315,7 @@ export class RedisCacheService {
    * Set multiple key-value pairs at once
    * @param keyValuePairs Array of [key, value, ttl?] tuples
    */
-  async mset(keyValuePairs: Array<[string, any, number?]>): Promise<void> {
+  async mset(keyValuePairs: any[]): Promise<void> {
     if (!this.isRedisAvailable() || keyValuePairs.length === 0) {
       return;
     }

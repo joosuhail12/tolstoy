@@ -5,7 +5,7 @@ import { PinoLogger } from 'nestjs-pino';
 
 describe('ConditionEvaluatorService', () => {
   let service: ConditionEvaluatorService;
-  let mockLogger: jest.Mocked<PinoLogger>;
+  let mockLogger: any;
 
   const mockContext: ConditionContext = {
     inputs: {
@@ -56,7 +56,7 @@ describe('ConditionEvaluatorService', () => {
       ],
     }).compile();
 
-    service = module.get<ConditionEvaluatorService>(ConditionEvaluatorService);
+    service = module.get(ConditionEvaluatorService);
   });
 
   afterEach(() => {
