@@ -94,7 +94,14 @@ jobs:
             echo '};' >> ecosystem.config.js
             
             echo "🔄 Restarting PM2 application..."
-            pm2 delete tolstoy-api 2>/dev/null || true
+            # Stop all PM2 processes and kill any remaining Node processes
+            pm2 stop all 2>/dev/null || true
+            pm2 delete all 2>/dev/null || true
+            pkill -f "tolstoy" 2>/dev/null || true
+            pkill -f "dist/main.js" 2>/dev/null || true
+            sleep 2
+            
+            # Clean start
             pm2 start ecosystem.config.js
             pm2 save
             
@@ -135,9 +142,9 @@ jobs:
           # Check PM2 logs first to see if there are any startup issues
           ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${EC2_USER}@${EC2_HOST} "pm2 logs tolstoy-api --lines 10"
           
-          # Wait longer for the application to fully start (AWS Secrets Manager + database connection)
-          echo "⏳ Waiting 30 seconds for application startup..."
-          sleep 30
+          # Wait for the application to fully start (AWS Secrets Manager + database connection)
+          echo "⏳ Waiting 15 seconds for application startup..."
+          sleep 15
           
           # Check if the application is listening on port 3000
           echo "🔍 Checking if application is listening on port 3000..."
