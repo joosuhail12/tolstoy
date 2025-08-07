@@ -70,7 +70,7 @@ jobs:
             
             echo "🔄 Updating PM2 configuration..."
             # Ensure PM2 ecosystem file has correct environment
-            cat > ecosystem.config.js << 'PM2_CONFIG'
+            cat > ecosystem.config.js << 'EOF'
 module.exports = {
   apps: [{
     name: 'tolstoy-api',
@@ -93,7 +93,7 @@ module.exports = {
     time: true
   }]
 };
-PM2_CONFIG
+EOF
             
             echo "🔄 Restarting PM2 application..."
             pm2 delete tolstoy-api 2>/dev/null || true
