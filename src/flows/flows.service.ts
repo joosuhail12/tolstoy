@@ -41,10 +41,10 @@ export class FlowsService {
     const cacheKey = CacheKeys.flowList(tenant.orgId);
     
     // Try cache first
-    const cached = await this.cacheService.get<Flow[]>(cacheKey);
-    if (cached) {
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached && Array.isArray(cached)) {
       this.logger.debug({ orgId: tenant.orgId, cached: true }, 'Retrieved flows list from cache');
-      return cached;
+      return cached as any;
     }
 
     const flows = await this.prisma.flow.findMany({
@@ -76,15 +76,15 @@ export class FlowsService {
     const cacheKey = CacheKeys.flow(tenant.orgId, id);
     
     // Try cache first
-    const cached = await this.cacheService.get<Flow>(cacheKey);
-    if (cached) {
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached && typeof cached === 'object' && cached !== null) {
       // Verify tenant access (security check even for cached data)
-      if (cached.orgId !== tenant.orgId) {
+      if ((cached as any).orgId !== tenant.orgId) {
         throw new ForbiddenException('Access denied: Flow belongs to different organization');
       }
       
       this.logger.debug({ flowId: id, orgId: tenant.orgId, cached: true }, 'Retrieved flow from cache');
-      return cached;
+      return cached as any;
     }
 
     const flow = await this.prisma.flow.findUnique({
@@ -150,7 +150,7 @@ export class FlowsService {
 
       return updatedFlow;
     } catch (error) {
-      if (error.code === 'P2025') {
+      if (error instanceof Error && (error as any).code === 'P2025') {
         throw new NotFoundException(`Flow with ID ${id} not found`);
       }
       throw error;
@@ -176,7 +176,7 @@ export class FlowsService {
 
       return deletedFlow;
     } catch (error) {
-      if (error.code === 'P2025') {
+      if (error instanceof Error && (error as any).code === 'P2025') {
         throw new NotFoundException(`Flow with ID ${id} not found`);
       }
       throw error;
@@ -191,10 +191,10 @@ export class FlowsService {
     const cacheKey = CacheKeys.flow(orgId, id);
     
     // Try cache first
-    const cached = await this.cacheService.get<Flow>(cacheKey);
-    if (cached) {
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached && typeof cached === 'object' && cached !== null) {
       this.logger.debug({ flowId: id, orgId, cached: true }, 'Retrieved flow for execution from cache');
-      return cached;
+      return cached as any;
     }
 
     const flow = await this.prisma.flow.findFirst({

@@ -90,7 +90,7 @@ export class ToolSecretsService {
 
     // Check cache for tool metadata first
     const toolCacheKey = CacheKeys.toolMeta(orgId, toolId);
-    let tool = await this.cacheService.get<any>(toolCacheKey);
+    let tool = await this.cacheService.get(toolCacheKey);
     
     if (!tool) {
       // Verify tool exists and belongs to organization
@@ -121,7 +121,7 @@ export class ToolSecretsService {
         await this.awsSecrets.createSecret(
           secretName,
           credentials,
-          `Tool credentials for ${tool.name} in organization ${orgId}`,
+          `Tool credentials for ${(tool as any).name} in organization ${orgId}`,
         );
         this.logger.info({ toolId, orgId, secretName }, 'Created new credentials');
       }
@@ -137,10 +137,10 @@ export class ToolSecretsService {
 
       const result = {
         toolId,
-        toolName: tool.name,
+        toolName: (tool as any).name,
         credentials,
         maskedCredentials: this.maskCredentials(credentials),
-        createdAt: tool.createdAt,
+        createdAt: (tool as any).createdAt,
         updatedAt: new Date(),
       };
 
@@ -155,8 +155,9 @@ export class ToolSecretsService {
       return result;
 
     } catch (error) {
-      this.logger.error({ toolId, orgId, error: error.message }, 'Failed to store credentials for tool');
-      throw new BadRequestException(`Failed to store credentials: ${error.message}`);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown credentials storage error';
+      this.logger.error({ toolId, orgId, error: errorMsg }, 'Failed to store credentials for tool');
+      throw new BadRequestException(`Failed to store credentials: ${errorMsg}`);
     }
   }
 
@@ -169,7 +170,7 @@ export class ToolSecretsService {
 
     // Check cache for tool metadata first
     const toolCacheKey = CacheKeys.toolMeta(orgId, toolId);
-    let tool = await this.cacheService.get<any>(toolCacheKey);
+    let tool = await this.cacheService.get(toolCacheKey);
     
     if (!tool) {
       // Verify tool exists and belongs to organization
@@ -185,7 +186,7 @@ export class ToolSecretsService {
       await this.cacheService.set(toolCacheKey, tool, { ttl: CacheKeys.TTL.TOOL_META });
     }
 
-    if (!tool.secretName) {
+    if (!(tool as any).secretName) {
       throw new NotFoundException(`No credentials stored for tool ${toolId}`);
     }
 
@@ -195,24 +196,24 @@ export class ToolSecretsService {
       if (maskValues) {
         // For masked values, try to get from cache first
         const credentialsCacheKey = CacheKeys.toolCredentials(orgId, toolId);
-        const cachedMeta = await this.cacheService.get<any>(credentialsCacheKey);
+        const cachedMeta = await this.cacheService.get(credentialsCacheKey);
         
-        if (cachedMeta && cachedMeta.maskedCredentials) {
+        if (cachedMeta && (cachedMeta as any).maskedCredentials) {
           this.logger.debug({ toolId, orgId, cached: true }, 'Retrieved masked credentials from cache');
           
           return {
             toolId,
-            toolName: tool.name,
+            toolName: (tool as any).name,
             credentials: {}, // Always empty for masked requests
-            maskedCredentials: cachedMeta.maskedCredentials,
-            createdAt: tool.createdAt,
-            updatedAt: cachedMeta.updatedAt || tool.updatedAt,
+            maskedCredentials: (cachedMeta as any).maskedCredentials,
+            createdAt: (tool as any).createdAt,
+            updatedAt: (cachedMeta as any).updatedAt || (tool as any).updatedAt,
           };
         }
       }
 
       // Fetch from AWS Secrets Manager
-      credentials = await this.awsSecrets.getSecretAsJson(tool.secretName);
+      credentials = await this.awsSecrets.getSecretAsJson((tool as any).secretName);
       const maskedCredentials = this.maskCredentials(credentials);
 
       // Cache the masked credentials metadata
@@ -221,22 +222,23 @@ export class ToolSecretsService {
         await this.cacheService.set(credentialsCacheKey, {
           hasCredentials: true,
           maskedCredentials,
-          updatedAt: tool.updatedAt,
+          updatedAt: (tool as any).updatedAt,
         }, { ttl: CacheKeys.TTL.TOOLS });
       }
 
       return {
         toolId,
-        toolName: tool.name,
+        toolName: (tool as any).name,
         credentials: maskValues ? {} : credentials,
         maskedCredentials,
-        createdAt: tool.createdAt,
-        updatedAt: tool.updatedAt,
+        createdAt: (tool as any).createdAt,
+        updatedAt: (tool as any).updatedAt,
       };
 
     } catch (error) {
-      this.logger.error({ toolId, orgId, error: error.message }, 'Failed to retrieve credentials for tool');
-      throw new BadRequestException(`Failed to retrieve credentials: ${error.message}`);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown credentials retrieval error';
+      this.logger.error({ toolId, orgId, error: errorMsg }, 'Failed to retrieve credentials for tool');
+      throw new BadRequestException(`Failed to retrieve credentials: ${errorMsg}`);
     }
   }
 
@@ -245,7 +247,7 @@ export class ToolSecretsService {
 
     // Check cache for tool metadata first
     const toolCacheKey = CacheKeys.toolMeta(orgId, toolId);
-    let tool = await this.cacheService.get<any>(toolCacheKey);
+    let tool = await this.cacheService.get(toolCacheKey);
     
     if (!tool) {
       // Verify tool exists and belongs to organization
@@ -258,13 +260,13 @@ export class ToolSecretsService {
       }
     }
 
-    if (!tool.secretName) {
+    if (!(tool as any).secretName) {
       throw new NotFoundException(`No credentials stored for tool ${toolId}`);
     }
 
     try {
       // Delete secret from AWS
-      await this.awsSecrets.deleteSecret(tool.secretName, false); // Use soft delete by default
+      await this.awsSecrets.deleteSecret((tool as any).secretName, false); // Use soft delete by default
       
       // Remove secret name from tool record
       await this.prisma.tool.update({
@@ -278,8 +280,10 @@ export class ToolSecretsService {
       this.logger.info({ toolId, orgId }, 'Successfully deleted credentials for tool and invalidated caches');
 
     } catch (error) {
-      this.logger.error({ toolId, orgId, error: error.message }, 'Failed to delete credentials for tool');
-      throw new BadRequestException(`Failed to delete credentials: ${error.message}`);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown credentials deletion error';
+      this.logger.error({ toolId, orgId, error: errorMsg }, 'Failed to delete credentials for tool');
+      const errorMsg2 = error instanceof Error ? error.message : 'Unknown deletion error';
+      throw new BadRequestException(`Failed to delete credentials: ${errorMsg2}`);
     }
   }
 
@@ -295,11 +299,11 @@ export class ToolSecretsService {
 
     // Try to get the tools list from cache first
     const toolsListCacheKey = CacheKeys.toolList(orgId);
-    let cachedResult = await this.cacheService.get<Array<any>>(toolsListCacheKey);
+    let cachedResult = await this.cacheService.get(toolsListCacheKey);
     
     if (cachedResult) {
       this.logger.debug({ orgId, cached: true }, 'Retrieved tools list from cache');
-      return cachedResult;
+      return cachedResult as any;
     }
 
     const tools = await this.prisma.tool.findMany({
@@ -317,17 +321,17 @@ export class ToolSecretsService {
       tools.map(async (tool) => {
         let credentialKeys: string[] = [];
         
-        if (tool.secretName) {
+        if ((tool as any).secretName) {
           // Check cache for credential keys first
           const credentialsCacheKey = CacheKeys.toolCredentials(orgId, tool.id);
-          const cachedMeta = await this.cacheService.get<any>(credentialsCacheKey);
+          const cachedMeta = await this.cacheService.get(credentialsCacheKey);
           
-          if (cachedMeta && cachedMeta.maskedCredentials) {
-            credentialKeys = Object.keys(cachedMeta.maskedCredentials);
+          if (cachedMeta && (cachedMeta as any).maskedCredentials) {
+            credentialKeys = Object.keys((cachedMeta as any).maskedCredentials);
           } else {
             // Fallback to AWS Secrets Manager
             try {
-              const credentials = await this.awsSecrets.getSecretAsJson(tool.secretName);
+              const credentials = await this.awsSecrets.getSecretAsJson((tool as any).secretName);
               credentialKeys = Object.keys(credentials);
               
               // Cache the metadata for future use
@@ -338,18 +342,19 @@ export class ToolSecretsService {
               }, { ttl: CacheKeys.TTL.TOOLS });
               
             } catch (error) {
-              this.logger.warn({ toolId: tool.id, orgId, error: error.message }, 'Failed to retrieve credential keys for tool');
+              const errorMsg = error instanceof Error ? error.message : 'Unknown credential keys error';
+              this.logger.warn({ toolId: tool.id, orgId, error: errorMsg }, 'Failed to retrieve credential keys for tool');
             }
           }
         }
 
         return {
           toolId: tool.id,
-          toolName: tool.name,
+          toolName: (tool as any).name,
           baseUrl: tool.baseUrl,
           authType: tool.authType,
-          hasCredentials: !!tool.secretName,
-          credentialKeys: tool.secretName ? credentialKeys : undefined,
+          hasCredentials: !!(tool as any).secretName,
+          credentialKeys: (tool as any).secretName ? credentialKeys : undefined,
         };
       }),
     );
@@ -381,7 +386,7 @@ export class ToolSecretsService {
       this.logger.error({ 
         orgId, 
         toolId, 
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown cache invalidation error' 
       }, 'Failed to invalidate tool caches');
     }
   }
@@ -403,7 +408,7 @@ export class ToolSecretsService {
     } catch (error) {
       this.logger.error({ 
         orgId, 
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown cache invalidation error' 
       }, 'Failed to invalidate organization tool caches');
     }
   }
@@ -423,7 +428,7 @@ export class ToolSecretsService {
     } catch (error) {
       this.logger.error({ 
         orgId, 
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown cache invalidation error' 
       }, 'Failed to warm up tools cache');
     }
   }

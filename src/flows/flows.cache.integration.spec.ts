@@ -98,7 +98,7 @@ describe('FlowsService - Cache Integration', () => {
       ],
     }).compile();
 
-    service = module.get<FlowsService>(FlowsService);
+    service = module.get(FlowsService);
   });
 
   afterEach(() => {

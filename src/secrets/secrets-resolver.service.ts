@@ -258,10 +258,11 @@ export class SecretsResolver {
         await this.getToolCredentials(toolName, orgId);
       } catch (error) {
         // Ignore errors during warmup - tools may not have credentials
+        const errorMsg = error instanceof Error ? error.message : 'Unknown warmup error';
         this.logger.debug({ 
           toolName, 
           orgId, 
-          error: error.message 
+          error: errorMsg 
         }, 'Skipped warmup for tool without credentials');
       }
     });

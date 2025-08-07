@@ -69,7 +69,7 @@ describe('RedisCacheService', () => {
       ],
     }).compile();
 
-    service = module.get<RedisCacheService>(RedisCacheService);
+    service = module.get(RedisCacheService);
   });
 
   afterEach(() => {

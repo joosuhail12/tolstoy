@@ -57,7 +57,7 @@ describe('SecretsResolver - Cache Integration', () => {
       ],
     }).compile();
 
-    service = module.get<SecretsResolver>(SecretsResolver);
+    service = module.get(SecretsResolver);
   });
 
   afterEach(() => {

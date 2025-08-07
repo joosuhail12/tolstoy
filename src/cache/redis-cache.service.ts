@@ -88,7 +88,7 @@ export class RedisCacheService {
       this.connectionError = error as Error;
       this.isConnected = false;
       this.logger.error(
-        { error: error.message }, 
+        { error: error instanceof Error ? error.message : 'Unknown initialization error' }, 
         'Failed to initialize Redis cache service - operating in fallback mode'
       );
       
@@ -123,7 +123,8 @@ export class RedisCacheService {
         return null;
       }
     } catch (error) {
-      this.logger.error({ key, error: error.message }, 'Redis GET error');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown Redis GET error';
+      this.logger.error({ key, error: errorMsg }, 'Redis GET error');
       this.metrics.misses++;
       this.updateHitRate();
       return null;
@@ -170,7 +171,8 @@ export class RedisCacheService {
       }, 'Cache set');
       
     } catch (error) {
-      this.logger.error({ key, error: error.message }, 'Redis SET error');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown Redis SET error';
+      this.logger.error({ key, error: errorMsg }, 'Redis SET error');
       // Don't throw error - allow application to continue without caching
     }
   }
@@ -191,7 +193,8 @@ export class RedisCacheService {
       
       this.logger.debug({ key }, 'Cache key deleted');
     } catch (error) {
-      this.logger.error({ key, error: error.message }, 'Redis DEL error');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown Redis DEL error';
+      this.logger.error({ key, error: errorMsg }, 'Redis DEL error');
     }
   }
 
@@ -224,7 +227,8 @@ export class RedisCacheService {
       
       return deletedCount;
     } catch (error) {
-      this.logger.error({ pattern, error: error.message }, 'Redis pattern delete error');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown Redis pattern delete error';
+      this.logger.error({ pattern, error: errorMsg }, 'Redis pattern delete error');
       return 0;
     }
   }
@@ -243,7 +247,8 @@ export class RedisCacheService {
       const exists = await this.redis!.exists(key);
       return exists === 1;
     } catch (error) {
-      this.logger.error({ key, error: error.message }, 'Redis EXISTS error');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown Redis EXISTS error';
+      this.logger.error({ key, error: errorMsg }, 'Redis EXISTS error');
       return false;
     }
   }
@@ -262,7 +267,8 @@ export class RedisCacheService {
       await this.redis!.expire(key, ttl);
       this.logger.debug({ key, ttl }, 'TTL updated for cache key');
     } catch (error) {
-      this.logger.error({ key, ttl, error: error.message }, 'Redis EXPIRE error');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown Redis EXPIRE error';
+      this.logger.error({ key, ttl, error: errorMsg }, 'Redis EXPIRE error');
     }
   }
 
@@ -271,7 +277,7 @@ export class RedisCacheService {
    * @param keys Array of cache keys
    * @returns Array of values (null for missing keys)
    */
-  async mget<T>(keys: string[]): Promise<(T | null)[]> {
+  async mget(keys: string[]): Promise<(any | null)[]> {
     if (!this.isRedisAvailable() || keys.length === 0) {
       return new Array(keys.length).fill(null);
     }
@@ -295,9 +301,10 @@ export class RedisCacheService {
         misses 
       }, 'Batch cache get completed');
       
-      return values as (T | null)[];
+      return values;
     } catch (error) {
-      this.logger.error({ keys: keys.length, error: error.message }, 'Redis MGET error');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown Redis MGET error';
+      this.logger.error({ keys: keys.length, error: errorMsg }, 'Redis MGET error');
       this.metrics.misses += keys.length;
       this.updateHitRate();
       return new Array(keys.length).fill(null);
@@ -336,7 +343,7 @@ export class RedisCacheService {
     } catch (error) {
       this.logger.error({ 
         pairs: keyValuePairs.length, 
-        error: error.message 
+        error: error instanceof Error ? error.message : 'Unknown Redis MSET error' 
       }, 'Redis MSET error');
     }
   }
@@ -402,7 +409,8 @@ export class RedisCacheService {
       const result = await this.redis.ping();
       return result === 'PONG';
     } catch (error) {
-      this.logger.error({ error: error.message }, 'Redis ping failed');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown Redis ping error';
+      this.logger.error({ error: errorMsg }, 'Redis ping failed');
       return false;
     }
   }

@@ -100,7 +100,8 @@ export class AwsSecretsService {
           lastError = error as Error;
           if (attempt < 3) {
             const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
-            this.logger.warn({ secretId, key, attempt, delay, error: error.message }, 'Secret retrieval failed, retrying');
+            const errorMsg = error instanceof Error ? error.message : 'Unknown secret retrieval error';
+          this.logger.warn({ secretId, key, attempt, delay, error: errorMsg }, 'Secret retrieval failed, retrying');
             await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
@@ -109,7 +110,8 @@ export class AwsSecretsService {
       throw lastError!;
       
     } catch (error) {
-      this.logger.error({ secretId, key, error: error.message, attempts: 3 }, 'Failed to retrieve secret after all attempts');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown secret retrieval error';
+      this.logger.error({ secretId, key, error: errorMsg, attempts: 3 }, 'Failed to retrieve secret after all attempts');
       
       // Try to get stale cached value from Redis as fallback
       if (this.cacheService) {
@@ -120,7 +122,8 @@ export class AwsSecretsService {
             return staleCache;
           }
         } catch (cacheError) {
-          this.logger.debug({ error: cacheError.message }, 'Could not retrieve stale cache value');
+          const cacheErrorMsg = cacheError instanceof Error ? cacheError.message : 'Unknown cache error';
+          this.logger.debug({ error: cacheErrorMsg }, 'Could not retrieve stale cache value');
         }
       }
       
@@ -133,7 +136,8 @@ export class AwsSecretsService {
       const secretString = await this.getSecret(secretId);
       return JSON.parse(secretString);
     } catch (error) {
-      this.logger.error({ secretId, error: error.message }, 'Failed to parse secret as JSON');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown JSON parsing error';
+      this.logger.error({ secretId, error: errorMsg }, 'Failed to parse secret as JSON');
       throw error;
     }
   }
@@ -190,7 +194,8 @@ export class AwsSecretsService {
       await this.getSecret(secretId);
       return true;
     } catch (error) {
-      this.logger.error({ secretId, error: error.message }, 'Cannot access secret');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown secret access error';
+      this.logger.error({ secretId, error: errorMsg }, 'Cannot access secret');
       return false;
     }
   }
@@ -218,7 +223,8 @@ export class AwsSecretsService {
 
       this.logger.info({ secretId }, 'Successfully updated secret and cleared cache');
     } catch (error) {
-      this.logger.error({ secretId, error: error.message }, 'Failed to update secret');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown secret update error';
+      this.logger.error({ secretId, error: errorMsg }, 'Failed to update secret');
       throw error;
     }
   }
@@ -240,7 +246,8 @@ export class AwsSecretsService {
       await this.client.send(command);
       this.logger.info({ secretName }, 'Successfully created secret');
     } catch (error) {
-      this.logger.error({ secretName, error: error.message }, 'Failed to create secret');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown secret creation error';
+      this.logger.error({ secretName, error: errorMsg }, 'Failed to create secret');
       throw error;
     }
   }
@@ -265,7 +272,8 @@ export class AwsSecretsService {
       await this.updateSecret(secretId, existingSecret);
       this.logger.info({ secretId, key }, 'Successfully updated secret key');
     } catch (error) {
-      this.logger.error({ secretId, key, error: error.message }, 'Failed to update secret key');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown secret key update error';
+      this.logger.error({ secretId, key, error: errorMsg }, 'Failed to update secret key');
       throw error;
     }
   }
@@ -293,7 +301,8 @@ export class AwsSecretsService {
         this.logger.warn({ secretId }, 'Secret not found, may already be deleted');
         return; // Don't throw error if secret doesn't exist
       }
-      this.logger.error({ secretId, error: error.message }, 'Failed to delete secret');
+      const errorMsg = error instanceof Error ? error.message : 'Unknown secret deletion error';
+      this.logger.error({ secretId, error: errorMsg }, 'Failed to delete secret');
       throw error;
     }
   }
@@ -305,7 +314,8 @@ export class AwsSecretsService {
         const deletedCount = await this.cacheService.delPattern(pattern);
         this.logger.info({ deletedKeys: deletedCount }, 'AWS Secrets Manager cache cleared from Redis');
       } catch (error) {
-        this.logger.error({ error: error.message }, 'Failed to clear AWS Secrets Manager cache');
+        const errorMsg = error instanceof Error ? error.message : 'Unknown cache clearing error';
+        this.logger.error({ error: errorMsg }, 'Failed to clear AWS Secrets Manager cache');
       }
     } else {
       this.logger.debug('No cache service available to clear');
