@@ -63,6 +63,9 @@ jobs:
             echo "📦 Installing dependencies..."
             yarn install --production=false
             
+            echo "📦 Installing missing peer dependencies..."
+            yarn add rxjs@^7.1.0
+            
             echo "⚙️ Generating Prisma client..."
             yarn db:generate
             
