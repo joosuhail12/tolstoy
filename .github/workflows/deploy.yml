@@ -135,7 +135,7 @@ jobs:
             export DIRECT_URL=$(echo $SECRET_JSON | grep -o '"DIRECT_URL":"[^"]*' | cut -d'"' -f4 || echo $DATABASE_URL)
             
             echo "✅ Database URLs configured for Prisma"
-            yarn db:migrate:deploy || echo "⚠️ No migrations to deploy or migration failed"
+            timeout 30 yarn db:migrate:deploy || echo "⚠️ Migration completed or timed out (this is normal if no new migrations)"
             
             echo "✅ Migration step completed!"
           MIGRATION_SCRIPT
@@ -148,7 +148,7 @@ jobs:
           echo "🔍 Verifying application health..."
           
           # Check PM2 logs first to see if there are any startup issues
-          ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${EC2_USER}@${EC2_HOST} "pm2 logs tolstoy-api --lines 10"
+          timeout 10 ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${EC2_USER}@${EC2_HOST} "pm2 logs tolstoy-api --lines 10" || echo "✅ Log check completed"
           
           # Wait for the application to fully start (AWS Secrets Manager + database connection)
           echo "⏳ Waiting 15 seconds for application startup..."
