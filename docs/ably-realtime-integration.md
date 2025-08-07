@@ -282,16 +282,22 @@ AWS_REGION=us-east-1
 
 ### AWS Secrets Manager Setup
 
-Store your Ably API key securely:
+Store your Ably API key securely in the main database secret:
 
 ```bash
-# Create Ably API key secret
-aws secretsmanager create-secret \
-  --name "tolstoy/ably/api-key" \
-  --description "Ably API key for real-time flow execution monitoring" \
-  --secret-string "your-actual-ably-api-key" \
+# Add Ably API key to conductor-db-secret
+aws secretsmanager update-secret \
+  --secret-id "conductor-db-secret" \
+  --secret-string '{
+    "DATABASE_URL": "your-database-url",
+    "DIRECT_URL": "your-direct-database-url", 
+    "ABLY_API_KEY": "your-actual-ably-api-key",
+    "DAYTONA_API_KEY": "your-daytona-key"
+  }' \
   --region us-east-1
 ```
+
+**Note**: The Ably API key is now stored in the `conductor-db-secret` alongside database credentials for centralized secret management.
 
 ### Ably Dashboard Configuration
 

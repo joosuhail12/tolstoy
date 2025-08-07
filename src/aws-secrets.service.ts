@@ -144,6 +144,10 @@ export class AwsSecretsService {
     return this.getSecret(secretId, 'DAYTONA_ASYNC_TIMEOUT');
   }
 
+  async getAblyApiKey(secretId: string = 'conductor-db-secret'): Promise<string> {
+    return this.getSecret(secretId, 'ABLY_API_KEY');
+  }
+
   async getInngestApiKey(secretId: string = 'tolstoy/env'): Promise<string> {
     return this.getSecret(secretId, 'INNGEST_API_KEY');
   }

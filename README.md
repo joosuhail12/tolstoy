@@ -630,7 +630,7 @@ Live monitoring and debugging of workflow executions using Ably WebSocket integr
 
 **Technical Implementation:**
 - Automatic retry logic with exponential backoff
-- AWS Secrets Manager integration for API key storage
+- AWS Secrets Manager integration (Ably API key stored in `conductor-db-secret`)
 - Comprehensive error handling and connection management
 - Built-in rate limiting and performance optimization
 

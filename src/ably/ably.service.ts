@@ -119,7 +119,7 @@ export class AblyService implements OnModuleDestroy {
         return envKey;
       }
 
-      const secretKey = await this.awsSecretsService.getSecret('tolstoy/ably/api-key');
+      const secretKey = await this.awsSecretsService.getAblyApiKey();
       return secretKey;
     } catch (error) {
       this.logger.debug({ error: error.message }, 'Ably API key not found in secrets');
