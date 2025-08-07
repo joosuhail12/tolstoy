@@ -20,17 +20,38 @@ jobs:
           echo "${{ secrets.EC2_KEY }}" | base64 -d > ssh_key.pem
           chmod 600 ssh_key.pem
           
+      - name: 🔍 Debug secrets
+        run: |
+          echo "Checking secret availability..."
+          echo "EC2_USER length: ${#EC2_USER}"
+          echo "EC2_HOST length: ${#EC2_HOST}" 
+          echo "EC2_PATH length: ${#EC2_PATH}"
+          echo "EC2_KEY length: ${#EC2_KEY}"
+          if [ -z "$EC2_USER" ] || [ -z "$EC2_HOST" ]; then
+            echo "❌ Required secrets are missing!"
+            echo "Please verify that EC2_USER, EC2_HOST, EC2_KEY, and EC2_PATH are set in GitHub repository secrets"
+            exit 1
+          fi
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_PATH: ${{ secrets.EC2_PATH }}
+          EC2_KEY: ${{ secrets.EC2_KEY }}
+          
       - name: ✅ Test SSH connection
         run: |
-          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${{ secrets.EC2_USER }}"@"${{ secrets.EC2_HOST }}" "echo 'SSH connection successful'"
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${EC2_USER}@${EC2_HOST}" "echo 'SSH connection successful'"
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
           
       - name: 🚀 Deploy application to EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${{ secrets.EC2_USER }}"@"${{ secrets.EC2_HOST }}" << 'DEPLOY_SCRIPT'
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${EC2_USER}@${EC2_HOST}" << 'DEPLOY_SCRIPT'
             set -e
             
             echo "🔄 Navigating to application directory..."
-            cd ${{ secrets.EC2_PATH }}
+            cd /home/ubuntu/tolstoy
             
             echo "📥 Pulling latest code from GitHub..."
             git pull origin main
@@ -52,18 +73,24 @@ jobs:
             
             echo "✅ Deployment completed successfully!"
           DEPLOY_SCRIPT
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
           
       - name: 🗃️ Run database migrations (optional)
         run: |
-          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${{ secrets.EC2_USER }}"@"${{ secrets.EC2_HOST }}" << 'MIGRATION_SCRIPT'
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${EC2_USER}@${EC2_HOST}" << 'MIGRATION_SCRIPT'
             set -e
-            cd ${{ secrets.EC2_PATH }}
+            cd /home/ubuntu/tolstoy
             
             echo "🗃️ Running Prisma migrations..."
             yarn db:migrate:deploy || echo "⚠️ No migrations to deploy or migration failed"
             
             echo "✅ Migration step completed!"
           MIGRATION_SCRIPT
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
           
       - name: 🔍 Verify deployment
         run: |
@@ -73,7 +100,7 @@ jobs:
           sleep 10
           
           # Test health endpoint
-          HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}/health)
+          HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://${EC2_HOST}/health)
           
           if [ "$HEALTH_CHECK" -eq 200 ]; then
             echo "✅ Health check passed (HTTP $HEALTH_CHECK)"
@@ -83,7 +110,7 @@ jobs:
           fi
           
           # Test status endpoint
-          STATUS_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://${{ secrets.EC2_HOST }}/status)
+          STATUS_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://${EC2_HOST}/status)
           
           if [ "$STATUS_CHECK" -eq 200 ]; then
             echo "✅ Status check passed (HTTP $STATUS_CHECK)"
@@ -93,6 +120,8 @@ jobs:
           fi
           
           echo "🎉 Deployment verification successful!"
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
           
       - name: 🧹 Cleanup SSH key
         if: always()
@@ -108,6 +137,8 @@ jobs:
           echo "  • Repository: ${{ github.repository }}"
           echo "  • Branch: ${{ github.ref_name }}"
           echo "  • Commit: ${{ github.sha }}"
-          echo "  • Target: ${{ secrets.EC2_HOST }}"
-          echo "  • Health: http://${{ secrets.EC2_HOST }}/health"
-          echo "  • Status: http://${{ secrets.EC2_HOST }}/status"
+          echo "  • Target: ${EC2_HOST}"
+          echo "  • Health: http://${EC2_HOST}/health"
+          echo "  • Status: http://${EC2_HOST}/status"
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
