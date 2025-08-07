@@ -3,6 +3,11 @@ import { InngestModule as NestInngestModule } from 'nestjs-inngest';
 import { AwsSecretsService } from '../../aws-secrets.service';
 import { ExecuteFlowHandler } from './execute-flow.handler';
 import { InngestExecutionService } from './inngest-execution.service';
+import { SecretsResolver } from '../../secrets/secrets-resolver.service';
+import { AblyService } from '../../ably/ably.service';
+import { PrismaService } from '../../prisma.service';
+import { CommonModule } from '../../common/common.module';
+import { CacheModule } from '../../cache/cache.module';
 
 /**
  * Inngest Integration Module
@@ -12,20 +17,23 @@ import { InngestExecutionService } from './inngest-execution.service';
  */
 @Module({
   imports: [
+    CommonModule,
+    CacheModule,
     NestInngestModule.forRootAsync({
       imports: [], // AwsSecretsService is globally available
       inject: [AwsSecretsService],
       useFactory: async (secretsService: AwsSecretsService) => {
         try {
           // Fetch Inngest credentials from AWS Secrets Manager
-          const config = await secretsService.getInngestConfig();
+          const eventKey = await secretsService.getSecret('tolstoy/env', 'INNGEST_API_KEY');
+          const signingKey = process.env.INNGEST_API_KEY;
 
           return {
             appId: 'tolstoy-workflow-engine',
             inngest: {
               id: 'tolstoy',
               name: 'Tolstoy Workflow Engine',
-              eventKey: config.apiKey,
+              eventKey: eventKey,
             },
             serve: {
               servePort: process.env.PORT || 3000,
@@ -86,7 +94,12 @@ import { InngestExecutionService } from './inngest-execution.service';
       },
     }),
   ],
-  providers: [ExecuteFlowHandler, InngestExecutionService],
+  providers: [
+    ExecuteFlowHandler, 
+    InngestExecutionService,
+    SecretsResolver,
+    AblyService,
+  ],
   exports: [InngestExecutionService],
 })
 export class InngestModule {}

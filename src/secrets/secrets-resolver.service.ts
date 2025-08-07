@@ -36,10 +36,17 @@ export class SecretsResolver {
     const cacheKey = CacheKeys.secrets(orgId, toolName);
 
     // Try cache first
-    const cached = await this.cacheService.get(cacheKey);
-    if (cached) {
-      this.logger.debug({ toolName, orgId, cached: true }, 'Retrieved credentials from cache');
-      return cached;
+    try {
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        this.logger.debug({ toolName, orgId, cached: true }, 'Retrieved credentials from cache');
+        return cached;
+      }
+    } catch (error) {
+      this.logger.warn(
+        { toolName, orgId, error: error instanceof Error ? error.message : 'Unknown cache error' },
+        'Cache error during credential lookup, falling back to AWS',
+      );
     }
 
     const secretId = this.buildToolSecretId(toolName, orgId);
@@ -51,8 +58,15 @@ export class SecretsResolver {
       );
       const credentials = await this.awsSecretsService.getSecretAsJson(secretId);
 
-      // Cache the credentials
-      await this.cacheService.set(cacheKey, credentials, { ttl: CacheKeys.TTL.SECRETS });
+      // Cache the credentials (don't let caching errors affect the response)
+      try {
+        await this.cacheService.set(cacheKey, credentials, { ttl: CacheKeys.TTL.SECRETS });
+      } catch (cacheError) {
+        this.logger.warn(
+          { toolName, orgId, error: cacheError instanceof Error ? cacheError.message : 'Unknown cache error' },
+          'Failed to cache credentials, but returning AWS result',
+        );
+      }
 
       return credentials as ToolCredentials;
     } catch (error) {

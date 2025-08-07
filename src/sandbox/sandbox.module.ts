@@ -1,8 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { SandboxService } from './sandbox.service';
 import { DaytonaClientImpl } from './daytona-client';
-import { AwsSecretsService } from '../aws-secrets.service';
 
 /**
  * SandboxModule - Daytona Integration Module
@@ -16,10 +15,12 @@ import { AwsSecretsService } from '../aws-secrets.service';
  *
  * Dependencies:
  * - ConfigModule: For environment variable access
+ * - AwsSecretsService: Available globally via CommonModule
  */
+@Global()
 @Module({
   imports: [ConfigModule],
-  providers: [SandboxService, DaytonaClientImpl, AwsSecretsService],
+  providers: [SandboxService, DaytonaClientImpl],
   exports: [SandboxService],
 })
 export class SandboxModule {}

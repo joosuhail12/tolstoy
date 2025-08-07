@@ -3,6 +3,7 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { ToolSecretsService, ToolCredentials } from './tool-secrets.service';
 import { PrismaService } from '../prisma.service';
 import { AwsSecretsService } from '../aws-secrets.service';
+import { RedisCacheService } from '../cache/redis-cache.service';
 
 describe('ToolSecretsService', () => {
   let service: ToolSecretsService;
@@ -47,6 +48,15 @@ describe('ToolSecretsService', () => {
             updateSecret: jest.fn(),
             getSecretAsJson: jest.fn(),
             deleteSecret: jest.fn(),
+          },
+        },
+        {
+          provide: RedisCacheService,
+          useValue: {
+            get: jest.fn(),
+            set: jest.fn(),
+            del: jest.fn(),
+            delPattern: jest.fn(),
           },
         },
         {

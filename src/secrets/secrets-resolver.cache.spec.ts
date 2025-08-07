@@ -35,6 +35,7 @@ describe('SecretsResolver - Cache Integration', () => {
     mockLogger = {
       debug: jest.fn(),
       info: jest.fn(),
+      warn: jest.fn(),
       error: jest.fn(),
     } as any;
 
@@ -121,10 +122,9 @@ describe('SecretsResolver - Cache Integration', () => {
       mockAwsSecretsService.getSecretAsJson.mockResolvedValue(mockCredentials);
       mockCacheService.set.mockResolvedValue();
 
-      const result = await service.getToolCredentials(toolName, orgId);
-
+      await expect(service.getToolCredentials(toolName, orgId)).resolves.toEqual(mockCredentials);
+      
       // Should fallback to AWS and still work
-      expect(result).toEqual(mockCredentials);
       expect(mockAwsSecretsService.getSecretAsJson).toHaveBeenCalled();
     });
   });
@@ -285,7 +285,7 @@ describe('SecretsResolver - Cache Integration', () => {
           {
             toolName: 'nonexistent',
             orgId,
-            error: 'Secret not found',
+            error: 'Tool credentials not found for nonexistent',
           },
           'Skipped warmup for tool without credentials',
         );

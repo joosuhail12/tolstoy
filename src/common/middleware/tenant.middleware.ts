@@ -24,11 +24,15 @@ export class TenantMiddleware implements NestMiddleware {
     // Set response header for client traceability
     res.setHeader('x-request-id', requestId);
 
-    // Attach tenant context to request
+    // Attach tenant context to request using multiple methods to ensure compatibility
     req.tenant = {
       orgId: orgId.toString(),
       userId: userId.toString(),
     };
+    
+    // Also set it on the raw request object for Fastify compatibility
+    (req as any).raw = (req as any).raw || req;
+    (req as any).raw.tenant = req.tenant;
 
     // Store additional metadata for logging
     (req as any).logContext = {

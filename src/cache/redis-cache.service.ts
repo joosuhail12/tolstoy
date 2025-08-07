@@ -59,12 +59,12 @@ export class RedisCacheService {
       let redisToken: string | undefined;
 
       try {
-        redisUrl = await this.awsSecretsService.getSecret('tolstoy/env', 'UPSTASH_REDIS_REST_URL');
+        redisUrl = await this.awsSecretsService.getSecret('conductor-db-secret', 'UPSTASH_REDIS_REST_URL');
         redisToken = await this.awsSecretsService.getSecret(
-          'tolstoy/env',
+          'conductor-db-secret',
           'UPSTASH_REDIS_REST_TOKEN',
         );
-        this.logger.info('Retrieved Redis credentials from AWS Secrets Manager');
+        this.logger.info('Retrieved Redis credentials from AWS Secrets Manager (conductor-db-secret)');
       } catch {
         // Fallback to environment variables
         redisUrl = this.configService.get('UPSTASH_REDIS_REST_URL');

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InngestFunction } from 'nestjs-inngest';
 import { SandboxService, SandboxExecutionContext } from '../../sandbox/sandbox.service';
@@ -53,7 +53,7 @@ interface StepExecutionResult {
 @Injectable()
 export class ExecuteFlowHandler {
   constructor(
-    private readonly sandboxService: SandboxService,
+    @Optional() private readonly sandboxService: SandboxService,
     private readonly secretsResolver: SecretsResolver,
     private readonly ablyService: AblyService,
     private readonly inputValidator: InputValidatorService,
@@ -558,6 +558,16 @@ export class ExecuteFlowHandler {
       };
     }
 
+    if (!this.sandboxService) {
+      return {
+        success: false,
+        error: {
+          message: 'SandboxService is not available',
+          code: 'SANDBOX_UNAVAILABLE',
+        },
+      };
+    }
+
     const sandboxContext: SandboxExecutionContext = {
       orgId: context.orgId,
       userId: context.userId,
@@ -597,6 +607,16 @@ export class ExecuteFlowHandler {
         error: {
           message: 'Code is required for sandbox_async step',
           code: 'MISSING_CODE',
+        },
+      };
+    }
+
+    if (!this.sandboxService) {
+      return {
+        success: false,
+        error: {
+          message: 'SandboxService is not available',
+          code: 'SANDBOX_UNAVAILABLE',
         },
       };
     }
@@ -683,7 +703,7 @@ export class ExecuteFlowHandler {
   private async executeDataTransform(step: any, context: any): Promise<StepExecutionResult> {
     const { script, useSandbox = true } = step.config;
 
-    if (useSandbox && this.sandboxService.isConfigured()) {
+    if (useSandbox && this.sandboxService && this.sandboxService.isConfigured()) {
       const sandboxCode = `
         const input = context.stepOutputs;
         const flowContext = context;
@@ -743,7 +763,7 @@ export class ExecuteFlowHandler {
   private async executeConditional(step: any, context: any): Promise<StepExecutionResult> {
     const { condition, useSandbox = true } = step.config;
 
-    if (useSandbox && this.sandboxService.isConfigured()) {
+    if (useSandbox && this.sandboxService && this.sandboxService.isConfigured()) {
       const sandboxCode = `
         const context = arguments[0];
         return ${condition};

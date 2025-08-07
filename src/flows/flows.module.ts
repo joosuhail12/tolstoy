@@ -21,6 +21,6 @@ import { InngestExecutionService } from './inngest/inngest-execution.service';
     OAuthTokenService,
     AwsSecretsService,
   ],
-  exports: [FlowsService, FlowExecutorService, InngestExecutionService],
+  exports: [FlowsService, FlowExecutorService],
 })
 export class FlowsModule {}

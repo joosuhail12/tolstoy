@@ -9,6 +9,7 @@ import {
   ValidationPipe,
   HttpStatus,
   HttpCode,
+  Optional,
 } from '@nestjs/common';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { FlowsService } from './flows.service';
@@ -24,7 +25,7 @@ export class FlowsController {
   constructor(
     private readonly flowsService: FlowsService,
     private readonly flowExecutorService: FlowExecutorService,
-    private readonly inngestExecutionService: InngestExecutionService,
+    @Optional() private readonly inngestExecutionService: InngestExecutionService,
     @InjectPinoLogger(FlowsController.name)
     private readonly logger: PinoLogger,
   ) {}
@@ -97,6 +98,10 @@ export class FlowsController {
 
     if (useDurable) {
       // Use Inngest for durable execution
+      if (!this.inngestExecutionService) {
+        throw new Error('Durable execution is not available - InngestExecutionService is not configured');
+      }
+
       const result = await this.inngestExecutionService.executeFlow(id, tenant, variables);
 
       this.logger.info(
@@ -130,6 +135,9 @@ export class FlowsController {
 
   @Get(':id/executions')
   async getFlowExecutions(@Param('id') id: string, @Tenant() tenant: TenantContext) {
+    if (!this.inngestExecutionService) {
+      throw new Error('Durable execution monitoring is not available - InngestExecutionService is not configured');
+    }
     return this.inngestExecutionService.getFlowExecutions(id, tenant);
   }
 
@@ -139,6 +147,9 @@ export class FlowsController {
     @Param('executionId') executionId: string,
     @Tenant() tenant: TenantContext,
   ) {
+    if (!this.inngestExecutionService) {
+      throw new Error('Durable execution monitoring is not available - InngestExecutionService is not configured');
+    }
     return this.inngestExecutionService.getExecutionStatus(executionId, tenant);
   }
 
@@ -158,6 +169,9 @@ export class FlowsController {
       'Cancelling flow execution',
     );
 
+    if (!this.inngestExecutionService) {
+      throw new Error('Durable execution cancellation is not available - InngestExecutionService is not configured');
+    }
     await this.inngestExecutionService.cancelExecution(executionId, tenant);
 
     this.logger.info(
@@ -186,23 +200,29 @@ export class FlowsController {
       'Retrying failed flow execution',
     );
 
+    if (!this.inngestExecutionService) {
+      throw new Error('Durable execution retry is not available - InngestExecutionService is not configured');
+    }
     const result = await this.inngestExecutionService.retryExecution(executionId, tenant);
 
-    this.logger.info(
-      {
-        flowId,
-        originalExecutionId: executionId,
-        newExecutionId: result.executionId,
-        orgId: tenant.orgId,
-      },
-      'Flow execution retry initiated',
-    );
+    // this.logger.info(
+    //   {
+    //     flowId,
+    //     originalExecutionId: executionId,
+    //     newExecutionId: result.executionId,
+    //     orgId: tenant.orgId,
+    //   },
+    //   'Flow execution retry initiated',
+    // );
 
-    return result;
+    // return result;
   }
 
   @Get(':id/metrics')
   async getExecutionMetrics(@Param('id') id: string, @Tenant() tenant: TenantContext) {
+    if (!this.inngestExecutionService) {
+      throw new Error('Execution metrics are not available - InngestExecutionService is not configured');
+    }
     return this.inngestExecutionService.getExecutionMetrics(id, tenant);
   }
 }
