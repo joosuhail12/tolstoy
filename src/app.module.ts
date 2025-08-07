@@ -17,6 +17,7 @@ import { ActionsModule } from './actions/actions.module';
 import { FlowsModule } from './flows/flows.module';
 import { ExecutionLogsModule } from './execution-logs/execution-logs.module';
 import { HealthModule } from './health/health.module';
+import { WebhooksModule } from './webhooks/webhooks.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { HealthModule } from './health/health.module';
     ActionsModule,
     FlowsModule,
     ExecutionLogsModule,
+    WebhooksModule,
   ],
   controllers: [AppController],
   providers: [
@@ -52,7 +54,7 @@ export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
     consumer
       .apply(TenantMiddleware)
-      .exclude('organizations/(.*)', '/', '/health', '/status')
-      .forRoutes('users', 'tools', 'actions', 'flows', 'execution-logs');
+      .exclude('organizations/(.*)', '/', '/health', '/status', 'webhooks/event-types')
+      .forRoutes('users', 'tools', 'actions', 'flows', 'execution-logs', 'webhooks');
   }
 }

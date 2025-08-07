@@ -101,17 +101,186 @@ npm run db:push
 - **Organization** - Multi-tenant organization structure
 - **User** - Users belonging to organizations  
 - **Tool** - External tools/APIs that can be integrated
-- **Action** - Specific actions/endpoints for tools
+- **Action** - Specific actions/endpoints for tools with input validation
 - **Flow** - Workflow definitions with versioning
 - **ExecutionLog** - Audit trail of workflow executions
 
 ### Relationships
 - Organization → Users (1:many)
 - Organization → Tools (1:many) 
+- Organization → Actions (1:many)
 - Organization → Flows (1:many)
 - Tool → Actions (1:many)
 - Flow → ExecutionLogs (1:many)
 - User → ExecutionLogs (1:many)
+
+## 📥 Action Input Schema
+
+Each Action defines its expected input parameters via a metadata-based schema stored in the `inputSchema` field. This enables dynamic validation using Zod without storing executable code in the database.
+
+### Schema Format
+
+Actions store input parameters as an array of metadata objects:
+
+```json
+[
+  {
+    "name": "title",
+    "label": "Ticket Title",
+    "type": "string",
+    "required": true,
+    "description": "Short summary of the issue",
+    "control": "text",
+    "validation": {
+      "min": 3,
+      "max": 100
+    }
+  },
+  {
+    "name": "priority",
+    "label": "Priority Level",
+    "type": "enum",
+    "options": ["low", "medium", "high"],
+    "required": true,
+    "control": "select",
+    "default": "medium"
+  },
+  {
+    "name": "assignee_email",
+    "label": "Assignee Email",
+    "type": "string",
+    "required": false,
+    "validation": {
+      "email": true
+    }
+  },
+  {
+    "name": "due_date",
+    "label": "Due Date",
+    "type": "string",
+    "required": false,
+    "validation": {
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    }
+  }
+]
+```
+
+### Supported Parameter Types
+
+| Type | Description | Validation Options | Example |
+|------|-------------|-------------------|---------|
+| `string` | Text input | `min`, `max`, `pattern`, `email`, `url` | User names, descriptions |
+| `number` | Numeric input | `min`, `max` | Counts, IDs, amounts |
+| `boolean` | True/false | None | Feature toggles |
+| `enum` | Selection from options | `options` array required | Priority levels, statuses |
+| `array` | List of values | None | Tags, categories |
+| `object` | Complex nested data | None | Metadata objects |
+
+### Parameter Properties
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `name` | string | Yes | Parameter identifier (used as object key) |
+| `type` | string | Yes | Data type (string, number, boolean, enum, array, object) |
+| `required` | boolean | Yes | Whether parameter is mandatory |
+| `label` | string | No | Human-readable display name |
+| `description` | string | No | Help text explaining the parameter |
+| `control` | string | No | UI control hint (text, textarea, select, checkbox, number) |
+| `default` | any | No | Default value if not provided |
+| `options` | string[] | No | Valid choices for enum type |
+| `validation` | object | No | Type-specific validation rules |
+
+### Validation Rules
+
+#### String Validation
+```json
+{
+  "validation": {
+    "min": 3,           // Minimum length
+    "max": 100,         // Maximum length
+    "pattern": "^[A-Z]+$", // Regex pattern
+    "email": true,      // Email format validation
+    "url": true         // URL format validation
+  }
+}
+```
+
+#### Number Validation
+```json
+{
+  "validation": {
+    "min": 0,          // Minimum value
+    "max": 999         // Maximum value
+  }
+}
+```
+
+### Input Validation Process
+
+1. **Schema Loading**: Action's `inputSchema` is loaded from database
+2. **Zod Schema Building**: Metadata is converted to Zod validation schema
+3. **Input Validation**: Provided inputs are validated against schema
+4. **Error Handling**: Validation errors return detailed field-level messages
+5. **Execution**: Valid inputs are passed to action execution
+
+### Example Action Creation
+
+```bash
+curl -X POST http://localhost:3000/actions \
+  -H "Content-Type: application/json" \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id" \
+  -d '{
+    "name": "Create Jira Ticket",
+    "key": "create-jira-ticket", 
+    "toolId": "tool-id",
+    "method": "POST",
+    "endpoint": "/rest/api/2/issue",
+    "headers": {
+      "Authorization": "Bearer {{secrets.jira_token}}"
+    },
+    "inputSchema": [
+      {
+        "name": "summary",
+        "type": "string", 
+        "required": true,
+        "label": "Issue Summary",
+        "validation": {"min": 5, "max": 255}
+      },
+      {
+        "name": "priority",
+        "type": "enum",
+        "required": true,
+        "options": ["Low", "Medium", "High", "Urgent"],
+        "default": "Medium"
+      }
+    ]
+  }'
+```
+
+### Validation Error Response
+
+When validation fails, detailed error information is returned:
+
+```json
+{
+  "statusCode": 400,
+  "message": "Input validation failed",
+  "error": "Bad Request",
+  "errors": [
+    {
+      "field": "title",
+      "message": "String must contain at least 3 character(s)",
+      "code": "too_small"
+    },
+    {
+      "field": "priority", 
+      "message": "Invalid enum value. Expected 'low' | 'medium' | 'high', received 'urgent'",
+      "code": "invalid_enum_value"
+    }
+  ]
+}
 
 ## 🔗 API Endpoints
 
@@ -174,6 +343,18 @@ PUT    /execution-logs/:id # Update execution log
 DELETE /execution-logs/:id # Delete execution log
 ```
 
+#### Webhooks (Requires tenant headers)
+```bash
+GET    /webhooks             # List webhooks in organization
+GET    /webhooks/event-types # Get valid event types (no headers required)
+POST   /webhooks             # Register new webhook
+GET    /webhooks/:id         # Get webhook by ID
+PUT    /webhooks/:id         # Update webhook
+DELETE /webhooks/:id         # Delete webhook
+PATCH  /webhooks/:id/toggle  # Enable/disable webhook
+POST   /webhooks/:id/test    # Send test event to webhook
+```
+
 ### API Testing Examples
 
 #### Create an Organization
@@ -207,6 +388,130 @@ curl -X POST http://localhost:3000/tools \
 - **Relationship handling** with proper foreign key validation
 - **Error handling** with meaningful HTTP status codes
 - **Auto-generated timestamps** for all entities
+
+## 🔔 Webhook Registration
+
+### Overview
+Tolstoy supports webhook registration to enable real-time event notifications to external systems. Organizations can register webhooks to receive notifications when specific events occur within their workflows.
+
+### Supported Event Types
+- `flow.started` - Flow execution has started
+- `flow.completed` - Flow execution completed successfully
+- `flow.failed` - Flow execution failed
+- `step.started` - Individual step execution started
+- `step.completed` - Step completed successfully
+- `step.failed` - Step execution failed
+- `step.skipped` - Step was skipped
+- `action.executed` - Action was executed
+- `action.failed` - Action execution failed
+- `webhook.test` - Test webhook event
+
+### Webhook Registration
+
+#### Register a New Webhook
+```bash
+curl -X POST http://localhost:3000/webhooks \
+  -H "Content-Type: application/json" \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id" \
+  -d '{
+    "name": "Production Notifications",
+    "url": "https://example.com/webhook",
+    "eventTypes": ["flow.completed", "flow.failed"],
+    "secret": "your-webhook-secret",
+    "enabled": true,
+    "headers": {
+      "X-Custom-Header": "custom-value"
+    }
+  }'
+```
+
+#### List Webhooks
+```bash
+# List all webhooks
+curl -X GET http://localhost:3000/webhooks \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+
+# Filter by event type
+curl -X GET "http://localhost:3000/webhooks?eventType=flow.completed" \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+#### Toggle Webhook Status
+```bash
+curl -X PATCH http://localhost:3000/webhooks/webhook-id/toggle \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+#### Test Webhook
+```bash
+curl -X POST http://localhost:3000/webhooks/webhook-id/test \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+### Webhook Security
+
+#### Signature Verification
+All webhook requests include an HMAC signature for verification:
+
+1. **Headers Included**:
+   - `x-webhook-signature`: HMAC-SHA256 signature
+   - `x-webhook-timestamp`: Request timestamp
+   - `x-webhook-event`: Event type
+   - `x-webhook-delivery`: Unique delivery ID
+
+2. **Signature Verification Process**:
+```javascript
+const crypto = require('crypto');
+
+function verifyWebhookSignature(payload, signature, secret, timestamp) {
+  // Check timestamp to prevent replay attacks (5 min tolerance)
+  const currentTime = Date.now();
+  if (Math.abs(currentTime - timestamp) > 5 * 60 * 1000) {
+    return false;
+  }
+
+  // Verify signature
+  const payloadWithTimestamp = { timestamp, ...payload };
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(payloadWithTimestamp))
+    .digest('hex');
+
+  return `sha256=${expectedSignature}` === signature;
+}
+```
+
+#### Security Best Practices
+- Always use HTTPS URLs for production webhooks
+- Store webhook secrets securely (minimum 16 characters)
+- Implement timestamp validation to prevent replay attacks
+- Verify signatures before processing webhook payloads
+- Use unique secrets for each webhook registration
+
+### Webhook Payload Format
+```json
+{
+  "eventType": "flow.completed",
+  "timestamp": 1234567890000,
+  "data": {
+    "flowId": "flow-123",
+    "executionId": "exec-456",
+    "status": "completed",
+    "duration": 1500,
+    "outputs": { ... }
+  },
+  "metadata": {
+    "orgId": "org-123",
+    "webhookId": "webhook-789",
+    "deliveryId": "whd_1234567890_abc123"
+  }
+}
+```
 
 ## 🛠️ Development Scripts
 

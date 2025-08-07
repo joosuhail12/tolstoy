@@ -5,6 +5,7 @@ import { AblyService, FlowStepEvent, FlowExecutionEvent } from '../ably/ably.ser
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { SecretsResolver } from '../secrets/secrets-resolver.service';
 import { OAuthTokenService } from '../oauth/oauth-token.service';
+import { InputValidatorService } from '../common/services/input-validator.service';
 
 export interface FlowStep {
   id: string;
@@ -52,7 +53,8 @@ export class FlowExecutorService {
     private readonly prisma: PrismaService,
     private readonly ablyService: AblyService,
     private readonly secretsResolver: SecretsResolver,
-    private readonly oauthService: OAuthTokenService
+    private readonly oauthService: OAuthTokenService,
+    private readonly inputValidator: InputValidatorService
   ) {}
 
   async executeFlow(
@@ -244,6 +246,8 @@ export class FlowExecutorService {
     context: FlowExecutionContext
   ): Promise<StepExecutionResult> {
     switch (step.type) {
+      case 'action':
+        return this.executeAction(step, context);
       case 'http_request':
         return this.executeHttpRequest(step, context);
       case 'oauth_api_call':
@@ -414,6 +418,183 @@ export class FlowExecutorService {
         error: {
           message: `Condition evaluation failed: ${error.message}`,
           code: 'CONDITION_ERROR'
+        }
+      };
+    }
+  }
+
+  private async executeAction(
+    step: FlowStep,
+    context: FlowExecutionContext
+  ): Promise<StepExecutionResult> {
+    const { actionId, inputs } = step.config;
+
+    if (!actionId) {
+      return {
+        success: false,
+        error: {
+          message: 'Action ID is required for action step',
+          code: 'MISSING_ACTION_ID'
+        }
+      };
+    }
+
+    try {
+      const action = await this.prisma.action.findUnique({
+        where: { id: actionId },
+        include: { tool: true }
+      });
+
+      if (!action) {
+        return {
+          success: false,
+          error: {
+            message: `Action with ID ${actionId} not found`,
+            code: 'ACTION_NOT_FOUND'
+          }
+        };
+      }
+
+      if (action.orgId !== context.orgId) {
+        return {
+          success: false,
+          error: {
+            message: 'Access denied: Action belongs to different organization',
+            code: 'ACTION_ACCESS_DENIED'
+          }
+        };
+      }
+
+      let validatedInputs = inputs || {};
+      
+      if (action.inputSchema && Array.isArray(action.inputSchema)) {
+        try {
+          validatedInputs = this.inputValidator.validate(action.inputSchema as any[], inputs);
+        } catch (validationError) {
+          return {
+            success: false,
+            error: {
+              message: `Input validation failed: ${validationError.message}`,
+              code: 'INPUT_VALIDATION_ERROR'
+            }
+          };
+        }
+      }
+
+      const resolvedInputs = await this.resolveActionInputs(validatedInputs, context);
+      const executionResult = await this.executeActionRequest(action, resolvedInputs);
+
+      return {
+        success: executionResult.success,
+        output: executionResult.output,
+        error: executionResult.error
+      };
+
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: `Action execution failed: ${error.message}`,
+          code: 'ACTION_EXECUTION_ERROR'
+        }
+      };
+    }
+  }
+
+  private async resolveActionInputs(inputs: any, context: FlowExecutionContext): Promise<any> {
+    if (typeof inputs !== 'object' || inputs === null) {
+      return inputs;
+    }
+
+    const resolved: any = Array.isArray(inputs) ? [] : {};
+
+    for (const [key, value] of Object.entries(inputs)) {
+      if (typeof value === 'string' && value.includes('{{')) {
+        resolved[key] = this.resolveTemplate(value, context);
+      } else if (typeof value === 'object' && value !== null) {
+        resolved[key] = await this.resolveActionInputs(value, context);
+      } else {
+        resolved[key] = value;
+      }
+    }
+
+    return resolved;
+  }
+
+  private resolveTemplate(template: string, context: FlowExecutionContext): any {
+    return template.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
+      const trimmedPath = path.trim();
+      
+      if (trimmedPath.startsWith('steps.')) {
+        const stepPath = trimmedPath.substring(6);
+        return this.getNestedValue(context.stepOutputs, stepPath);
+      }
+      
+      if (trimmedPath.startsWith('variables.')) {
+        const varPath = trimmedPath.substring(10);
+        return this.getNestedValue(context.variables, varPath);
+      }
+      
+      if (context.variables[trimmedPath] !== undefined) {
+        return context.variables[trimmedPath];
+      }
+      
+      return match;
+    });
+  }
+
+  private getNestedValue(obj: any, path: string): any {
+    return path.split('.').reduce((current, key) => {
+      return current && current[key] !== undefined ? current[key] : undefined;
+    }, obj);
+  }
+
+  private async executeActionRequest(action: any, inputs: any): Promise<StepExecutionResult> {
+    const { tool, endpoint, method, headers } = action;
+    const url = `${tool.baseUrl}${endpoint}`;
+
+    try {
+      const requestHeaders = {
+        'Content-Type': 'application/json',
+        ...headers
+      };
+
+      const requestBody = ['GET', 'HEAD'].includes(method.toUpperCase()) ? undefined : JSON.stringify(inputs);
+
+      const response = await fetch(url, {
+        method: method.toUpperCase(),
+        headers: requestHeaders,
+        body: requestBody
+      });
+
+      const responseData = await response.text();
+      let parsedData;
+      
+      try {
+        parsedData = JSON.parse(responseData);
+      } catch {
+        parsedData = responseData;
+      }
+
+      return {
+        success: response.ok,
+        output: {
+          status: response.status,
+          statusText: response.statusText,
+          data: parsedData,
+          headers: Object.fromEntries(response.headers.entries())
+        },
+        error: response.ok ? undefined : {
+          message: `HTTP ${response.status}: ${response.statusText}`,
+          code: 'ACTION_HTTP_ERROR'
+        }
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: {
+          message: `Action request failed: ${error.message}`,
+          code: 'ACTION_NETWORK_ERROR'
         }
       };
     }

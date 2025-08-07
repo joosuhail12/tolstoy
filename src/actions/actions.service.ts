@@ -20,7 +20,10 @@ export class ActionsService {
     }
 
     return this.prisma.action.create({
-      data: createActionDto,
+      data: {
+        ...createActionDto,
+        orgId: tenant.orgId,
+      },
     });
   }
 

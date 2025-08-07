@@ -171,6 +171,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.prismaClient?.executionLog;
   }
 
+  get webhook() {
+    return this.prismaClient?.webhook;
+  }
+
   // Health check method
   async isHealthy(): Promise<boolean> {
     try {

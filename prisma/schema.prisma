@@ -20,7 +20,9 @@ model Organization {
   updatedAt      DateTime       @updatedAt
   users          User[]
   tools          Tool[]
+  actions        Action[]
   flows          Flow[]
+  webhooks       Webhook[]
   executionLogs  ExecutionLog[]
 }
 
@@ -49,16 +51,25 @@ model Tool {
 }
 
 model Action {
-  id          String   @id @default(cuid())
-  toolId      String
-  endpoint    String
-  method      String
-  schema      Json
-  executeIf   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  name           String
+  key            String
+  orgId          String
+  toolId         String
+  method         String
+  endpoint       String
+  headers        Json
+  inputSchema    Json
+  executeIf      Json?
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  tool        Tool     @relation(fields: [toolId], references: [id])
+  tool           Tool     @relation(fields: [toolId], references: [id])
+  organization   Organization @relation(fields: [orgId], references: [id])
+
+  @@unique([orgId, key])
+  @@index([toolId])
 }
 
 model Flow {
@@ -87,4 +98,22 @@ model ExecutionLog {
   organization Organization @relation(fields: [orgId], references: [id])
   user         User         @relation(fields: [userId], references: [id])
   flow         Flow         @relation(fields: [flowId], references: [id])
+}
+
+model Webhook {
+  id          String   @id @default(cuid())
+  orgId       String
+  name        String
+  url         String
+  eventTypes  String[]
+  enabled     Boolean  @default(true)
+  secret      String?
+  headers     Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id])
+
+  @@index([orgId])
+  @@index([enabled])
 }

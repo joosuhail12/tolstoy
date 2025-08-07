@@ -1,23 +1,39 @@
-import { IsString, IsNotEmpty, IsObject, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsObject, IsOptional, IsArray, IsNumber } from 'class-validator';
 
 export class CreateActionDto {
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsString()
+  @IsNotEmpty()
+  key: string;
+
   @IsString()
   @IsNotEmpty()
   toolId: string;
 
   @IsString()
   @IsNotEmpty()
-  endpoint: string;
+  method: string;
 
   @IsString()
   @IsNotEmpty()
-  method: string;
+  endpoint: string;
 
   @IsObject()
   @IsNotEmpty()
-  schema: Record<string, any>;
+  headers: Record<string, any>;
 
-  @IsString()
+  @IsArray()
+  @IsNotEmpty()
+  inputSchema: any[];
+
+  @IsObject()
   @IsOptional()
-  executeIf?: string;
+  executeIf?: Record<string, any>;
+
+  @IsNumber()
+  @IsOptional()
+  version?: number;
 }
