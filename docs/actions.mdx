@@ -1,0 +1,678 @@
+---
+title: Action Reference
+description: "Complete reference for Tolstoy actions, their properties, and usage patterns"
+---
+
+# Action Reference
+
+Actions are reusable components that perform specific operations within your flows. They can interact with external APIs, process data, send notifications, or execute any custom logic you define.
+
+<Info>
+Actions are the building blocks of Tolstoy workflows. Each action is designed to be stateless, idempotent, and composable.
+</Info>
+
+## Action Schema
+
+Every action in Tolstoy follows a standardized schema that defines its behavior, inputs, and execution parameters.
+
+### Core Properties
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `key` | string | ✅ | Unique identifier within the organization |
+| `name` | string | ✅ | Human-readable action name |
+| `method` | string | ✅ | HTTP method (GET, POST, PUT, DELETE, PATCH) |
+| `endpoint` | string | ✅ | API endpoint (relative or absolute URL) |
+| `headers` | object | ❌ | Static HTTP headers to include |
+| `inputSchema` | array | ✅ | Parameter definitions for the action |
+| `executeIf` | object | ❌ | Conditional execution logic |
+| `version` | number | ✅ | Action version for change management |
+
+### Example Action Definition
+
+```json
+{
+  "key": "create-github-issue",
+  "name": "Create GitHub Issue",
+  "method": "POST",
+  "endpoint": "/repos/{{org}}/{{repo}}/issues",
+  "headers": {
+    "Accept": "application/vnd.github.v3+json",
+    "Authorization": "Bearer {{auth.github_token}}"
+  },
+  "inputSchema": [
+    {
+      "name": "org",
+      "type": "string",
+      "required": true,
+      "description": "GitHub organization name",
+      "validation": {
+        "pattern": "^[a-zA-Z0-9-]+$"
+      }
+    },
+    {
+      "name": "repo",
+      "type": "string", 
+      "required": true,
+      "description": "Repository name"
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "required": true,
+      "description": "Issue title",
+      "control": "text",
+      "validation": {
+        "min": 1,
+        "max": 256
+      }
+    },
+    {
+      "name": "body",
+      "type": "string",
+      "required": false,
+      "description": "Issue description",
+      "control": "textarea"
+    },
+    {
+      "name": "labels",
+      "type": "array",
+      "required": false,
+      "description": "Issue labels",
+      "control": "multi-select",
+      "options": ["bug", "enhancement", "documentation"]
+    },
+    {
+      "name": "assignees",
+      "type": "array",
+      "required": false,
+      "description": "GitHub usernames to assign"
+    }
+  ],
+  "executeIf": {
+    "operator": "and",
+    "conditions": [
+      {
+        "operator": "exists",
+        "field": "context.create_issue"
+      },
+      {
+        "operator": "equals",
+        "field": "context.environment",
+        "value": "production"
+      }
+    ]
+  },
+  "version": 1
+}
+```
+
+## Input Schema Reference
+
+The `inputSchema` defines the parameters that your action accepts. Each parameter has the following properties:
+
+### Parameter Properties
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `name` | string | ✅ | Parameter name (used as field key) |
+| `type` | string | ✅ | Data type (string, number, boolean, array, object) |
+| `required` | boolean | ✅ | Whether the parameter is mandatory |
+| `description` | string | ❌ | Human-readable parameter description |
+| `control` | string | ❌ | UI control type for forms |
+| `default` | any | ❌ | Default value if not provided |
+| `options` | array | ❌ | Valid options for enum/select types |
+| `validation` | object | ❌ | Validation rules |
+
+### Data Types
+
+<AccordionGroup>
+  <Accordion title="String Type">
+    ```json
+    {
+      "name": "message",
+      "type": "string",
+      "required": true,
+      "description": "The message content",
+      "control": "textarea",
+      "default": "Hello, World!",
+      "validation": {
+        "min": 1,
+        "max": 1000,
+        "pattern": "^[\\w\\s\\.,!?-]+$"
+      }
+    }
+    ```
+    
+    **Validation Options:**
+    - `min`: Minimum string length
+    - `max`: Maximum string length
+    - `pattern`: Regular expression pattern
+    - `email`: Validates email format
+    - `url`: Validates URL format
+  </Accordion>
+
+  <Accordion title="Number Type">
+    ```json
+    {
+      "name": "timeout",
+      "type": "number",
+      "required": false,
+      "description": "Request timeout in milliseconds",
+      "control": "number",
+      "default": 5000,
+      "validation": {
+        "min": 100,
+        "max": 60000
+      }
+    }
+    ```
+    
+    **Validation Options:**
+    - `min`: Minimum numeric value
+    - `max`: Maximum numeric value
+  </Accordion>
+
+  <Accordion title="Boolean Type">
+    ```json
+    {
+      "name": "send_notification",
+      "type": "boolean",
+      "required": false,
+      "description": "Whether to send notification",
+      "control": "checkbox",
+      "default": true
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Array Type">
+    ```json
+    {
+      "name": "tags",
+      "type": "array",
+      "required": false,
+      "description": "List of tags to apply",
+      "control": "multi-select",
+      "options": ["urgent", "bug", "feature", "documentation"],
+      "validation": {
+        "min": 0,
+        "max": 5
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Object Type">
+    ```json
+    {
+      "name": "metadata",
+      "type": "object",
+      "required": false,
+      "description": "Additional metadata",
+      "control": "json-editor",
+      "default": {}
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Enum Type">
+    ```json
+    {
+      "name": "priority",
+      "type": "enum",
+      "required": true,
+      "description": "Task priority level",
+      "control": "select",
+      "options": ["low", "medium", "high", "critical"],
+      "default": "medium"
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### UI Controls
+
+The `control` property determines how the parameter appears in visual editors:
+
+| Control | Description | Best For |
+|---------|-------------|----------|
+| `text` | Single-line text input | Short strings, IDs, names |
+| `textarea` | Multi-line text input | Long text, descriptions, JSON |
+| `number` | Numeric input with validation | Numbers, counts, measurements |
+| `checkbox` | Boolean toggle | True/false values |
+| `select` | Dropdown menu | Enum values, predefined options |
+| `multi-select` | Multi-choice selection | Arrays of predefined values |
+| `json-editor` | JSON code editor | Complex objects, configurations |
+| `code-editor` | Code syntax highlighting | Scripts, code snippets |
+
+## Conditional Execution
+
+The `executeIf` property allows actions to run conditionally based on data or context. This uses JSONLogic syntax for complex conditions.
+
+### Basic Conditions
+
+```json
+// Execute only in production
+"executeIf": {
+  "operator": "equals",
+  "field": "context.environment",
+  "value": "production"
+}
+
+// Execute if previous step succeeded
+"executeIf": {
+  "operator": "equals",
+  "field": "steps.validate.output.success",
+  "value": true
+}
+
+// Execute if field exists and is not empty
+"executeIf": {
+  "operator": "and",
+  "conditions": [
+    {
+      "operator": "exists",
+      "field": "context.user_email"
+    },
+    {
+      "operator": "not_equals",
+      "field": "context.user_email",
+      "value": ""
+    }
+  ]
+}
+```
+
+### Advanced Conditions
+
+```json
+// Complex multi-condition logic
+"executeIf": {
+  "operator": "or",
+  "conditions": [
+    {
+      "operator": "and",
+      "conditions": [
+        {
+          "operator": "equals",
+          "field": "context.environment",
+          "value": "production"
+        },
+        {
+          "operator": "greater_than",
+          "field": "context.error_count",
+          "value": 5
+        }
+      ]
+    },
+    {
+      "operator": "equals",
+      "field": "context.force_notification",
+      "value": true
+    }
+  ]
+}
+```
+
+## Built-in Actions
+
+Tolstoy provides a comprehensive set of built-in actions for common operations:
+
+### HTTP Actions
+
+<AccordionGroup>
+  <Accordion title="HTTP GET">
+    ```yaml
+    action: "http.get"
+    inputs:
+      url: "https://api.example.com/users/{{userId}}"
+      headers:
+        Authorization: "Bearer {{auth.api_token}}"
+        Accept: "application/json"
+      timeout: 10000
+      retries: 3
+    ```
+  </Accordion>
+
+  <Accordion title="HTTP POST">
+    ```yaml
+    action: "http.post"
+    inputs:
+      url: "https://api.example.com/users"
+      headers:
+        Content-Type: "application/json"
+      body:
+        name: "{{inputs.user_name}}"
+        email: "{{inputs.user_email}}"
+      timeout: 15000
+    ```
+  </Accordion>
+
+  <Accordion title="HTTP PUT/PATCH">
+    ```yaml
+    action: "http.patch"
+    inputs:
+      url: "https://api.example.com/users/{{userId}}"
+      headers:
+        Content-Type: "application/json"
+      body:
+        status: "active"
+        last_login: "{{now()}}"
+    ```
+  </Accordion>
+
+  <Accordion title="HTTP DELETE">
+    ```yaml
+    action: "http.delete"
+    inputs:
+      url: "https://api.example.com/users/{{userId}}"
+      headers:
+        Authorization: "Bearer {{auth.api_token}}"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Data Transformation Actions
+
+<AccordionGroup>
+  <Accordion title="JSON Transform">
+    ```yaml
+    action: "data.transform"
+    inputs:
+      data: "{{steps.fetch_user.output}}"
+      template: |
+        {
+          "id": "{{data.user_id}}",
+          "fullName": "{{data.first_name}} {{data.last_name}}",
+          "email": "{{data.email_address}}",
+          "isActive": "{{data.status === 'active'}}"
+        }
+    ```
+  </Accordion>
+
+  <Accordion title="Array Operations">
+    ```yaml
+    action: "data.array.filter"
+    inputs:
+      array: "{{steps.fetch_users.output.users}}"
+      condition:
+        operator: "equals"
+        field: "status"
+        value: "active"
+    ```
+  </Accordion>
+
+  <Accordion title="String Operations">
+    ```yaml
+    action: "data.string.format"
+    inputs:
+      template: "Hello {{name}}, welcome to {{company}}!"
+      data:
+        name: "{{context.user_name}}"
+        company: "Tolstoy"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Control Flow Actions
+
+<AccordionGroup>
+  <Accordion title="Conditional Branching">
+    ```yaml
+    action: "control.if"
+    inputs:
+      condition:
+        operator: "greater_than"
+        field: "context.user_count"
+        value: 100
+      then:
+        - action: "notification.send"
+          inputs:
+            message: "High user count detected"
+      else:
+        - action: "logger.info"
+          inputs:
+            message: "User count is normal"
+    ```
+  </Accordion>
+
+  <Accordion title="For Each Loop">
+    ```yaml
+    action: "control.for_each"
+    inputs:
+      items: "{{context.user_ids}}"
+      steps:
+        - action: "user.process"
+          inputs:
+            user_id: "{{item}}"
+        - action: "notification.send"
+          inputs:
+            user_id: "{{item}}"
+            message: "Processing complete"
+    ```
+  </Accordion>
+
+  <Accordion title="Parallel Execution">
+    ```yaml
+    action: "control.parallel"
+    inputs:
+      steps:
+        - action: "service.health_check"
+          inputs:
+            service: "database"
+        - action: "service.health_check"
+          inputs:
+            service: "cache"
+        - action: "service.health_check"
+          inputs:
+            service: "queue"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Utility Actions
+
+<AccordionGroup>
+  <Accordion title="Wait/Delay">
+    ```yaml
+    action: "util.wait"
+    inputs:
+      duration: 5000  # milliseconds
+      reason: "Rate limiting delay"
+    ```
+  </Accordion>
+
+  <Accordion title="Generate UUID">
+    ```yaml
+    action: "util.uuid"
+    inputs:
+      format: "v4"  # v1, v4, or v5
+    ```
+  </Accordion>
+
+  <Accordion title="Current Timestamp">
+    ```yaml
+    action: "util.timestamp"
+    inputs:
+      format: "ISO"  # ISO, unix, or custom format
+      timezone: "UTC"
+    ```
+  </Accordion>
+
+  <Accordion title="Random Generation">
+    ```yaml
+    action: "util.random"
+    inputs:
+      type: "string"  # string, number, boolean
+      length: 16
+      charset: "alphanumeric"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Creating Custom Actions
+
+You can create custom actions for your specific use cases:
+
+### Action Development Template
+
+```json
+{
+  "key": "my-custom-action",
+  "name": "My Custom Action",
+  "description": "Performs a specific business operation",
+  "method": "POST",
+  "endpoint": "https://my-service.com/api/action",
+  "headers": {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer {{auth.service_token}}"
+  },
+  "inputSchema": [
+    {
+      "name": "operation_type",
+      "type": "enum",
+      "required": true,
+      "description": "Type of operation to perform",
+      "options": ["create", "update", "delete"],
+      "control": "select"
+    },
+    {
+      "name": "entity_id",
+      "type": "string",
+      "required": true,
+      "description": "Unique identifier for the entity",
+      "validation": {
+        "pattern": "^[a-zA-Z0-9-]+$"
+      }
+    },
+    {
+      "name": "metadata",
+      "type": "object",
+      "required": false,
+      "description": "Additional operation metadata",
+      "default": {}
+    },
+    {
+      "name": "dry_run",
+      "type": "boolean",
+      "required": false,
+      "description": "Perform validation only, don't execute",
+      "default": false
+    }
+  ],
+  "executeIf": {
+    "operator": "not_equals",
+    "field": "context.skip_custom_actions",
+    "value": true
+  },
+  "version": 1
+}
+```
+
+### Action Testing
+
+Test your custom actions thoroughly:
+
+```yaml
+# Test configuration
+test_cases:
+  - name: "Valid operation"
+    inputs:
+      operation_type: "create"
+      entity_id: "test-entity-123"
+      metadata: { "source": "test" }
+    expected_output:
+      success: true
+      entity_id: "test-entity-123"
+      
+  - name: "Invalid entity ID"
+    inputs:
+      operation_type: "create"
+      entity_id: "invalid id with spaces"
+    expected_error: "validation_error"
+    
+  - name: "Dry run mode"
+    inputs:
+      operation_type: "delete"
+      entity_id: "test-entity-123"
+      dry_run: true
+    expected_output:
+      success: true
+      dry_run: true
+      would_delete: true
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Action Design Principles">
+    - **Single Responsibility**: Each action should do one thing well
+    - **Idempotency**: Actions should be safe to retry
+    - **Input Validation**: Always validate inputs thoroughly
+    - **Error Handling**: Provide clear error messages and codes
+    - **Documentation**: Include comprehensive descriptions
+  </Accordion>
+
+  <Accordion title="Performance Considerations">
+    - **Timeout Management**: Set appropriate timeouts for external calls
+    - **Rate Limiting**: Respect API rate limits
+    - **Caching**: Cache results when appropriate
+    - **Batch Operations**: Group related operations when possible
+    - **Resource Cleanup**: Clean up temporary resources
+  </Accordion>
+
+  <Accordion title="Security Guidelines">
+    - **Secret Management**: Use secure credential storage
+    - **Input Sanitization**: Sanitize all user inputs
+    - **Access Control**: Implement proper authorization
+    - **Audit Logging**: Log all significant operations
+    - **Encryption**: Encrypt sensitive data in transit and at rest
+  </Accordion>
+
+  <Accordion title="Versioning Strategy">
+    - **Backward Compatibility**: Maintain compatibility when possible
+    - **Version Incrementing**: Increment version for breaking changes
+    - **Migration Path**: Provide clear upgrade instructions
+    - **Deprecation**: Announce deprecation well in advance
+    - **Documentation**: Document all version changes
+  </Accordion>
+</AccordionGroup>
+
+## Action Registry
+
+Explore the complete action registry in your Tolstoy dashboard:
+
+<CardGroup cols={2}>
+  <Card title="Browse Actions" icon="search" href="/dashboard/actions">
+    Discover all available actions in your organization
+  </Card>
+  <Card title="Create Action" icon="plus" href="/dashboard/actions/new">
+    Build and deploy your own custom actions
+  </Card>
+  <Card title="Action Analytics" icon="chart-line" href="/dashboard/analytics">
+    Monitor action performance and usage metrics
+  </Card>
+  <Card title="API Documentation" icon="code" href="/api/actions">
+    Complete API reference for action management
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+Now that you understand actions, explore these related topics:
+
+<CardGroup cols={2}>
+  <Card title="Integration Library" icon="puzzle-piece" href="/integrations">
+    Discover pre-built actions for popular services
+  </Card>
+  <Card title="Testing Actions" icon="test-tube" href="/testing">
+    Learn how to test your actions effectively
+  </Card>
+  <Card title="Action SDK" icon="code" href="/sdk">
+    Use the SDK to build actions programmatically
+  </Card>
+  <Card title="Community Actions" icon="users" href="/community">
+    Share and discover community-built actions
+  </Card>
+</CardGroup>

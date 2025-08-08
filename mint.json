@@ -1,0 +1,50 @@
+{
+  "name": "Tolstoy Docs",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#2563eb",
+    "light": "#3b82f6",
+    "dark": "#1d4ed8"
+  },
+  "topbarCtaButton": {
+    "name": "Dashboard",
+    "url": "https://app.tolstoy.dev"
+  },
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "onboarding"
+      ]
+    },
+    {
+      "group": "Core Concepts",
+      "pages": [
+        "flows",
+        "actions"
+      ]
+    },
+    {
+      "group": "Guides",
+      "pages": [
+        "guides/first-workflow"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api-reference/introduction"
+      ]
+    }
+  ],
+  "footerSocials": {
+    "twitter": "https://twitter.com/tolstoy_dev",
+    "github": "https://github.com/tolstoy-dev"
+  }
+}

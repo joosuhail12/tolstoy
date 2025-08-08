@@ -1,0 +1,435 @@
+---
+title: Flow Definition Guide
+description: "Learn how to define, structure, and version workflows in Tolstoy"
+---
+
+# Flow Definition Guide
+
+Flows are the heart of Tolstoy - they define the sequence of steps that make up your automated workflows. This guide covers everything you need to know about creating, structuring, and managing flows.
+
+<Info>
+Flows are immutable once published. Use the `version` field to evolve your workflows over time while maintaining backward compatibility.
+</Info>
+
+## Flow Anatomy
+
+Every flow consists of these core components:
+
+```yaml
+version: 1
+name: "My Workflow"
+description: "A comprehensive workflow example"
+metadata:
+  tags: ["production", "api-integration"]
+  author: "team@company.com"
+
+variables:
+  api_base_url: "https://api.example.com"
+  retry_attempts: 3
+
+steps:
+  - key: "fetch-data"
+    name: "Fetch User Data"
+    action: "http.get"
+    inputs:
+      url: "{{variables.api_base_url}}/users/{{context.userId}}"
+    executeIf:
+      operator: "exists"
+      field: "context.userId"
+    
+  - key: "process-data"
+    name: "Process User Data"
+    action: "custom.transform"
+    inputs:
+      data: "{{steps.fetch-data.output.data}}"
+      template: "user-processing"
+    dependsOn: ["fetch-data"]
+
+errorHandling:
+  strategy: "retry"
+  maxRetries: "{{variables.retry_attempts}}"
+  backoff: "exponential"
+```
+
+## Flow Schema Reference
+
+### Basic Properties
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `version` | number | ✅ | Flow schema version (use 1 for current) |
+| `name` | string | ✅ | Human-readable flow name |
+| `description` | string | ❌ | Detailed description of the flow's purpose |
+| `metadata` | object | ❌ | Additional flow metadata |
+
+### Variables
+
+Variables allow you to parameterize your flows and make them reusable:
+
+```yaml
+variables:
+  # Static values
+  api_endpoint: "https://api.service.com"
+  timeout_ms: 5000
+  
+  # Environment-specific
+  database_url: "{{env.DATABASE_URL}}"
+  
+  # Dynamic defaults
+  batch_size: "{{context.batch_size || 100}}"
+```
+
+**Variable Types:**
+- **Static**: Fixed values defined in the flow
+- **Environment**: Retrieved from environment variables using `{{env.VAR_NAME}}`
+- **Context**: Passed at execution time using `{{context.field_name}}`
+- **Dynamic**: Computed using expressions and fallbacks
+
+### Steps
+
+Steps are the building blocks of your workflow. Each step represents a single operation:
+
+```yaml
+steps:
+  - key: "unique-step-key"           # Required: Unique within the flow
+    name: "Human Readable Name"      # Optional: Display name
+    action: "tool.action-name"       # Required: Action to execute
+    inputs:                          # Required: Action inputs
+      param1: "value"
+      param2: "{{variables.my_var}}"
+    executeIf:                       # Optional: Conditional execution
+      operator: "equals"
+      field: "context.environment"
+      value: "production"
+    dependsOn: ["previous-step"]     # Optional: Step dependencies
+    timeout: 30000                   # Optional: Step timeout in ms
+    retries: 2                       # Optional: Step-level retries
+```
+
+## Step Execution Control
+
+### Conditional Execution
+
+Use `executeIf` to conditionally execute steps based on data or context:
+
+```yaml
+# Simple condition
+executeIf:
+  operator: "equals"
+  field: "context.environment"
+  value: "production"
+
+# Complex condition with multiple operators
+executeIf:
+  operator: "and"
+  conditions:
+    - operator: "exists"
+      field: "steps.validate.output.success"
+    - operator: "greater_than"
+      field: "context.user_count"
+      value: 0
+    - operator: "in"
+      field: "context.region"
+      value: ["us-east-1", "us-west-2"]
+```
+
+**Available Operators:**
+- `equals`, `not_equals`
+- `greater_than`, `less_than`, `greater_than_or_equal`, `less_than_or_equal`
+- `exists`, `not_exists`
+- `contains`, `not_contains`
+- `in`, `not_in`
+- `and`, `or`, `not`
+
+### Step Dependencies
+
+Control execution order with explicit dependencies:
+
+```yaml
+steps:
+  - key: "setup"
+    action: "database.migrate"
+    
+  - key: "seed-data"
+    action: "database.seed"
+    dependsOn: ["setup"]           # Waits for setup to complete
+    
+  - key: "validate"
+    action: "database.validate"
+    dependsOn: ["seed-data"]       # Sequential dependency
+    
+  - key: "notify-success"
+    action: "slack.message"
+    dependsOn: ["setup", "seed-data", "validate"]  # Multiple dependencies
+    
+  - key: "cleanup"
+    action: "temp.cleanup"
+    # No dependencies - runs in parallel with other steps
+```
+
+## Data Flow and Context
+
+### Accessing Step Output
+
+Reference outputs from previous steps using the `steps` context:
+
+```yaml
+steps:
+  - key: "fetch-user"
+    action: "api.get"
+    inputs:
+      url: "/users/123"
+      
+  - key: "update-profile"
+    action: "api.post"
+    inputs:
+      url: "/profiles"
+      data:
+        userId: "{{steps.fetch-user.output.data.id}}"
+        name: "{{steps.fetch-user.output.data.name}}"
+        email: "{{steps.fetch-user.output.data.email}}"
+```
+
+### Context Variables
+
+Access execution context and environment data:
+
+```yaml
+# Execution context
+user_id: "{{context.userId}}"           # Passed at runtime
+execution_id: "{{context.executionId}}" # Auto-generated
+org_id: "{{context.orgId}}"             # Organization context
+
+# Environment variables
+database_url: "{{env.DATABASE_URL}}"
+api_key: "{{env.API_KEY}}"
+
+# System context
+current_time: "{{now()}}"
+random_id: "{{uuid()}}"
+```
+
+## Error Handling
+
+### Flow-Level Error Handling
+
+Configure how your entire flow responds to errors:
+
+```yaml
+errorHandling:
+  strategy: "retry"                    # retry | fail_fast | continue
+  maxRetries: 3
+  backoff: "exponential"              # linear | exponential | fixed
+  retryDelay: 1000                    # Base delay in ms
+  onError:
+    - action: "slack.notify"
+      inputs:
+        channel: "#alerts"
+        message: "Flow {{context.flowId}} failed: {{error.message}}"
+```
+
+### Step-Level Error Handling
+
+Override error handling for specific steps:
+
+```yaml
+steps:
+  - key: "critical-step"
+    action: "payment.process"
+    inputs:
+      amount: 100
+      currency: "USD"
+    errorHandling:
+      strategy: "fail_fast"           # This step must succeed
+      
+  - key: "optional-step"
+    action: "analytics.track"
+    inputs:
+      event: "payment_processed"
+    errorHandling:
+      strategy: "continue"            # Failure doesn't stop the flow
+      onError:
+        - action: "logger.warn"
+          inputs:
+            message: "Analytics tracking failed"
+```
+
+## Advanced Patterns
+
+### Parallel Execution
+
+Execute multiple steps concurrently:
+
+```yaml
+steps:
+  # These run in parallel (no dependencies)
+  - key: "fetch-user-data"
+    action: "api.get"
+    inputs:
+      url: "/users/{{context.userId}}"
+      
+  - key: "fetch-account-data" 
+    action: "api.get"
+    inputs:
+      url: "/accounts/{{context.accountId}}"
+      
+  - key: "fetch-preferences"
+    action: "api.get"
+    inputs:
+      url: "/preferences/{{context.userId}}"
+      
+  # This waits for all parallel steps
+  - key: "merge-data"
+    action: "data.merge"
+    dependsOn: ["fetch-user-data", "fetch-account-data", "fetch-preferences"]
+    inputs:
+      sources:
+        - "{{steps.fetch-user-data.output}}"
+        - "{{steps.fetch-account-data.output}}"
+        - "{{steps.fetch-preferences.output}}"
+```
+
+### Loops and Iteration
+
+Process arrays of data with loop patterns:
+
+```yaml
+variables:
+  user_ids: ["user1", "user2", "user3"]
+
+steps:
+  - key: "process-users"
+    action: "control.for_each"
+    inputs:
+      items: "{{variables.user_ids}}"
+      steps:
+        - key: "fetch-user"
+          action: "api.get"
+          inputs:
+            url: "/users/{{item}}"
+            
+        - key: "send-email"
+          action: "email.send"
+          inputs:
+            to: "{{steps.fetch-user.output.email}}"
+            subject: "Welcome!"
+```
+
+### Conditional Branching
+
+Create complex logic with conditional branches:
+
+```yaml
+steps:
+  - key: "check-user-type"
+    action: "user.classify"
+    inputs:
+      userId: "{{context.userId}}"
+      
+  - key: "premium-flow"
+    action: "premium.process"
+    executeIf:
+      operator: "equals"
+      field: "steps.check-user-type.output.type"
+      value: "premium"
+      
+  - key: "standard-flow"
+    action: "standard.process"
+    executeIf:
+      operator: "equals"
+      field: "steps.check-user-type.output.type"
+      value: "standard"
+```
+
+## Flow Versioning
+
+### Version Management
+
+Flows are immutable - create new versions to make changes:
+
+```yaml
+# Version 1 - Initial flow
+version: 1
+name: "User Onboarding"
+steps:
+  - key: "send-welcome-email"
+    action: "email.send"
+
+---
+# Version 2 - Added SMS notification
+version: 2
+name: "User Onboarding"
+steps:
+  - key: "send-welcome-email"
+    action: "email.send"
+  - key: "send-sms"
+    action: "sms.send"
+```
+
+### Migration Strategies
+
+When updating flows, consider:
+
+1. **Backward Compatibility**: Ensure new versions work with existing data
+2. **Gradual Rollout**: Deploy new versions gradually
+3. **Rollback Plan**: Keep previous versions available for rollback
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Flow Design Principles">
+    - **Single Responsibility**: Each flow should have one clear purpose
+    - **Idempotency**: Flows should be safe to re-run
+    - **Error Recovery**: Design for failure scenarios
+    - **Monitoring**: Include logging and notification steps
+  </Accordion>
+
+  <Accordion title="Performance Optimization">
+    - **Parallel Execution**: Use dependencies wisely to enable parallelism
+    - **Timeout Management**: Set appropriate timeouts for each step
+    - **Resource Efficiency**: Avoid unnecessary data fetching
+    - **Batch Processing**: Group similar operations when possible
+  </Accordion>
+
+  <Accordion title="Security Considerations">
+    - **Secret Management**: Never hardcode sensitive data
+    - **Input Validation**: Validate all external inputs
+    - **Access Control**: Use proper authentication and authorization
+    - **Audit Logging**: Log all significant actions
+  </Accordion>
+
+  <Accordion title="Testing and Debugging">
+    - **Unit Tests**: Test individual steps in isolation
+    - **Integration Tests**: Test complete flow execution
+    - **Dry Run Mode**: Test flows without side effects
+    - **Debug Logging**: Add comprehensive logging for troubleshooting
+  </Accordion>
+</AccordionGroup>
+
+## Examples Repository
+
+Check out our [examples repository](https://github.com/tolstoy-dev/examples) for real-world flow patterns:
+
+- **API Integration Flows**: Connect with external services
+- **Data Processing Pipelines**: ETL and data transformation workflows
+- **Notification Systems**: Multi-channel alert and messaging flows
+- **E-commerce Automation**: Order processing and fulfillment workflows
+
+## Next Steps
+
+Now that you understand flow definition, explore these related topics:
+
+<CardGroup cols={2}>
+  <Card title="Actions Reference" icon="code" href="/actions">
+    Learn about available actions and how to create custom ones
+  </Card>
+  <Card title="Integrations" icon="plug" href="/integrations">
+    Discover pre-built integrations with popular tools
+  </Card>
+  <Card title="API Reference" icon="terminal" href="/api">
+    Dive into the complete Tolstoy API documentation
+  </Card>
+  <Card title="CLI Reference" icon="command-line" href="/cli">
+    Master the Tolstoy command-line interface
+  </Card>
+</CardGroup>

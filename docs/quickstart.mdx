@@ -1,0 +1,171 @@
+---
+title: Quickstart
+description: "Get up and running with Tolstoy in under 5 minutes"
+---
+
+# Quickstart Guide
+
+Get Tolstoy up and running in under 5 minutes and create your first automated workflow.
+
+<Info>
+This guide assumes you have Node.js (v18+) and npm installed on your machine.
+</Info>
+
+## Prerequisites
+
+Before we begin, make sure you have:
+- Node.js 18 or higher
+- npm or yarn package manager
+- A code editor (VS Code recommended)
+
+## Step 1: Set Up Your Environment
+
+First, let's set up the necessary environment variables:
+
+```bash
+# Clone or access your Tolstoy workspace
+export TOLSTOY_ORG_ID="your-org-id"
+export TOLSTOY_API_KEY="your-api-key"
+```
+
+<Warning>
+Keep your API keys secure and never commit them to version control. Use environment variables or a secure secret management system.
+</Warning>
+
+## Step 2: Create Your First Flow
+
+Create a new file called `hello-world.yaml` with a simple workflow:
+
+```yaml hello-world.yaml
+version: 1
+name: "Hello World Flow"
+description: "A simple workflow to get started"
+
+steps:
+  - key: "greeting"
+    name: "Send Greeting"
+    action: "http.post"
+    inputs:
+      url: "https://httpbin.org/post"
+      headers:
+        Content-Type: "application/json"
+      body:
+        message: "Hello from Tolstoy!"
+        timestamp: "{{now()}}"
+    
+  - key: "log-result"
+    name: "Log the Result"
+    action: "console.log"
+    inputs:
+      message: "Workflow completed successfully!"
+      data: "{{steps.greeting.output}}"
+```
+
+## Step 3: Deploy Your Flow
+
+Use the Tolstoy CLI to deploy your flow:
+
+```bash
+# Install the Tolstoy CLI
+npm install -g @tolstoy/cli
+
+# Login to your Tolstoy account
+tolstoy auth login
+
+# Deploy your flow
+tolstoy deploy hello-world.yaml
+```
+
+## Step 4: Execute Your Flow
+
+Now let's run your first workflow:
+
+```bash
+# Execute the flow
+tolstoy run hello-world --org=$TOLSTOY_ORG_ID
+
+# Monitor execution
+tolstoy logs hello-world --follow
+```
+
+## Step 5: View Results
+
+Your workflow will execute and you should see output similar to this:
+
+```json
+{
+  "executionId": "exec-12345",
+  "status": "completed",
+  "duration": 1240,
+  "steps": {
+    "greeting": {
+      "status": "completed",
+      "output": {
+        "statusCode": 200,
+        "data": {
+          "message": "Hello from Tolstoy!",
+          "timestamp": "2024-01-15T10:30:00Z"
+        }
+      }
+    },
+    "log-result": {
+      "status": "completed",
+      "output": "Workflow completed successfully!"
+    }
+  }
+}
+```
+
+## Next Steps
+
+Congratulations! 🎉 You've successfully created and executed your first Tolstoy workflow. Here's what to explore next:
+
+<CardGroup cols={2}>
+  <Card title="Flow Definition Guide" icon="book" href="/flows">
+    Learn advanced flow patterns, conditional logic, and error handling
+  </Card>
+  <Card title="Actions Reference" icon="code" href="/actions">
+    Explore available actions and how to create custom ones
+  </Card>
+  <Card title="Integrations" icon="plug" href="/integrations">
+    Connect with popular tools like Slack, GitHub, AWS, and more
+  </Card>
+  <Card title="API Reference" icon="terminal" href="/api">
+    Dive into the complete Tolstoy API documentation
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+Having issues? Here are common solutions:
+
+<AccordionGroup>
+  <Accordion title="Authentication Failed">
+    Make sure your API key is valid and has the correct permissions:
+    ```bash
+    tolstoy auth verify
+    ```
+  </Accordion>
+
+  <Accordion title="Flow Deployment Failed">
+    Check your YAML syntax and ensure all required fields are present:
+    ```bash
+    tolstoy validate hello-world.yaml
+    ```
+  </Accordion>
+
+  <Accordion title="Step Execution Failed">
+    Review the execution logs for detailed error information:
+    ```bash
+    tolstoy logs hello-world --level=error
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Community & Support
+
+- **Discord**: Join our [community Discord](https://discord.gg/tolstoy) for real-time help
+- **GitHub**: Browse examples and contribute at [github.com/tolstoy-dev/examples](https://github.com/tolstoy-dev/examples)
+- **Documentation**: Explore our full documentation for advanced features
+
+Ready to build more complex workflows? Let's dive into the [Flow Definition Guide](/flows)!

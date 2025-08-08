@@ -1,0 +1,578 @@
+---
+title: "Developer Onboarding"
+description: "Complete guide for developers joining the Tolstoy team"
+---
+
+# Developer Onboarding
+
+Welcome to the Tolstoy development team! This guide will help you get up and running with our codebase, development environment, and workflows.
+
+<Info>
+This onboarding guide is specifically for developers working on the Tolstoy platform itself. If you're looking to use Tolstoy for workflow automation, check out our [Quickstart Guide](/quickstart) instead.
+</Info>
+
+## Repository Structure
+
+Our codebase is organized as a monorepo with clear separation of concerns:
+
+```
+tolstoy/
+├── src/                          # Main application source
+│   ├── actions/                  # Action management module
+│   ├── flows/                    # Flow definition and execution
+│   ├── common/                   # Shared utilities and services
+│   ├── webhooks/                 # Webhook handling and dispatch
+│   ├── metrics/                  # Monitoring and metrics
+│   ├── cache/                    # Caching layer (Redis)
+│   ├── auth/                     # Authentication and authorization
+│   └── main.ts                   # Application entry point
+├── test/                         # Test files and fixtures
+├── docs/                         # Documentation (this site!)
+├── migrations/                   # Database migrations
+├── scripts/                      # Build and deployment scripts
+├── docker/                       # Docker configurations
+├── .github/                      # GitHub Actions workflows
+└── package.json                  # Node.js dependencies
+```
+
+### Key Modules
+
+<AccordionGroup>
+  <Accordion title="Actions Module (src/actions/)">
+    Manages reusable workflow components:
+    - `actions.service.ts` - CRUD operations for actions
+    - `actions.controller.ts` - REST API endpoints
+    - `dto/` - Data transfer objects and validation
+  </Accordion>
+
+  <Accordion title="Flows Module (src/flows/)">
+    Core workflow engine:
+    - `flow-executor.service.ts` - Main execution engine
+    - `flows.service.ts` - Flow management
+    - `inngest/` - Background job processing
+  </Accordion>
+
+  <Accordion title="Common Module (src/common/)">
+    Shared utilities:
+    - `services/` - Input validation, condition evaluation
+    - `filters/` - Global exception handling
+    - `middleware/` - Authentication, tenant context
+  </Accordion>
+
+  <Accordion title="Webhooks Module (src/webhooks/)">
+    Event handling system:
+    - `webhooks.service.ts` - Webhook management
+    - `dispatch-webhook.handler.ts` - Event dispatching
+    - `webhook-signature.service.ts` - Security verification
+  </Accordion>
+</AccordionGroup>
+
+## Prerequisites
+
+Before setting up your local environment, ensure you have:
+
+- **Node.js** v18.0 or higher
+- **npm** or **yarn** package manager
+- **Docker** and **docker-compose**
+- **Git** with SSH key configured
+- **PostgreSQL** client tools (optional, for direct DB access)
+- **Redis** client tools (optional, for cache inspection)
+
+## Local Development Setup
+
+### 1. Clone and Install Dependencies
+
+```bash
+# Clone the repository
+git clone git@github.com:tolstoy-dev/tolstoy.git
+cd tolstoy
+
+# Install dependencies
+npm install
+
+# Or if you prefer yarn
+yarn install
+```
+
+### 2. Environment Configuration
+
+Copy the example environment file and configure it:
+
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit the environment file with your editor
+code .env
+```
+
+Key environment variables to configure:
+
+```bash .env
+# Database Configuration
+DATABASE_URL="postgresql://tolstoy:password@localhost:5432/tolstoy_dev"
+
+# Redis Configuration  
+REDIS_URL="redis://localhost:6379"
+
+# AWS Configuration (for Secrets Manager)
+AWS_REGION="us-east-1"
+AWS_ACCESS_KEY_ID="your-access-key"
+AWS_SECRET_ACCESS_KEY="your-secret-key"
+
+# Application Settings
+NODE_ENV="development"
+PORT="3000"
+LOG_LEVEL="debug"
+
+# External Service Keys (get from team)
+INNGEST_API_KEY="your-inngest-key"
+INNGEST_WEBHOOK_SECRET="your-webhook-secret"
+GITHUB_TOKEN="your-github-token"
+```
+
+<Warning>
+Never commit real credentials to version control. Use the team's shared secret management system for production keys.
+</Warning>
+
+### 3. Start Infrastructure Services
+
+We use Docker Compose for local infrastructure:
+
+```bash
+# Start PostgreSQL, Redis, and other services
+docker-compose up -d
+
+# Check that all services are running
+docker-compose ps
+```
+
+Services included:
+- **PostgreSQL** (port 5432) - Primary database
+- **Redis** (port 6379) - Caching and sessions
+- **Mailhog** (port 8025) - Email testing
+- **Prometheus** (port 9090) - Metrics collection
+- **Grafana** (port 3001) - Metrics visualization
+
+### 4. Database Setup
+
+Initialize your development database:
+
+```bash
+# Generate and run migrations
+npx prisma migrate dev --name init
+
+# Seed the database with test data
+npx prisma db seed
+
+# Optional: Open Prisma Studio for database inspection
+npx prisma studio
+```
+
+### 5. Start the Application
+
+Run the application in development mode:
+
+```bash
+# Start with hot reload
+npm run start:dev
+
+# Or with debug logging
+npm run start:debug
+
+# The application will be available at http://localhost:3000
+```
+
+## Running Tests
+
+We have comprehensive test coverage across unit, integration, and end-to-end tests:
+
+### Test Commands
+
+```bash
+# Run all tests
+npm test
+
+# Run tests with coverage
+npm run test:cov
+
+# Run tests in watch mode (for development)
+npm run test:watch
+
+# Run specific test file
+npm test -- user.service.spec.ts
+
+# Run integration tests only
+npm run test:integration
+
+# Run end-to-end tests
+npm run test:e2e
+```
+
+### Test Structure
+
+```
+test/
+├── unit/                    # Unit tests (fast, isolated)
+│   ├── services/
+│   ├── controllers/
+│   └── utils/
+├── integration/             # Integration tests (with database)
+│   ├── flows/
+│   ├── webhooks/
+│   └── auth/
+├── e2e/                     # End-to-end tests (full stack)
+│   ├── api/
+│   └── workflows/
+└── fixtures/                # Test data and mocks
+    ├── flows/
+    ├── actions/
+    └── users/
+```
+
+### Writing Tests
+
+Follow these conventions when writing tests:
+
+```typescript
+describe('FlowExecutorService', () => {
+  let service: FlowExecutorService;
+  let mockPrisma: jest.Mocked<PrismaService>;
+  
+  beforeEach(async () => {
+    const module = await Test.createTestingModule({
+      providers: [
+        FlowExecutorService,
+        { provide: PrismaService, useValue: mockPrisma }
+      ],
+    }).compile();
+    
+    service = module.get<FlowExecutorService>(FlowExecutorService);
+  });
+  
+  describe('executeFlow', () => {
+    it('should execute a simple flow successfully', async () => {
+      // Arrange
+      const flowDefinition = { /* test data */ };
+      
+      // Act
+      const result = await service.executeFlow(flowDefinition);
+      
+      // Assert
+      expect(result.status).toBe('completed');
+      expect(result.steps).toHaveLength(2);
+    });
+  });
+});
+```
+
+## Code Quality Standards
+
+### Linting and Formatting
+
+We use ESLint and Prettier to maintain code quality:
+
+```bash
+# Run linting
+npm run lint
+
+# Auto-fix linting issues
+npm run lint:fix
+
+# Format code with Prettier
+npm run format
+
+# Check formatting
+npm run format:check
+```
+
+### TypeScript Configuration
+
+Our TypeScript configuration enforces strict type safety:
+
+- **Strict mode enabled**: No `any` types allowed
+- **Null safety**: All values must handle null/undefined
+- **No unused variables**: Clean up unused imports/variables
+- **Consistent interfaces**: Use interfaces for object types
+
+Example of good TypeScript practices:
+
+```typescript
+// ✅ Good: Explicit types, null handling
+interface FlowExecutionResult {
+  id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  startedAt: Date;
+  completedAt: Date | null;
+  steps: StepResult[];
+}
+
+// ✅ Good: Proper error handling
+async function executeFlow(flowId: string): Promise<FlowExecutionResult | null> {
+  try {
+    const flow = await flowService.findById(flowId);
+    if (!flow) {
+      return null;
+    }
+    
+    return await executeFlowSteps(flow);
+  } catch (error) {
+    logger.error('Flow execution failed', { flowId, error });
+    throw new FlowExecutionError('Failed to execute flow', { cause: error });
+  }
+}
+```
+
+## CI/CD Pipeline
+
+Our GitHub Actions workflows handle continuous integration and deployment:
+
+### Workflow Overview
+
+```yaml .github/workflows/ci.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+      - run: npm ci
+      - run: npm run test:cov
+      - run: npm run lint
+      - run: npm run build
+      
+  deploy-staging:
+    needs: test
+    if: github.ref == 'refs/heads/develop'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Staging
+        run: ./scripts/deploy.sh staging
+        
+  deploy-production:
+    needs: test  
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Production
+        run: ./scripts/deploy.sh production
+```
+
+### Pipeline Stages
+
+1. **Code Quality**: Linting, formatting, type checking
+2. **Testing**: Unit, integration, and E2E tests
+3. **Security**: Dependency scanning, SAST analysis
+4. **Build**: Compile TypeScript, bundle assets
+5. **Deploy**: Automated deployment to staging/production
+
+### Deployment Process
+
+- **Staging**: Auto-deploy from `develop` branch
+- **Production**: Auto-deploy from `main` branch
+- **Manual**: Emergency deployments via GitHub Actions
+
+## Contributing Guidelines
+
+### Branch Strategy
+
+We use Git Flow with these branch types:
+
+- `main` - Production-ready code
+- `develop` - Integration branch for features
+- `feature/*` - New feature development
+- `bugfix/*` - Bug fixes
+- `hotfix/*` - Emergency production fixes
+
+### Pull Request Process
+
+1. **Create Feature Branch**
+   ```bash
+   git checkout develop
+   git pull origin develop
+   git checkout -b feature/user-authentication
+   ```
+
+2. **Development Process**
+   - Write code following our standards
+   - Add comprehensive tests
+   - Update documentation
+   - Run local quality checks
+
+3. **Create Pull Request**
+   - Use our PR template
+   - Link related issues
+   - Add relevant labels
+   - Request reviews from team members
+
+4. **Review Process**
+   - Automated CI checks must pass
+   - At least 2 team member reviews required
+   - All conversations must be resolved
+   - Squash and merge when approved
+
+### Commit Message Convention
+
+We follow Conventional Commits:
+
+```bash
+# Format: type(scope): description
+
+feat(flows): add conditional step execution
+fix(auth): resolve token validation issue
+docs(api): update endpoint documentation
+test(webhooks): add integration tests
+refactor(cache): optimize Redis connection pooling
+```
+
+Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
+
+## Development Tools and Tips
+
+### Recommended VS Code Extensions
+
+```json .vscode/extensions.json
+{
+  "recommendations": [
+    "bradlc.vscode-tailwindcss",
+    "esbenp.prettier-vscode", 
+    "ms-vscode.vscode-typescript-next",
+    "bradlc.vscode-tailwindcss",
+    "ms-vscode.vscode-json"
+  ]
+}
+```
+
+### Debugging
+
+Debug the application with these configurations:
+
+```json .vscode/launch.json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Tolstoy",
+      "type": "node", 
+      "request": "launch",
+      "program": "${workspaceFolder}/src/main.ts",
+      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "env": {
+        "NODE_ENV": "development"
+      }
+    }
+  ]
+}
+```
+
+### Database Management
+
+Common database operations:
+
+```bash
+# Create new migration
+npx prisma migrate dev --name add_user_preferences
+
+# Reset database (destructive!)
+npx prisma migrate reset
+
+# Deploy migrations to production
+npx prisma migrate deploy
+
+# Generate Prisma client after schema changes  
+npx prisma generate
+
+# View database in browser
+npx prisma studio
+```
+
+### Monitoring and Observability
+
+Access local monitoring tools:
+
+- **Application Logs**: `npm run logs:tail`
+- **Metrics Dashboard**: http://localhost:3001 (Grafana)
+- **Database Queries**: Enable query logging in development
+- **Redis Inspection**: Use Redis CLI or GUI tool
+
+## Getting Help
+
+### Team Resources
+
+<CardGroup cols={2}>
+  <Card title="Team Chat" icon="slack">
+    Join #dev-tolstoy on Slack for real-time help
+  </Card>
+  <Card title="Documentation" icon="book">
+    Browse our internal wiki for detailed guides
+  </Card>
+  <Card title="Office Hours" icon="clock">
+    Join daily standup at 9 AM PST for questions
+  </Card>
+  <Card title="Code Reviews" icon="code">
+    Schedule 1:1 code review sessions with seniors
+  </Card>
+</CardGroup>
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="Database Connection Issues">
+    ```bash
+    # Check Docker services
+    docker-compose ps
+    
+    # Restart database
+    docker-compose restart postgres
+    
+    # Check database logs
+    docker-compose logs postgres
+    ```
+  </Accordion>
+
+  <Accordion title="Redis Connection Problems">
+    ```bash
+    # Check Redis status
+    docker-compose exec redis redis-cli ping
+    
+    # Clear Redis cache
+    docker-compose exec redis redis-cli FLUSHALL
+    ```
+  </Accordion>
+
+  <Accordion title="Build Failures">
+    ```bash
+    # Clean and rebuild
+    npm run clean
+    npm install
+    npm run build
+    
+    # Clear TypeScript cache
+    rm -rf node_modules/.cache
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+Now that you're set up, here are some recommended next steps:
+
+1. **Explore the Codebase**: Start with the main modules and trace through a simple flow execution
+2. **Run the Test Suite**: Understand our testing patterns by examining existing tests
+3. **Pick a First Issue**: Look for issues labeled `good-first-issue` in our GitHub repo
+4. **Join Team Meetings**: Attend standups, planning, and architecture discussions
+5. **Read Architecture Docs**: Review our technical decision records and system design docs
+
+Welcome to the team! 🚀
+
+<Card title="Ready for Your First Contribution?" icon="rocket" href="/contributing">
+  Check out our detailed contributing guide to make your first pull request
+</Card>
