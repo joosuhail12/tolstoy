@@ -25,6 +25,8 @@ model Organization {
   webhooks            Webhook[]
   executionLogs       ExecutionLog[]
   webhookDispatchLogs WebhookDispatchLog[]
+  toolAuthConfigs     ToolAuthConfig[]
+  userCredentials     UserCredential[]
 }
 
 model User {
@@ -36,6 +38,7 @@ model User {
 
   organization  Organization @relation(fields: [orgId], references: [id])
   executionLogs ExecutionLog[]
+  userCredentials UserCredential[]
 }
 
 model Tool {
@@ -48,8 +51,10 @@ model Tool {
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
-  organization  Organization @relation(fields: [orgId], references: [id])
-  actions       Action[]
+  organization    Organization     @relation(fields: [orgId], references: [id])
+  actions         Action[]
+  toolAuthConfigs ToolAuthConfig[]
+  userCredentials UserCredential[]
 }
 
 model Action {
@@ -146,4 +151,39 @@ model WebhookDispatchLog {
   @@index([orgId, createdAt])
   @@index([webhookId, createdAt])
   @@index([eventType, createdAt])
+}
+
+model ToolAuthConfig {
+  id        String   @id @default(cuid())
+  orgId     String
+  toolId    String
+  type      String   // "apiKey" | "oauth2"
+  config    Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tool         Tool         @relation(fields: [toolId], references: [id])
+  organization Organization @relation(fields: [orgId], references: [id])
+
+  @@unique([orgId, toolId])
+  @@index([orgId])
+}
+
+model UserCredential {
+  id           String   @id @default(cuid())
+  orgId        String
+  userId       String
+  toolId       String
+  accessToken  String
+  refreshToken String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tool         Tool         @relation(fields: [toolId], references: [id])
+  organization Organization @relation(fields: [orgId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+
+  @@unique([orgId, userId, toolId])
+  @@index([orgId, userId])
 }
