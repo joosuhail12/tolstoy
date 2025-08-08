@@ -1,16 +1,13 @@
 {
-  "project": "tolstoy",
+  "project": "tolstoy-api",
   "openapi_spec": "docs/openapi.json",
-  "stainless_config": "stainless.yml",
+  "stainless_config": "./stainless.yml",
   "targets": {
-    "typescript": {
-      "output_path": "./tolstoy-typescript"
-    },
     "python": {
-      "output_path": "./tolstoy-python"
+      "output_path": "./tolstoy-api-python"
     },
-    "go": {
-      "output_path": "./tolstoy-go"
+    "typescript": {
+      "output_path": "./tolstoy-api-typescript"
     }
   }
 }

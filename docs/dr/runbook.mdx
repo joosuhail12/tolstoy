@@ -1,0 +1,438 @@
+---
+title: Disaster Recovery Runbook
+description: Comprehensive disaster recovery procedures for Tolstoy workflow automation platform
+sidebar_position: 6
+---
+
+# 🚨 Disaster Recovery Runbook
+
+> **Critical Information**: This runbook provides step-by-step procedures to restore Tolstoy services in case of disasters. Keep this document accessible during emergencies.
+
+## 📋 Overview
+
+**Recovery Time Objective (RTO)**: 4 hours  
+**Recovery Point Objective (RPO)**: 24 hours  
+**Last Updated**: {new Date().toISOString().split('T')[0]}
+
+### Quick Reference
+- **Backup Schedule**: Daily at 02:00 UTC
+- **Backup Retention**: 30 days (S3 lifecycle)
+- **Backup Location**: `s3://tolstoy-backups-prod-[suffix]/backups/`
+- **State Management**: HCP Terraform Cloud
+- **Monitoring**: CloudWatch Dashboard & SNS Alerts
+
+---
+
+## 🚨 Emergency Contacts
+
+### Primary Response Team
+- **DevOps Lead**: [Your Contact]
+- **Database Admin**: [Your Contact] 
+- **Engineering Lead**: [Your Contact]
+- **Management**: [Your Contact]
+
+### Escalation Chain
+1. **Level 1**: DevOps Team (30 minutes)
+2. **Level 2**: Engineering Management (1 hour)
+3. **Level 3**: Executive Team (2 hours)
+
+---
+
+## 📊 Disaster Classification
+
+### Severity Levels
+
+**🔴 Critical (P0)**
+- Complete service outage
+- Data corruption/loss
+- Security breach
+
+**🟡 High (P1)**
+- Degraded performance
+- Partial service unavailable
+- Non-critical component failure
+
+**🟢 Medium (P2)**
+- Minor issues
+- Backup failures
+- Monitoring alerts
+
+---
+
+## 1️⃣ Database Recovery
+
+### Prerequisites
+- AWS CLI configured with appropriate permissions
+- Access to AWS Secrets Manager (`tolstoy/env`, `conductor-db-secret`)
+- Neon PostgreSQL access credentials
+
+### 1.1 List Available Backups
+
+```bash
+# List recent backups
+aws s3 ls s3://tolstoy-backups-prod-[suffix]/backups/ --human-readable --summarize
+
+# Find specific backup by date
+aws s3 ls s3://tolstoy-backups-prod-[suffix]/backups/ | grep "2025-08-"
+```
+
+### 1.2 Download Backup
+
+```bash
+# Download latest backup
+LATEST_BACKUP=$(aws s3 ls s3://tolstoy-backups-prod-[suffix]/backups/ --recursive | sort | tail -n 1 | awk '{print $4}')
+aws s3 cp s3://tolstoy-backups-prod-[suffix]/$LATEST_BACKUP ./latest-backup.sql.gz
+
+# Or download specific backup
+aws s3 cp s3://tolstoy-backups-prod-[suffix]/backups/neon-backup-2025-08-08T02-00-00-000Z.sql.gz ./backup.sql.gz
+```
+
+### 1.3 Restore Database
+
+:::warning
+**CRITICAL**: Restoring will overwrite existing data. Ensure you have confirmed data loss before proceeding.
+:::
+
+```bash
+# Extract backup
+gunzip backup.sql.gz
+
+# Get database connection string
+DATABASE_URL=$(aws secretsmanager get-secret-value \
+  --secret-id "conductor-db-secret" \
+  --region us-east-1 \
+  --query 'SecretString' \
+  --output text | jq -r '.DATABASE_URL')
+
+# Alternative: Use tolstoy/env secret
+DATABASE_URL=$(aws secretsmanager get-secret-value \
+  --secret-id "tolstoy/env" \
+  --region us-east-1 \
+  --query 'SecretString' \
+  --output text | jq -r '.DATABASE_URL')
+
+# Restore database (pg_restore for custom format)
+pg_restore --clean --if-exists --no-owner --no-privileges \
+  --host=<neon-host> --port=5432 --username=<username> \
+  --dbname=<database> --verbose backup.sql
+
+# For SQL format backups
+# psql $DATABASE_URL < backup.sql
+```
+
+### 1.4 Verify Database Restoration
+
+```bash
+# Test database connection
+psql $DATABASE_URL -c "SELECT version();"
+
+# Check table counts (compare with pre-disaster state)
+psql $DATABASE_URL -c "\dt+"
+
+# Verify recent data
+psql $DATABASE_URL -c "SELECT COUNT(*) FROM flows WHERE created_at >= NOW() - INTERVAL '7 days';"
+```
+
+---
+
+## 2️⃣ Infrastructure Recovery
+
+### 2.1 Terraform State Recovery
+
+**Current Setup**: HCP Terraform Cloud (Primary)
+
+#### Option A: HCP Terraform Cloud Recovery
+
+```bash
+# Verify HCP Terraform access
+terraform login
+
+# Navigate to terraform directory
+cd terraform
+
+# Initialize from HCP Terraform Cloud
+terraform init
+
+# Verify state
+terraform show
+
+# Plan recovery
+terraform plan
+```
+
+#### Option B: Fallback S3 Backend (If HCP Terraform Cloud unavailable)
+
+```bash
+# Check if fallback state exists
+aws s3 ls s3://tolstoy-tfstate-backup-prod-[suffix]/
+
+# Update main.tf backend configuration (use s3_backend_config.tf.example)
+# Replace cloud block with S3 backend configuration
+
+# Initialize with S3 backend
+terraform init -migrate-state
+
+# Verify state
+terraform show
+```
+
+### 2.2 Infrastructure Redeployment
+
+```bash
+# Review current state
+terraform plan
+
+# Apply infrastructure changes
+terraform apply
+
+# Verify critical resources
+terraform output api_gateway_invoke_url
+terraform output hcp_console_urls
+```
+
+### 2.3 Verify AWS Resources
+
+```bash
+# Check API Gateway
+curl -I $(terraform output -raw api_gateway_invoke_url)/health
+
+# Check Lambda functions
+aws lambda list-functions --query 'Functions[?contains(FunctionName, `tolstoy`)].{Name:FunctionName,Status:State}'
+
+# Check S3 buckets
+aws s3 ls | grep tolstoy
+
+# Check backup functionality
+aws lambda invoke --function-name tolstoy-backup-prod response.json
+cat response.json
+```
+
+---
+
+## 3️⃣ Application Recovery
+
+### 3.1 EC2 Instance Recovery
+
+```bash
+# Check EC2 instance status
+aws ec2 describe-instances --instance-ids i-0ea0ff0e9a8db29d4
+
+# Connect to EC2 instance
+ssh -i ~/.ssh/your-key.pem ubuntu@$(terraform output -raw backend_public_ip)
+
+# Check application status
+sudo systemctl status tolstoy
+sudo journalctl -u tolstoy -f
+```
+
+### 3.2 Environment Variables & Secrets
+
+```bash
+# Verify secrets are accessible
+aws secretsmanager get-secret-value --secret-id "tolstoy/env" --region us-east-1
+aws secretsmanager get-secret-value --secret-id "conductor-db-secret" --region us-east-1
+
+# Update application environment if needed
+sudo systemctl restart tolstoy
+```
+
+### 3.3 Application Smoke Tests
+
+```bash
+# Health checks
+curl $(terraform output -raw api_gateway_url)/health
+curl $(terraform output -raw api_gateway_url)/status/detailed
+
+# API functionality test
+curl -X POST $(terraform output -raw api_gateway_url)/flows \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: test-org" \
+  -H "x-user-id: test-user" \
+  -d '{"name":"test-flow","description":"DR test"}'
+```
+
+---
+
+## 4️⃣ SDK & Integration Recovery
+
+### 4.1 Stainless SDK Status
+
+```bash
+# Check Stainless project status
+curl -I https://stainless.app/projects/tolstoy-api/releases/latest/openapi.json
+
+# Verify SDK repositories
+curl -I https://api.github.com/repos/stainless-sdks/tolstoy-api-typescript
+curl -I https://api.github.com/repos/stainless-sdks/tolstoy-api-python
+```
+
+### 4.2 GitHub Actions Recovery
+
+```bash
+# Check workflow status
+gh workflow list --repo joosuhail12/tolstoy
+
+# Trigger documentation update if needed
+gh workflow run "Update API Documentation with Stainless" --repo joosuhail12/tolstoy
+```
+
+---
+
+## 5️⃣ Monitoring & Validation
+
+### 5.1 CloudWatch Dashboard Verification
+
+1. Open [CloudWatch Dashboard](https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1#dashboards:name=Tolstoy-Backup-prod)
+2. Verify backup success metrics
+3. Check Lambda function metrics
+4. Review recent logs
+
+### 5.2 SNS Notifications Setup
+
+```bash
+# Test SNS notifications
+aws sns publish \
+  --topic-arn $(terraform output -raw backup_notification_topic_arn) \
+  --message "DR Test: Tolstoy system recovery complete" \
+  --subject "Tolstoy DR Test Alert"
+```
+
+### 5.3 End-to-End Validation
+
+```bash
+# Create test flow via SDK (if available)
+npx tolstoy-api flows create \
+  --org-id "dr-test" \
+  --name "dr-validation-flow" \
+  --description "Disaster recovery validation test"
+
+# Run test flow
+npx tolstoy-api flows execute \
+  --flow-id <flow-id> \
+  --variables '{"test": true}'
+```
+
+---
+
+## 6️⃣ Post-Recovery Checklist
+
+### ✅ Immediate Actions (0-30 minutes)
+- [ ] Database restored and accessible
+- [ ] API Gateway responding to health checks
+- [ ] Core application functionality verified
+- [ ] Critical alerts cleared
+
+### ✅ Short-term Actions (30 minutes - 2 hours)
+- [ ] All infrastructure components operational
+- [ ] Backup systems re-enabled and tested
+- [ ] Monitoring dashboards updated
+- [ ] SDK integrations verified
+- [ ] Documentation updated with incident details
+
+### ✅ Long-term Actions (2-24 hours)
+- [ ] Full system load testing
+- [ ] Performance metrics baseline re-established
+- [ ] Incident post-mortem scheduled
+- [ ] DR procedures updated based on lessons learned
+- [ ] Team debriefing completed
+
+---
+
+## 📚 Additional Resources
+
+### Documentation Links
+- [AWS Deployment Guide](../aws-deployment-guide.md)
+- [AWS IAM Permissions](../aws-iam-permissions.md) 
+- [Secrets Manager Guide](../aws-secrets-manager-guide.md)
+- [Stainless Integration](../STAINLESS_INTEGRATION.md)
+
+### Monitoring URLs
+- **HCP Terraform Cloud**: https://app.terraform.io/app/tolstoy-org/tolstoy-api-gateway-prod
+- **AWS CloudWatch**: https://us-east-1.console.aws.amazon.com/cloudwatch/home?region=us-east-1
+- **Stainless Project**: https://stainless.app/projects/tolstoy-api
+- **API Gateway Console**: https://us-east-1.console.aws.amazon.com/apigateway/home?region=us-east-1
+
+### CLI Commands Reference
+
+```bash
+# Essential AWS CLI Commands
+aws sts get-caller-identity                          # Verify AWS access
+aws s3 ls s3://tolstoy-backups-prod-*/backups/      # List backups
+aws lambda invoke --function-name tolstoy-backup-prod response.json  # Test backup
+aws cloudwatch get-dashboard --dashboard-name Tolstoy-Backup-prod    # Get dashboard
+
+# Essential Terraform Commands
+terraform init                                       # Initialize
+terraform plan                                       # Plan changes
+terraform apply                                      # Apply changes
+terraform output                                     # Show outputs
+terraform state list                                 # List resources
+```
+
+---
+
+## 🔄 Recovery Time Estimates
+
+| Component | Estimated Recovery Time |
+|-----------|----------------------|
+| Database Restore | 30-60 minutes |
+| Infrastructure Deploy | 15-30 minutes |  
+| Application Recovery | 10-20 minutes |
+| End-to-End Validation | 30-45 minutes |
+| **Total RTO** | **~4 hours** |
+
+---
+
+## 📞 Vendor Support Contacts
+
+- **AWS Support**: [Your AWS Support Plan]
+- **Neon Support**: support@neon.tech
+- **HCP Support**: support@hashicorp.com
+- **Stainless Support**: support@stainless.app
+
+---
+
+## 📝 Incident Logging Template
+
+```markdown
+## Incident Report: [YYYY-MM-DD]
+
+**Incident ID**: TOL-[DATE]-[NUMBER]  
+**Start Time**: [UTC Timestamp]  
+**End Time**: [UTC Timestamp]  
+**Duration**: [Time]  
+**Severity**: P[0-2]
+
+### Impact
+- Services Affected: 
+- User Impact:
+- Data Impact:
+
+### Root Cause
+[Detailed root cause analysis]
+
+### Resolution Steps
+1. [Step 1]
+2. [Step 2] 
+3. [Step 3]
+
+### Lessons Learned
+- [Lesson 1]
+- [Lesson 2]
+
+### Action Items
+- [ ] [Action item with owner and due date]
+- [ ] [Action item with owner and due date]
+```
+
+---
+
+:::tip
+**Remember**: Practice makes perfect. Run DR drills quarterly to ensure procedures work and team familiarity.
+:::
+
+:::warning
+**Security Note**: Never commit credentials to version control. Always use AWS Secrets Manager or environment variables.
+:::
+
+*Last Updated: {new Date().toISOString().split('T')[0]} | Version: 1.0*

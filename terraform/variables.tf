@@ -383,3 +383,94 @@ variable "waf_log_retention_days" {
   type        = number
   default     = 7
 }
+
+# Backup Configuration Variables
+variable "backup_schedule" {
+  description = "EventBridge schedule expression for database backups"
+  type        = string
+  default     = "cron(0 2 * * ? *)" # Daily at 2 AM UTC
+  
+  validation {
+    condition = can(regex("^(rate\\(|cron\\()", var.backup_schedule))
+    error_message = "Backup schedule must be a valid EventBridge schedule expression."
+  }
+}
+
+variable "backup_retention_days" {
+  description = "Number of days to retain database backups in S3"
+  type        = number
+  default     = 30
+  
+  validation {
+    condition     = var.backup_retention_days >= 7 && var.backup_retention_days <= 365
+    error_message = "Backup retention must be between 7 and 365 days."
+  }
+}
+
+variable "enable_cross_region_backup" {
+  description = "Enable cross-region replication for database backups"
+  type        = bool
+  default     = false
+}
+
+variable "backup_replica_region" {
+  description = "AWS region for backup replication (if enabled)"
+  type        = string
+  default     = "us-west-2"
+}
+
+variable "enable_manual_backup" {
+  description = "Create a manual backup Lambda function for on-demand backups"
+  type        = bool
+  default     = true
+}
+
+variable "lambda_subnet_ids" {
+  description = "Subnet IDs for Lambda VPC configuration (optional)"
+  type        = list(string)
+  default     = null
+}
+
+variable "lambda_security_group_ids" {
+  description = "Security Group IDs for Lambda VPC configuration (optional)"
+  type        = list(string)
+  default     = null
+}
+
+# State Management Configuration Variables
+variable "enable_state_backup" {
+  description = "Enable S3 + DynamoDB fallback state management"
+  type        = bool
+  default     = false
+}
+
+variable "enable_cross_region_state_backup" {
+  description = "Enable cross-region replication for Terraform state backup"
+  type        = bool
+  default     = false
+}
+
+variable "tfc_token" {
+  description = "Terraform Cloud API token for state backup (optional)"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# Notification Configuration
+variable "backup_notification_email" {
+  description = "Email address for backup failure notifications"
+  type        = string
+  default     = ""
+  
+  validation {
+    condition = var.backup_notification_email == "" || can(regex("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", var.backup_notification_email))
+    error_message = "Must be a valid email address or empty string."
+  }
+}
+
+variable "enable_backup_notifications" {
+  description = "Enable SNS notifications for backup status"
+  type        = bool
+  default     = true
+}

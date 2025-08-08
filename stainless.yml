@@ -1,50 +1,177 @@
-# Stainless SDK Configuration for Tolstoy API
-# This configuration enables automatic SDK code sample generation for Mintlify documentation
+# yaml-language-server: $schema=https://app.stainless.com/config.schema.json
 
-project: tolstoy
+organization:
+  # Name of your organization or company, used to determine the name of the client
+  # and headings.
+  name: tolstoy-api
+  # Link to your API documentation.
+  docs: ''
+  # Contact email for bug reports, questions, and support requests.
+  contact: ''
 
-# OpenAPI specification configuration
-openapi:
-  # Generate code samples in Mintlify-compatible format
-  code_samples: 'mintlify'
-  
-  # Specify which programming languages to generate samples for
-  languages:
-    - typescript  # Primary SDK language for JavaScript/Node.js
-    - python      # Popular for automation and integrations
-    - go          # Enterprise backend language
-    - curl        # Universal HTTP client testing
+# `targets` define the output targets and their customization options, such as
+# whether to emit the Node SDK and what it's package name should be.
+targets:
+  typescript:
+    package_name: tolstoy-api
+    production_repo: null
+    publish:
+      npm: false
+  python:
+    package_name: tolstoy_api
+    production_repo: null
+    publish:
+      pypi: false
 
-# SDK generation settings (optional - for future SDK generation)
-sdk:
-  # Package names for different languages
-  package_name:
-    typescript: "@tolstoy/sdk"
-    python: "tolstoy-python" 
-    go: "github.com/tolstoy/go-sdk"
+# `environments` are a map of the name of the environment (e.g. "sandbox",
+# "production") to the corresponding url to use.
+environments:
+  production: https://tolstoy.getpullse.com
+  environment_1: http://localhost:3000
 
-# Documentation settings
-docs:
-  # Include authentication examples in code samples
-  include_auth: true
-  
-  # Multi-tenant header configuration for code samples
-  auth_headers:
-    - "x-org-id"
-    - "x-user-id"
-  
-  # Base URLs for different environments
-  base_urls:
-    production: "https://tolstoy.getpullse.com"
-    development: "http://localhost:3000"
+# `resources` define the structure and organization for your API, such as how
+# methods and models are grouped together and accessed. See the [configuration
+# guide] for more information.
+#
+# [configuration guide]: https://www.stainless.com/docs/guides/configure#resources
+resources:
+  status:
+    # Configure the methods defined in this resource. Each key in the object is the
+    # name of the method and the value is either an endpoint (for example, `get /foo`)
+    # or an object with more detail.
+    #
+    # [reference]: https://www.stainless.com/docs/reference/config#method
+    methods:
+      retrieve: get /status
+      retrieve_detailed: get /status/detailed
 
-# Code sample customization
-code_samples:
-  # Include realistic workflow automation examples
-  realistic_examples: true
-  
-  # Show error handling in code samples
-  include_error_handling: true
-  
-  # Include TypeScript types in samples
-  include_types: true
+  organizations:
+    methods:
+      create: post /organizations
+      list: get /organizations
+      retrieve: get /organizations/{id}
+      update: put /organizations/{id}
+      delete: delete /organizations/{id}
+
+  users:
+    methods:
+      create: post /users
+      list: get /users
+      retrieve: get /users/{id}
+      update: put /users/{id}
+      delete: delete /users/{id}
+
+  tools:
+    methods:
+      create: post /tools
+      list: get /tools
+      retrieve: get /tools/{id}
+      update: put /tools/{id}
+      delete: delete /tools/{id}
+    # Subresources define resources that are nested within another for more powerful
+    # logical groupings, e.g. `cards.payments`.
+    subresources:
+      secrets:
+        methods:
+          store: post /tools/{toolId}/secrets
+          retrieve: get /tools/{toolId}/secrets
+          delete: delete /tools/{toolId}/secrets
+          list: get /tools/secrets
+
+  actions:
+    methods:
+      create: post /actions
+      list: get /actions
+      retrieve: get /actions/{id}
+      update: put /actions/{id}
+      delete: delete /actions/{id}
+
+  flows:
+    methods:
+      create: post /flows
+      list: get /flows
+      retrieve: get /flows/{id}
+      update: put /flows/{id}
+      delete: delete /flows/{id}
+      execute: post /flows/{id}/execute
+      get_metrics: get /flows/{id}/metrics
+    subresources:
+      executions:
+        methods:
+          list: get /flows/{id}/executions
+          retrieve: get /flows/{id}/executions/{executionId}
+          cancel: post /flows/{id}/executions/{executionId}/cancel
+          retry: post /flows/{id}/executions/{executionId}/retry
+
+  execution_logs:
+    methods:
+      create: post /execution-logs
+      list: get /execution-logs
+      retrieve: get /execution-logs/{id}
+      update: put /execution-logs/{id}
+      delete: delete /execution-logs/{id}
+
+  webhooks:
+    methods:
+      create: post /webhooks
+      list: get /webhooks
+      get_valid_event_types: get /webhooks/event-types
+      retrieve: get /webhooks/{id}
+      update: put /webhooks/{id}
+      delete: delete /webhooks/{id}
+      toggle: patch /webhooks/{id}/toggle
+      test: post /webhooks/{id}/test
+
+  $client:
+    methods:
+      get_welcome_message: get /
+
+  health:
+    methods:
+      check: get /health
+
+settings:
+  # All generated integration tests that hit the prism mock http server are marked
+  # as skipped. Removing this setting or setting it to false enables tests, but
+  # doing so may result in test failures due to bugs in the test server.
+  #
+  # [prism mock http server]: https://stoplight.io/open-source/prism
+  disable_mock_tests: true
+  license: Apache-2.0
+
+# `client_settings` define settings for the API client, such as extra constructor
+# arguments (used for authentication), retry behavior, idempotency, etc.
+client_settings:
+  opts:
+    org_id:
+      type: string
+      nullable: false
+      auth:
+        security_scheme: x-org-id
+      description: Organization ID for multi-tenant access
+      read_env: TOLSTOY_API_ORG_ID
+    user_id:
+      type: string
+      nullable: false
+      auth:
+        security_scheme: x-user-id
+      description: User ID for request context
+      read_env: TOLSTOY_API_USER_ID
+
+security:
+  - x-org-id: []
+    x-user-id: []
+
+# `readme` is used to configure the code snippets that will be rendered in the
+# README.md of various SDKs. In particular, you can change the `headline`
+# snippet's endpoint and the arguments to call it with.
+readme:
+  example_requests:
+    default:
+      type: request
+      endpoint: get /status
+      params: {}
+    headline:
+      type: request
+      endpoint: get /status
+      params: {}
