@@ -1,6 +1,7 @@
 import { Injectable, InternalServerErrorException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
+import * as Sentry from '@sentry/nestjs';
 import { DaytonaClientImpl } from './daytona-client';
 import { AwsSecretsService } from '../aws-secrets.service';
 import { ExecutionContext } from './interfaces/daytona-client.interface';
@@ -68,35 +69,22 @@ export class SandboxService {
   async runSync(code: string, context: SandboxExecutionContext): Promise<SandboxExecutionResult> {
     const { orgId, userId, flowId, stepId, executionId } = context;
 
-    this.logger.info(
+    // Start Sentry performance span for sandbox execution
+    return await Sentry.startSpan(
       {
-        orgId,
-        userId,
-        flowId,
-        stepId,
-        executionId,
-        codeLength: code.length,
-        mode: 'sync',
+        op: 'sandbox.execute.sync',
+        name: 'Sandbox Sync Execution',
+        attributes: {
+          'sandbox.mode': 'sync',
+          'sandbox.code_length': code.length,
+          'sandbox.language': this.detectLanguage(code),
+          'org.id': orgId,
+          'flow.id': flowId,
+          'step.id': stepId,
+          'execution.id': executionId,
+        },
       },
-      'Starting synchronous sandbox execution',
-    );
-
-    try {
-      const daytonaResult = await this.client.run({
-        code,
-        context: this.buildExecutionContext(context),
-        language: this.detectLanguage(code),
-        timeout: await this.getSyncTimeout(),
-      });
-
-      const result: SandboxExecutionResult = {
-        success: daytonaResult.success,
-        output: daytonaResult.output,
-        error: daytonaResult.error,
-        executionTime: daytonaResult.executionTime,
-      };
-
-      if (result.success) {
+      async () => {
         this.logger.info(
           {
             orgId,
@@ -104,47 +92,110 @@ export class SandboxService {
             flowId,
             stepId,
             executionId,
-            executionTime: result.executionTime,
+            codeLength: code.length,
             mode: 'sync',
           },
-          'Synchronous sandbox execution completed successfully',
+          'Starting synchronous sandbox execution',
         );
-      } else {
-        this.logger.warn(
-          {
-            orgId,
-            userId,
-            flowId,
-            stepId,
-            executionId,
-            error: result.error?.message,
-            executionTime: result.executionTime,
-            mode: 'sync',
-          },
-          'Synchronous sandbox execution failed',
-        );
-      }
 
-      return result;
-    } catch (error) {
-      this.logger.error(
-        {
-          orgId,
-          userId,
-          flowId,
-          stepId,
-          executionId,
-          error: error instanceof Error ? error.message : 'Unknown error',
-          mode: 'sync',
-        },
-        'Synchronous sandbox execution error',
-      );
+        try {
+          const daytonaResult = await this.client.run({
+            code,
+            context: this.buildExecutionContext(context),
+            language: this.detectLanguage(code),
+            timeout: await this.getSyncTimeout(),
+          });
 
-      throw new InternalServerErrorException(
-        `Sandbox sync execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error,
-      );
-    }
+          const result: SandboxExecutionResult = {
+            success: daytonaResult.success,
+            output: daytonaResult.output,
+            error: daytonaResult.error,
+            executionTime: daytonaResult.executionTime,
+          };
+
+          if (result.success) {
+            this.logger.info(
+              {
+                orgId,
+                userId,
+                flowId,
+                stepId,
+                executionId,
+                executionTime: result.executionTime,
+                mode: 'sync',
+              },
+              'Synchronous sandbox execution completed successfully',
+            );
+          } else {
+            this.logger.warn(
+              {
+                orgId,
+                userId,
+                flowId,
+                stepId,
+                executionId,
+                error: result.error?.message,
+                executionTime: result.executionTime,
+                mode: 'sync',
+              },
+              'Synchronous sandbox execution failed',
+            );
+          }
+
+          return result;
+        } catch (error) {
+          this.logger.error(
+            {
+              orgId,
+              userId,
+              flowId,
+              stepId,
+              executionId,
+              error: error instanceof Error ? error.message : 'Unknown error',
+              mode: 'sync',
+            },
+            'Synchronous sandbox execution error',
+          );
+
+          // Capture sandbox execution error in Sentry
+          const syncTimeout = await this.getSyncTimeout();
+          Sentry.withScope(scope => {
+            scope.setTag('orgId', orgId);
+            scope.setTag('userId', userId);
+            scope.setTag('flowId', flowId);
+            scope.setTag('stepId', stepId);
+            scope.setTag('executionId', executionId);
+            scope.setTag('errorType', 'sandbox-sync-execution');
+
+            scope.setContext('sandboxExecution', {
+              mode: 'sync',
+              codeLength: code.length,
+              codeSnippet: this.sanitizeCodeSnippet(code),
+              language: this.detectLanguage(code),
+              timeout: syncTimeout,
+            });
+
+            scope.setContext('executionContext', {
+              orgId,
+              userId,
+              flowId,
+              stepId,
+              executionId,
+              variableKeys: context.variables ? Object.keys(context.variables) : [],
+              stepOutputKeys: context.stepOutputs ? Object.keys(context.stepOutputs) : [],
+            });
+
+            scope.setLevel('error');
+            Sentry.captureException(error);
+          });
+
+          throw new InternalServerErrorException(
+            `Sandbox sync execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+            error,
+          );
+        }
+      },
+    );
   }
 
   /**
@@ -205,6 +256,36 @@ export class SandboxService {
         },
         'Failed to start asynchronous sandbox execution',
       );
+
+      // Capture async sandbox execution error in Sentry
+      Sentry.withScope(scope => {
+        scope.setTag('orgId', orgId);
+        scope.setTag('userId', userId);
+        scope.setTag('flowId', flowId);
+        scope.setTag('stepId', stepId);
+        scope.setTag('executionId', executionId);
+        scope.setTag('errorType', 'sandbox-async-start');
+
+        scope.setContext('sandboxExecution', {
+          mode: 'async',
+          codeLength: code.length,
+          codeSnippet: this.sanitizeCodeSnippet(code),
+          language: this.detectLanguage(code),
+        });
+
+        scope.setContext('executionContext', {
+          orgId,
+          userId,
+          flowId,
+          stepId,
+          executionId,
+          variableKeys: context.variables ? Object.keys(context.variables) : [],
+          stepOutputKeys: context.stepOutputs ? Object.keys(context.stepOutputs) : [],
+        });
+
+        scope.setLevel('error');
+        Sentry.captureException(error);
+      });
 
       throw new InternalServerErrorException(
         `Sandbox async execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -457,5 +538,26 @@ export class SandboxService {
       // Fall back to environment variable
     }
     return this.configService.get('DAYTONA_ASYNC_TIMEOUT') || 300000;
+  }
+
+  /**
+   * Sanitize code snippet to remove sensitive information for Sentry
+   */
+  private sanitizeCodeSnippet(code: string): string {
+    const maxLength = 500; // Limit code snippet length
+    let sanitized = code.length > maxLength ? code.substring(0, maxLength) + '...' : code;
+
+    // Replace potential sensitive patterns
+    const sensitivePatterns = [
+      /(['"`])(?:password|token|key|secret|auth)[^=]*=\s*['"`][^'"`]+\1/gi,
+      /(['"`])[a-zA-Z0-9+/]{20,}\1/g, // Base64-like strings
+      /(['"`])[A-Za-z0-9]{20,}\1/g, // API keys pattern
+    ];
+
+    sensitivePatterns.forEach(pattern => {
+      sanitized = sanitized.replace(pattern, '"[REDACTED]"');
+    });
+
+    return sanitized;
   }
 }

@@ -5,7 +5,7 @@ export interface HealthCheck {
   status: 'healthy' | 'unhealthy';
   message: string;
   timestamp: string;
-  details?: any;
+  details?: Record<string, unknown>;
 }
 
 export interface DatabaseHealthCheck extends HealthCheck {
@@ -53,8 +53,8 @@ export class HealthService {
   async getDetailedHealthStatus(): Promise<{
     application: HealthCheck;
     database: DatabaseHealthCheck;
-    environment: any;
-    system: any;
+    environment: Record<string, unknown>;
+    system: Record<string, unknown>;
   }> {
     const timestamp = new Date().toISOString();
 

@@ -3,7 +3,9 @@ import { HttpModule } from '@nestjs/axios';
 import { DispatchWebhookHandler } from './dispatch-webhook.handler';
 import { WebhooksService } from './webhooks.service';
 import { WebhookSignatureService } from './webhook-signature.service';
+import { WebhookDispatchLogService } from './webhook-dispatch-log.service';
 import { PrismaService } from '../prisma.service';
+import { MetricsModule } from '../metrics/metrics.module';
 
 @Module({
   imports: [
@@ -12,8 +14,15 @@ import { PrismaService } from '../prisma.service';
       maxRedirects: 3,
       validateStatus: status => status < 500, // Don't throw on 4xx errors, let handler decide
     }),
+    MetricsModule,
   ],
-  providers: [DispatchWebhookHandler, WebhooksService, WebhookSignatureService, PrismaService],
+  providers: [
+    DispatchWebhookHandler,
+    WebhooksService,
+    WebhookSignatureService,
+    WebhookDispatchLogService,
+    PrismaService,
+  ],
   exports: [DispatchWebhookHandler],
 })
 export class DispatchWebhookModule {}

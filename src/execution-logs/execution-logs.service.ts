@@ -159,7 +159,7 @@ export class ExecutionLogsService {
         data: updateExecutionLogDto,
       });
     } catch (error) {
-      if (error instanceof Error && (error as any).code === 'P2025') {
+      if (error instanceof Error && 'code' in error && error.code === 'P2025') {
         throw new NotFoundException(`Execution log with ID ${id} not found`);
       }
       throw error;
@@ -174,7 +174,7 @@ export class ExecutionLogsService {
         where: { id },
       });
     } catch (error) {
-      if (error instanceof Error && (error as any).code === 'P2025') {
+      if (error instanceof Error && 'code' in error && error.code === 'P2025') {
         throw new NotFoundException(`Execution log with ID ${id} not found`);
       }
       throw error;
@@ -196,8 +196,8 @@ export class ExecutionLogsService {
         stepKey: data.stepKey,
         inputs: data.inputs as unknown as Prisma.InputJsonValue,
         status: data.status || 'started',
-        outputs: null,
-        error: null,
+        outputs: undefined,
+        error: undefined,
       },
     });
   }
@@ -259,7 +259,7 @@ export class ExecutionLogsService {
     return this.updateStepStatus(logId, 'failed', {
       error: {
         message: (error as Error)?.message || 'Unknown error',
-        code: (error as { code?: string })?.code,
+        code: (error as { code?: string })?.code || 'UNKNOWN_ERROR',
         stack: (error as Error)?.stack,
         ...(typeof error === 'object' && error !== null ? error : {}),
       },

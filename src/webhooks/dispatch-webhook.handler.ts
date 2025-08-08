@@ -4,6 +4,12 @@ import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InngestFunction } from 'nestjs-inngest';
 import { WebhooksService } from './webhooks.service';
 import { WebhookSignatureService, WebhookPayload } from './webhook-signature.service';
+import { WebhookDispatchLogService } from './webhook-dispatch-log.service';
+import {
+  MetricsService,
+  WebhookMetricLabels,
+  WebhookCounterLabels,
+} from '../metrics/metrics.service';
 import { firstValueFrom } from 'rxjs';
 
 export interface WebhookEventPayload {
@@ -30,7 +36,7 @@ export interface WebhookDispatchEvent {
 }
 
 export interface InngestStepContext {
-  run: <T>(name: string, fn: () => Promise<T>) => Promise<T>;
+  run: (name: string, fn: () => Promise<unknown>) => Promise<unknown>;
 }
 
 export interface InngestEvent {
@@ -48,6 +54,8 @@ export class DispatchWebhookHandler {
     private readonly webhookService: WebhooksService,
     private readonly webhookSignatureService: WebhookSignatureService,
     private readonly httpService: HttpService,
+    private readonly metricsService: MetricsService,
+    private readonly webhookDispatchLogService: WebhookDispatchLogService,
     @InjectPinoLogger(DispatchWebhookHandler.name)
     private readonly logger: PinoLogger,
   ) {}
@@ -71,7 +79,7 @@ export class DispatchWebhookHandler {
       return this.webhookService.getWebhooksForEvent(orgId, eventType);
     });
 
-    if (webhooks.length === 0) {
+    if (!Array.isArray(webhooks) || webhooks.length === 0) {
       this.logger.debug({ orgId, eventType }, 'No webhooks found for event type');
       return { dispatched: 0, results: [] };
     }
@@ -81,11 +89,32 @@ export class DispatchWebhookHandler {
       'Found webhooks for dispatch',
     );
 
-    const results = [];
+    const results: Array<{
+      success: boolean;
+      webhookId: string;
+      url: string;
+      statusCode?: number;
+      deliveryId: string;
+      duration: number;
+    }> = [];
 
     // Dispatch to each webhook with individual retry logic
     for (const webhook of webhooks) {
       const result = await step.run(`webhook-${webhook.id}`, async () => {
+        const startTime = Date.now();
+
+        // Prepare metrics labels
+        const metricLabels: WebhookMetricLabels = {
+          orgId,
+          eventType,
+          url: webhook.url,
+        };
+
+        // Start metrics timer
+        const endTimer = this.metricsService.startWebhookTimer(metricLabels);
+
+        let headers: Record<string, string> = {};
+
         try {
           // Create standardized webhook payload
           const webhookPayload: WebhookPayload = this.webhookSignatureService.createWebhookPayload(
@@ -98,18 +127,23 @@ export class DispatchWebhookHandler {
           );
 
           // Generate headers with signature if webhook has a secret
-          const headers = this.webhookSignatureService.generateWebhookHeaders(
+          const webhookHeaders = this.webhookSignatureService.generateWebhookHeaders(
             eventType,
             webhookPayload,
             webhook.secret || undefined,
           );
+
+          // Convert to Record<string, string> for HTTP client
+          headers = Object.fromEntries(
+            Object.entries(webhookHeaders).filter(([, value]) => value !== undefined),
+          ) as Record<string, string>;
 
           this.logger.debug(
             {
               webhookId: webhook.id,
               url: webhook.url,
               eventType,
-              deliveryId: headers['x-webhook-delivery'],
+              deliveryId: headers['x-webhook-delivery'] || 'unknown',
             },
             'Sending webhook',
           );
@@ -126,12 +160,34 @@ export class DispatchWebhookHandler {
             }),
           );
 
+          const duration = Date.now() - startTime;
+
+          // End timer and record success metrics
+          endTimer();
+          const successLabels: WebhookCounterLabels = { ...metricLabels, success: 'true' };
+          this.metricsService.incrementWebhookDispatch(successLabels);
+
+          // Log to database
+          await this.webhookDispatchLogService.logDispatchAttempt({
+            webhookId: webhook.id,
+            orgId,
+            eventType,
+            url: webhook.url,
+            status: 'success',
+            statusCode: response.status,
+            duration,
+            deliveryId: headers['x-webhook-delivery'] || 'unknown',
+          });
+
           this.logger.info(
             {
               webhookId: webhook.id,
               url: webhook.url,
               statusCode: response.status,
-              deliveryId: headers['x-webhook-delivery'],
+              deliveryId: headers['x-webhook-delivery'] || 'unknown',
+              duration,
+              orgId,
+              eventType,
             },
             'Webhook delivered successfully',
           );
@@ -141,12 +197,35 @@ export class DispatchWebhookHandler {
             webhookId: webhook.id,
             url: webhook.url,
             statusCode: response.status,
-            deliveryId: headers['x-webhook-delivery'],
+            deliveryId: headers['x-webhook-delivery'] || 'unknown',
+            duration,
           };
         } catch (error) {
+          const duration = Date.now() - startTime;
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
           const statusCode =
             (error as { response?: { status?: number } })?.response?.status || null;
+
+          // End timer and record failure metrics
+          endTimer();
+          const failureLabels: WebhookCounterLabels = { ...metricLabels, success: 'false' };
+          this.metricsService.incrementWebhookDispatch(failureLabels);
+
+          // Log to database
+          await this.webhookDispatchLogService.logDispatchAttempt({
+            webhookId: webhook.id,
+            orgId,
+            eventType,
+            url: webhook.url,
+            status: 'failure',
+            statusCode: statusCode || undefined,
+            duration,
+            error: {
+              message: errorMessage,
+              stack: error instanceof Error ? error.stack : undefined,
+            },
+            deliveryId: headers['x-webhook-delivery'] || 'unknown',
+          });
 
           this.logger.error(
             {
@@ -154,8 +233,12 @@ export class DispatchWebhookHandler {
               url: webhook.url,
               error: errorMessage,
               statusCode,
+              duration,
+              orgId,
+              eventType,
+              deliveryId: headers['x-webhook-delivery'] || 'unknown',
             },
-            'Webhook delivery failed',
+            `Webhook ${webhook.url} failed: ${errorMessage}`,
           );
 
           // Re-throw error to trigger Inngest retry
@@ -163,16 +246,28 @@ export class DispatchWebhookHandler {
         }
       });
 
-      results.push(result);
+      results.push(
+        result as {
+          success: boolean;
+          webhookId: string;
+          url: string;
+          statusCode?: number;
+          deliveryId: string;
+          duration: number;
+        },
+      );
     }
+
+    const successful = results.filter(r => r.success);
+    const failed = results.filter(r => !r.success);
 
     this.logger.info(
       {
         orgId,
         eventType,
         dispatched: results.length,
-        successful: results.filter(r => r.success).length,
-        failed: results.filter(r => !r.success).length,
+        successful: successful.length,
+        failed: failed.length,
       },
       'Webhook dispatch completed',
     );

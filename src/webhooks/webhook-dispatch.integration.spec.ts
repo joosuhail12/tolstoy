@@ -1,11 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { InngestService } from 'nestjs-inngest';
+import { register } from 'prom-client';
 import { of } from 'rxjs';
 import { FlowExecutorService } from '../flows/flow-executor.service';
 import { WebhooksService } from './webhooks.service';
 import { DispatchWebhookHandler } from './dispatch-webhook.handler';
 import { WebhookSignatureService } from './webhook-signature.service';
+import { WebhookDispatchLogService } from './webhook-dispatch-log.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { PrismaService } from '../prisma.service';
 import { AblyService } from '../ably/ably.service';
 import { SecretsResolver } from '../secrets/secrets-resolver.service';
@@ -23,6 +26,7 @@ describe('Webhook Dispatch Integration', () => {
   let mockWebhooksService: any;
   let mockPrismaService: any;
   let mockAblyService: any;
+  // let metricsService: MetricsService;
 
   const testWebhook = {
     id: 'webhook-123',
@@ -39,6 +43,9 @@ describe('Webhook Dispatch Integration', () => {
   };
 
   beforeEach(async () => {
+    // Clear all metrics before each test
+    register.clear();
+
     mockInngestService = {
       send: jest.fn().mockResolvedValue(undefined),
     };
@@ -115,6 +122,8 @@ describe('Webhook Dispatch Integration', () => {
         FlowExecutorService,
         DispatchWebhookHandler,
         WebhookSignatureService,
+        WebhookDispatchLogService,
+        MetricsService,
         {
           provide: PrismaService,
           useValue: mockPrismaService,
@@ -182,11 +191,16 @@ describe('Webhook Dispatch Integration', () => {
           provide: `PinoLogger:${DispatchWebhookHandler.name}`,
           useValue: mockLogger,
         },
+        {
+          provide: `PinoLogger:${WebhookDispatchLogService.name}`,
+          useValue: mockLogger,
+        },
       ],
     }).compile();
 
     flowExecutor = module.get(FlowExecutorService);
     webhookHandler = module.get(DispatchWebhookHandler);
+    // metricsService = module.get(MetricsService);
   });
 
   afterEach(() => {
@@ -263,7 +277,7 @@ describe('Webhook Dispatch Integration', () => {
 
       expect(result.dispatched).toBe(1);
       expect(result.results).toHaveLength(1);
-      expect(result.results[0].success).toBe(true);
+      expect((result.results[0] as { success: boolean }).success).toBe(true);
 
       // Verify webhook was called
       expect(mockHttpService.post).toHaveBeenCalledWith(
@@ -282,13 +296,75 @@ describe('Webhook Dispatch Integration', () => {
           maxRedirects: 3,
         }),
       );
+
+      // Verify metrics were recorded
+      const metricsString = await register.metrics();
+      expect(metricsString).toContain('webhook_dispatch_total');
+      expect(metricsString).toContain('webhook_dispatch_seconds');
+      expect(metricsString).toContain('orgId="org-456"');
+      expect(metricsString).toContain('eventType="step.completed"');
+      expect(metricsString).toContain('url="https://api.example.com/webhook"');
+      expect(metricsString).toContain('success="true"');
+    });
+
+    it('should record failure metrics when webhook dispatch fails', async () => {
+      // Mock HTTP service to throw an error
+      mockHttpService.post.mockImplementation(() => {
+        throw new Error('Network timeout');
+      });
+
+      const mockEvent = {
+        data: {
+          orgId: 'org-456',
+          eventType: 'step.completed',
+          payload: {
+            orgId: 'org-456',
+            flowId: 'flow-123',
+            executionId: 'exec-123',
+            stepKey: 'step-1',
+            status: 'completed',
+            output: { result: 'success' },
+          },
+        },
+      };
+
+      const mockStep = {
+        run: jest
+          .fn()
+          .mockImplementationOnce((name, callback) => callback())
+          .mockImplementationOnce(async (name, callback) => {
+            // This should throw an error from the HTTP service and simulate Inngest retry behavior
+            return await callback();
+          }),
+      };
+
+      // Execute webhook dispatch handler and expect it to throw
+      await expect(
+        webhookHandler.handler({
+          step: mockStep,
+          event: mockEvent,
+        }),
+      ).rejects.toThrow('Network timeout');
+
+      // Verify failure metrics were recorded
+      const metricsString = await register.metrics();
+      expect(metricsString).toContain('webhook_dispatch_total');
+      expect(metricsString).toContain('webhook_dispatch_seconds');
+      expect(metricsString).toContain('orgId="org-456"');
+      expect(metricsString).toContain('eventType="step.completed"');
+      expect(metricsString).toContain('url="https://api.example.com/webhook"');
+      expect(metricsString).toContain('success="false"');
     });
 
     it('should gracefully handle missing Inngest service', async () => {
+      // Clear metrics before creating a second module
+      register.clear();
+
       // Create flow executor without Inngest service
       const moduleWithoutInngest: TestingModule = await Test.createTestingModule({
         providers: [
           FlowExecutorService,
+          MetricsService,
           {
             provide: PrismaService,
             useValue: mockPrismaService,

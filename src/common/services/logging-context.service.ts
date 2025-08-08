@@ -1,6 +1,8 @@
 import { Injectable, Scope } from '@nestjs/common';
 import { AsyncLocalStorage } from 'async_hooks';
 
+export type LoggingContextValue = string | number | boolean | undefined;
+
 export interface LoggingContext {
   orgId?: string;
   userId?: string;
@@ -8,7 +10,7 @@ export interface LoggingContext {
   flowId?: string;
   stepId?: string;
   executionId?: string;
-  [key: string]: any;
+  [key: string]: LoggingContextValue;
 }
 
 @Injectable({ scope: Scope.DEFAULT })
@@ -18,7 +20,15 @@ export class LoggingContextService {
   /**
    * Run callback within a new logging context
    */
-  run(context: LoggingContext, callback: () => any): any {
+  run(context: LoggingContext, callback: () => unknown): unknown {
+    return this.asyncLocalStorage.run(context, callback);
+  }
+
+  runSync(context: LoggingContext, callback: () => void): void {
+    return this.asyncLocalStorage.run(context, callback);
+  }
+
+  runAsync(context: LoggingContext, callback: () => Promise<unknown>): Promise<unknown> {
     return this.asyncLocalStorage.run(context, callback);
   }
 
@@ -26,7 +36,7 @@ export class LoggingContextService {
    * Get the current logging context
    */
   getContext(): LoggingContext | undefined {
-    return this.asyncLocalStorage.getStore();
+    return this.asyncLocalStorage.getStore() as LoggingContext | undefined;
   }
 
   /**
@@ -42,15 +52,15 @@ export class LoggingContextService {
   /**
    * Get a specific value from the current context
    */
-  get(key: keyof LoggingContext): any {
+  get(key: keyof LoggingContext): LoggingContextValue {
     const context = this.getContext();
-    return context?.[key] as any;
+    return context?.[key];
   }
 
   /**
    * Set a specific value in the current context
    */
-  set(key: keyof LoggingContext, value: any): void {
+  set(key: keyof LoggingContext, value: LoggingContextValue): void {
     const context = this.getContext();
     if (context) {
       context[key] = value;
@@ -68,7 +78,7 @@ export class LoggingContextService {
   /**
    * Get tenant context (orgId, userId) for multi-tenant operations
    */
-  getTenantContext(): { orgId?: string; userId?: string } {
+  getTenantContext(): { orgId?: string | undefined; userId?: string | undefined } {
     const context = this.getContext();
     return {
       orgId: context?.orgId,
@@ -86,11 +96,26 @@ export class LoggingContextService {
     executionId?: string;
   } {
     const context = this.getContext();
-    return {
-      requestId: context?.requestId,
-      flowId: context?.flowId,
-      stepId: context?.stepId,
-      executionId: context?.executionId,
-    };
+    const result: {
+      requestId?: string;
+      flowId?: string;
+      stepId?: string;
+      executionId?: string;
+    } = {};
+
+    if (context?.requestId !== undefined) {
+      result.requestId = context.requestId;
+    }
+    if (context?.flowId !== undefined) {
+      result.flowId = context.flowId;
+    }
+    if (context?.stepId !== undefined) {
+      result.stepId = context.stepId;
+    }
+    if (context?.executionId !== undefined) {
+      result.executionId = context.executionId;
+    }
+
+    return result;
   }
 }

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { Action } from '@prisma/client';
+import { Action, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { CreateActionDto } from './dto/create-action.dto';
 import { UpdateActionDto } from './dto/update-action.dto';
@@ -19,19 +19,24 @@ export class ActionsService {
       throw new ForbiddenException('Tool not found or access denied');
     }
 
+    const createData: Prisma.ActionUncheckedCreateInput = {
+      name: createActionDto.name,
+      key: createActionDto.key,
+      toolId: createActionDto.toolId,
+      method: createActionDto.method,
+      endpoint: createActionDto.endpoint,
+      headers: createActionDto.headers as unknown as Prisma.InputJsonValue,
+      inputSchema: createActionDto.inputSchema as unknown as Prisma.InputJsonValue,
+      executeIf: createActionDto.executeIf as unknown as Prisma.InputJsonValue,
+      orgId: tenant.orgId,
+    };
+
+    if (createActionDto.version !== undefined) {
+      createData.version = createActionDto.version;
+    }
+
     return this.prisma.action.create({
-      data: {
-        name: createActionDto.name,
-        key: createActionDto.key,
-        toolId: createActionDto.toolId,
-        method: createActionDto.method,
-        endpoint: createActionDto.endpoint,
-        headers: createActionDto.headers as any,
-        inputSchema: createActionDto.inputSchema as any,
-        executeIf: createActionDto.executeIf as any,
-        version: createActionDto.version,
-        orgId: tenant.orgId,
-      },
+      data: createData,
     });
   }
 
@@ -90,22 +95,42 @@ export class ActionsService {
     }
 
     try {
+      const updateData: Prisma.ActionUncheckedUpdateInput = {};
+
+      if (updateActionDto.name !== undefined) {
+        updateData.name = updateActionDto.name;
+      }
+      if (updateActionDto.key !== undefined) {
+        updateData.key = updateActionDto.key;
+      }
+      if (updateActionDto.toolId !== undefined) {
+        updateData.toolId = updateActionDto.toolId;
+      }
+      if (updateActionDto.method !== undefined) {
+        updateData.method = updateActionDto.method;
+      }
+      if (updateActionDto.endpoint !== undefined) {
+        updateData.endpoint = updateActionDto.endpoint;
+      }
+      if (updateActionDto.headers !== undefined) {
+        updateData.headers = updateActionDto.headers as unknown as Prisma.InputJsonValue;
+      }
+      if (updateActionDto.inputSchema !== undefined) {
+        updateData.inputSchema = updateActionDto.inputSchema as unknown as Prisma.InputJsonValue;
+      }
+      if (updateActionDto.executeIf !== undefined) {
+        updateData.executeIf = updateActionDto.executeIf as unknown as Prisma.InputJsonValue;
+      }
+      if (updateActionDto.version !== undefined) {
+        updateData.version = updateActionDto.version;
+      }
+
       return await this.prisma.action.update({
         where: { id },
-        data: {
-          name: updateActionDto.name,
-          key: updateActionDto.key,
-          toolId: updateActionDto.toolId,
-          method: updateActionDto.method,
-          endpoint: updateActionDto.endpoint,
-          headers: updateActionDto.headers as any,
-          inputSchema: updateActionDto.inputSchema as any,
-          executeIf: updateActionDto.executeIf as any,
-          version: updateActionDto.version,
-        },
+        data: updateData,
       });
     } catch (error) {
-      if (error instanceof Error && (error as any).code === 'P2025') {
+      if (error instanceof Error && 'code' in error && error.code === 'P2025') {
         throw new NotFoundException(`Action with ID ${id} not found`);
       }
       throw error;
@@ -120,7 +145,7 @@ export class ActionsService {
         where: { id },
       });
     } catch (error) {
-      if (error instanceof Error && (error as any).code === 'P2025') {
+      if (error instanceof Error && 'code' in error && error.code === 'P2025') {
         throw new NotFoundException(`Action with ID ${id} not found`);
       }
       throw error;

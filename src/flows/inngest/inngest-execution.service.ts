@@ -70,7 +70,7 @@ export class InngestExecutionService {
         stepKey: 'flow_start',
         status: 'queued',
         inputs: inputVariables,
-        outputs: null,
+        outputs: undefined,
       },
     });
 

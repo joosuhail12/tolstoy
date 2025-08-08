@@ -6,6 +6,7 @@ import { AblyService } from '../../ably/ably.service';
 import { InputValidatorService } from '../../common/services/input-validator.service';
 import { ConditionEvaluatorService } from '../../common/services/condition-evaluator.service';
 import { PrismaService } from '../../prisma.service';
+import { ExecutionLogsService } from '../../execution-logs/execution-logs.service';
 
 describe('ExecuteFlowHandler - Throttling & Queuing', () => {
   let handler: ExecuteFlowHandler;
@@ -90,6 +91,16 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: ExecutionLogsService,
+          useValue: {
+            createStepLog: jest.fn(),
+            markStepStarted: jest.fn(),
+            markStepCompleted: jest.fn(),
+            markStepFailed: jest.fn(),
+            markStepSkipped: jest.fn(),
+          },
         },
         {
           provide: `PinoLogger:${ExecuteFlowHandler.name}`,

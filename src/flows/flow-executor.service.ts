@@ -1,19 +1,22 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { Flow, ExecutionLog, Prisma } from '@prisma/client';
+import * as Sentry from '@sentry/nestjs';
 import { PrismaService } from '../prisma.service';
 import { AblyService } from '../ably/ably.service';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { SecretsResolver } from '../secrets/secrets-resolver.service';
 import { OAuthTokenService } from '../oauth/oauth-token.service';
-import { InputValidatorService } from '../common/services/input-validator.service';
+import { InputValidatorService, InputParameter } from '../common/services/input-validator.service';
 import {
   ConditionEvaluatorService,
   ConditionContext,
+  ConditionValue,
 } from '../common/services/condition-evaluator.service';
 import { SandboxService, SandboxExecutionContext } from '../sandbox/sandbox.service';
 import { InngestService } from 'nestjs-inngest';
 import { ExecutionLogsService } from '../execution-logs/execution-logs.service';
+import { MetricsService, StepMetricLabels } from '../metrics/metrics.service';
 
 export interface FlowStepConfig {
   [key: string]: unknown;
@@ -91,6 +94,7 @@ export class FlowExecutorService {
     private readonly conditionEvaluator: ConditionEvaluatorService,
     private readonly sandboxService: SandboxService,
     private readonly executionLogsService: ExecutionLogsService,
+    private readonly metricsService: MetricsService,
     @Optional() private readonly inngestService: InngestService,
     @InjectPinoLogger(FlowExecutorService.name)
     private readonly logger: PinoLogger,
@@ -201,8 +205,8 @@ export class FlowExecutorService {
             executionError = {
               message: error instanceof Error ? error.message : 'Unknown error',
               code:
-                error instanceof Error && (error as any).code
-                  ? (error as any).code
+                error instanceof Error && 'code' in error && typeof error.code === 'string'
+                  ? error.code
                   : 'EXECUTION_ERROR',
             };
             break;
@@ -256,7 +260,9 @@ export class FlowExecutorService {
         error: {
           message: error instanceof Error ? error.message : 'Unknown error',
           code:
-            error instanceof Error && (error as any).code ? (error as any).code : 'EXECUTION_ERROR',
+            error instanceof Error && 'code' in error && typeof error.code === 'string'
+              ? error.code
+              : 'EXECUTION_ERROR',
         },
       });
 
@@ -281,156 +287,230 @@ export class FlowExecutorService {
   ): Promise<StepExecutionResult> {
     const startTime = Date.now();
 
-    // Create step execution log
-    const stepLog = await this.executionLogsService.markStepStarted(
-      context.orgId,
-      context.userId,
-      context.flowId,
-      context.executionId,
-      step.id,
+    // Start Sentry performance span for step execution
+    return await Sentry.startSpan(
       {
-        stepName: step.name,
-        stepType: step.type,
-        config: step.config,
-        executeIf:
-          typeof step.executeIf === 'string' ? step.executeIf : JSON.stringify(step.executeIf),
-        variables: context.variables,
-        stepOutputs: context.stepOutputs,
+        op: 'step.execute',
+        name: `${step.type}:${step.name}`,
+        attributes: {
+          'step.id': step.id,
+          'step.type': step.type,
+          'step.name': step.name,
+          'org.id': context.orgId,
+          'flow.id': context.flowId,
+          'execution.id': context.executionId,
+        },
       },
-    );
-
-    // Check executeIf condition before executing the step
-    if (step.executeIf) {
-      try {
-        const conditionContext: ConditionContext = {
-          inputs: context.variables,
-          variables: context.variables,
-          stepOutputs: context.stepOutputs,
-          currentStep: step,
+      async () => {
+        // Prepare metrics labels
+        const metricLabels: StepMetricLabels = {
           orgId: context.orgId,
-          userId: context.userId,
-          meta: {
-            flowId: context.flowId,
-            executionId: context.executionId,
-            stepId: step.id,
-          },
+          flowId: context.flowId,
+          stepKey: step.id,
         };
 
-        const shouldExecute = this.conditionEvaluator.evaluate(step.executeIf, conditionContext);
+        // Start metrics timer
+        const endTimer = this.metricsService.startStepTimer(metricLabels);
 
-        if (!shouldExecute) {
-          const duration = Date.now() - startTime;
-          const skipReason = 'executeIf condition evaluated to false';
+        // Create step execution log
+        const stepLog = await this.executionLogsService.markStepStarted(
+          context.orgId,
+          context.userId,
+          context.flowId,
+          context.executionId,
+          step.id,
+          {
+            stepName: step.name,
+            stepType: step.type,
+            config: step.config,
+            executeIf:
+              typeof step.executeIf === 'string' ? step.executeIf : JSON.stringify(step.executeIf),
+            variables: context.variables,
+            stepOutputs: context.stepOutputs,
+          },
+        );
 
-          this.logger.info(
+        // Check executeIf condition before executing the step
+        if (step.executeIf) {
+          try {
+            const conditionContext: ConditionContext = {
+              inputs: context.variables,
+              variables: context.variables,
+              stepOutputs: context.stepOutputs,
+              currentStep: step as unknown as Record<string, ConditionValue>,
+              orgId: context.orgId,
+              userId: context.userId,
+              meta: {
+                flowId: context.flowId,
+                executionId: context.executionId,
+                stepId: step.id,
+              },
+            };
+
+            const shouldExecute = this.conditionEvaluator.evaluate(
+              step.executeIf,
+              conditionContext,
+            );
+
+            if (!shouldExecute) {
+              const duration = Date.now() - startTime;
+              const skipReason = 'executeIf condition evaluated to false';
+
+              // End metrics timer for skipped step
+              endTimer();
+
+              this.logger.info(
+                {
+                  stepId: step.id,
+                  stepType: step.type,
+                  flowId: context.flowId,
+                  executionId: context.executionId,
+                  executeIf: step.executeIf,
+                  skipReason,
+                },
+                'Step skipped due to executeIf condition',
+              );
+
+              // Update step log to skipped
+              await this.executionLogsService.markStepSkipped(stepLog.id, skipReason);
+
+              // Publish step skipped event
+              await this.publishStepSkipped(step, context, skipReason);
+
+              return {
+                success: true,
+                skipped: true,
+                metadata: {
+                  duration,
+                  skipReason,
+                  stepType: step.type,
+                  stepId: step.id,
+                  timestamp: new Date().toISOString(),
+                },
+              };
+            }
+          } catch (error) {
+            this.logger.error(
+              {
+                stepId: step.id,
+                stepType: step.type,
+                flowId: context.flowId,
+                executionId: context.executionId,
+                executeIf: step.executeIf,
+                error: error instanceof Error ? error.message : 'Unknown error',
+              },
+              'Failed to evaluate executeIf condition, proceeding with step execution',
+            );
+
+            // If condition evaluation fails, proceed with step execution to be safe
+          }
+        }
+
+        await this.publishStepStarted(step, context);
+
+        try {
+          this.logger.debug(
             {
               stepId: step.id,
               stepType: step.type,
               flowId: context.flowId,
               executionId: context.executionId,
-              executeIf: step.executeIf,
-              skipReason,
             },
-            'Step skipped due to executeIf condition',
+            'Executing step',
           );
 
-          // Update step log to skipped
-          await this.executionLogsService.markStepSkipped(stepLog.id, skipReason);
+          const result = await this.executeStepByType(step, context);
+          const duration = Date.now() - startTime;
 
-          // Publish step skipped event
-          await this.publishStepSkipped(step, context, skipReason);
-
-          return {
-            success: true,
-            skipped: true,
+          const stepResult: StepExecutionResult = {
+            ...result,
             metadata: {
+              ...result.metadata,
               duration,
-              skipReason,
-              stepType: step.type,
-              stepId: step.id,
-              timestamp: new Date().toISOString(),
             },
           };
+
+          if (result.success) {
+            // End metrics timer for successful step
+            endTimer();
+
+            // Update step log to completed
+            await this.executionLogsService.markStepCompleted(stepLog.id, {
+              output: result.output,
+              duration,
+              metadata: result.metadata,
+            });
+
+            await this.publishStepCompleted(step, context, stepResult);
+          } else {
+            // End metrics timer and record error for failed step
+            endTimer();
+            this.metricsService.incrementStepErrors(metricLabels);
+
+            // Update step log to failed
+            await this.executionLogsService.markStepFailed(stepLog.id, result.error);
+
+            await this.publishStepFailed(step, context, stepResult);
+          }
+
+          return stepResult;
+        } catch (error) {
+          const duration = Date.now() - startTime;
+
+          // End metrics timer and record error for exception case
+          endTimer();
+          this.metricsService.incrementStepErrors(metricLabels);
+
+          // Capture step execution error in Sentry
+          Sentry.withScope(scope => {
+            scope.setTag('orgId', context.orgId);
+            scope.setTag('flowId', context.flowId);
+            scope.setTag('stepKey', step.id);
+            scope.setTag('stepType', step.type);
+            scope.setTag('errorType', 'step-execution');
+
+            scope.setContext('stepExecution', {
+              stepName: step.name,
+              stepType: step.type,
+              stepConfig: this.sanitizeStepConfig(step.config),
+              executionId: context.executionId,
+              duration,
+              userId: context.userId,
+            });
+
+            scope.setContext('flowContext', {
+              flowId: context.flowId,
+              orgId: context.orgId,
+              variableKeys: Object.keys(context.variables),
+              stepOutputKeys: Object.keys(context.stepOutputs),
+            });
+
+            scope.setLevel('error');
+            Sentry.captureException(error);
+          });
+
+          const stepResult: StepExecutionResult = {
+            success: false,
+            error: {
+              message: error instanceof Error ? error.message : 'Unknown error',
+              code:
+                error instanceof Error && 'code' in error && typeof error.code === 'string'
+                  ? error.code
+                  : 'STEP_EXECUTION_ERROR',
+              stack: error instanceof Error ? error.stack : 'No stack trace',
+            },
+            metadata: { duration },
+          };
+
+          // Update step log to failed (for exception case)
+          await this.executionLogsService.markStepFailed(stepLog.id, stepResult.error);
+
+          await this.publishStepFailed(step, context, stepResult);
+
+          return stepResult;
         }
-      } catch (error) {
-        this.logger.error(
-          {
-            stepId: step.id,
-            stepType: step.type,
-            flowId: context.flowId,
-            executionId: context.executionId,
-            executeIf: step.executeIf,
-            error: error instanceof Error ? error.message : 'Unknown error',
-          },
-          'Failed to evaluate executeIf condition, proceeding with step execution',
-        );
-
-        // If condition evaluation fails, proceed with step execution to be safe
-      }
-    }
-
-    await this.publishStepStarted(step, context);
-
-    try {
-      this.logger.debug(
-        {
-          stepId: step.id,
-          stepType: step.type,
-          flowId: context.flowId,
-          executionId: context.executionId,
-        },
-        'Executing step',
-      );
-
-      const result = await this.executeStepByType(step, context);
-      const duration = Date.now() - startTime;
-
-      const stepResult: StepExecutionResult = {
-        ...result,
-        metadata: {
-          ...result.metadata,
-          duration,
-        },
-      };
-
-      if (result.success) {
-        // Update step log to completed
-        await this.executionLogsService.markStepCompleted(stepLog.id, {
-          output: result.output,
-          duration,
-          metadata: result.metadata,
-        });
-
-        await this.publishStepCompleted(step, context, stepResult);
-      } else {
-        // Update step log to failed
-        await this.executionLogsService.markStepFailed(stepLog.id, result.error);
-
-        await this.publishStepFailed(step, context, stepResult);
-      }
-
-      return stepResult;
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      const stepResult: StepExecutionResult = {
-        success: false,
-        error: {
-          message: error instanceof Error ? error.message : 'Unknown error',
-          code:
-            error instanceof Error && (error as any).code
-              ? (error as any).code
-              : 'STEP_EXECUTION_ERROR',
-          stack: error instanceof Error ? error.stack : 'No stack trace',
-        },
-        metadata: { duration },
-      };
-
-      // Update step log to failed (for exception case)
-      await this.executionLogsService.markStepFailed(stepLog.id, stepResult.error);
-
-      await this.publishStepFailed(step, context, stepResult);
-      return stepResult;
-    }
+      },
+    );
   }
 
   private async executeStepByType(
@@ -784,7 +864,10 @@ export class FlowExecutorService {
 
       if (action.inputSchema && Array.isArray(action.inputSchema)) {
         try {
-          validatedInputs = this.inputValidator.validate(action.inputSchema as any[], inputs);
+          validatedInputs = this.inputValidator.validate(
+            action.inputSchema as unknown as InputParameter[],
+            inputs,
+          );
         } catch (validationError) {
           return {
             success: false,
@@ -796,12 +879,9 @@ export class FlowExecutorService {
         }
       }
 
-      const resolvedInputs = await this.resolveActionInputs(
-        validatedInputs as Record<string, unknown>,
-        context,
-      );
+      const resolvedInputs = await this.resolveActionInputs(validatedInputs, context);
       const executionResult = await this.executeActionRequest(
-        action as unknown as Record<string, unknown>,
+        action as Record<string, unknown>,
         resolvedInputs as Record<string, unknown>,
       );
 
@@ -833,11 +913,20 @@ export class FlowExecutorService {
 
     for (const [key, value] of Object.entries(inputs)) {
       if (typeof value === 'string' && value.includes('{{')) {
-        resolved[key] = this.resolveTemplate(value, context);
+        if (typeof resolved === 'object' && resolved !== null && !Array.isArray(resolved)) {
+          (resolved as Record<string, unknown>)[key] = this.resolveTemplate(value, context);
+        }
       } else if (typeof value === 'object' && value !== null) {
-        resolved[key] = await this.resolveActionInputs(value, context);
+        if (typeof resolved === 'object' && resolved !== null && !Array.isArray(resolved)) {
+          (resolved as Record<string, unknown>)[key] = await this.resolveActionInputs(
+            value,
+            context,
+          );
+        }
       } else {
-        resolved[key] = value;
+        if (typeof resolved === 'object' && resolved !== null && !Array.isArray(resolved)) {
+          (resolved as Record<string, unknown>)[key] = value;
+        }
       }
     }
 
@@ -1265,7 +1354,7 @@ export class FlowExecutorService {
       failedSteps: number;
       skippedSteps?: number;
       duration: number;
-      output?: any;
+      output?: unknown;
       error?: { message: string; code?: string };
     },
   ): Promise<void> {
@@ -1333,7 +1422,7 @@ export class FlowExecutorService {
         stepKey: 'flow_start',
         status,
         inputs: input as unknown as Prisma.InputJsonValue,
-        outputs: null,
+        outputs: undefined,
       },
     });
   }
@@ -1391,5 +1480,48 @@ export class FlowExecutorService {
       );
       // Don't throw error - webhook dispatch failure shouldn't fail the flow
     }
+  }
+
+  /**
+   * Sanitize step configuration to remove sensitive data before sending to Sentry
+   */
+  private sanitizeStepConfig(config: FlowStepConfig): Record<string, unknown> {
+    const sanitized = { ...config };
+
+    // Remove sensitive fields
+    const sensitiveFields = [
+      'password',
+      'secret',
+      'token',
+      'key',
+      'apiKey',
+      'authorization',
+      'credentials',
+      'auth',
+      'privateKey',
+      'secretKey',
+      'accessToken',
+    ];
+
+    const sanitizeObject = (obj: Record<string, unknown>): Record<string, unknown> => {
+      const result: Record<string, unknown> = {};
+
+      for (const [key, value] of Object.entries(obj)) {
+        const lowerKey = key.toLowerCase();
+        const isSensitive = sensitiveFields.some(field => lowerKey.includes(field.toLowerCase()));
+
+        if (isSensitive) {
+          result[key] = '[REDACTED]';
+        } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+          result[key] = sanitizeObject(value as Record<string, unknown>);
+        } else {
+          result[key] = value;
+        }
+      }
+
+      return result;
+    };
+
+    return sanitizeObject(sanitized);
   }
 }

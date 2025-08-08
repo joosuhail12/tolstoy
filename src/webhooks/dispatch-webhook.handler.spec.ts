@@ -1,10 +1,13 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { AxiosResponse } from 'axios';
+import { register } from 'prom-client';
 import { of, throwError } from 'rxjs';
 import { DispatchWebhookHandler } from './dispatch-webhook.handler';
 import { WebhooksService } from './webhooks.service';
 import { WebhookSignatureService } from './webhook-signature.service';
+import { WebhookDispatchLogService } from './webhook-dispatch-log.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 describe('DispatchWebhookHandler', () => {
   let handler: DispatchWebhookHandler;
@@ -12,6 +15,8 @@ describe('DispatchWebhookHandler', () => {
   let mockWebhookSignatureService: any;
   let mockHttpService: any;
   let mockLogger: any;
+  let mockMetricsService: any;
+  let mockWebhookDispatchLogService: any;
 
   const mockWebhook = {
     id: 'webhook-1',
@@ -43,6 +48,9 @@ describe('DispatchWebhookHandler', () => {
   };
 
   beforeEach(async () => {
+    // Clear metrics before each test
+    register.clear();
+
     mockWebhooksService = {
       getWebhooksForEvent: jest.fn(),
     };
@@ -62,6 +70,16 @@ describe('DispatchWebhookHandler', () => {
       error: jest.fn(),
     };
 
+    mockMetricsService = {
+      startWebhookTimer: jest.fn().mockReturnValue(jest.fn()),
+      incrementWebhookDispatch: jest.fn(),
+      recordWebhookDuration: jest.fn(),
+    };
+
+    mockWebhookDispatchLogService = {
+      logDispatchAttempt: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         DispatchWebhookHandler,
@@ -78,6 +96,14 @@ describe('DispatchWebhookHandler', () => {
           useValue: mockHttpService,
         },
         {
+          provide: MetricsService,
+          useValue: mockMetricsService,
+        },
+        {
+          provide: WebhookDispatchLogService,
+          useValue: mockWebhookDispatchLogService,
+        },
+        {
           provide: `PinoLogger:${DispatchWebhookHandler.name}`,
           useValue: mockLogger,
         },
@@ -89,6 +115,7 @@ describe('DispatchWebhookHandler', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    register.clear();
   });
 
   describe('handler', () => {
@@ -130,8 +157,8 @@ describe('DispatchWebhookHandler', () => {
 
       expect(result.dispatched).toBe(1);
       expect(result.results).toHaveLength(1);
-      expect(result.results[0].success).toBe(true);
-      expect(result.results[0].statusCode).toBe(200);
+      expect((result.results[0] as { success: boolean }).success).toBe(true);
+      expect((result.results[0] as { statusCode: number }).statusCode).toBe(200);
 
       expect(mockWebhooksService.getWebhooksForEvent).toHaveBeenCalledWith(
         'org-123',
@@ -139,6 +166,32 @@ describe('DispatchWebhookHandler', () => {
       );
       expect(mockWebhookSignatureService.createWebhookPayload).toHaveBeenCalled();
       expect(mockWebhookSignatureService.generateWebhookHeaders).toHaveBeenCalled();
+
+      // Verify metrics were recorded
+      expect(mockMetricsService.startWebhookTimer).toHaveBeenCalledWith({
+        orgId: 'org-123',
+        eventType: 'step.completed',
+        url: 'https://example.com/webhook',
+      });
+      expect(mockMetricsService.incrementWebhookDispatch).toHaveBeenCalledWith({
+        orgId: 'org-123',
+        eventType: 'step.completed',
+        url: 'https://example.com/webhook',
+        success: 'true',
+      });
+
+      // Verify database logging
+      expect(mockWebhookDispatchLogService.logDispatchAttempt).toHaveBeenCalledWith({
+        webhookId: 'webhook-1',
+        orgId: 'org-123',
+        eventType: 'step.completed',
+        url: 'https://example.com/webhook',
+        status: 'success',
+        statusCode: 200,
+        duration: expect.any(Number),
+        deliveryId: 'whd_123_456',
+      });
+
       expect(mockHttpService.post).toHaveBeenCalledWith(
         'https://example.com/webhook',
         expect.any(Object),
@@ -253,9 +306,42 @@ describe('DispatchWebhookHandler', () => {
           url: 'https://example.com/webhook',
           error: 'Network error',
           statusCode: null,
+          duration: expect.any(Number),
+          orgId: 'org-123',
+          eventType: 'step.completed',
+          deliveryId: 'whd_123_456',
         },
-        'Webhook delivery failed',
+        'Webhook https://example.com/webhook failed: Network error',
       );
+
+      // Verify failure metrics were recorded
+      expect(mockMetricsService.startWebhookTimer).toHaveBeenCalledWith({
+        orgId: 'org-123',
+        eventType: 'step.completed',
+        url: 'https://example.com/webhook',
+      });
+      expect(mockMetricsService.incrementWebhookDispatch).toHaveBeenCalledWith({
+        orgId: 'org-123',
+        eventType: 'step.completed',
+        url: 'https://example.com/webhook',
+        success: 'false',
+      });
+
+      // Verify failure database logging
+      expect(mockWebhookDispatchLogService.logDispatchAttempt).toHaveBeenCalledWith({
+        webhookId: 'webhook-1',
+        orgId: 'org-123',
+        eventType: 'step.completed',
+        url: 'https://example.com/webhook',
+        status: 'failure',
+        statusCode: undefined,
+        duration: expect.any(Number),
+        error: {
+          message: 'Network error',
+          stack: expect.any(String),
+        },
+        deliveryId: 'whd_123_456',
+      });
     });
 
     it('should handle multiple webhooks', async () => {
@@ -305,7 +391,7 @@ describe('DispatchWebhookHandler', () => {
 
       expect(result.dispatched).toBe(2);
       expect(result.results).toHaveLength(2);
-      expect(result.results.every(r => r.success)).toBe(true);
+      expect(result.results.every(r => (r as { success: boolean }).success)).toBe(true);
 
       expect(mockStep.run).toHaveBeenCalledTimes(3); // 1 fetch + 2 dispatch calls
       expect(mockHttpService.post).toHaveBeenCalledTimes(2);

@@ -105,7 +105,7 @@ export class OAuthTokenService {
   ): Promise<TokenRefreshResponse> {
     const tokenEndpoint = config.refreshEndpoint || config.tokenEndpoint;
 
-    const requestData = {
+    const requestData: Record<string, string> = {
       grant_type: 'refresh_token',
       refresh_token: refreshToken,
       client_id: config.clientId,

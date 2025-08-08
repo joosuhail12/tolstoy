@@ -852,6 +852,214 @@ Execution logs are designed to support Prometheus metrics collection:
 - **Audit trail**: Complete history of all step executions
 - **Context preservation**: Full execution context saved with each log
 - **Index optimization**: Efficient querying by execution ID and step key
+- **Prometheus metrics**: Real-time step execution, retry, and error metrics
+
+## 📊 Metrics Collection with Prometheus
+
+### Overview
+Tolstoy integrates with Prometheus to provide comprehensive metrics for monitoring workflow execution performance, retry behavior, and error patterns. All metrics are automatically instrumented and include multi-tenant labeling for proper organization isolation.
+
+### Available Metrics
+
+#### Step Execution Metrics
+- **`step_execution_seconds`** - Histogram tracking step execution duration
+  - **Labels**: `orgId`, `flowId`, `stepKey`
+  - **Buckets**: [0.1, 0.5, 1, 5, 10] seconds
+  - **Description**: Measures time from step start to completion/failure
+
+- **`step_retries_total`** - Counter tracking step retry attempts
+  - **Labels**: `orgId`, `flowId`, `stepKey`
+  - **Description**: Incremented each time a step is retried (both manual retries and Inngest automatic retries)
+
+- **`step_errors_total`** - Counter tracking step failures
+  - **Labels**: `orgId`, `flowId`, `stepKey`
+  - **Description**: Incremented for each step that fails or throws an exception
+
+#### HTTP Request Metrics (Auto-instrumented)
+- **`http_requests_total`** - Counter for all HTTP requests
+  - **Labels**: `method`, `route`, `status`
+  - **Description**: Total count of HTTP requests by method, route, and response status
+
+- **`http_request_duration_seconds`** - Histogram for HTTP request duration
+  - **Labels**: `method`, `route`, `status`
+  - **Buckets**: [0.1, 0.5, 1, 2, 5] seconds
+  - **Description**: Response time distribution for all HTTP endpoints
+
+### Metrics Endpoint
+
+#### Accessing Metrics
+```bash
+# Get all metrics in Prometheus format
+curl http://localhost:3000/metrics
+
+# Example output snippet:
+# step_execution_seconds_bucket{orgId="org-123",flowId="flow-456",stepKey="data-transform",le="0.5"} 15
+# step_execution_seconds_sum{orgId="org-123",flowId="flow-456",stepKey="data-transform"} 12.5
+# step_retries_total{orgId="org-123",flowId="flow-456",stepKey="api-call"} 3
+# step_errors_total{orgId="org-123",flowId="flow-456",stepKey="validation"} 1
+```
+
+#### Endpoint Security
+- **Path**: `/metrics`
+- **Authentication**: None (intended for Prometheus scraping)
+- **Tenant Middleware**: Excluded from tenant validation
+- **Rate Limiting**: None applied
+
+### Integration Examples
+
+#### Prometheus Configuration
+```yaml
+# prometheus.yml
+scrape_configs:
+  - job_name: 'tolstoy'
+    static_configs:
+      - targets: ['localhost:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+```
+
+#### Example Queries
+
+##### Step Performance Monitoring
+```promql
+# Average step execution time by organization
+rate(step_execution_seconds_sum[5m]) / rate(step_execution_seconds_count[5m])
+
+# 95th percentile step execution time
+histogram_quantile(0.95, rate(step_execution_seconds_bucket[5m]))
+
+# Steps taking longer than 5 seconds
+step_execution_seconds_bucket{le="5"} - step_execution_seconds_bucket{le="10"}
+```
+
+##### Error Rate Analysis
+```promql
+# Step error rate by flow
+rate(step_errors_total[5m]) / rate(step_execution_seconds_count[5m])
+
+# Most frequently failing steps
+topk(10, increase(step_errors_total[1h]))
+
+# Error rate by organization
+sum(rate(step_errors_total[5m])) by (orgId)
+```
+
+##### Retry Pattern Analysis
+```promql
+# Retry rate by step type
+rate(step_retries_total[5m])
+
+# Steps with highest retry counts
+topk(10, increase(step_retries_total[1h]))
+
+# Retry success rate (retries vs final errors)
+rate(step_retries_total[5m]) / rate(step_errors_total[5m])
+```
+
+##### HTTP Performance Monitoring
+```promql
+# API response time 99th percentile
+histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))
+
+# Error rate by endpoint
+sum(rate(http_requests_total{status=~"4..|5.."}[5m])) by (route)
+
+# Request throughput by method
+sum(rate(http_requests_total[5m])) by (method)
+```
+
+### Alerting Rules
+
+#### Critical Alerts
+```yaml
+# High error rate alert
+- alert: HighStepErrorRate
+  expr: rate(step_errors_total[5m]) / rate(step_execution_seconds_count[5m]) > 0.1
+  for: 5m
+  labels:
+    severity: critical
+  annotations:
+    summary: "High step error rate detected"
+    description: "Step error rate is {{ $value }} for {{ $labels.orgId }}/{{ $labels.flowId }}"
+
+# Long-running steps
+- alert: SlowStepExecution
+  expr: histogram_quantile(0.95, rate(step_execution_seconds_bucket[5m])) > 30
+  for: 10m
+  labels:
+    severity: warning
+  annotations:
+    summary: "Steps taking longer than expected"
+```
+
+### Dashboard Examples
+
+#### Grafana Dashboard Panels
+
+##### Step Execution Performance
+- **Panel Type**: Time Series
+- **Query**: `rate(step_execution_seconds_sum[5m]) / rate(step_execution_seconds_count[5m])`
+- **Legend**: `{{orgId}} - {{flowId}} - {{stepKey}}`
+
+##### Error Rate Tracking
+- **Panel Type**: Stat
+- **Query**: `sum(rate(step_errors_total[5m]))`
+- **Thresholds**: Green (0-0.01), Yellow (0.01-0.05), Red (>0.05)
+
+##### Retry Analysis
+- **Panel Type**: Bar Chart
+- **Query**: `topk(10, increase(step_retries_total[1h]))`
+
+### Multi-tenant Metrics
+
+#### Organization-level Monitoring
+```promql
+# Metrics by organization
+sum(rate(step_execution_seconds_count[5m])) by (orgId)
+sum(rate(step_errors_total[5m])) by (orgId)
+sum(rate(step_retries_total[5m])) by (orgId)
+```
+
+#### Flow-level Analysis
+```promql
+# Performance by flow
+avg(rate(step_execution_seconds_sum[5m]) / rate(step_execution_seconds_count[5m])) by (flowId)
+
+# Most active flows
+topk(10, sum(rate(step_execution_seconds_count[5m])) by (flowId))
+```
+
+### Performance Considerations
+
+#### Metrics Storage
+- **Cardinality**: Each unique combination of labels creates a new time series
+- **Retention**: Configure appropriate retention based on metrics volume
+- **Sampling**: Consider recording rules for long-term storage
+
+#### Resource Usage
+- **Memory**: Metrics are stored in memory until scraped
+- **CPU**: Minimal impact from metrics collection
+- **Network**: Metrics endpoint generates ~1-10KB per scrape depending on activity
+
+### Troubleshooting
+
+#### Common Issues
+1. **No metrics appearing**: Verify `/metrics` endpoint is accessible and not blocked
+2. **Missing labels**: Ensure step execution includes all required context (orgId, flowId, stepKey)
+3. **High cardinality**: Monitor unique label combinations to prevent memory issues
+4. **Scrape failures**: Check Prometheus configuration and network connectivity
+
+#### Debugging Commands
+```bash
+# Check metrics endpoint
+curl -v http://localhost:3000/metrics
+
+# Verify specific metrics
+curl http://localhost:3000/metrics | grep step_execution_seconds
+
+# Check HTTP metrics
+curl http://localhost:3000/metrics | grep http_requests_total
+```
 
 ## 🛠️ Development Scripts
 
@@ -1653,6 +1861,193 @@ Comprehensive logging with execution context:
 - **Timeout Errors**: Execution exceeds time limits
 - **Network Errors**: Daytona API connectivity issues
 - **Resource Errors**: Insufficient sandbox resources
+
+## 🐞 Error Reporting with Sentry
+
+Tolstoy integrates with Sentry for centralized error monitoring, alerting, and traceability of issues in production. All critical errors, validation failures, and runtime exceptions are automatically captured and reported.
+
+### Configuration
+
+#### DSN Setup
+The Sentry DSN is stored securely in AWS Secrets Manager under the `tolstoy/env` secret:
+```bash
+# Add SENTRY_DSN to your AWS secret
+aws secretsmanager update-secret \
+  --secret-id tolstoy/env \
+  --secret-string '{"SENTRY_DSN":"your-sentry-dsn-here"}'
+```
+
+#### Environment Variables
+For local development, set the environment variable:
+```bash
+export SENTRY_DSN="https://your-sentry-dsn@sentry.io/project-id"
+```
+
+### Initialization
+
+Sentry is automatically initialized in `main.ts` with:
+- Environment-based configuration (development/production)
+- HTTP request tracing integration
+- Prisma ORM integration
+- Custom error filtering and sanitization
+
+```typescript
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.NODE_ENV,
+  tracesSampleRate: nodeEnv === 'production' ? 0.25 : 1.0,
+  integrations: [
+    new Integrations.Http({ tracing: true }),
+    new Integrations.Prisma(),
+  ],
+});
+```
+
+### Error Capture & Context
+
+#### Global Exception Filter
+All unhandled exceptions are captured via `SentryExceptionFilter`:
+- **Server errors (5xx)**: Automatically captured in Sentry
+- **Client errors (4xx)**: Logged locally, not reported to Sentry
+- **Request context**: URL, method, headers, tenant information
+- **Sensitive data**: Automatically sanitized before reporting
+
+#### Instrumented Services
+
+**Input Validation Errors**
+```typescript
+// Validation failures include detailed context
+Sentry.addBreadcrumb({
+  message: 'Input validation failed',
+  category: 'validation',
+  data: {
+    errorCount: issues.length,
+    fields: ['email', 'name'],
+    parameterCount: 5,
+  },
+});
+```
+
+**Step Execution Errors**
+```typescript
+// Step failures include execution context
+Sentry.withScope((scope) => {
+  scope.setTag('orgId', 'org-123');
+  scope.setTag('flowId', 'flow-456');
+  scope.setTag('stepKey', 'data-transform');
+  scope.setContext('stepExecution', {
+    stepType: 'sandbox',
+    duration: 1500,
+    executionId: 'exec-789',
+  });
+  Sentry.captureException(error);
+});
+```
+
+**Sandbox Execution Errors**
+```typescript
+// Sandbox failures include code context
+scope.setContext('sandboxExecution', {
+  mode: 'sync',
+  codeLength: 245,
+  codeSnippet: 'const result = process(data)...',
+  language: 'javascript',
+  timeout: 30000,
+});
+```
+
+### Performance Tracing
+
+Critical operations include performance spans:
+
+#### Step Execution Tracing
+```typescript
+const span = Sentry.startSpan({
+  op: 'step.execute',
+  name: 'http_request:API Call',
+  attributes: {
+    'step.id': 'api-call-1',
+    'step.type': 'http_request',
+    'org.id': 'org-123',
+    'flow.id': 'flow-456',
+  },
+});
+```
+
+#### Sandbox Execution Tracing
+```typescript
+const span = Sentry.startSpan({
+  op: 'sandbox.execute.sync',
+  name: 'Sandbox Sync Execution',
+  attributes: {
+    'sandbox.mode': 'sync',
+    'sandbox.language': 'javascript',
+    'sandbox.code_length': 245,
+  },
+});
+```
+
+### Error Categories & Tags
+
+Errors are automatically tagged for easy filtering:
+
+| Tag | Values | Description |
+|-----|--------|-------------|
+| `errorType` | `validation`, `step-execution`, `sandbox-sync-execution` | Error category |
+| `orgId` | Organization ID | Tenant isolation |
+| `flowId` | Flow ID | Workflow identification |
+| `stepKey` | Step identifier | Specific step that failed |
+| `stepType` | `http_request`, `sandbox`, `webhook`, etc. | Step type |
+
+### Security & Privacy
+
+#### Sensitive Data Sanitization
+- **Headers**: Authorization, cookies, API keys automatically redacted
+- **Step Config**: Passwords, secrets, tokens removed before reporting
+- **Code Snippets**: Sensitive patterns replaced with `[REDACTED]`
+- **Request Bodies**: Filtered out to prevent data leakage
+
+#### Example Sanitization
+```typescript
+// Original
+{
+  "authorization": "Bearer secret-token",
+  "apiKey": "sk-1234567890abcdef",
+  "password": "user-password"
+}
+
+// Sanitized for Sentry
+{
+  "authorization": "[REDACTED]",
+  "apiKey": "[REDACTED]",
+  "password": "[REDACTED]"
+}
+```
+
+### Monitoring Dashboard
+
+Use Sentry's dashboard to monitor:
+- **Error rates** by organization, flow, and step type
+- **Performance metrics** for critical operations
+- **User impact** analysis with tenant-level filtering
+- **Alert notifications** for production incidents
+
+### Troubleshooting
+
+#### Common Issues
+1. **DSN not found**: Check AWS Secrets Manager configuration
+2. **No errors in Sentry**: Verify DSN and network connectivity  
+3. **Missing context**: Ensure tenant headers are provided
+4. **Performance impact**: Adjust `tracesSampleRate` if needed
+
+#### Debug Mode
+Enable debug logging for development:
+```typescript
+Sentry.init({
+  debug: process.env.NODE_ENV === 'development',
+  // ... other config
+});
+```
 
 ### Performance & Scaling
 

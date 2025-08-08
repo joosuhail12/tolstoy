@@ -14,16 +14,17 @@ datasource db {
 // Prisma Schema Models
 
 model Organization {
-  id             String         @id @default(cuid())
-  name           String
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  users          User[]
-  tools          Tool[]
-  actions        Action[]
-  flows          Flow[]
-  webhooks       Webhook[]
-  executionLogs  ExecutionLog[]
+  id                  String                @id @default(cuid())
+  name                String
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  users               User[]
+  tools               Tool[]
+  actions             Action[]
+  flows               Flow[]
+  webhooks            Webhook[]
+  executionLogs       ExecutionLog[]
+  webhookDispatchLogs WebhookDispatchLog[]
 }
 
 model User {
@@ -120,7 +121,29 @@ model Webhook {
   updatedAt   DateTime @updatedAt
 
   organization Organization @relation(fields: [orgId], references: [id])
+  dispatchLogs WebhookDispatchLog[]
 
   @@index([orgId])
   @@index([enabled])
+}
+
+model WebhookDispatchLog {
+  id          String   @id @default(cuid())
+  webhookId   String
+  orgId       String
+  eventType   String
+  url         String
+  status      String   // 'success' | 'failure'
+  statusCode  Int?     // HTTP status code
+  duration    Float    // duration in milliseconds
+  error       Json?    // error details if failed
+  deliveryId  String   // unique delivery identifier
+  createdAt   DateTime @default(now())
+
+  webhook      Webhook      @relation(fields: [webhookId], references: [id])
+  organization Organization @relation(fields: [orgId], references: [id])
+
+  @@index([orgId, createdAt])
+  @@index([webhookId, createdAt])
+  @@index([eventType, createdAt])
 }

@@ -79,7 +79,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
         );
       } else {
         this.logger.info('Using local environment variables for database credentials');
-        databaseUrl = this.configService.get('DATABASE_URL');
+        databaseUrl = this.configService.get('DATABASE_URL') || '';
 
         if (!databaseUrl) {
           throw new Error('DATABASE_URL environment variable not found');
@@ -203,6 +203,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
 
   get webhook() {
     return this.prismaClient?.webhook;
+  }
+
+  get webhookDispatchLog() {
+    return this.prismaClient?.webhookDispatchLog;
   }
 
   // Health check method

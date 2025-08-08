@@ -1,8 +1,13 @@
+// IMPORTANT: Make sure to import `instrument.ts` at the top of your file.
+import './instrument';
+
+// All other imports below
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
+import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -23,6 +28,9 @@ async function bootstrap() {
       disableErrorMessages: false, // Show validation error messages
     }),
   );
+
+  // Set up global Sentry exception filter
+  app.useGlobalFilters(new SentryExceptionFilter(app.get(Logger)));
 
   await app.listen(3000, '0.0.0.0');
 

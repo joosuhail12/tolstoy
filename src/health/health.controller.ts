@@ -14,8 +14,8 @@ export class HealthController {
   async getDetailedHealth(): Promise<{
     application: HealthCheck;
     database: DatabaseHealthCheck;
-    environment: any;
-    system: any;
+    environment: Record<string, unknown>;
+    system: Record<string, unknown>;
   }> {
     return this.healthService.getDetailedHealthStatus();
   }

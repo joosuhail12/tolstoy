@@ -1,11 +1,15 @@
 import { Module, MiddlewareConsumer, NestModule, OnModuleInit } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
+import { IncomingMessage, ServerResponse } from 'http';
+import { makeCounterProvider, makeHistogramProvider } from '@willsoto/nestjs-prometheus';
+import { SentryModule } from '@sentry/nestjs/setup';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TenantMiddleware } from './common/middleware/tenant.middleware';
 import { CommonModule } from './common/common.module';
 import { CacheModule } from './cache/cache.module';
+import { MetricsModule } from './metrics/metrics.module';
 import { AwsSecretsService } from './aws-secrets.service';
 import { RedisCacheService } from './cache/redis-cache.service';
 import { SecretsResolver } from './secrets/secrets-resolver.service';
@@ -27,6 +31,7 @@ import { InngestModule } from './flows/inngest/inngest.module';
 
 @Module({
   imports: [
+    SentryModule.forRoot(),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
@@ -51,7 +56,12 @@ import { InngestModule } from './flows/inngest/inngest.module';
           },
         },
         serializers: {
-          req: (req: any) => ({
+          req: (req: {
+            id?: string;
+            method: string;
+            url: string;
+            headers: Record<string, unknown>;
+          }) => ({
             id: req.id,
             method: req.method,
             url: req.url,
@@ -61,23 +71,31 @@ import { InngestModule } from './flows/inngest/inngest.module';
               'x-request-id': req.headers['x-request-id'],
             },
           }),
-          res: (res: any) => ({
+          res: (res: { statusCode: number }) => ({
             statusCode: res.statusCode,
           }),
         },
-        customSuccessMessage: (req: any, res: any, responseTime: number) =>
-          `${req.method} ${req.url} completed in ${responseTime}ms`,
-        customErrorMessage: (req: any, res: any, error: Error) =>
-          `Error on ${req.method} ${req.url}: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        customProps: (req: any) => ({
+        customSuccessMessage: (
+          req: IncomingMessage,
+          res: ServerResponse<IncomingMessage>,
+          responseTime: number,
+        ) => `${req.method || 'UNKNOWN'} ${req.url || 'unknown'} completed in ${responseTime}ms`,
+        customErrorMessage: (
+          req: IncomingMessage,
+          res: ServerResponse<IncomingMessage>,
+          error: Error,
+        ) =>
+          `Error on ${req.method || 'UNKNOWN'} ${req.url || 'unknown'}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        customProps: (req: IncomingMessage) => ({
           orgId: req.headers['x-org-id'],
           userId: req.headers['x-user-id'],
-          requestId: req.id || req.headers['x-request-id'],
+          requestId: req.headers['x-request-id'],
         }),
       },
     }),
     CommonModule,
     CacheModule,
+    MetricsModule,
     HealthModule,
     OrganizationsModule,
     UsersModule,
@@ -91,7 +109,24 @@ import { InngestModule } from './flows/inngest/inngest.module';
     InngestModule,
   ],
   controllers: [AppController],
-  providers: [AppService, AwsSecretsService, SecretsResolver, OAuthTokenService, AblyService],
+  providers: [
+    AppService,
+    AwsSecretsService,
+    SecretsResolver,
+    OAuthTokenService,
+    AblyService,
+    makeCounterProvider({
+      name: 'http_requests_total',
+      help: 'HTTP Requests Total',
+      labelNames: ['method', 'route', 'status'],
+    }),
+    makeHistogramProvider({
+      name: 'http_request_duration_seconds',
+      help: 'HTTP request duration in seconds',
+      labelNames: ['method', 'route', 'status'],
+      buckets: [0.1, 0.5, 1, 2, 5],
+    }),
+  ],
   exports: [AwsSecretsService, SecretsResolver, OAuthTokenService, AblyService],
 })
 export class AppModule implements NestModule, OnModuleInit {
@@ -108,7 +143,7 @@ export class AppModule implements NestModule, OnModuleInit {
   configure(consumer: MiddlewareConsumer): void {
     consumer
       .apply(TenantMiddleware)
-      .exclude('organizations/(.*)', '/', '/health', '/status', 'webhooks/event-types')
+      .exclude('organizations/(.*)', '/', '/health', '/status', '/metrics', 'webhooks/event-types')
       .forRoutes(
         'users',
         'tools',

@@ -8,10 +8,11 @@ import { OAuthTokenService } from '../oauth/oauth-token.service';
 import { AwsSecretsService } from '../aws-secrets.service';
 import { SandboxModule } from '../sandbox/sandbox.module';
 import { ExecutionLogsModule } from '../execution-logs/execution-logs.module';
+import { MetricsModule } from '../metrics/metrics.module';
 import { InngestExecutionService } from './inngest/inngest-execution.service';
 
 @Module({
-  imports: [SandboxModule, ExecutionLogsModule],
+  imports: [SandboxModule, ExecutionLogsModule, MetricsModule],
   controllers: [FlowsController],
   providers: [
     FlowsService,

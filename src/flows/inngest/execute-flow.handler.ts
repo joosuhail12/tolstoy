@@ -11,6 +11,7 @@ import {
 } from '../../common/services/condition-evaluator.service';
 import { PrismaService } from '../../prisma.service';
 import { ExecutionLogsService } from '../../execution-logs/execution-logs.service';
+import { MetricsService, StepMetricLabels } from '../../metrics/metrics.service';
 
 export interface FlowExecutionEvent {
   data: {
@@ -61,6 +62,7 @@ export class ExecuteFlowHandler {
     private readonly conditionEvaluator: ConditionEvaluatorService,
     private readonly prisma: PrismaService,
     private readonly executionLogsService: ExecutionLogsService,
+    private readonly metricsService: MetricsService,
     @Optional() private readonly inngestService: InngestService,
     @InjectPinoLogger(ExecuteFlowHandler.name)
     private readonly logger: PinoLogger,
@@ -131,8 +133,17 @@ export class ExecuteFlowHandler {
           async () => {
             retryCount++;
 
-            // Log retry attempts for monitoring
+            // Prepare metrics labels
+            const metricLabels: StepMetricLabels = {
+              orgId,
+              flowId,
+              stepKey: flowStep.id,
+            };
+
+            // Log retry attempts and increment retry metrics
             if (retryCount > 1) {
+              this.metricsService.incrementStepRetries(metricLabels);
+
               this.logger.info(
                 {
                   stepId: flowStep.id,
@@ -415,6 +426,16 @@ export class ExecuteFlowHandler {
   ): Promise<StepExecutionResult> {
     const startTime = Date.now();
 
+    // Prepare metrics labels
+    const metricLabels: StepMetricLabels = {
+      orgId: context.orgId,
+      flowId: context.flowId,
+      stepKey: step.id,
+    };
+
+    // Start metrics timer
+    const endTimer = this.metricsService.startStepTimer(metricLabels);
+
     // Check executeIf condition before executing the step
     if (step.executeIf) {
       try {
@@ -437,6 +458,9 @@ export class ExecuteFlowHandler {
         if (!shouldExecute) {
           const duration = Date.now() - startTime;
           const skipReason = 'executeIf condition evaluated to false';
+
+          // End metrics timer for skipped step
+          endTimer();
 
           this.logger.info(
             {
@@ -523,6 +547,12 @@ export class ExecuteFlowHandler {
 
       const duration = Date.now() - startTime;
 
+      // End metrics timer and record error if step failed
+      endTimer();
+      if (!result.success) {
+        this.metricsService.incrementStepErrors(metricLabels);
+      }
+
       return {
         ...result,
         metadata: {
@@ -532,6 +562,10 @@ export class ExecuteFlowHandler {
       };
     } catch (error) {
       const duration = Date.now() - startTime;
+
+      // End metrics timer and record error for exception case
+      endTimer();
+      this.metricsService.incrementStepErrors(metricLabels);
 
       return {
         success: false,

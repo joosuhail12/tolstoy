@@ -169,13 +169,12 @@ describe('WebhookSignatureService', () => {
 
   describe('verifyWebhookRequest', () => {
     it('should verify valid webhook request', () => {
-      const body: WebhookPayload = {
+      const timestamp = Date.now();
+      const body = {
         eventType: 'test.event',
-        timestamp: Date.now(),
         data: { test: 'data' },
       };
       const secret = 'test-secret';
-      const timestamp = Date.now();
       const payloadWithTimestamp = { timestamp, ...body };
       const signature = service.generateSignature(payloadWithTimestamp, secret);
 

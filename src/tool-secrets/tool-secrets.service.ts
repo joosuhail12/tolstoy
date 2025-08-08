@@ -13,7 +13,7 @@ export interface StoredCredentials {
   toolId: string;
   toolName: string;
   credentials: ToolCredentials;
-  maskedCredentials: any;
+  maskedCredentials: Record<string, string>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -39,8 +39,8 @@ export class ToolSecretsService {
     return value.substring(0, 4) + '*'.repeat(value.length - 8) + value.substring(value.length - 4);
   }
 
-  private maskCredentials(credentials: ToolCredentials): any {
-    const masked: any = {};
+  private maskCredentials(credentials: ToolCredentials): Record<string, string> {
+    const masked: Record<string, string> = {};
     Object.keys(credentials).forEach(key => {
       masked[key] = this.maskCredential(credentials[key]);
     });
@@ -224,7 +224,18 @@ export class ToolSecretsService {
       }
 
       // Fetch from AWS Secrets Manager
-      const credentials = await this.awsSecrets.getSecretAsJson((tool as any).secretName);
+      const credentialsRaw = await this.awsSecrets.getSecretAsJson((tool as any).secretName);
+      const credentials: ToolCredentials = {};
+
+      // Convert unknown values to strings, ensuring type safety
+      for (const [key, value] of Object.entries(credentialsRaw)) {
+        if (typeof value === 'string') {
+          credentials[key] = value;
+        } else {
+          credentials[key] = String(value);
+        }
+      }
+
       const maskedCredentials = this.maskCredentials(credentials);
 
       // Cache the masked credentials metadata
@@ -357,7 +368,20 @@ export class ToolSecretsService {
           } else {
             // Fallback to AWS Secrets Manager
             try {
-              const credentials = await this.awsSecrets.getSecretAsJson((tool as any).secretName);
+              const credentialsRaw = await this.awsSecrets.getSecretAsJson(
+                (tool as any).secretName,
+              );
+              const credentials: ToolCredentials = {};
+
+              // Convert unknown values to strings, ensuring type safety
+              for (const [key, value] of Object.entries(credentialsRaw)) {
+                if (typeof value === 'string') {
+                  credentials[key] = value;
+                } else {
+                  credentials[key] = String(value);
+                }
+              }
+
               credentialKeys = Object.keys(credentials);
 
               // Cache the metadata for future use
@@ -381,14 +405,26 @@ export class ToolSecretsService {
           }
         }
 
-        return {
+        const result: {
+          toolId: string;
+          toolName: string;
+          baseUrl: string;
+          authType: string;
+          hasCredentials: boolean;
+          credentialKeys?: string[];
+        } = {
           toolId: tool.id,
           toolName: (tool as any).name,
           baseUrl: tool.baseUrl,
           authType: tool.authType,
           hasCredentials: !!(tool as any).secretName,
-          credentialKeys: (tool as any).secretName ? credentialKeys : undefined,
         };
+
+        if ((tool as any).secretName && credentialKeys) {
+          result.credentialKeys = credentialKeys;
+        }
+
+        return result;
       }),
     );
 

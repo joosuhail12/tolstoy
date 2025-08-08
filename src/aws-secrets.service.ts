@@ -144,7 +144,7 @@ export class AwsSecretsService {
     }
   }
 
-  async getSecretAsJson(secretId: string): Promise<any> {
+  async getSecretAsJson(secretId: string): Promise<Record<string, unknown>> {
     try {
       const secretString = await this.getSecret(secretId);
       return JSON.parse(secretString);
@@ -197,8 +197,8 @@ export class AwsSecretsService {
   }> {
     const secrets = await this.getSecretAsJson(secretId);
     return {
-      apiKey: secrets.INNGEST_API_KEY,
-      webhookSecret: secrets.INNGEST_WEBHOOK_SECRET,
+      apiKey: String(secrets.INNGEST_API_KEY),
+      webhookSecret: String(secrets.INNGEST_WEBHOOK_SECRET),
     };
   }
 
@@ -213,7 +213,10 @@ export class AwsSecretsService {
     }
   }
 
-  async updateSecret(secretId: string, secretValue: string | any): Promise<void> {
+  async updateSecret(
+    secretId: string,
+    secretValue: string | Record<string, unknown>,
+  ): Promise<void> {
     try {
       this.logger.info({ secretId }, 'Updating secret value');
 
@@ -243,7 +246,7 @@ export class AwsSecretsService {
 
   async createSecret(
     secretName: string,
-    secretValue: string | any,
+    secretValue: string | Record<string, unknown>,
     description?: string,
   ): Promise<void> {
     try {
@@ -343,9 +346,15 @@ export class AwsSecretsService {
   /**
    * Get cache metrics for monitoring
    */
-  getCacheMetrics(): any {
+  getCacheMetrics(): Record<string, unknown> {
     if (this.cacheService) {
-      return this.cacheService.getMetrics();
+      const metrics = this.cacheService.getMetrics();
+      return {
+        hitRate: metrics.hitRate,
+        hits: metrics.hits,
+        misses: metrics.misses,
+        operations: metrics.operations,
+      };
     }
     return { error: 'Cache service not available' };
   }

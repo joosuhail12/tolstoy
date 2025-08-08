@@ -8,6 +8,7 @@ import { AblyService } from '../../ably/ably.service';
 import { CommonModule } from '../../common/common.module';
 import { CacheModule } from '../../cache/cache.module';
 import { ExecutionLogsModule } from '../../execution-logs/execution-logs.module';
+import { MetricsModule } from '../../metrics/metrics.module';
 
 /**
  * Inngest Integration Module
@@ -20,6 +21,7 @@ import { ExecutionLogsModule } from '../../execution-logs/execution-logs.module'
     CommonModule,
     CacheModule,
     ExecutionLogsModule,
+    MetricsModule,
     NestInngestModule.forRootAsync({
       imports: [], // AwsSecretsService is globally available
       inject: [AwsSecretsService],
@@ -30,6 +32,7 @@ import { ExecutionLogsModule } from '../../execution-logs/execution-logs.module'
 
           return {
             appId: 'tolstoy-workflow-engine',
+            signingKey: eventKey, // Add signingKey for nestjs-inngest compatibility
             inngest: {
               id: 'tolstoy',
               name: 'Tolstoy Workflow Engine',
@@ -63,6 +66,7 @@ import { ExecutionLogsModule } from '../../execution-logs/execution-logs.module'
           // Fallback to environment variables if AWS Secrets fail
           return {
             appId: 'tolstoy-workflow-engine',
+            signingKey: process.env.INNGEST_API_KEY || 'dev-key', // Add signingKey for nestjs-inngest compatibility
             inngest: {
               id: 'tolstoy',
               name: 'Tolstoy Workflow Engine',

@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { register } from 'prom-client';
 import { FlowExecutorService, FlowStep, FlowExecutionContext } from './flow-executor.service';
 import { SandboxService } from '../sandbox/sandbox.service';
 import { PrismaService } from '../prisma.service';
@@ -8,12 +9,14 @@ import { OAuthTokenService } from '../oauth/oauth-token.service';
 import { InputValidatorService } from '../common/services/input-validator.service';
 import { ConditionEvaluatorService } from '../common/services/condition-evaluator.service';
 import { ExecutionLogsService } from '../execution-logs/execution-logs.service';
+import { MetricsService } from '../metrics/metrics.service';
 import { InngestService } from 'nestjs-inngest';
 
 describe('FlowExecutorService - Sandbox Integration', () => {
   let flowExecutorService: FlowExecutorService;
   let sandboxService: any;
   let ablyService: any;
+  // let metricsService: MetricsService;
 
   const mockContext: FlowExecutionContext = {
     executionId: 'exec-123',
@@ -39,6 +42,9 @@ describe('FlowExecutorService - Sandbox Integration', () => {
   };
 
   beforeEach(async () => {
+    // Clear all metrics before each test
+    register.clear();
+
     const mockSandboxService = {
       runSync: jest.fn(),
       runAsync: jest.fn(),
@@ -89,6 +95,7 @@ describe('FlowExecutorService - Sandbox Integration', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FlowExecutorService,
+        MetricsService,
         { provide: SandboxService, useValue: mockSandboxService },
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: AblyService, useValue: mockAblyService },
@@ -105,6 +112,7 @@ describe('FlowExecutorService - Sandbox Integration', () => {
     flowExecutorService = module.get(FlowExecutorService);
     sandboxService = module.get(SandboxService);
     ablyService = module.get(AblyService);
+    // metricsService = module.get(MetricsService);
 
     // Default mock implementations
     ablyService.createStepEvent.mockResolvedValue({} as any);
@@ -113,6 +121,7 @@ describe('FlowExecutorService - Sandbox Integration', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    register.clear();
   });
 
   describe('Sandbox Sync Execution', () => {
@@ -153,6 +162,13 @@ describe('FlowExecutorService - Sandbox Integration', () => {
           language: 'javascript',
         }),
       });
+
+      // Verify metrics were recorded
+      const metricsString = await register.metrics();
+      expect(metricsString).toContain('step_execution_seconds');
+      expect(metricsString).toContain('orgId="org-789"');
+      expect(metricsString).toContain('flowId="flow-456"');
+      expect(metricsString).toContain('stepKey="step-sandbox-sync"');
     });
 
     it('should handle sandbox_sync execution failures', async () => {
@@ -180,6 +196,14 @@ describe('FlowExecutorService - Sandbox Integration', () => {
           executionTime: 500,
         }),
       });
+
+      // Verify error metrics were recorded
+      const metricsString = await register.metrics();
+      expect(metricsString).toContain('step_errors_total');
+      expect(metricsString).toContain('orgId="org-789"');
+      expect(metricsString).toContain('flowId="flow-456"');
+      expect(metricsString).toContain('stepKey="step-sandbox-sync-fail"');
+      expect(metricsString).toContain('1'); // Should show 1 error
     });
 
     it('should handle missing code in sandbox_sync step', async () => {
@@ -201,6 +225,11 @@ describe('FlowExecutorService - Sandbox Integration', () => {
       });
 
       expect(sandboxService.runSync).not.toHaveBeenCalled();
+
+      // Verify error metrics were recorded even for configuration errors
+      const metricsString = await register.metrics();
+      expect(metricsString).toContain('step_errors_total');
+      expect(metricsString).toContain('stepKey="step-no-code"');
     });
   });
 

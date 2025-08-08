@@ -2,15 +2,25 @@ import { Injectable, BadRequestException } from '@nestjs/common';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import * as jsonLogic from 'json-logic-js';
 
+export type ConditionValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined
+  | unknown
+  | ConditionValue[]
+  | { [key: string]: ConditionValue };
+
 export interface ConditionContext {
   /** Input variables from the flow execution */
-  inputs: Record<string, any>;
+  inputs: Record<string, ConditionValue>;
   /** Variables passed to the flow */
-  variables: Record<string, any>;
+  variables: Record<string, ConditionValue>;
   /** Outputs from previous steps */
-  stepOutputs: Record<string, any>;
+  stepOutputs: Record<string, ConditionValue>;
   /** Current step configuration */
-  currentStep?: Record<string, any>;
+  currentStep?: Record<string, ConditionValue>;
   /** Organization context */
   orgId?: string;
   /** User context */
@@ -23,13 +33,57 @@ export interface ConditionContext {
   };
 }
 
+export type JSONLogicRule = Record<string, unknown> | string | number | boolean;
+
+export interface SimpleComparisonRule {
+  field: string;
+  operator:
+    | '=='
+    | '!='
+    | '>'
+    | '<'
+    | '>='
+    | '<='
+    | 'contains'
+    | 'startsWith'
+    | 'endsWith'
+    | 'equals'
+    | '==='
+    | 'strictEquals'
+    | 'notEquals'
+    | '!=='
+    | 'strictNotEquals'
+    | 'greaterThan'
+    | 'greaterThanOrEqual'
+    | 'lessThan'
+    | 'lessThanOrEqual'
+    | 'in'
+    | 'notIn'
+    | 'exists'
+    | 'notExists';
+  value: ConditionValue;
+}
+
+export interface CustomDSLRule {
+  type: 'custom';
+  operation: 'timeWindow' | 'userRole' | 'stepOutput';
+  [key: string]: ConditionValue;
+}
+
+export type ConditionRuleValue = JSONLogicRule | SimpleComparisonRule | CustomDSLRule;
+
 export interface ConditionRule {
   /** JSONLogic rule or custom condition format */
-  rule: any;
+  rule: ConditionRuleValue;
   /** Optional description of the condition */
   description?: string;
   /** Condition type for validation */
   type?: 'jsonlogic' | 'custom';
+}
+
+export interface ConditionValidationResult {
+  valid: boolean;
+  error?: string;
 }
 
 /**
@@ -53,7 +107,7 @@ export class ConditionEvaluatorService {
   /**
    * Evaluate a condition rule against the provided context
    */
-  evaluate(rule: any, context: ConditionContext): boolean {
+  evaluate(rule: ConditionRuleValue, context: ConditionContext): boolean {
     if (!rule) {
       // No rule means always execute
       return true;
@@ -106,20 +160,22 @@ export class ConditionEvaluatorService {
   /**
    * Validate a condition rule without executing it
    */
-  validateRule(rule: any): { valid: boolean; error?: string } {
+  validateRule(rule: ConditionRuleValue): ConditionValidationResult {
     if (!rule) {
       return { valid: true };
     }
 
     try {
       // Test with mock context
-      const mockContext = {
+      const mockContext: ConditionContext = {
         inputs: { test: 'value' },
         variables: { test: 'value' },
         stepOutputs: { test: 'value' },
       };
 
-      this.evaluateRule(rule, mockContext);
+      if (rule) {
+        this.evaluateRule(rule, mockContext);
+      }
       return { valid: true };
     } catch (error) {
       return {
@@ -149,19 +205,26 @@ export class ConditionEvaluatorService {
   /**
    * Internal rule evaluation logic
    */
-  private evaluateRule(rule: any, context: ConditionContext): any {
+  private evaluateRule(
+    rule: ConditionRuleValue | null | undefined,
+    context: ConditionContext,
+  ): boolean {
     // Set current context for custom operations
     this.currentContext = context;
 
     try {
+      if (!rule) {
+        return true;
+      }
+
       // Handle JSONLogic format
       if (this.isJSONLogicRule(rule)) {
-        return jsonLogic.apply(rule, context);
+        return Boolean(jsonLogic.apply(rule as any, context));
       }
 
       // Handle simple comparison format
       if (this.isSimpleComparisonRule(rule)) {
-        return this.evaluateSimpleComparison(rule, context);
+        return this.evaluateSimpleComparison(rule as SimpleComparisonRule, context);
       }
 
       // Handle custom DSL format
@@ -170,7 +233,7 @@ export class ConditionEvaluatorService {
       }
 
       // Default: treat as JSONLogic
-      return jsonLogic.apply(rule, context);
+      return Boolean(jsonLogic.apply(rule as any, context));
     } finally {
       // Clear current context
       this.currentContext = null;
@@ -250,7 +313,7 @@ export class ConditionEvaluatorService {
    * Evaluate simple comparison rules
    * Format: { field: "inputs.priority", operator: "==", value: "high" }
    */
-  private evaluateSimpleComparison(rule: any, context: ConditionContext): boolean {
+  private evaluateSimpleComparison(rule: SimpleComparisonRule, context: ConditionContext): boolean {
     const { field, operator, value } = rule;
 
     const fieldValue = this.getFieldValue(field, context);
@@ -403,9 +466,15 @@ export class ConditionEvaluatorService {
   /**
    * Custom DSL: Step output evaluation
    */
-  private evaluateStepOutput(config: any, context: ConditionContext): boolean {
-    const { stepId, condition } = config;
-    const stepOutput = context.stepOutputs?.[stepId];
+  private evaluateStepOutput(
+    config: Record<string, ConditionValue>,
+    context: ConditionContext,
+  ): boolean {
+    const { stepId, condition } = config as { stepId: string; condition: ConditionRuleValue };
+    const stepOutput = context.stepOutputs?.[stepId as string];
+    if (!stepOutput || typeof stepOutput !== 'object') {
+      return false;
+    }
 
     if (!stepOutput) {
       return false;
@@ -414,7 +483,7 @@ export class ConditionEvaluatorService {
     // Apply condition to step output
     return this.evaluateRule(condition, {
       ...context,
-      inputs: stepOutput,
+      inputs: stepOutput as Record<string, ConditionValue>,
     });
   }
 }

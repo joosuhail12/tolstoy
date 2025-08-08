@@ -226,8 +226,8 @@ describe('ConditionEvaluatorService', () => {
 
   describe('Edge Cases and Error Handling', () => {
     it('should return true for null/undefined rules', () => {
-      expect(service.evaluate(null, mockContext)).toBe(true);
-      expect(service.evaluate(undefined, mockContext)).toBe(true);
+      expect(service.evaluate(null as any, mockContext)).toBe(true);
+      expect(service.evaluate(undefined as any, mockContext)).toBe(true);
     });
 
     it('should handle complex nested conditions', () => {
@@ -298,7 +298,7 @@ describe('ConditionEvaluatorService', () => {
     });
 
     it('should handle null rules in validation', () => {
-      const result = service.validateRule(null);
+      const result = service.validateRule(null as any);
       expect(result.valid).toBe(true);
     });
   });

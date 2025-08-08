@@ -1,5 +1,21 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { z, ZodObject, ZodSchema } from 'zod';
+import * as Sentry from '@sentry/nestjs';
+
+export type InputParameterDefaultValue =
+  | string
+  | number
+  | boolean
+  | string[]
+  | Record<string, unknown>;
+
+export interface InputValidationRules {
+  min?: number;
+  max?: number;
+  pattern?: string;
+  email?: boolean;
+  url?: boolean;
+}
 
 export interface InputParameter {
   name: string;
@@ -8,20 +24,36 @@ export interface InputParameter {
   required: boolean;
   description?: string;
   control?: 'text' | 'textarea' | 'select' | 'checkbox' | 'number';
-  default?: any;
+  default?: InputParameterDefaultValue;
   options?: string[];
-  validation?: {
-    min?: number;
-    max?: number;
-    pattern?: string;
-    email?: boolean;
-    url?: boolean;
-  };
+  validation?: InputValidationRules;
+}
+
+export type ValidatedInputData = Record<
+  string,
+  string | number | boolean | string[] | Record<string, unknown>
+>;
+
+export interface ValidationErrorDetail {
+  field: string;
+  message: string;
+  code: string;
+}
+
+export interface SchemaPropertyDescription {
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'array' | 'object';
+  required: boolean;
+  description?: string | undefined;
+  label?: string | undefined;
+  control?: 'text' | 'textarea' | 'select' | 'checkbox' | 'number' | undefined;
+  default?: InputParameterDefaultValue | undefined;
+  options?: string[] | undefined;
+  validation?: InputValidationRules | undefined;
 }
 
 @Injectable()
 export class InputValidatorService {
-  buildZodSchema(paramList: InputParameter[]): ZodObject<any> {
+  buildZodSchema(paramList: InputParameter[]): ZodObject<Record<string, ZodSchema>> {
     const shape: Record<string, ZodSchema> = {};
 
     for (const param of paramList) {
@@ -60,20 +92,35 @@ export class InputValidatorService {
           break;
         case 'enum':
           if (!param.options || param.options.length === 0) {
-            throw new BadRequestException(
+            const error = new BadRequestException(
               `Enum parameter '${param.name}' must have options defined`,
             );
+
+            // Capture schema building error in Sentry
+            Sentry.withScope(scope => {
+              scope.setTag('errorType', 'schema-building');
+              scope.setLevel('error');
+              scope.setContext('schemaBuildingError', {
+                parameterName: param.name,
+                parameterType: param.type,
+                reason: 'enum-without-options',
+              });
+
+              Sentry.captureException(error);
+            });
+
+            throw error;
           }
           base = z.enum(param.options as [string, ...string[]]);
           break;
         case 'array':
-          base = z.array(z.any());
+          base = z.array(z.unknown());
           break;
         case 'object':
           base = z.object({}).passthrough();
           break;
         default:
-          base = z.any();
+          base = z.unknown();
       }
 
       if (param.default !== undefined && param.default !== null) {
@@ -86,17 +133,49 @@ export class InputValidatorService {
     return z.object(shape);
   }
 
-  validate(paramList: InputParameter[], inputData: any): any {
+  validate(paramList: InputParameter[], inputData: unknown): ValidatedInputData {
     try {
       const schema = this.buildZodSchema(paramList);
-      return schema.parse(inputData || {});
-    } catch (err: any) {
+      return schema.parse(inputData || {}) as ValidatedInputData;
+    } catch (err: unknown) {
       if (err instanceof z.ZodError) {
-        const formattedErrors = err.issues.map(issue => ({
+        const formattedErrors: ValidationErrorDetail[] = err.issues.map(issue => ({
           field: issue.path.join('.'),
           message: issue.message,
           code: issue.code,
         }));
+
+        // Add Sentry breadcrumb for validation failure
+        Sentry.addBreadcrumb({
+          message: 'Input validation failed',
+          category: 'validation',
+          level: 'warning',
+          data: {
+            errorCount: err.issues.length,
+            fields: err.issues.map(issue => issue.path.join('.')),
+            inputKeys:
+              inputData && typeof inputData === 'object' && inputData !== null
+                ? Object.keys(inputData)
+                : [],
+            parameterCount: paramList.length,
+          },
+        });
+
+        // Capture validation error details in Sentry
+        Sentry.withScope(scope => {
+          scope.setTag('errorType', 'validation');
+          scope.setLevel('warning');
+          scope.setContext('validationFailure', {
+            issues: formattedErrors,
+            inputDataKeys:
+              inputData && typeof inputData === 'object' && inputData !== null
+                ? Object.keys(inputData)
+                : [],
+            parameters: paramList.map(p => ({ name: p.name, type: p.type, required: p.required })),
+          });
+
+          Sentry.captureException(err);
+        });
 
         throw new BadRequestException({
           message: 'Input validation failed',
@@ -105,14 +184,30 @@ export class InputValidatorService {
         });
       }
 
+      // For non-Zod errors, capture with different context
+      Sentry.withScope(scope => {
+        scope.setTag('errorType', 'validation-unknown');
+        scope.setLevel('error');
+        scope.setContext('validationError', {
+          errorMessage: err instanceof Error ? err.message : 'Unknown error',
+          inputDataKeys:
+            inputData && typeof inputData === 'object' && inputData !== null
+              ? Object.keys(inputData)
+              : [],
+          parameterCount: paramList.length,
+        });
+
+        Sentry.captureException(err);
+      });
+
       throw new BadRequestException({
         message: 'Input validation failed',
-        error: err.message || 'Unknown validation error',
+        error: err instanceof Error ? err.message : 'Unknown validation error',
       });
     }
   }
 
-  validateAsync(paramList: InputParameter[], inputData: any): Promise<any> {
+  validateAsync(paramList: InputParameter[], inputData: unknown): Promise<ValidatedInputData> {
     try {
       const result = this.validate(paramList, inputData);
       return Promise.resolve(result);
@@ -121,7 +216,7 @@ export class InputValidatorService {
     }
   }
 
-  getSchemaDescription(paramList: InputParameter[]): Record<string, any> {
+  getSchemaDescription(paramList: InputParameter[]): Record<string, SchemaPropertyDescription> {
     return paramList.reduce(
       (acc, param) => {
         acc[param.name] = {
@@ -136,7 +231,7 @@ export class InputValidatorService {
         };
         return acc;
       },
-      {} as Record<string, any>,
+      {} as Record<string, SchemaPropertyDescription>,
     );
   }
 }

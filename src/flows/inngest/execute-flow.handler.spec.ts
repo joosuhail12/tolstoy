@@ -69,6 +69,30 @@ describe('ExecuteFlowHandler', () => {
         { provide: ConditionEvaluatorService, useValue: mockConditionEvaluator },
         { provide: PrismaService, useValue: mockPrismaService },
         {
+          provide: 'ExecutionLogsService',
+          useValue: {
+            createStepLog: jest.fn(),
+            markStepStarted: jest.fn(),
+            markStepCompleted: jest.fn(),
+            markStepFailed: jest.fn(),
+            markStepSkipped: jest.fn(),
+          },
+        },
+        {
+          provide: 'MetricsService',
+          useValue: {
+            startStepTimer: jest.fn(() => jest.fn()),
+            incrementStepExecution: jest.fn(),
+            incrementFlowExecution: jest.fn(),
+          },
+        },
+        {
+          provide: 'InngestService',
+          useValue: {
+            send: jest.fn(),
+          },
+        },
+        {
           provide: `PinoLogger:${ExecuteFlowHandler.name}`,
           useValue: mockLogger,
         },

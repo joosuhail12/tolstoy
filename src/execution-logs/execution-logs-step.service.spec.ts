@@ -98,8 +98,8 @@ describe('ExecutionLogsService - Step Logging', () => {
             stepOutputs: {},
           },
           status: 'started',
-          outputs: null,
-          error: null,
+          outputs: undefined,
+          error: undefined,
         },
       });
     });
@@ -199,8 +199,8 @@ describe('ExecutionLogsService - Step Logging', () => {
             stepOutputs: {},
           },
           status: 'started',
-          outputs: null,
-          error: null,
+          outputs: undefined,
+          error: undefined,
         },
       });
     });
@@ -257,7 +257,7 @@ describe('ExecutionLogsService - Step Logging', () => {
       const error = { custom: 'error object' };
       const expectedError = {
         message: 'Unknown error',
-        code: undefined,
+        code: 'UNKNOWN_ERROR',
         stack: undefined,
         custom: 'error object',
       };

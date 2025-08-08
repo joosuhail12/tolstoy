@@ -5,11 +5,13 @@ export interface WebhookPayload {
   eventType: string;
   timestamp: number;
   data: Record<string, unknown>;
-  metadata?: {
-    orgId: string;
-    webhookId: string;
-    deliveryId: string;
-  };
+  metadata?:
+    | {
+        orgId: string;
+        webhookId: string;
+        deliveryId: string;
+      }
+    | undefined;
 }
 
 export interface WebhookHeaders {
@@ -17,6 +19,7 @@ export interface WebhookHeaders {
   'x-webhook-timestamp'?: string;
   'x-webhook-event'?: string;
   'x-webhook-delivery'?: string;
+  [key: string]: string | undefined;
 }
 
 @Injectable()
@@ -68,8 +71,8 @@ export class WebhookSignatureService {
 
     if (secret) {
       const payloadWithTimestamp = {
-        timestamp,
         ...payload,
+        timestamp,
       };
       headers['x-webhook-signature'] = this.generateSignature(payloadWithTimestamp, secret);
     }

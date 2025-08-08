@@ -104,10 +104,8 @@ describe('WebhooksService', () => {
     });
 
     it('should use default enabled value if not provided', async () => {
-      const dtoWithoutEnabled = {
-        ...createDto,
-        enabled: undefined,
-      };
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { enabled, ...dtoWithoutEnabled } = createDto;
       mockPrisma.webhook.findFirst.mockResolvedValue(null);
       mockPrisma.webhook.create.mockResolvedValue(mockWebhook);
 

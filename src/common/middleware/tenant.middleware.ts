@@ -1,13 +1,18 @@
 import { Injectable, NestMiddleware, BadRequestException } from '@nestjs/common';
 import { Response, NextFunction } from 'express';
+import { IncomingHttpHeaders } from 'http';
 import { randomUUID } from 'crypto';
 import { RequestWithTenant } from '../interfaces/tenant-context.interface';
 
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
-  use(req: RequestWithTenant, res: Response, next: NextFunction): void {
-    const orgId = req.headers['x-org-id'] as string;
-    const userId = req.headers['x-user-id'] as string;
+  use(
+    req: RequestWithTenant & { headers: IncomingHttpHeaders },
+    res: Response,
+    next: NextFunction,
+  ): void {
+    const orgId = req.headers['x-org-id'] as string | undefined;
+    const userId = req.headers['x-user-id'] as string | undefined;
 
     if (!orgId || !userId) {
       throw new BadRequestException(
@@ -16,10 +21,10 @@ export class TenantMiddleware implements NestMiddleware {
     }
 
     // Generate or use existing request ID for traceability
-    const requestId = (req.headers['x-request-id'] as string) || randomUUID();
+    const requestId = (req.headers['x-request-id'] as string | undefined) || randomUUID();
 
     // Attach request ID to request for Fastify compatibility
-    (req as any).id = requestId;
+    (req as unknown as RequestWithTenant & { id: string }).id = requestId;
 
     // Set response header for client traceability
     res.setHeader('x-request-id', requestId);
@@ -31,13 +36,18 @@ export class TenantMiddleware implements NestMiddleware {
     };
 
     // Also set it on the raw request object for Fastify compatibility
-    (req as any).raw = (req as any).raw || req;
-    (req as any).raw.tenant = req.tenant;
+    (req as unknown as RequestWithTenant & { raw: RequestWithTenant }).raw =
+      (req as unknown as RequestWithTenant & { raw?: RequestWithTenant }).raw || req;
+    (req as unknown as RequestWithTenant & { raw: RequestWithTenant }).raw.tenant = req.tenant;
 
     // Store additional metadata for logging
-    (req as any).logContext = {
-      orgId: orgId.toString(),
-      userId: userId.toString(),
+    (
+      req as unknown as RequestWithTenant & {
+        logContext: { orgId: string; userId: string; requestId: string };
+      }
+    ).logContext = {
+      orgId: orgId!.toString(),
+      userId: userId!.toString(),
       requestId,
     };
 
