@@ -1,5 +1,5 @@
 {
-  "name": "@tolstoy/sdk",
+  "name": "@joosuhail/tolstoy-sdk",
   "version": "1.0.0",
   "description": "Official TypeScript SDK for Tolstoy workflow automation platform",
   "main": "dist/index.js",

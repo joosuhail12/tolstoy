@@ -1,17 +1,17 @@
-# @tolstoy/sdk
+# @joosuhail/tolstoy-sdk
 
 The official TypeScript SDK for the Tolstoy workflow automation platform.
 
 ## Installation
 
 ```bash
-npm install @tolstoy/sdk
+npm install @joosuhail/tolstoy-sdk
 ```
 
 ## Quick Start
 
 ```typescript
-import { TolstoyClient } from '@tolstoy/sdk';
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
 
 const client = new TolstoyClient(
   'https://tolstoy.getpullse.com',
