@@ -3,6 +3,16 @@
   "theme": "mint",
   "name": "Tolstoy Docs",
   "description": "Workflow automation platform documentation - Learn how to create, manage, and execute workflows with Tolstoy",
+  "api": {
+    "playground": {
+      "mode": "show"
+    },
+    "baseUrl": ["https://api.tolstoy.dev", "http://localhost:3000"],
+    "auth": {
+      "method": "key",
+      "name": "x-org-id"
+    }
+  },
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
@@ -50,10 +60,15 @@
             ]
           },
           {
-            "group": "API Documentation",
+            "group": "API Documentation", 
             "pages": [
+              "docs/api-reference/index",
               "docs/api/index"
             ]
+          },
+          {
+            "group": "Interactive API Reference",
+            "openapi": "docs/openapi.json"
           }
         ]
       }

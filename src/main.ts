@@ -6,6 +6,9 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Logger } from 'nestjs-pino';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import * as fs from 'fs';
+import * as path from 'path';
 import { AppModule } from './app.module';
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
 
@@ -31,6 +34,56 @@ async function bootstrap() {
 
   // Set up global Sentry exception filter
   app.useGlobalFilters(new SentryExceptionFilter(app.get(Logger)));
+
+  // Configure Swagger/OpenAPI
+  const config = new DocumentBuilder()
+    .setTitle('Tolstoy API')
+    .setDescription('Interactive API reference for Tolstoy workflow automation platform')
+    .setVersion(process.env.APP_VERSION || '1.0.0')
+    .addServer('https://api.tolstoy.dev', 'Production')
+    .addServer('http://localhost:3000', 'Development')
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'x-org-id',
+        in: 'header',
+        description: 'Organization ID for multi-tenant access'
+      },
+      'x-org-id'
+    )
+    .addApiKey(
+      {
+        type: 'apiKey',
+        name: 'x-user-id', 
+        in: 'header',
+        description: 'User ID for request context'
+      },
+      'x-user-id'
+    )
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config, {
+    include: [AppModule],
+    deepScanRoutes: true,
+  });
+
+  // Write OpenAPI spec to docs/openapi.json
+  const outPath = path.resolve(__dirname, '../docs/openapi.json');
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(outPath, JSON.stringify(document, null, 2));
+
+  // If running in generate-openapi mode, exit after generating the spec
+  if (process.argv.includes('--generate-openapi')) {
+    console.log('OpenAPI spec generated at:', outPath);
+    process.exit(0);
+  }
+
+  // Serve Swagger UI at /api-docs (optional)
+  await SwaggerModule.setup('api-docs', app, document, {
+    swaggerOptions: {
+      persistAuthorization: true,
+    },
+  });
 
   await app.listen(3000, '0.0.0.0');
 
