@@ -1,0 +1,786 @@
+---
+title: Enhanced Input Schema
+description: "Rich UI and validation metadata for action input parameters"
+---
+
+# Enhanced Input Schema
+
+The enhanced input schema system provides rich UI and validation metadata for action input parameters, enabling sophisticated form generation, validation, and user experiences across the platform.
+
+## Overview
+
+**Feature:** Enhanced Input Schema Metadata
+
+The enhanced input schema extends beyond basic validation to include:
+
+- Rich UI control specifications (text, number, select, checkbox, date-picker)
+- Advanced validation constraints (min/max, patterns, formats)
+- Conditional visibility logic using JSONLogic
+- Default values and placeholders
+- Custom labels and descriptions
+- Accessibility and internationalization support
+
+## ActionInputParam Interface
+
+### Basic Structure
+
+```typescript
+interface ActionInputParam {
+  // Core identification
+  name: string;                    // Machine-readable parameter name
+  label?: string;                  // Human-readable UI label
+  description?: string;            // Help text for users
+  
+  // Type and validation
+  type: 'string' | 'number' | 'boolean' | 'enum' | 'date';
+  required: boolean;               // Whether parameter is required
+  
+  // UI rendering
+  control: 'text' | 'number' | 'checkbox' | 'select' | 'date-picker' | 'textarea';
+  
+  // Options and defaults
+  options?: string[];              // For enum/select controls
+  default?: any;                   // Default value
+  
+  // Conditional logic
+  visibleIf?: any;                 // JSONLogic visibility condition
+  
+  // Enhanced validation
+  validation?: ValidationConstraints;
+  
+  // UI enhancements
+  ui?: UIMetadata;
+}
+```
+
+### Validation Constraints
+
+```typescript
+interface ValidationConstraints {
+  min?: number;                    // Min length/value
+  max?: number;                    // Max length/value
+  pattern?: string;                // Regex pattern
+  message?: string;                // Custom error message
+  enum?: string[];                 // Valid values
+  format?: 'date' | 'date-time' | 'email' | 'url'; // Format validation
+}
+```
+
+### UI Metadata
+
+```typescript
+interface UIMetadata {
+  placeholder?: string;            // Placeholder text
+  hint?: string;                   // Additional help text
+  multiline?: boolean;             // Use textarea for strings
+  step?: number;                   // Step value for numbers
+  className?: string;              // CSS styling classes
+}
+```
+
+## Parameter Types
+
+### String Parameters
+
+String parameters support text input with extensive validation options:
+
+```json
+{
+  "name": "title",
+  "label": "Task Title", 
+  "description": "Enter a descriptive title for the task",
+  "type": "string",
+  "required": true,
+  "control": "text",
+  "validation": {
+    "min": 3,
+    "max": 100,
+    "message": "Title must be between 3 and 100 characters"
+  },
+  "ui": {
+    "placeholder": "Enter task title...",
+    "hint": "Keep it concise and specific"
+  }
+}
+```
+
+**Text Area Example:**
+```json
+{
+  "name": "description",
+  "label": "Description",
+  "type": "string", 
+  "required": false,
+  "control": "textarea",
+  "validation": {
+    "max": 1000
+  },
+  "ui": {
+    "multiline": true,
+    "placeholder": "Describe the task in detail..."
+  }
+}
+```
+
+**Email Validation:**
+```json
+{
+  "name": "email",
+  "label": "Email Address",
+  "type": "string",
+  "required": true,
+  "control": "text",
+  "validation": {
+    "format": "email",
+    "message": "Please enter a valid email address"
+  }
+}
+```
+
+**Pattern Validation:**
+```json
+{
+  "name": "reference_code",
+  "label": "Reference Code",
+  "type": "string",
+  "required": true,
+  "control": "text",
+  "validation": {
+    "pattern": "^[A-Z]{2}-\\d{4}$",
+    "message": "Format: AB-1234"
+  },
+  "ui": {
+    "placeholder": "AB-1234"
+  }
+}
+```
+
+### Number Parameters
+
+Number parameters handle numeric input with range validation:
+
+```json
+{
+  "name": "priority",
+  "label": "Priority Level",
+  "description": "Task priority from 1 (low) to 5 (critical)",
+  "type": "number",
+  "required": true,
+  "control": "number",
+  "validation": {
+    "min": 1,
+    "max": 5,
+    "message": "Priority must be between 1 and 5"
+  },
+  "default": 3,
+  "ui": {
+    "step": 1
+  }
+}
+```
+
+### Boolean Parameters
+
+Boolean parameters render as checkboxes or toggles:
+
+```json
+{
+  "name": "urgent",
+  "label": "Urgent Task",
+  "description": "Mark as urgent for immediate attention",
+  "type": "boolean",
+  "required": false,
+  "control": "checkbox",
+  "default": false
+}
+```
+
+### Enum Parameters
+
+Enum parameters provide selection from predefined options:
+
+```json
+{
+  "name": "status",
+  "label": "Task Status",
+  "description": "Current status of the task",
+  "type": "enum",
+  "required": true,
+  "control": "select",
+  "options": ["todo", "in-progress", "review", "done"],
+  "default": "todo"
+}
+```
+
+### Date Parameters
+
+Date parameters handle date and time input:
+
+```json
+{
+  "name": "due_date",
+  "label": "Due Date",
+  "description": "When this task should be completed",
+  "type": "date",
+  "required": false,
+  "control": "date-picker",
+  "validation": {
+    "format": "date"
+  }
+}
+```
+
+## Conditional Visibility
+
+Use JSONLogic expressions to control field visibility based on other field values:
+
+### Basic Conditional
+
+```json
+{
+  "name": "escalation_note",
+  "label": "Escalation Note",
+  "type": "string",
+  "required": false,
+  "control": "textarea",
+  "visibleIf": {
+    "===": [{"var": "inputs.urgent"}, true]
+  }
+}
+```
+
+### Complex Conditional
+
+```json
+{
+  "name": "approval_required",
+  "label": "Requires Approval",
+  "type": "boolean", 
+  "required": false,
+  "control": "checkbox",
+  "visibleIf": {
+    "and": [
+      {"===": [{"var": "inputs.priority"}, 5]},
+      {"in": [{"var": "inputs.category"}, ["security", "finance"]]}
+    ]
+  }
+}
+```
+
+### Nested Conditions
+
+```json
+{
+  "name": "manager_approval",
+  "label": "Manager Approval Required",
+  "type": "boolean",
+  "required": false, 
+  "control": "checkbox",
+  "visibleIf": {
+    "or": [
+      {">=": [{"var": "inputs.budget"}, 10000]},
+      {"and": [
+        {"===": [{"var": "inputs.urgent"}, true]},
+        {"===": [{"var": "inputs.priority"}, 5]}
+      ]}
+    ]
+  }
+}
+```
+
+## Default Values
+
+Default values are automatically applied when fields are not provided:
+
+```json
+[
+  {
+    "name": "priority",
+    "type": "number",
+    "required": false,
+    "control": "number", 
+    "default": 3
+  },
+  {
+    "name": "notify_assignee",
+    "type": "boolean",
+    "required": false,
+    "control": "checkbox",
+    "default": true
+  },
+  {
+    "name": "category",
+    "type": "enum",
+    "required": false,
+    "control": "select",
+    "options": ["general", "bug", "feature"],
+    "default": "general"
+  }
+]
+```
+
+## Validation Process
+
+### Input Validation Flow
+
+1. **Schema Loading**: Enhanced schema is loaded and processed
+2. **Type Conversion**: String inputs are converted to appropriate types
+3. **Required Check**: Required fields are validated
+4. **Type Validation**: Values are checked against their declared types
+5. **Constraint Validation**: Min/max, patterns, formats are validated
+6. **Enum Validation**: Selected values are checked against allowed options
+7. **Visibility Application**: Hidden fields are removed from final result
+
+### Error Handling
+
+Validation errors include detailed information for debugging:
+
+```json
+{
+  "message": "Input validation failed",
+  "errors": [
+    {
+      "field": "email",
+      "message": "Invalid email format", 
+      "code": "invalid_string"
+    },
+    {
+      "field": "priority",
+      "message": "Number must be greater than or equal to 1",
+      "code": "too_small"
+    }
+  ]
+}
+```
+
+## Legacy Compatibility
+
+The system maintains backward compatibility with legacy input schemas:
+
+### Legacy Format
+
+```json
+[
+  {
+    "name": "title",
+    "type": "string", 
+    "required": true,
+    "description": "Task title"
+  }
+]
+```
+
+### Automatic Migration
+
+Legacy schemas are automatically converted to enhanced format:
+
+```json
+{
+  "name": "title",
+  "label": "Title",                // Auto-generated from name
+  "description": "Task title",
+  "type": "string",
+  "required": true,
+  "control": "text"               // Auto-mapped from type
+}
+```
+
+## Integration Examples
+
+### Action Definition
+
+```json
+{
+  "name": "Create Task",
+  "key": "create-task",
+  "method": "POST",
+  "endpoint": "/tasks",
+  "inputSchema": [
+    {
+      "name": "title",
+      "label": "Task Title",
+      "description": "A clear, descriptive title for the task",
+      "type": "string",
+      "required": true,
+      "control": "text",
+      "validation": {
+        "min": 3,
+        "max": 100
+      },
+      "ui": {
+        "placeholder": "Enter task title..."
+      }
+    },
+    {
+      "name": "priority", 
+      "label": "Priority",
+      "description": "Task priority level",
+      "type": "enum",
+      "required": true,
+      "control": "select",
+      "options": ["low", "medium", "high", "critical"],
+      "default": "medium"
+    },
+    {
+      "name": "urgent",
+      "label": "Mark as Urgent",
+      "description": "Requires immediate attention",
+      "type": "boolean",
+      "required": false,
+      "control": "checkbox",
+      "default": false
+    },
+    {
+      "name": "escalation_note",
+      "label": "Escalation Note", 
+      "description": "Additional context for urgent tasks",
+      "type": "string",
+      "required": false,
+      "control": "textarea",
+      "visibleIf": {"===": [{"var": "inputs.urgent"}, true]},
+      "validation": {
+        "max": 500
+      }
+    }
+  ]
+}
+```
+
+### API Usage
+
+```bash
+curl -X POST /actions/create-task/execute \
+  -H "Authorization: Bearer sk_..." \
+  -H "X-Org-ID: org_123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputs": {
+      "title": "Fix login bug",
+      "priority": "high", 
+      "urgent": true,
+      "escalation_note": "Affecting all users"
+    }
+  }'
+```
+
+### Validation Result
+
+```json
+{
+  "success": true,
+  "executionId": "exec_123",
+  "duration": 250,
+  "data": {
+    "id": "task_456",
+    "title": "Fix login bug",
+    "priority": "high",
+    "urgent": true,
+    "escalation_note": "Affecting all users"
+  }
+}
+```
+
+## UI Generation
+
+### React Form Generation
+
+Enhanced schemas can automatically generate form UIs:
+
+```typescript
+import { ActionInputParam } from '@tolstoy/types';
+
+function generateFormField(param: ActionInputParam) {
+  switch (param.control) {
+    case 'text':
+      return (
+        <input
+          type="text"
+          name={param.name}
+          placeholder={param.ui?.placeholder}
+          required={param.required}
+          minLength={param.validation?.min}
+          maxLength={param.validation?.max}
+        />
+      );
+      
+    case 'select':
+      return (
+        <select name={param.name} required={param.required}>
+          {param.options?.map(option => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      );
+      
+    case 'checkbox':
+      return (
+        <input
+          type="checkbox"
+          name={param.name}
+          defaultChecked={param.default}
+        />
+      );
+      
+    // ... other controls
+  }
+}
+```
+
+### Form Validation
+
+Client-side validation using the schema:
+
+```typescript
+function validateInput(param: ActionInputParam, value: any): string | null {
+  if (param.required && !value) {
+    return `${param.label || param.name} is required`;
+  }
+  
+  if (param.type === 'string' && value) {
+    if (param.validation?.min && value.length < param.validation.min) {
+      return `Must be at least ${param.validation.min} characters`;
+    }
+    if (param.validation?.max && value.length > param.validation.max) {
+      return `Must be no more than ${param.validation.max} characters`;
+    }
+  }
+  
+  if (param.type === 'enum' && value && !param.options?.includes(value)) {
+    return `Must be one of: ${param.options?.join(', ')}`;
+  }
+  
+  return null;
+}
+```
+
+## Monitoring and Metrics
+
+### Validation Error Metrics
+
+Prometheus metrics track validation failures:
+
+```promql
+# Total validation errors by type
+sum by (errorType) (validation_errors_total)
+
+# Validation error rate by organization
+rate(validation_errors_total[5m]) by (orgId)
+
+# Most problematic actions
+topk(10, sum by (actionKey) (validation_errors_total))
+```
+
+### Common Error Types
+
+- `type-validation`: Wrong data type provided
+- `range-validation`: Value outside min/max bounds
+- `format-validation`: Invalid format (email, URL, date)
+- `enum-validation`: Value not in allowed options
+- `pattern-validation`: Regex pattern match failed
+- `custom-validation`: Custom validation rule failed
+
+### Error Analysis
+
+```promql
+# Email validation errors
+validation_errors_total{errorType="email-validation"}
+
+# Range validation issues by action
+sum by (actionKey) (validation_errors_total{errorType="range-validation"})
+
+# Most common validation problems
+topk(5, sum by (errorType) (validation_errors_total))
+```
+
+## Migration Guide
+
+### Upgrading Existing Actions
+
+**Step 1: Audit Current Schemas**
+```bash
+# Find actions with legacy schemas
+curl -X GET /actions \
+  -H "X-Org-ID: org_123" \
+  | jq '.data[] | select(.inputSchema[0].control == null)'
+```
+
+**Step 2: Enhance Schemas**
+
+Before (Legacy):
+```json
+{
+  "name": "email",
+  "type": "string",
+  "required": true,
+  "validation": {"pattern": "^[\\w.-]+@[\\w.-]+\\.[a-zA-Z]{2,}$"}
+}
+```
+
+After (Enhanced):
+```json
+{
+  "name": "email",
+  "label": "Email Address", 
+  "description": "Enter your email address for notifications",
+  "type": "string",
+  "required": true,
+  "control": "text",
+  "validation": {
+    "format": "email",
+    "message": "Please enter a valid email address"
+  },
+  "ui": {
+    "placeholder": "user@example.com"
+  }
+}
+```
+
+**Step 3: Test Enhanced Validation**
+```bash
+curl -X POST /actions/enhanced-action/execute \
+  -H "X-Org-ID: org_123" \
+  -d '{"inputs": {"email": "invalid-email"}}'
+```
+
+## Best Practices
+
+### 1. Clear Labels and Descriptions
+
+```json
+{
+  "name": "api_key", 
+  "label": "API Key",                    // Clear, user-friendly
+  "description": "Your secret API key from the provider dashboard"
+}
+```
+
+### 2. Appropriate Control Types
+
+```json
+{
+  "name": "priority",
+  "type": "enum",
+  "control": "select",                   // Better than text input
+  "options": ["low", "medium", "high"]
+}
+```
+
+### 3. Helpful Validation Messages
+
+```json
+{
+  "validation": {
+    "pattern": "^[A-Z]{3}-\\d{3}$",
+    "message": "Format must be ABC-123"  // Explain the expected format
+  }
+}
+```
+
+### 4. Reasonable Defaults
+
+```json
+{
+  "name": "timeout",
+  "type": "number", 
+  "default": 30,                        // Sensible default
+  "validation": {"min": 1, "max": 300}
+}
+```
+
+### 5. Logical Field Organization
+
+```json
+[
+  // Basic fields first
+  {"name": "title", "required": true},
+  {"name": "description", "required": false},
+  
+  // Configuration fields
+  {"name": "priority", "required": false},
+  {"name": "due_date", "required": false},
+  
+  // Advanced/conditional fields last
+  {"name": "escalation_note", "visibleIf": "..."}
+]
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Validation Not Working**
+- Check that `validateEnhanced()` is being used instead of `validate()`
+- Verify the schema format matches `ActionInputParam` interface
+- Ensure required fields are marked correctly
+
+**Conditional Visibility Issues**
+- Test JSONLogic expressions using online tools
+- Check that field names in conditions match exactly
+- Verify input data structure (`inputs.fieldName`)
+
+**Type Conversion Problems**
+- String numbers are automatically converted
+- Boolean strings ('true'/'false') are converted
+- Empty strings for optional numbers become `undefined`
+
+### Debug Information
+
+Enable detailed logging for validation issues:
+
+```typescript
+// In your service
+try {
+  const result = await inputValidator.validateEnhanced(
+    schema,
+    inputs,
+    { orgId, actionKey, contextType: 'debug' }
+  );
+} catch (error) {
+  console.error('Validation failed:', {
+    schema,
+    inputs, 
+    error: error.response
+  });
+}
+```
+
+### Testing Enhanced Schemas
+
+```bash
+# Test with minimal valid input
+curl -X POST /actions/test-action/execute \
+  -H "X-Org-ID: org_123" \
+  -d '{"inputs": {"required_field": "value"}}'
+
+# Test validation errors
+curl -X POST /actions/test-action/execute \
+  -H "X-Org-ID: org_123" \
+  -d '{"inputs": {"invalid_email": "not-an-email"}}'
+
+# Test conditional fields
+curl -X POST /actions/test-action/execute \
+  -H "X-Org-ID: org_123" \
+  -d '{"inputs": {"show_field": true, "conditional_field": "value"}}'
+```
+
+## Future Enhancements
+
+### Planned Features
+
+- **Internationalization**: Multi-language labels and messages
+- **Advanced UI Controls**: Rich text, file uploads, date ranges
+- **Cross-Field Validation**: Validation rules spanning multiple fields
+- **Dynamic Options**: Options loaded from APIs
+- **Field Groups**: Logical grouping of related fields
+- **Progressive Disclosure**: Step-by-step form revealing
+
+### API Extensions
+
+Future API enhancements may include:
+
+- Schema validation endpoint (`POST /schemas/validate`)
+- UI component generation (`GET /actions/:key/ui-schema`)
+- Form preview (`GET /actions/:key/preview`)
+- Validation testing (`POST /actions/:key/test-validation`)
+
+This enhanced input schema system provides a foundation for sophisticated, user-friendly forms while maintaining full backward compatibility with existing implementations.
