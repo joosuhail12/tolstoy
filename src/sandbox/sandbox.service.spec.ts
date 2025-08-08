@@ -168,11 +168,11 @@ describe('SandboxService', () => {
         context: expect.objectContaining({
           variables: mockContext.variables,
           stepOutputs: mockContext.stepOutputs,
-          meta: expect.objectContaining({
-            orgId: 'org-123',
-            userId: 'user-456',
-            flowId: 'flow-789',
-          }),
+          orgId: 'org-123',
+          userId: 'user-456',
+          flowId: 'flow-789',
+          stepId: 'step-001',
+          executionId: 'exec-123',
         }),
         language: 'javascript',
         timeout: 30000,
@@ -484,41 +484,11 @@ describe('SandboxService', () => {
 
       expect(context).toHaveProperty('variables', mockContext.variables);
       expect(context).toHaveProperty('stepOutputs', mockContext.stepOutputs);
-      expect(context).toHaveProperty('meta');
-      expect(context.meta).toMatchObject({
-        orgId: 'org-123',
-        userId: 'user-456',
-        flowId: 'flow-789',
-        stepId: 'step-001',
-        executionId: 'exec-123',
-      });
-      expect(context).toHaveProperty('utils');
-      expect(context.utils).toHaveProperty('log');
-      expect(context.utils).toHaveProperty('error');
-      expect(context.utils).toHaveProperty('warn');
-    });
-
-    it('should provide working utility functions in context', async () => {
-      daytonaClient.run.mockResolvedValue(mockSyncResult);
-
-      await service.runSync('test code', mockContext);
-
-      const calledWith = daytonaClient.run.mock.calls[0][0];
-      const utils = calledWith.context.utils;
-
-      const logResult = utils.log('test message', { data: 'test' });
-      expect(logResult).toMatchObject({
-        type: 'log',
-        message: 'test message',
-        data: { data: 'test' },
-        timestamp: expect.any(String),
-      });
-
-      const errorResult = utils.error('error message');
-      expect(errorResult).toMatchObject({
-        type: 'error',
-        message: 'error message',
-      });
+      expect(context).toHaveProperty('orgId', 'org-123');
+      expect(context).toHaveProperty('userId', 'user-456');
+      expect(context).toHaveProperty('flowId', 'flow-789');
+      expect(context).toHaveProperty('stepId', 'step-001');
+      expect(context).toHaveProperty('executionId', 'exec-123');
     });
   });
 

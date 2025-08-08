@@ -1,3 +1,5 @@
+import 'jest';
+
 // Global setup for smoke tests
 beforeAll(() => {
   // Ensure required environment variables are present

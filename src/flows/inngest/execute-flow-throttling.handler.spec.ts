@@ -7,6 +7,8 @@ import { InputValidatorService } from '../../common/services/input-validator.ser
 import { ConditionEvaluatorService } from '../../common/services/condition-evaluator.service';
 import { PrismaService } from '../../prisma.service';
 import { ExecutionLogsService } from '../../execution-logs/execution-logs.service';
+import { MetricsService } from '../../metrics/metrics.service';
+import { InngestService } from 'nestjs-inngest';
 
 describe('ExecuteFlowHandler - Throttling & Queuing', () => {
   let handler: ExecuteFlowHandler;
@@ -16,6 +18,8 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
   let mockInputValidator: any;
   let mockConditionEvaluator: any;
   let mockPrismaService: any;
+  let mockMetricsService: any;
+  let mockInngestService: any;
   let mockLogger: any;
 
   const mockStep = {
@@ -56,6 +60,22 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
       executionLog: {
         update: jest.fn().mockResolvedValue({}),
       },
+    } as any;
+
+    mockMetricsService = {
+      incrementStepExecutions: jest.fn(),
+      incrementStepRetries: jest.fn(),
+      incrementStepErrors: jest.fn(),
+      recordStepDuration: jest.fn(),
+      recordFlowDuration: jest.fn(),
+      incrementFlowExecutions: jest.fn(),
+      incrementFlowCompletions: jest.fn(),
+      incrementFlowFailures: jest.fn(),
+      incrementWebhookDispatches: jest.fn(),
+    } as any;
+
+    mockInngestService = {
+      send: jest.fn().mockResolvedValue(void 0),
     } as any;
 
     mockLogger = {
@@ -101,6 +121,14 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
             markStepFailed: jest.fn(),
             markStepSkipped: jest.fn(),
           },
+        },
+        {
+          provide: MetricsService,
+          useValue: mockMetricsService,
+        },
+        {
+          provide: InngestService,
+          useValue: mockInngestService,
         },
         {
           provide: `PinoLogger:${ExecuteFlowHandler.name}`,
