@@ -1,0 +1,541 @@
+---
+title: API Reference
+sidebar_position: 6
+---
+
+# API Reference
+
+Complete reference for all methods and types in the Tolstoy SDK.
+
+## TolstoyClient Class
+
+The main SDK class providing access to all Tolstoy API endpoints.
+
+### Constructor
+
+```typescript
+new TolstoyClient(
+  baseUrl: string,
+  orgId?: string,
+  userId?: string,
+  token?: string
+)
+```
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `baseUrl` | `string` | ✅ | Base URL of the Tolstoy API |
+| `orgId` | `string` | ⚠️ | Organization ID (recommended) |
+| `userId` | `string` | ⚠️ | User ID for request context (recommended) |
+| `token` | `string` | ❌ | Optional Bearer token |
+
+**Example:**
+```typescript
+const client = new TolstoyClient(
+  'https://tolstoy.getpullse.com',
+  'org_abc123',
+  'user_def456',
+  'optional_bearer_token'
+);
+```
+
+## Helper Methods
+
+Simplified methods for common operations.
+
+### runFlow()
+
+Execute a workflow with inputs.
+
+```typescript
+runFlow(
+  flowId: string, 
+  inputs: any, 
+  useDurable?: boolean
+): Promise<ExecutionResult>
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `flowId` | `string` | - | Workflow ID to execute |
+| `inputs` | `any` | - | Input variables for the workflow |
+| `useDurable` | `boolean` | `true` | Use async execution (recommended) |
+
+**Returns:** `Promise<ExecutionResult>`
+
+**Example:**
+```typescript
+const execution = await client.runFlow('flow_123', {
+  userId: 'user_456',
+  email: 'user@example.com'
+}, true);
+
+console.log(execution.data.executionId);
+```
+
+### getFlowExecution()
+
+Get the status of a workflow execution.
+
+```typescript
+getFlowExecution(
+  flowId: string, 
+  executionId: string
+): Promise<ExecutionStatus>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `flowId` | `string` | Workflow ID |
+| `executionId` | `string` | Execution ID from runFlow() |
+
+**Returns:** `Promise<ExecutionStatus>`
+
+**Example:**
+```typescript
+const status = await client.getFlowExecution('flow_123', 'exec_789');
+console.log(status.data.status); // 'running' | 'completed' | 'failed'
+```
+
+### listFlows()
+
+List all workflows in the organization.
+
+```typescript
+listFlows(): Promise<FlowList>
+```
+
+**Returns:** `Promise<FlowList>`
+
+**Example:**
+```typescript
+const flows = await client.listFlows();
+flows.data.forEach(flow => {
+  console.log(`${flow.id}: ${flow.name}`);
+});
+```
+
+### createTool()
+
+Create a new tool integration.
+
+```typescript
+createTool(toolData: CreateToolDto): Promise<Tool>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `toolData` | `CreateToolDto` | Tool configuration object |
+
+**Returns:** `Promise<Tool>`
+
+**Example:**
+```typescript
+const tool = await client.createTool({
+  name: 'GitHub API',
+  baseUrl: 'https://api.github.com',
+  authType: 'bearer',
+  description: 'GitHub integration'
+});
+```
+
+### listTools()
+
+List all tool integrations.
+
+```typescript
+listTools(): Promise<ToolList>
+```
+
+**Returns:** `Promise<ToolList>`
+
+### createWebhook()
+
+Create a new webhook.
+
+```typescript
+createWebhook(webhookData: CreateWebhookDto): Promise<Webhook>
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `webhookData` | `CreateWebhookDto` | Webhook configuration |
+
+**Returns:** `Promise<Webhook>`
+
+**Example:**
+```typescript
+const webhook = await client.createWebhook({
+  name: 'Flow Monitor',
+  url: 'https://your-app.com/webhooks',
+  events: ['flow.completed', 'flow.failed'],
+  active: true
+});
+```
+
+### listWebhooks()
+
+List all webhooks.
+
+```typescript
+listWebhooks(): Promise<WebhookList>
+```
+
+**Returns:** `Promise<WebhookList>`
+
+## Raw API Access
+
+Access to all generated API endpoints for advanced usage.
+
+### client.raw
+
+```typescript
+client.raw: Api<unknown>
+```
+
+Provides direct access to all API endpoints with full type safety.
+
+**Example:**
+```typescript
+// Advanced flow operations
+const flowDetails = await client.raw.flows.flowsControllerFindOne('flow_123');
+
+// Organization management
+const orgs = await client.raw.organizations.organizationsControllerFindAll();
+
+// User management
+const users = await client.raw.users.usersControllerFindAll();
+
+// Health checks
+const health = await client.raw.health.healthControllerGetDetailedHealth();
+```
+
+## Type Definitions
+
+### ExecutionResult
+
+```typescript
+interface ExecutionResult {
+  data: {
+    executionId: string;
+    status: 'running' | 'completed' | 'failed';
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+```
+
+### ExecutionStatus
+
+```typescript
+interface ExecutionStatus {
+  data: {
+    executionId: string;
+    flowId: string;
+    status: 'running' | 'completed' | 'failed';
+    progress: number; // 0-100
+    currentStep?: string;
+    result?: any;
+    error?: string;
+    startedAt: string;
+    completedAt?: string;
+    duration?: number; // milliseconds
+  };
+}
+```
+
+### FlowList
+
+```typescript
+interface FlowList {
+  data: Flow[];
+}
+
+interface Flow {
+  id: string;
+  name: string;
+  description?: string;
+  active: boolean;
+  version: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  tags?: string[];
+}
+```
+
+### CreateToolDto
+
+```typescript
+interface CreateToolDto {
+  name: string;
+  baseUrl: string;
+  authType: 'none' | 'bearer' | 'apikey' | 'oauth2' | 'basic';
+  description?: string;
+  headers?: Record<string, string>;
+  timeout?: number;
+  retries?: number;
+  oauthConfig?: {
+    authUrl: string;
+    tokenUrl: string;
+    clientId?: string;
+    scopes?: string[];
+  };
+}
+```
+
+### Tool
+
+```typescript
+interface Tool {
+  data: {
+    id: string;
+    name: string;
+    baseUrl: string;
+    authType: string;
+    description?: string;
+    active: boolean;
+    createdAt: string;
+    updatedAt: string;
+    lastUsed?: string;
+  };
+}
+```
+
+### CreateWebhookDto
+
+```typescript
+interface CreateWebhookDto {
+  name: string;
+  url: string;
+  events: string[];
+  active?: boolean;
+  secret?: string;
+  headers?: Record<string, string>;
+  timeout?: number;
+  retries?: number;
+  metadata?: Record<string, any>;
+  verifySSL?: boolean;
+}
+```
+
+### Webhook
+
+```typescript
+interface Webhook {
+  data: {
+    id: string;
+    name: string;
+    url: string;
+    events: string[];
+    active: boolean;
+    secret?: string;
+    createdAt: string;
+    updatedAt: string;
+    lastDelivery?: string;
+    deliveryCount: number;
+    failureCount: number;
+  };
+}
+```
+
+## Available Events
+
+Webhook event types you can subscribe to:
+
+### Flow Events
+- `flow.started` - Workflow execution began
+- `flow.completed` - Workflow completed successfully
+- `flow.failed` - Workflow failed with error
+- `flow.cancelled` - Workflow was cancelled
+- `flow.step_completed` - Individual step completed
+- `flow.step_failed` - Individual step failed
+
+### Tool Events
+- `tool.connected` - Tool integration established
+- `tool.failed` - Tool integration failed
+- `tool.updated` - Tool configuration changed
+
+### Organization Events
+- `org.updated` - Organization settings changed
+- `org.user_added` - User added to organization
+- `org.user_removed` - User removed from organization
+
+### User Events
+- `user.created` - New user account created
+- `user.updated` - User profile updated
+- `user.deleted` - User account deleted
+
+## Error Types
+
+### API Error Response
+
+```typescript
+interface ApiError {
+  response: {
+    status: number;
+    statusText: string;
+    data: {
+      success: false;
+      error: {
+        code: string;
+        message: string;
+        details?: any;
+      };
+      meta: {
+        timestamp: string;
+        requestId: string;
+      };
+    };
+  };
+}
+```
+
+### Common Error Codes
+
+| Code | HTTP Status | Description |
+|------|-------------|-------------|
+| `VALIDATION_ERROR` | 400 | Invalid request parameters |
+| `UNAUTHORIZED` | 401 | Missing or invalid authentication |
+| `FORBIDDEN` | 403 | Insufficient permissions |
+| `NOT_FOUND` | 404 | Resource not found |
+| `CONFLICT` | 409 | Resource already exists |
+| `RATE_LIMITED` | 429 | Too many requests |
+| `INTERNAL_ERROR` | 500 | Server error |
+| `SERVICE_UNAVAILABLE` | 503 | Service temporarily unavailable |
+
+## Complete API Coverage
+
+The SDK provides access to all **52 API endpoints** across these controllers:
+
+### Health Controller
+- `GET /status` - Basic health check
+- `GET /status/detailed` - Detailed health information
+
+### Organizations Controller
+- `GET /organizations` - List organizations
+- `POST /organizations` - Create organization
+- `GET /organizations/{id}` - Get organization
+- `PUT /organizations/{id}` - Update organization
+- `DELETE /organizations/{id}` - Delete organization
+
+### Users Controller
+- `GET /users` - List users
+- `POST /users` - Create user
+- `GET /users/{id}` - Get user
+- `PUT /users/{id}` - Update user
+- `DELETE /users/{id}` - Delete user
+
+### Tools Controller
+- `GET /tools` - List tools
+- `POST /tools` - Create tool
+- `GET /tools/{id}` - Get tool
+- `PUT /tools/{id}` - Update tool
+- `DELETE /tools/{id}` - Delete tool
+
+### Actions Controller
+- `GET /actions` - List actions
+- `POST /actions` - Create action
+- `GET /actions/{id}` - Get action
+- `PUT /actions/{id}` - Update action
+- `DELETE /actions/{id}` - Delete action
+
+### Flows Controller
+- `GET /flows` - List flows
+- `POST /flows` - Create flow
+- `GET /flows/{id}` - Get flow
+- `PUT /flows/{id}` - Update flow
+- `DELETE /flows/{id}` - Delete flow
+- `POST /flows/{id}/execute` - Execute flow
+- `GET /flows/{id}/executions` - List executions
+- `GET /flows/{id}/executions/{execId}` - Get execution
+- `POST /flows/{id}/executions/{execId}/cancel` - Cancel execution
+- `POST /flows/{id}/executions/{execId}/retry` - Retry execution
+- `GET /flows/{id}/metrics` - Get flow metrics
+
+### Execution Logs Controller
+- `GET /execution-logs` - List execution logs
+- `POST /execution-logs` - Create log entry
+- `GET /execution-logs/{id}` - Get log entry
+- `PUT /execution-logs/{id}` - Update log entry
+- `DELETE /execution-logs/{id}` - Delete log entry
+
+### Webhooks Controller
+- `GET /webhooks` - List webhooks
+- `POST /webhooks` - Create webhook
+- `GET /webhooks/event-types` - List event types
+- `GET /webhooks/{id}` - Get webhook
+- `PUT /webhooks/{id}` - Update webhook
+- `DELETE /webhooks/{id}` - Delete webhook
+- `PATCH /webhooks/{id}/toggle` - Toggle webhook
+- `POST /webhooks/{id}/test` - Test webhook
+
+### Tool Secrets Controller
+- `GET /tools/secrets` - List tool secrets
+- `POST /tools/secrets` - Store credentials
+- `DELETE /tools/secrets/{id}` - Delete credentials
+- `GET /tools/{id}/secrets` - Get tool secrets
+
+All endpoints are available through `client.raw` with full TypeScript type support.
+
+## Examples
+
+### Advanced Error Handling
+
+```typescript
+import { AxiosError } from 'axios';
+
+try {
+  const execution = await client.runFlow('flow_123', inputs);
+} catch (error) {
+  const apiError = error as AxiosError;
+  
+  if (apiError.response) {
+    const { status, data } = apiError.response;
+    console.error(`API Error ${status}:`, data.error.message);
+    
+    // Handle specific error codes
+    switch (data.error.code) {
+      case 'VALIDATION_ERROR':
+        console.error('Invalid input:', data.error.details);
+        break;
+      case 'RATE_LIMITED':
+        console.error('Rate limited. Retry after:', apiError.response.headers['retry-after']);
+        break;
+      case 'NOT_FOUND':
+        console.error('Flow not found:', flowId);
+        break;
+      default:
+        console.error('Unexpected error:', data.error);
+    }
+  } else if (apiError.request) {
+    console.error('Network error:', apiError.message);
+  } else {
+    console.error('Request setup error:', apiError.message);
+  }
+}
+```
+
+### Custom Headers and Configuration
+
+```typescript
+// Custom request with additional headers
+const execution = await client.raw.flows.flowsControllerExecuteFlow(
+  'flow_123',
+  { variables: inputs, useDurable: true },
+  {
+    headers: {
+      'X-Request-ID': 'req_abc123',
+      'X-Priority': 'high',
+      'X-Trace-ID': generateTraceId()
+    },
+    timeout: 30000, // 30 second timeout
+  }
+);
+```
+
+## Next Steps
+
+- [Examples](/sdk/examples) - Real-world implementation patterns
+- [Advanced Usage](/sdk/advanced-usage) - Expert patterns and optimization
+- [Troubleshooting](/sdk/troubleshooting) - Common issues and solutions

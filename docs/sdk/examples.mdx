@@ -1,0 +1,622 @@
+---
+title: Examples
+sidebar_position: 5
+---
+
+# Real-World Examples
+
+Complete examples showing how to integrate the Tolstoy SDK into real applications.
+
+## User Onboarding Automation
+
+Complete user onboarding system with workflow execution and webhook monitoring.
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+class UserOnboardingService {
+  private tolstoy: TolstoyClient;
+
+  constructor(orgId: string) {
+    this.tolstoy = new TolstoyClient(
+      process.env.TOLSTOY_API_URL!,
+      orgId,
+      'onboarding_service',
+      process.env.TOLSTOY_TOKEN
+    );
+  }
+
+  async onboardNewUser(userData: {
+    email: string;
+    name: string;
+    plan: string;
+    referralCode?: string;
+  }) {
+    try {
+      // Start onboarding workflow
+      const execution = await this.tolstoy.runFlow('user_onboarding_v2', {
+        user: userData,
+        timestamp: new Date().toISOString(),
+        source: 'api_signup',
+        features: this.getFeaturesForPlan(userData.plan)
+      });
+
+      // Set up completion monitoring
+      await this.setupOnboardingWebhook(execution.data.executionId, userData.email);
+
+      return {
+        success: true,
+        executionId: execution.data.executionId,
+        message: 'Onboarding started successfully'
+      };
+    } catch (error) {
+      console.error('Onboarding failed:', error);
+      
+      // Send failure notification
+      await this.notifyOnboardingFailure(userData.email, error.message);
+      
+      throw new Error(`Onboarding failed: ${error.message}`);
+    }
+  }
+
+  private async setupOnboardingWebhook(executionId: string, userEmail: string) {
+    return this.tolstoy.createWebhook({
+      name: `Onboarding Webhook - ${userEmail}`,
+      url: `${process.env.APP_URL}/webhooks/onboarding-complete`,
+      events: ['flow.completed', 'flow.failed'],
+      active: true,
+      metadata: {
+        executionId,
+        userEmail,
+        type: 'onboarding'
+      }
+    });
+  }
+
+  private getFeaturesForPlan(plan: string) {
+    const features = {
+      free: ['basic_dashboard', 'email_support'],
+      pro: ['advanced_analytics', 'priority_support', 'api_access'],
+      enterprise: ['custom_integrations', 'dedicated_support', 'sso']
+    };
+    return features[plan] || features.free;
+  }
+
+  private async notifyOnboardingFailure(email: string, error: string) {
+    // Implementation depends on your notification system
+    console.error(`Onboarding failed for ${email}: ${error}`);
+  }
+}
+
+// Usage
+const onboarding = new UserOnboardingService('org_123');
+
+await onboarding.onboardNewUser({
+  email: 'john@example.com',
+  name: 'John Doe',
+  plan: 'pro',
+  referralCode: 'FRIEND2024'
+});
+```
+
+## E-commerce Order Processing
+
+Automated order fulfillment with inventory management and notifications.
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+class OrderProcessingService {
+  private tolstoy: TolstoyClient;
+
+  constructor() {
+    this.tolstoy = new TolstoyClient(
+      process.env.TOLSTOY_API_URL!,
+      process.env.ECOMMERCE_ORG_ID!,
+      'order_processor'
+    );
+  }
+
+  async processOrder(order: {
+    orderId: string;
+    customerId: string;
+    items: Array<{ sku: string; quantity: number; price: number }>;
+    shippingAddress: any;
+    paymentMethod: string;
+  }) {
+    // Execute order processing workflow
+    const execution = await this.tolstoy.runFlow('order_fulfillment', {
+      order: {
+        ...order,
+        timestamp: new Date().toISOString(),
+        totalAmount: this.calculateTotal(order.items)
+      },
+      processing: {
+        priority: this.getOrderPriority(order),
+        warehouse: await this.selectWarehouse(order.shippingAddress),
+        shippingMethod: this.determineShipping(order)
+      }
+    });
+
+    // Set up order tracking webhooks
+    await this.setupOrderWebhooks(order.orderId, order.customerId);
+
+    return execution.data.executionId;
+  }
+
+  private calculateTotal(items: any[]) {
+    return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  }
+
+  private getOrderPriority(order: any): 'high' | 'normal' | 'low' {
+    const total = this.calculateTotal(order.items);
+    if (total > 500) return 'high';
+    if (total > 100) return 'normal';
+    return 'low';
+  }
+
+  private async selectWarehouse(address: any) {
+    // Logic to select optimal warehouse
+    return 'warehouse_west';
+  }
+
+  private determineShipping(order: any) {
+    // Logic to determine shipping method
+    return 'standard';
+  }
+
+  private async setupOrderWebhooks(orderId: string, customerId: string) {
+    const webhookEvents = [
+      'order.payment_processed',
+      'order.inventory_reserved',
+      'order.shipped',
+      'order.delivered',
+      'order.cancelled'
+    ];
+
+    return this.tolstoy.createWebhook({
+      name: `Order Tracking - ${orderId}`,
+      url: `${process.env.APP_URL}/webhooks/order-updates`,
+      events: webhookEvents,
+      metadata: { orderId, customerId }
+    });
+  }
+
+  async cancelOrder(orderId: string, reason: string) {
+    return this.tolstoy.runFlow('order_cancellation', {
+      orderId,
+      reason,
+      timestamp: new Date().toISOString()
+    });
+  }
+
+  async getOrderStatus(executionId: string) {
+    const status = await this.tolstoy.getFlowExecution('order_fulfillment', executionId);
+    return {
+      status: status.data.status,
+      currentStep: status.data.currentStep,
+      estimatedCompletion: status.data.estimatedCompletion
+    };
+  }
+}
+```
+
+## Marketing Automation Campaign
+
+Multi-channel marketing campaign with personalization and A/B testing.
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+class MarketingCampaignService {
+  private tolstoy: TolstoyClient;
+
+  constructor() {
+    this.tolstoy = new TolstoyClient(
+      process.env.TOLSTOY_API_URL!,
+      process.env.MARKETING_ORG_ID!,
+      'campaign_manager'
+    );
+  }
+
+  async launchCampaign(campaign: {
+    name: string;
+    audience: string[];
+    channels: ('email' | 'sms' | 'push' | 'social')[];
+    content: {
+      subject: string;
+      template: string;
+      variables: Record<string, any>;
+    };
+    schedule: {
+      startDate: Date;
+      timezone: string;
+      frequency?: 'once' | 'daily' | 'weekly';
+    };
+    abTest?: {
+      enabled: boolean;
+      variants: string[];
+      splitRatio: number[];
+    };
+  }) {
+    // Launch campaign workflow
+    const execution = await this.tolstoy.runFlow('marketing_campaign', {
+      campaign: {
+        ...campaign,
+        id: `campaign_${Date.now()}`,
+        createdAt: new Date().toISOString()
+      },
+      segmentation: await this.buildAudienceSegments(campaign.audience),
+      personalization: await this.preparePersonalization(campaign.content),
+      analytics: {
+        trackOpens: true,
+        trackClicks: true,
+        trackConversions: true
+      }
+    });
+
+    // Set up campaign monitoring
+    await this.setupCampaignMonitoring(execution.data.executionId, campaign.name);
+
+    return {
+      executionId: execution.data.executionId,
+      campaignId: `campaign_${Date.now()}`,
+      estimatedReach: campaign.audience.length
+    };
+  }
+
+  private async buildAudienceSegments(audience: string[]) {
+    // Segment audience based on various criteria
+    return {
+      segments: [
+        { name: 'high_value', count: Math.floor(audience.length * 0.2) },
+        { name: 'regular', count: Math.floor(audience.length * 0.6) },
+        { name: 'new_users', count: Math.floor(audience.length * 0.2) }
+      ]
+    };
+  }
+
+  private async preparePersonalization(content: any) {
+    return {
+      dynamicContent: true,
+      variables: content.variables,
+      localization: 'auto'
+    };
+  }
+
+  private async setupCampaignMonitoring(executionId: string, campaignName: string) {
+    const events = [
+      'campaign.started',
+      'campaign.email_sent',
+      'campaign.opened',
+      'campaign.clicked',
+      'campaign.converted',
+      'campaign.completed'
+    ];
+
+    return this.tolstoy.createWebhook({
+      name: `Campaign Monitor - ${campaignName}`,
+      url: `${process.env.APP_URL}/webhooks/campaign-analytics`,
+      events,
+      metadata: { executionId, campaignName }
+    });
+  }
+
+  async getCampaignAnalytics(executionId: string) {
+    const execution = await this.tolstoy.getFlowExecution('marketing_campaign', executionId);
+    
+    return {
+      status: execution.data.status,
+      metrics: {
+        sent: execution.data.metrics?.sent || 0,
+        opened: execution.data.metrics?.opened || 0,
+        clicked: execution.data.metrics?.clicked || 0,
+        converted: execution.data.metrics?.converted || 0,
+        openRate: this.calculateRate(
+          execution.data.metrics?.opened, 
+          execution.data.metrics?.sent
+        ),
+        clickRate: this.calculateRate(
+          execution.data.metrics?.clicked, 
+          execution.data.metrics?.opened
+        ),
+        conversionRate: this.calculateRate(
+          execution.data.metrics?.converted, 
+          execution.data.metrics?.clicked
+        )
+      }
+    };
+  }
+
+  private calculateRate(numerator: number = 0, denominator: number = 0): string {
+    if (denominator === 0) return '0%';
+    return `${((numerator / denominator) * 100).toFixed(2)}%`;
+  }
+}
+```
+
+## Customer Support Automation
+
+Automated ticket routing and response system with escalation rules.
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+class SupportAutomationService {
+  private tolstoy: TolstoyClient;
+
+  constructor() {
+    this.tolstoy = new TolstoyClient(
+      process.env.TOLSTOY_API_URL!,
+      process.env.SUPPORT_ORG_ID!,
+      'support_automation'
+    );
+  }
+
+  async processTicket(ticket: {
+    id: string;
+    customerId: string;
+    subject: string;
+    description: string;
+    priority: 'low' | 'medium' | 'high' | 'critical';
+    category: string;
+    channel: 'email' | 'chat' | 'phone';
+  }) {
+    // Analyze and route ticket
+    const execution = await this.tolstoy.runFlow('support_ticket_processing', {
+      ticket: {
+        ...ticket,
+        receivedAt: new Date().toISOString()
+      },
+      routing: {
+        department: this.determineDepartment(ticket.category),
+        agent: await this.selectAgent(ticket.priority),
+        sla: this.getSLA(ticket.priority)
+      },
+      automation: {
+        autoResponse: this.shouldSendAutoResponse(ticket),
+        knowledgeBaseSearch: true,
+        sentimentAnalysis: true
+      }
+    });
+
+    // Set up ticket monitoring
+    await this.setupTicketMonitoring(ticket.id, ticket.customerId);
+
+    return execution.data.executionId;
+  }
+
+  private determineDepartment(category: string): string {
+    const departmentMap: Record<string, string> = {
+      'billing': 'finance',
+      'technical': 'engineering',
+      'account': 'customer_success',
+      'general': 'support'
+    };
+    return departmentMap[category] || 'support';
+  }
+
+  private async selectAgent(priority: string) {
+    // Logic to select best available agent
+    const agents = await this.getAvailableAgents();
+    
+    if (priority === 'critical') {
+      return agents.senior[0] || agents.regular[0];
+    }
+    
+    return agents.regular[0] || agents.senior[0];
+  }
+
+  private async getAvailableAgents() {
+    // Mock implementation - integrate with your agent management system
+    return {
+      senior: ['agent_1', 'agent_2'],
+      regular: ['agent_3', 'agent_4', 'agent_5']
+    };
+  }
+
+  private getSLA(priority: string) {
+    const slaHours = {
+      critical: 1,
+      high: 4,
+      medium: 24,
+      low: 72
+    };
+    return slaHours[priority] || 24;
+  }
+
+  private shouldSendAutoResponse(ticket: any): boolean {
+    return ticket.channel === 'email' && ticket.priority !== 'critical';
+  }
+
+  private async setupTicketMonitoring(ticketId: string, customerId: string) {
+    const events = [
+      'ticket.assigned',
+      'ticket.responded',
+      'ticket.escalated',
+      'ticket.resolved',
+      'ticket.reopened'
+    ];
+
+    return this.tolstoy.createWebhook({
+      name: `Ticket Monitor - ${ticketId}`,
+      url: `${process.env.APP_URL}/webhooks/ticket-updates`,
+      events,
+      metadata: { ticketId, customerId }
+    });
+  }
+
+  async escalateTicket(ticketId: string, reason: string) {
+    return this.tolstoy.runFlow('ticket_escalation', {
+      ticketId,
+      reason,
+      escalatedAt: new Date().toISOString(),
+      escalatedBy: 'system'
+    });
+  }
+}
+```
+
+## Multi-Tenant SaaS Integration
+
+Complete multi-tenant setup with organization isolation and user management.
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+class MultiTenantTolstoyService {
+  private clients = new Map<string, TolstoyClient>();
+
+  getClientForTenant(orgId: string, userId: string, token?: string): TolstoyClient {
+    const key = `${orgId}:${userId}`;
+    
+    if (!this.clients.has(key)) {
+      const client = new TolstoyClient(
+        process.env.TOLSTOY_API_URL!,
+        orgId,
+        userId,
+        token
+      );
+      this.clients.set(key, client);
+    }
+    
+    return this.clients.get(key)!;
+  }
+
+  async executeWorkflowForTenant(
+    orgId: string, 
+    userId: string, 
+    flowId: string, 
+    inputs: any
+  ) {
+    const client = this.getClientForTenant(orgId, userId);
+    return client.runFlow(flowId, inputs);
+  }
+
+  async setupTenantWebhooks(orgId: string, userId: string) {
+    const client = this.getClientForTenant(orgId, userId);
+    
+    return client.createWebhook({
+      name: `Tenant Webhook - ${orgId}`,
+      url: `${process.env.APP_URL}/webhooks/tenant/${orgId}`,
+      events: ['flow.completed', 'flow.failed'],
+      active: true,
+      metadata: { orgId, userId }
+    });
+  }
+
+  async getTenantAnalytics(orgId: string, userId: string) {
+    const client = this.getClientForTenant(orgId, userId);
+    
+    const [flows, executions] = await Promise.all([
+      client.listFlows(),
+      client.raw.flows.flowsControllerGetFlowExecutions('')
+    ]);
+
+    return {
+      totalFlows: flows.data.length,
+      activeFlows: flows.data.filter(f => f.active).length,
+      totalExecutions: executions.data?.length || 0,
+      // Add more analytics as needed
+    };
+  }
+}
+
+// Usage in Express.js middleware
+import express from 'express';
+
+const app = express();
+const tolstoyService = new MultiTenantTolstoyService();
+
+app.use(async (req, res, next) => {
+  const orgId = req.headers['x-org-id'] as string;
+  const userId = req.headers['x-user-id'] as string;
+  
+  if (!orgId || !userId) {
+    return res.status(400).json({ error: 'Missing tenant headers' });
+  }
+
+  req.tolstoy = tolstoyService.getClientForTenant(orgId, userId);
+  next();
+});
+
+app.post('/api/workflows/execute', async (req, res) => {
+  try {
+    const { flowId, inputs } = req.body;
+    const execution = await req.tolstoy.runFlow(flowId, inputs);
+    res.json(execution.data);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+## Testing and Development
+
+Examples for testing SDK integrations and development workflows.
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+// Mock client for testing
+class MockTolstoyClient {
+  async runFlow(flowId: string, inputs: any) {
+    return {
+      data: {
+        executionId: `mock_exec_${Date.now()}`,
+        status: 'running'
+      }
+    };
+  }
+
+  async listFlows() {
+    return {
+      data: [
+        { id: 'flow_1', name: 'Test Flow', active: true },
+        { id: 'flow_2', name: 'Another Flow', active: false }
+      ]
+    };
+  }
+}
+
+// Test helper
+function createTestClient(useMock = false): TolstoyClient {
+  if (useMock || process.env.NODE_ENV === 'test') {
+    return new MockTolstoyClient() as any;
+  }
+
+  return new TolstoyClient(
+    process.env.TOLSTOY_TEST_URL || 'https://api-test.tolstoy.dev',
+    'test_org',
+    'test_user',
+    process.env.TOLSTOY_TEST_TOKEN
+  );
+}
+
+// Jest test example
+describe('Workflow Integration', () => {
+  let client: TolstoyClient;
+
+  beforeEach(() => {
+    client = createTestClient(true); // Use mock
+  });
+
+  it('should execute workflow successfully', async () => {
+    const result = await client.runFlow('test_flow', { userId: 'test_123' });
+    expect(result.data.executionId).toBeDefined();
+    expect(result.data.status).toBe('running');
+  });
+
+  it('should list flows', async () => {
+    const flows = await client.listFlows();
+    expect(flows.data).toHaveLength(2);
+    expect(flows.data[0].name).toBe('Test Flow');
+  });
+});
+```
+
+## Next Steps
+
+- [API Reference](/sdk/api-reference) - Complete method documentation
+- [Advanced Usage](/sdk/advanced-usage) - Expert patterns and optimization
+- [Troubleshooting](/sdk/troubleshooting) - Common issues and solutions

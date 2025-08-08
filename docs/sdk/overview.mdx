@@ -1,0 +1,183 @@
+---
+title: Overview
+sidebar_position: 1
+---
+
+# Tolstoy TypeScript SDK
+
+The official TypeScript SDK for the Tolstoy workflow automation platform. Build powerful integrations with type safety and modern JavaScript/TypeScript patterns.
+
+## Why Use the Tolstoy SDK?
+
+- **🔒 Multi-tenant Ready**: Built-in support for organization and user context
+- **📝 Full Type Safety**: Complete TypeScript support with IntelliSense
+- **🎯 Simple & Powerful**: Helper methods for common tasks + raw API access
+- **⚡ Production Ready**: Comprehensive error handling and testing
+- **🔄 Always Current**: Auto-generated from OpenAPI specification
+
+## Quick Overview
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient(
+  'https://tolstoy.getpullse.com',
+  'your-org-id',
+  'your-user-id'
+);
+
+// Execute workflows
+const execution = await client.runFlow('flow_123', {
+  userId: 'user_456',
+  email: 'user@example.com'
+});
+
+// Manage integrations
+const tool = await client.createTool({
+  name: 'GitHub API',
+  baseUrl: 'https://api.github.com',
+  authType: 'bearer'
+});
+
+// Set up webhooks
+const webhook = await client.createWebhook({
+  name: 'Flow Monitor',
+  url: 'https://your-app.com/webhooks',
+  events: ['flow.completed', 'flow.failed']
+});
+```
+
+## Key Features
+
+### ⚡ Workflow Automation
+Execute and monitor workflows with full type safety. Support for both synchronous and asynchronous execution modes.
+
+### 🔧 Tool Integrations
+Create and manage connections to external APIs and services. Support for multiple authentication methods.
+
+### 🔗 Event-Driven Architecture
+Set up webhooks for real-time notifications about workflow events, user actions, and system changes.
+
+### 📊 Complete API Coverage
+Access to all **52 API endpoints** across health, organizations, users, tools, actions, flows, logs, and webhooks.
+
+## Package Information
+
+- **Package**: `@joosuhail/tolstoy-sdk@1.0.0`
+- **Size**: 26.8 KB compressed, 221.7 kB unpacked
+- **Dependencies**: axios (production-ready)
+- **Node.js**: 16.0.0+ required
+- **TypeScript**: 5.0.0+ recommended
+
+## Architecture
+
+The SDK provides two levels of access:
+
+### 1. Helper Methods (Recommended)
+Simplified methods for common operations with sensible defaults.
+
+```typescript
+// Simple workflow execution
+const execution = await client.runFlow('flow_id', inputs);
+
+// Easy tool creation
+const tool = await client.createTool(toolConfig);
+```
+
+### 2. Raw API Access (Advanced)
+Direct access to all generated endpoints for advanced use cases.
+
+```typescript
+// Advanced operations
+const metrics = await client.raw.flows.flowsControllerGetMetrics('flow_id');
+const health = await client.raw.health.healthControllerGetDetailedHealth();
+```
+
+## Multi-Tenant Architecture
+
+Built for SaaS applications with organization-level isolation:
+
+```typescript
+// Different clients for different tenants
+const clientA = new TolstoyClient(baseUrl, 'org_a', 'user_123');
+const clientB = new TolstoyClient(baseUrl, 'org_b', 'user_456');
+
+// Each client operates in its own tenant context
+await clientA.runFlow('flow_id', inputs); // Isolated to org_a
+await clientB.runFlow('flow_id', inputs); // Isolated to org_b
+```
+
+## Getting Started
+
+Ready to start building? Choose your path:
+
+### 🚀 New to Tolstoy?
+Start with the **[Installation Guide](/sdk/installation)** and **[Quick Start](/sdk/quickstart)** to get up and running in minutes.
+
+### 🔐 Setting Up Access?
+Learn about **[Authentication](/sdk/authentication)** and multi-tenant configuration.
+
+### 🎯 Building Integrations?
+Explore **[Core Features](/sdk/core-features)** for workflows, tools, and webhooks.
+
+### 💡 Need Examples?
+Check out **[Real-World Examples](/sdk/examples)** including user onboarding, e-commerce, and marketing automation.
+
+### 📚 Looking for Details?
+Dive into the **[Complete API Reference](/sdk/api-reference)** for all methods and types.
+
+## Popular Use Cases
+
+### User Onboarding
+Automate new user setup with multi-step workflows including account creation, welcome emails, and feature tutorials.
+
+### E-commerce Automation  
+Handle order processing, inventory management, shipping notifications, and customer communications.
+
+### Marketing Campaigns
+Execute multi-channel campaigns with personalization, A/B testing, and performance tracking.
+
+### Customer Support
+Automate ticket routing, response generation, escalation rules, and satisfaction surveys.
+
+### Integration Management
+Connect external services, manage API credentials, and monitor integration health.
+
+## Community & Support
+
+- **📖 Documentation**: Complete guides and API reference
+- **🐛 Issues**: Report bugs and request features  
+- **💬 Community**: Join our developer community
+- **🔄 Updates**: SDK automatically syncs with API changes
+
+## Next Steps
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+  <div className="border rounded-lg p-4">
+    <h3 className="text-lg font-semibold mb-2">🚀 Get Started</h3>
+    <p className="text-sm text-gray-600 mb-3">Install the SDK and run your first workflow in 2 minutes.</p>
+    <a href="/sdk/installation" className="text-blue-600 font-medium">Installation Guide →</a>
+  </div>
+  
+  <div className="border rounded-lg p-4">
+    <h3 className="text-lg font-semibold mb-2">💡 See Examples</h3>
+    <p className="text-sm text-gray-600 mb-3">Real-world implementations for common automation scenarios.</p>
+    <a href="/sdk/examples" className="text-blue-600 font-medium">View Examples →</a>
+  </div>
+  
+  <div className="border rounded-lg p-4">
+    <h3 className="text-lg font-semibold mb-2">🔧 Core Features</h3>
+    <p className="text-sm text-gray-600 mb-3">Learn about workflows, tools, webhooks, and advanced patterns.</p>
+    <a href="/sdk/core-features" className="text-blue-600 font-medium">Explore Features →</a>
+  </div>
+  
+  <div className="border rounded-lg p-4">
+    <h3 className="text-lg font-semibold mb-2">📚 API Reference</h3>
+    <p className="text-sm text-gray-600 mb-3">Complete method documentation and type definitions.</p>
+    <a href="/sdk/api-reference" className="text-blue-600 font-medium">Browse API →</a>
+  </div>
+</div>
+
+---
+
+*The Tolstoy SDK is automatically generated from our OpenAPI specification and is always up-to-date with the latest API changes.*

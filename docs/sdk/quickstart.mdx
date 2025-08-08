@@ -1,0 +1,118 @@
+---
+title: Quick Start
+sidebar_position: 2
+---
+
+# Quick Start
+
+Get up and running with the Tolstoy SDK in under 2 minutes.
+
+## Basic Setup
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient(
+  'https://tolstoy.getpullse.com', // Base URL
+  'your-org-id',                    // Organization ID
+  'your-user-id',                   // User ID
+  'optional-bearer-token'           // Optional authentication token
+);
+```
+
+## Your First Workflow Execution
+
+```typescript
+// Execute a workflow
+const execution = await client.runFlow('flow_123', {
+  userId: 'user_456',
+  email: 'user@example.com',
+  customData: 'any value'
+});
+
+console.log(`Execution started: ${execution.data.executionId}`);
+
+// Check execution status
+const status = await client.getFlowExecution(
+  'flow_123', 
+  execution.data.executionId
+);
+
+console.log(`Status: ${status.data.status}`);
+```
+
+## Common Operations
+
+### List Available Flows
+```typescript
+const flows = await client.listFlows();
+flows.data.forEach(flow => {
+  console.log(`${flow.name}: ${flow.description}`);
+});
+```
+
+### Create a Tool Integration
+```typescript
+const tool = await client.createTool({
+  name: 'GitHub API',
+  baseUrl: 'https://api.github.com',
+  authType: 'bearer',
+  description: 'GitHub REST API integration'
+});
+```
+
+### Set Up a Webhook
+```typescript
+const webhook = await client.createWebhook({
+  name: 'Flow Completion Webhook',
+  url: 'https://your-app.com/webhooks/tolstoy',
+  events: ['flow.completed', 'flow.failed'],
+  active: true
+});
+```
+
+## Error Handling
+
+```typescript
+try {
+  const execution = await client.runFlow('flow_id', {});
+} catch (error) {
+  if (error.response) {
+    // API error response
+    console.error('API Error:', error.response.data);
+    console.error('Status:', error.response.status);
+  } else if (error.request) {
+    // Network error
+    console.error('Network Error:', error.message);
+  } else {
+    // Other error
+    console.error('Error:', error.message);
+  }
+}
+```
+
+## TypeScript Support
+
+The SDK provides full type safety:
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient(baseUrl, orgId, userId);
+
+// All responses are fully typed
+const execution = await client.runFlow('flow_123', {
+  userId: 'user_456'
+});
+
+// TypeScript knows the response structure
+const executionId: string = execution.data.executionId;
+const status: 'running' | 'completed' | 'failed' = execution.data.status;
+```
+
+## Next Steps
+
+- [Authentication](/sdk/authentication) - Configure secure access
+- [Core Features](/sdk/core-features) - Explore workflows, tools, and webhooks  
+- [Examples](/sdk/examples) - Real-world implementation patterns
+- [API Reference](/sdk/api-reference) - Complete method documentation

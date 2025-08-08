@@ -184,9 +184,25 @@
         "icon": "terminal",
         "groups": [
           {
-            "group": "TypeScript SDK",
+            "group": "Getting Started",
             "pages": [
-              "docs/sdk/index"
+              "docs/sdk/overview",
+              "docs/sdk/installation",
+              "docs/sdk/quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "docs/sdk/authentication",
+              "docs/sdk/core-features",
+              "docs/sdk/examples"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "docs/sdk/api-reference"
             ]
           }
         ]
