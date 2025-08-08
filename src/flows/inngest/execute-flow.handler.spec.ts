@@ -8,6 +8,7 @@ import { ConditionEvaluatorService } from '../../common/services/condition-evalu
 import { PrismaService } from '../../prisma.service';
 import { ExecutionLogsService } from '../../execution-logs/execution-logs.service';
 import { MetricsService } from '../../metrics/metrics.service';
+import { AuthConfigService } from '../../auth/auth-config.service';
 
 describe('ExecuteFlowHandler', () => {
   let handler: ExecuteFlowHandler;
@@ -61,6 +62,11 @@ describe('ExecuteFlowHandler', () => {
       debug: jest.fn(),
     };
 
+    const mockAuthConfigService = {
+      getOrgAuthConfig: jest.fn().mockResolvedValue(null),
+      getUserCredentials: jest.fn().mockResolvedValue(null),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         ExecuteFlowHandler,
@@ -88,8 +94,10 @@ describe('ExecuteFlowHandler', () => {
             incrementFlowExecution: jest.fn(),
             incrementStepRetries: jest.fn(),
             incrementStepErrors: jest.fn(),
+            incrementAuthInjection: jest.fn(),
           },
         },
+        { provide: AuthConfigService, useValue: mockAuthConfigService },
         {
           provide: 'InngestService',
           useValue: {

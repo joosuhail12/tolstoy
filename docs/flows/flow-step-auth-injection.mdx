@@ -1,0 +1,392 @@
+---
+title: Flow-Step Auth Injection
+description: "Automatic authentication header injection for flow steps"
+---
+
+# Flow-Step Auth Injection
+
+The flow engine automatically injects authentication headers into flow steps that require external API calls. This ensures that all HTTP requests made during flow execution are properly authenticated using the configured organization and user credentials.
+
+## Overview
+
+**Feature:** Automatic Authentication Injection
+
+When a flow executes, the system will:
+
+1. Analyze each step to determine if authentication is required
+2. Resolve the appropriate tool configuration and credentials
+3. Inject authentication headers before step execution
+4. Track auth injection metrics for monitoring
+
+## Supported Step Types
+
+Authentication headers are automatically injected for these step types:
+
+### http_request
+Direct HTTP requests made to external APIs receive authentication headers based on the configured tool settings.
+
+### oauth_api_call  
+API calls that require OAuth2 authentication get user-specific access tokens injected automatically.
+
+## Tool Name Resolution
+
+The system determines which authentication configuration to use by extracting the tool name from step configuration:
+
+### 1. Explicit Tool Name
+If the step config includes a `toolName` property, it's used directly:
+
+```json
+{
+  "type": "http_request",
+  "config": {
+    "toolName": "Slack",
+    "url": "https://slack.com/api/chat.postMessage",
+    "method": "POST"
+  }
+}
+```
+
+### 2. URL Domain Mapping
+When no explicit tool name is provided, the system maps common domains to tool names:
+
+| Domain | Tool Name |
+|--------|-----------|
+| `api.slack.com` | Slack |
+| `hooks.slack.com` | Slack |  
+| `api.github.com` | GitHub |
+| `api.notion.com` | Notion |
+| `api.linear.app` | Linear |
+| `discord.com` | Discord |
+| `api.discord.com` | Discord |
+
+Example:
+```json
+{
+  "type": "http_request", 
+  "config": {
+    "url": "https://api.github.com/repos/owner/repo/issues",
+    "method": "GET"
+  }
+}
+```
+This automatically resolves to the "GitHub" tool configuration.
+
+## Authentication Types
+
+### API Key Authentication
+
+For tools configured with API key auth, headers are injected based on the configuration:
+
+**Custom Header Name:**
+```json
+{
+  "type": "apiKey",
+  "config": {
+    "headerName": "X-API-Key", 
+    "headerValue": "sk_live_1234567890abcdef"
+  }
+}
+```
+Results in: `X-API-Key: sk_live_1234567890abcdef`
+
+**Default Authorization Header:**
+```json
+{
+  "type": "apiKey",
+  "config": {
+    "apiKey": "sk_live_1234567890abcdef"
+  }
+}
+```
+Results in: `Authorization: Bearer sk_live_1234567890abcdef`
+
+### OAuth2 Authentication
+
+For OAuth2-configured tools, user-specific access tokens are injected:
+
+```json
+{
+  "type": "oauth2",
+  "config": {
+    "clientId": "your_client_id",
+    "clientSecret": "your_client_secret"
+  }
+}
+```
+
+The system:
+1. Retrieves stored user credentials for the organization and tool
+2. Refreshes expired tokens automatically
+3. Injects: `Authorization: Bearer {access_token}`
+
+## Header Merging
+
+Authentication headers are merged with existing step headers, with auth headers taking precedence:
+
+```json
+{
+  "type": "http_request",
+  "config": {
+    "url": "https://api.slack.com/chat.postMessage",
+    "headers": {
+      "Content-Type": "application/json",
+      "X-Custom-Header": "custom-value"
+    }
+  }
+}
+```
+
+Final headers:
+```json
+{
+  "Content-Type": "application/json",
+  "X-Custom-Header": "custom-value", 
+  "Authorization": "Bearer xoxb-slack-token"
+}
+```
+
+## Context Integration
+
+### SandboxExecutionContext
+
+Sandbox steps receive authentication headers in their execution context:
+
+```typescript
+interface SandboxExecutionContext {
+  orgId: string;
+  userId: string; 
+  flowId: string;
+  stepId: string;
+  executionId: string;
+  variables?: Record<string, unknown>;
+  stepOutputs?: Record<string, unknown>;
+  authHeaders?: Record<string, string>; // 👈 Added auth headers
+}
+```
+
+This allows sandbox code to access authentication headers for making authenticated requests.
+
+### HTTP Request Steps
+
+HTTP request steps automatically use the injected headers when making fetch requests:
+
+```javascript
+const response = await fetch(url, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    ...configHeaders,
+    ...authHeaders  // 👈 Injected authentication
+  },
+  body: JSON.stringify(requestBody)
+});
+```
+
+## Metrics and Monitoring
+
+Authentication injection is tracked with Prometheus metrics:
+
+### auth_injection_total
+
+Counter tracking authentication header injections:
+
+```
+auth_injection_total{
+  orgId="org_12345",
+  stepId="send-slack-message", 
+  stepType="http_request",
+  toolName="Slack",
+  authType="oauth2"
+} 1
+```
+
+**Labels:**
+- `orgId`: Organization identifier
+- `stepId`: Step identifier within the flow
+- `stepType`: Type of step (http_request, oauth_api_call, etc.)
+- `toolName`: Resolved tool name
+- `authType`: Authentication type (apiKey, oauth2, none)
+
+### Query Examples
+
+**Total auth injections by tool:**
+```promql
+sum by (toolName) (auth_injection_total)
+```
+
+**Auth injection rate by organization:**
+```promql
+rate(auth_injection_total[5m]) by (orgId)
+```
+
+**Failed auth resolutions (authType="none"):**
+```promql
+sum by (toolName) (auth_injection_total{authType="none"})
+```
+
+## Error Handling
+
+### Authentication Resolution Failures
+
+When authentication cannot be resolved:
+
+1. **Missing Tool Config:** Step executes without auth headers
+2. **Expired OAuth Tokens:** System attempts token refresh
+3. **Invalid Credentials:** Error logged, step continues without auth
+
+### Debug Logging
+
+Enable debug logging to troubleshoot auth injection:
+
+```json
+{
+  "stepId": "api-call-step",
+  "stepType": "http_request", 
+  "toolName": "GitHub",
+  "authType": "oauth2",
+  "hasAuthHeaders": true,
+  "headerNames": ["Authorization"]
+}
+```
+
+## Best Practices
+
+### 1. Explicit Tool Names
+
+Always specify `toolName` in step config for reliable auth resolution:
+
+```json
+{
+  "type": "http_request",
+  "config": {
+    "toolName": "Slack",  // 👈 Explicit tool name
+    "url": "https://hooks.slack.com/services/...",
+    "method": "POST"
+  }
+}
+```
+
+### 2. User Context Required
+
+For OAuth2 authentication, ensure flows include user context:
+
+```json
+{
+  "orgId": "org_12345",
+  "userId": "user_67890",  // 👈 Required for OAuth2
+  "flowId": "flow_abc123",
+  "steps": [...] 
+}
+```
+
+### 3. Monitor Auth Metrics
+
+Set up alerts for authentication failures:
+
+```promql
+# Alert on high rate of missing auth configs
+rate(auth_injection_total{authType="none"}[5m]) > 0.1
+```
+
+### 4. Test Authentication
+
+Verify tool configurations work by executing test flows:
+
+```bash
+# Test Slack integration
+curl -X POST /flows/execute \
+  -H "X-Org-ID: org_12345" \
+  -H "X-User-ID: user_67890" \
+  -d '{"flowId": "test-slack-auth", ...}'
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**No Authentication Headers Injected**
+- Check tool configuration exists for the organization
+- Verify `toolName` is correctly specified or URL domain is mapped
+- Ensure user has completed OAuth flow for OAuth2 tools
+
+**"Unknown" Tool Name in Metrics**
+- Step couldn't resolve tool name from URL domain
+- Add explicit `toolName` to step configuration
+- Check if domain mapping needs to be added
+
+**OAuth2 Token Expired**
+- System should automatically refresh tokens
+- Check user credentials haven't been revoked
+- Verify OAuth2 refresh token is valid
+
+### Debug Commands
+
+**Check Tool Configuration:**
+```bash
+# Verify tool auth config exists
+curl -X GET /tools/auth-config \
+  -H "X-Org-ID: org_12345" \
+  -H "Authorization: Bearer sk_..."
+```
+
+**Test User Credentials:**
+```bash
+# Check user OAuth tokens
+curl -X GET /auth/user-credentials \
+  -H "X-Org-ID: org_12345" \
+  -H "X-User-ID: user_67890" \
+  -H "Authorization: Bearer sk_..."
+```
+
+## Security Considerations
+
+### Credential Protection
+
+- Authentication headers are never logged in plaintext
+- Tokens are encrypted at rest in the database
+- Headers are only visible within the execution context
+
+### Access Control
+
+- User credentials are scoped to prevent cross-user access
+- Organization isolation ensures credential separation
+- API keys are organization-specific
+
+### Token Management
+
+- OAuth2 access tokens are automatically refreshed
+- Expired tokens trigger refresh before step execution
+- Refresh failures result in graceful degradation
+
+## Migration Guide
+
+If you're upgrading from manual authentication handling:
+
+### Before (Manual Auth)
+
+```json
+{
+  "type": "http_request",
+  "config": {
+    "url": "https://api.slack.com/chat.postMessage",
+    "headers": {
+      "Authorization": "Bearer {{slack_token}}"
+    }
+  }
+}
+```
+
+### After (Automatic Injection)
+
+```json  
+{
+  "type": "http_request", 
+  "config": {
+    "toolName": "Slack",
+    "url": "https://api.slack.com/chat.postMessage"
+    // 👈 No manual auth headers needed
+  }
+}
+```
+
+The system automatically injects the correct authentication headers based on your tool configuration.

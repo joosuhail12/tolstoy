@@ -9,6 +9,7 @@ import { CommonModule } from '../../common/common.module';
 import { CacheModule } from '../../cache/cache.module';
 import { ExecutionLogsModule } from '../../execution-logs/execution-logs.module';
 import { MetricsModule } from '../../metrics/metrics.module';
+import { AuthModule } from '../../auth/auth.module';
 
 /**
  * Inngest Integration Module
@@ -22,6 +23,7 @@ import { MetricsModule } from '../../metrics/metrics.module';
     CacheModule,
     ExecutionLogsModule,
     MetricsModule,
+    AuthModule,
     NestInngestModule.forRootAsync({
       imports: [], // AwsSecretsService is globally available
       inject: [AwsSecretsService],

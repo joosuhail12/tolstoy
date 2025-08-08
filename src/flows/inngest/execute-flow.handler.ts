@@ -12,7 +12,8 @@ import {
 import { PrismaService } from '../../prisma.service';
 import { Prisma } from '@prisma/client';
 import { ExecutionLogsService } from '../../execution-logs/execution-logs.service';
-import { MetricsService, StepMetricLabels } from '../../metrics/metrics.service';
+import { MetricsService, StepMetricLabels, AuthInjectionMetricLabels } from '../../metrics/metrics.service';
+import { AuthConfigService } from '../../auth/auth-config.service';
 
 // Step Configuration Interfaces
 interface SandboxSyncConfig {
@@ -172,6 +173,7 @@ interface ExecutionContext {
   executionId: string;
   variables: Record<string, unknown>;
   stepOutputs: Record<string, unknown>;
+  authHeaders?: Record<string, string>;
 }
 
 interface WebhookDispatchPayload {
@@ -197,6 +199,7 @@ export class ExecuteFlowHandler {
     private readonly prisma: PrismaService,
     private readonly executionLogsService: ExecutionLogsService,
     private readonly metricsService: MetricsService,
+    private readonly authConfig: AuthConfigService,
     @Optional() private readonly inngestService: InngestService,
     @InjectPinoLogger(ExecuteFlowHandler.name)
     private readonly logger: PinoLogger,
@@ -529,6 +532,151 @@ export class ExecuteFlowHandler {
   }
 
   /**
+   * Build authentication headers for a step based on the tool configuration
+   */
+  private async buildAuthHeaders(
+    step: FlowStepConfig,
+    context: ExecutionContext,
+  ): Promise<Record<string, string>> {
+    try {
+      // For steps that don't require external API calls, return empty headers
+      const stepTypesRequiringAuth = ['http_request', 'oauth_api_call'];
+      if (!stepTypesRequiringAuth.includes(step.type)) {
+        return {};
+      }
+
+      // Extract tool name from step config or context
+      // For http_request steps, we need to determine the tool from the URL or step metadata
+      let toolName: string | undefined;
+      
+      // Check if step config has tool information
+      const stepConfig = step.config as any;
+      if (stepConfig.toolName) {
+        toolName = stepConfig.toolName;
+      } else if (stepConfig.url) {
+        // Try to infer tool name from URL domain if available
+        try {
+          const url = new URL(stepConfig.url);
+          const domain = url.hostname.toLowerCase();
+          
+          // Map common domains to tool names
+          const domainToolMap: Record<string, string> = {
+            'api.slack.com': 'Slack',
+            'api.github.com': 'GitHub',
+            'api.notion.com': 'Notion',
+            'api.linear.app': 'Linear',
+            'hooks.slack.com': 'Slack',
+            'discord.com': 'Discord',
+            'api.discord.com': 'Discord',
+          };
+          
+          toolName = domainToolMap[domain];
+        } catch (error) {
+          this.logger.debug(
+            {
+              stepId: step.id,
+              url: stepConfig.url,
+              error: error instanceof Error ? error.message : 'Unknown error',
+            },
+            'Failed to parse URL for tool name inference',
+          );
+        }
+      }
+
+      if (!toolName) {
+        this.logger.debug(
+          {
+            stepId: step.id,
+            stepType: step.type,
+          },
+          'No tool name found for step, skipping auth header injection',
+        );
+        return {};
+      }
+
+      // Get organization auth configuration for the tool
+      const orgAuth = await this.authConfig.getOrgAuthConfig(context.orgId, toolName);
+      let authHeaders: Record<string, string> = {};
+
+      if (orgAuth) {
+        // Handle API Key authentication
+        if (orgAuth.type === 'apiKey' && orgAuth.config) {
+          const config = orgAuth.config as any;
+          if (config.headerName && config.headerValue) {
+            authHeaders[config.headerName] = config.headerValue;
+          } else if (config.apiKey) {
+            // Default to Authorization header if no specific header name is configured
+            authHeaders['Authorization'] = `Bearer ${config.apiKey}`;
+          }
+        }
+        
+        // Handle OAuth2 authentication (requires user context)
+        else if (orgAuth.type === 'oauth2' && context.userId) {
+          try {
+            const userCredentials = await this.authConfig.getUserCredentials(
+              context.orgId,
+              context.userId,
+              toolName,
+            );
+            
+            if (userCredentials?.accessToken) {
+              authHeaders['Authorization'] = `Bearer ${userCredentials.accessToken}`;
+            }
+          } catch (error) {
+            this.logger.warn(
+              {
+                stepId: step.id,
+                orgId: context.orgId,
+                userId: context.userId,
+                toolName,
+                error: error instanceof Error ? error.message : 'Unknown error',
+              },
+              'Failed to retrieve user credentials for OAuth2 authentication',
+            );
+          }
+        }
+      }
+
+      this.logger.debug(
+        {
+          stepId: step.id,
+          stepType: step.type,
+          toolName,
+          authType: orgAuth?.type,
+          hasAuthHeaders: Object.keys(authHeaders).length > 0,
+          headerNames: Object.keys(authHeaders),
+        },
+        'Built authentication headers for step',
+      );
+
+      // Record metrics for auth injection
+      const authType = orgAuth?.type || 'none';
+      const metricsLabels: AuthInjectionMetricLabels = {
+        orgId: context.orgId,
+        stepId: step.id,
+        stepType: step.type,
+        toolName: toolName || 'unknown',
+        authType,
+      };
+      this.metricsService.incrementAuthInjection(metricsLabels);
+
+      return authHeaders;
+    } catch (error) {
+      this.logger.error(
+        {
+          stepId: step.id,
+          stepType: step.type,
+          orgId: context.orgId,
+          userId: context.userId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        },
+        'Failed to build authentication headers for step',
+      );
+      return {};
+    }
+  }
+
+  /**
    * Execute a single flow step with proper context and error handling
    */
   private async executeStep(
@@ -547,19 +695,28 @@ export class ExecuteFlowHandler {
     // Start metrics timer
     const endTimer = this.metricsService.startStepTimer(metricLabels);
 
+    // Build authentication headers for this step
+    const authHeaders = await this.buildAuthHeaders(step, context);
+    
+    // Add auth headers to context for this step execution
+    const contextWithAuth: ExecutionContext = {
+      ...context,
+      authHeaders,
+    };
+
     // Check executeIf condition before executing the step
     if (step.executeIf) {
       try {
         const conditionContext: ConditionContext = {
-          inputs: context.variables as Record<string, unknown>,
-          variables: context.variables as Record<string, unknown>,
-          stepOutputs: context.stepOutputs as Record<string, unknown>,
+          inputs: contextWithAuth.variables as Record<string, unknown>,
+          variables: contextWithAuth.variables as Record<string, unknown>,
+          stepOutputs: contextWithAuth.stepOutputs as Record<string, unknown>,
           currentStep: step as unknown as Record<string, unknown>,
-          orgId: context.orgId,
-          userId: context.userId,
+          orgId: contextWithAuth.orgId,
+          userId: contextWithAuth.userId,
           meta: {
-            flowId: context.flowId,
-            executionId: context.executionId,
+            flowId: contextWithAuth.flowId,
+            executionId: contextWithAuth.executionId,
             stepId: step.id,
           },
         };
@@ -577,8 +734,8 @@ export class ExecuteFlowHandler {
             {
               stepId: step.id,
               stepType: step.type,
-              flowId: context.flowId,
-              executionId: context.executionId,
+              flowId: contextWithAuth.flowId,
+              executionId: contextWithAuth.executionId,
               executeIf: step.executeIf,
               skipReason,
             },
@@ -602,8 +759,8 @@ export class ExecuteFlowHandler {
           {
             stepId: step.id,
             stepType: step.type,
-            flowId: context.flowId,
-            executionId: context.executionId,
+            flowId: contextWithAuth.flowId,
+            executionId: contextWithAuth.executionId,
             executeIf: step.executeIf,
             error: error instanceof Error ? error.message : 'Unknown error',
           },
@@ -619,31 +776,31 @@ export class ExecuteFlowHandler {
 
       switch (step.type) {
         case 'sandbox_sync':
-          result = await this.executeSandboxSync(step, context);
+          result = await this.executeSandboxSync(step, contextWithAuth);
           break;
 
         case 'sandbox_async':
-          result = await this.executeSandboxAsync(step, context);
+          result = await this.executeSandboxAsync(step, contextWithAuth);
           break;
 
         case 'code_execution':
-          result = await this.executeCodeExecution(step, context);
+          result = await this.executeCodeExecution(step, contextWithAuth);
           break;
 
         case 'data_transform':
-          result = await this.executeDataTransform(step, context);
+          result = await this.executeDataTransform(step, contextWithAuth);
           break;
 
         case 'conditional':
-          result = await this.executeConditional(step, context);
+          result = await this.executeConditional(step, contextWithAuth);
           break;
 
         case 'http_request':
-          result = await this.executeHttpRequest(step, context);
+          result = await this.executeHttpRequest(step, contextWithAuth);
           break;
 
         case 'delay':
-          result = await this.executeDelay(step, context);
+          result = await this.executeDelay(step, contextWithAuth);
           break;
 
         default:
@@ -728,6 +885,7 @@ export class ExecuteFlowHandler {
       executionId: context.executionId,
       variables: context.variables as Record<string, unknown>,
       stepOutputs: context.stepOutputs,
+      authHeaders: context.authHeaders,
     };
 
     const result = await this.sandboxService.runSync(code, sandboxContext);
@@ -780,6 +938,7 @@ export class ExecuteFlowHandler {
       executionId: context.executionId,
       variables: context.variables as Record<string, unknown>,
       stepOutputs: context.stepOutputs,
+      authHeaders: context.authHeaders,
     };
 
     const sessionId = await this.sandboxService.runAsync(code, sandboxContext);
@@ -878,6 +1037,7 @@ export class ExecuteFlowHandler {
         executionId: context.executionId,
         variables: context.variables,
         stepOutputs: context.stepOutputs,
+        authHeaders: context.authHeaders,
       };
 
       const result = await this.sandboxService.runSync(sandboxCode, sandboxContext);
@@ -940,6 +1100,7 @@ export class ExecuteFlowHandler {
         executionId: context.executionId,
         variables: context.variables,
         stepOutputs: context.stepOutputs,
+        authHeaders: context.authHeaders,
       };
 
       const result = await this.sandboxService.runSync(sandboxCode, sandboxContext);
@@ -983,18 +1144,33 @@ export class ExecuteFlowHandler {
 
   private async executeHttpRequest(
     step: FlowStepConfig,
-    _context: ExecutionContext,
+    context: ExecutionContext,
   ): Promise<StepExecutionResult> {
     const config = step.config as HttpRequestConfig;
     const { url, method = 'GET', headers = {}, body } = config;
 
     try {
+      // Merge authentication headers with existing headers
+      const requestHeaders = {
+        'Content-Type': 'application/json',
+        ...headers,
+        ...(context.authHeaders || {}),
+      };
+
+      this.logger.debug(
+        {
+          stepId: step.id,
+          method,
+          url,
+          hasAuthHeaders: Object.keys(context.authHeaders || {}).length > 0,
+          authHeaderNames: Object.keys(context.authHeaders || {}),
+        },
+        'Executing HTTP request with authentication headers',
+      );
+
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers,
-        },
+        headers: requestHeaders,
         body: body ? JSON.stringify(body) : undefined,
       });
 

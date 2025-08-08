@@ -14,6 +14,7 @@ export interface SandboxExecutionContext {
   executionId: string;
   variables?: Record<string, unknown>;
   stepOutputs?: Record<string, unknown>;
+  authHeaders?: Record<string, string>;
 }
 
 export interface SandboxExecutionResult {
@@ -191,7 +192,10 @@ export class SandboxService {
 
           throw new InternalServerErrorException(
             `Sandbox sync execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            error,
+            {
+              cause: error,
+              description: error instanceof Error ? error.stack : undefined,
+            },
           );
         }
       },
@@ -289,7 +293,10 @@ export class SandboxService {
 
       throw new InternalServerErrorException(
         `Sandbox async execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error,
+        {
+          cause: error,
+          description: error instanceof Error ? error.stack : undefined,
+        },
       );
     }
   }
@@ -377,7 +384,10 @@ export class SandboxService {
 
       throw new InternalServerErrorException(
         `Fetching sandbox async result failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error,
+        {
+          cause: error,
+          description: error instanceof Error ? error.stack : undefined,
+        },
       );
     }
   }
@@ -435,7 +445,10 @@ export class SandboxService {
 
       throw new InternalServerErrorException(
         `Failed to cancel sandbox execution: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        error,
+        {
+          cause: error,
+          description: error instanceof Error ? error.stack : undefined,
+        },
       );
     }
   }

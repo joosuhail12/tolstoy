@@ -9,10 +9,11 @@ import { AwsSecretsService } from '../aws-secrets.service';
 import { SandboxModule } from '../sandbox/sandbox.module';
 import { ExecutionLogsModule } from '../execution-logs/execution-logs.module';
 import { MetricsModule } from '../metrics/metrics.module';
+import { AuthModule } from '../auth/auth.module';
 import { InngestExecutionService } from './inngest/inngest-execution.service';
 
 @Module({
-  imports: [SandboxModule, ExecutionLogsModule, MetricsModule],
+  imports: [SandboxModule, ExecutionLogsModule, MetricsModule, AuthModule],
   controllers: [FlowsController],
   providers: [
     FlowsService,

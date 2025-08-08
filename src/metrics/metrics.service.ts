@@ -23,6 +23,24 @@ export interface WebhookCounterLabels extends WebhookMetricLabels {
   readonly success: string; // 'true' | 'false'
 }
 
+export interface ActionMetricLabels {
+  readonly orgId: string;
+  readonly toolKey: string;
+  readonly actionKey: string;
+}
+
+export interface ActionCounterLabels extends ActionMetricLabels {
+  readonly status: string; // 'started' | 'success' | 'error'
+}
+
+export interface AuthInjectionMetricLabels {
+  readonly orgId: string;
+  readonly stepId: string;
+  readonly stepType: string;
+  readonly toolName: string;
+  readonly authType: string; // 'apiKey' | 'oauth2' | 'none'
+}
+
 @Injectable()
 export class MetricsService {
   public readonly stepExecutionHistogram: Histogram<keyof StepMetricLabels>;
@@ -30,6 +48,9 @@ export class MetricsService {
   public readonly stepErrorsCounter: Counter<keyof StepMetricLabels>;
   public readonly webhookDispatchCounter: Counter<keyof WebhookCounterLabels>;
   public readonly webhookDispatchHistogram: Histogram<keyof WebhookMetricLabels>;
+  public readonly actionExecutionCounter: Counter<keyof ActionCounterLabels>;
+  public readonly actionExecutionDuration: Histogram<keyof ActionMetricLabels>;
+  public readonly authInjectionCounter: Counter<keyof AuthInjectionMetricLabels>;
 
   constructor() {
     this.stepExecutionHistogram = new Histogram({
@@ -73,6 +94,43 @@ export class MetricsService {
       buckets: [0.1, 0.5, 1, 2, 5],
       registers: [register],
     });
+
+    this.actionExecutionCounter = new Counter({
+      name: 'action_execution_total',
+      help: 'Total number of single action executions',
+      labelNames: ['orgId', 'toolKey', 'actionKey', 'status'] as readonly (
+        | 'orgId'
+        | 'toolKey'
+        | 'actionKey'
+        | 'status'
+      )[],
+      registers: [register],
+    });
+
+    this.actionExecutionDuration = new Histogram({
+      name: 'action_execution_seconds',
+      help: 'Single action execution duration in seconds',
+      labelNames: ['orgId', 'toolKey', 'actionKey'] as readonly (
+        | 'orgId'
+        | 'toolKey'
+        | 'actionKey'
+      )[],
+      buckets: [0.1, 0.5, 1, 5, 10, 30],
+      registers: [register],
+    });
+
+    this.authInjectionCounter = new Counter({
+      name: 'auth_injection_total',
+      help: 'Total number of auth header injections for flow steps',
+      labelNames: ['orgId', 'stepId', 'stepType', 'toolName', 'authType'] as readonly (
+        | 'orgId'
+        | 'stepId'
+        | 'stepType'
+        | 'toolName'
+        | 'authType'
+      )[],
+      registers: [register],
+    });
   }
 
   recordStepDuration(labels: StepMetricLabels, duration: number): void {
@@ -101,5 +159,9 @@ export class MetricsService {
 
   startWebhookTimer(labels: WebhookMetricLabels) {
     return this.webhookDispatchHistogram.labels(labels).startTimer();
+  }
+
+  incrementAuthInjection(labels: AuthInjectionMetricLabels): void {
+    this.authInjectionCounter.labels(labels).inc();
   }
 }
