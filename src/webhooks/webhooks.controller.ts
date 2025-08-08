@@ -84,7 +84,11 @@ export class WebhooksController {
       properties: {
         id: { type: 'string', example: 'webhook_abc123' },
         url: { type: 'string', example: 'https://api.example.com/webhook' },
-        eventTypes: { type: 'array', items: { type: 'string' }, example: ['flow.execution.completed'] },
+        eventTypes: {
+          type: 'array',
+          items: { type: 'string' },
+          example: ['flow.execution.completed'],
+        },
         enabled: { type: 'boolean', example: true },
         createdAt: { type: 'string', format: 'date-time' },
         updatedAt: { type: 'string', format: 'date-time' },
@@ -132,7 +136,11 @@ export class WebhooksController {
         properties: {
           id: { type: 'string', example: 'webhook_abc123' },
           url: { type: 'string', example: 'https://api.example.com/webhook' },
-          eventTypes: { type: 'array', items: { type: 'string' }, example: ['flow.execution.completed'] },
+          eventTypes: {
+            type: 'array',
+            items: { type: 'string' },
+            example: ['flow.execution.completed'],
+          },
           enabled: { type: 'boolean', example: true },
           createdAt: { type: 'string', format: 'date-time' },
           updatedAt: { type: 'string', format: 'date-time' },
@@ -196,7 +204,11 @@ export class WebhooksController {
       properties: {
         id: { type: 'string', example: 'webhook_abc123' },
         url: { type: 'string', example: 'https://api.example.com/webhook' },
-        eventTypes: { type: 'array', items: { type: 'string' }, example: ['flow.execution.completed'] },
+        eventTypes: {
+          type: 'array',
+          items: { type: 'string' },
+          example: ['flow.execution.completed'],
+        },
         enabled: { type: 'boolean', example: true },
         createdAt: { type: 'string', format: 'date-time' },
         updatedAt: { type: 'string', format: 'date-time' },

@@ -37,7 +37,8 @@ export class ToolSecretsController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Store Tool Credentials',
-    description: 'Securely store encrypted credentials for an external tool. These credentials will be used when the tool is executed in workflows.',
+    description:
+      'Securely store encrypted credentials for an external tool. These credentials will be used when the tool is executed in workflows.',
   })
   @ApiParam({
     name: 'toolId',
@@ -124,7 +125,8 @@ export class ToolSecretsController {
   @Get()
   @ApiOperation({
     summary: 'Get Tool Credentials',
-    description: 'Retrieve stored credentials for a tool. By default returns masked values for security. Use unmask=true to get actual values (use carefully).',
+    description:
+      'Retrieve stored credentials for a tool. By default returns masked values for security. Use unmask=true to get actual values (use carefully).',
   })
   @ApiParam({
     name: 'toolId',
@@ -231,7 +233,8 @@ export class ToolSecretsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete Tool Credentials',
-    description: 'Permanently delete stored credentials for a tool. This will affect any workflows that use this tool.',
+    description:
+      'Permanently delete stored credentials for a tool. This will affect any workflows that use this tool.',
   })
   @ApiParam({
     name: 'toolId',
@@ -275,7 +278,8 @@ export class ToolSecretsListController {
   @Get()
   @ApiOperation({
     summary: 'List Tools with Credentials',
-    description: 'Get all tools in the organization with their credential status. Shows which tools have credentials stored and which ones need setup.',
+    description:
+      'Get all tools in the organization with their credential status. Shows which tools have credentials stored and which ones need setup.',
   })
   @ApiResponse({
     status: 200,

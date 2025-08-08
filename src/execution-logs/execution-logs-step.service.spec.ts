@@ -69,7 +69,7 @@ describe('ExecutionLogsService - Step Logging', () => {
       ],
     }).compile();
 
-    service = module.get<ExecutionLogsService>(ExecutionLogsService);
+    service = module.get(ExecutionLogsService) as ExecutionLogsService;
   });
 
   afterEach(() => {

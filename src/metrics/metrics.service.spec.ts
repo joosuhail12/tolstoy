@@ -18,7 +18,7 @@ describe('MetricsService', () => {
       providers: [MetricsService],
     }).compile();
 
-    service = module.get<MetricsService>(MetricsService);
+    service = module.get(MetricsService) as MetricsService;
   });
 
   afterEach(() => {

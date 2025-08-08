@@ -327,7 +327,7 @@ export class RedisCacheService {
    * Set multiple key-value pairs at once
    * @param keyValuePairs Array of [key, value, ttl?] tuples
    */
-  async mset(keyValuePairs: Array<[string, unknown, number?]>): Promise<void> {
+  async mset(keyValuePairs: [string, unknown, number?][]): Promise<void> {
     if (!this.isRedisAvailable() || keyValuePairs.length === 0) {
       return;
     }

@@ -48,7 +48,7 @@ export class FlowsService {
     const cached = await this.cacheService.get(cacheKey);
     if (cached && Array.isArray(cached)) {
       this.logger.debug({ orgId: tenant.orgId, cached: true }, 'Retrieved flows list from cache');
-      return cached as any;
+      return cached as Flow[];
     }
 
     const flows = await this.prisma.flow.findMany({
@@ -86,7 +86,7 @@ export class FlowsService {
     const cached = await this.cacheService.get(cacheKey);
     if (cached && typeof cached === 'object' && cached !== null) {
       // Verify tenant access (security check even for cached data)
-      if ((cached as any).orgId !== tenant.orgId) {
+      if ('orgId' in cached && (cached as { orgId: string }).orgId !== tenant.orgId) {
         throw new ForbiddenException('Access denied: Flow belongs to different organization');
       }
 
@@ -94,7 +94,7 @@ export class FlowsService {
         { flowId: id, orgId: tenant.orgId, cached: true },
         'Retrieved flow from cache',
       );
-      return cached as any;
+      return cached as Flow;
     }
 
     const flow = await this.prisma.flow.findUnique({
@@ -219,7 +219,7 @@ export class FlowsService {
         { flowId: id, orgId, cached: true },
         'Retrieved flow for execution from cache',
       );
-      return cached as any;
+      return cached as Flow | null;
     }
 
     const flow = await this.prisma.flow.findFirst({

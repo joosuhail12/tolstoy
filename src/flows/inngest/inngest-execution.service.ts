@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InngestService } from 'nestjs-inngest';
 import { PrismaService } from '../../prisma.service';
+import { Prisma } from '@prisma/client';
 import { TenantContext } from '../../common/interfaces/tenant-context.interface';
 import { FlowStep } from '../flow-executor.service';
 
@@ -32,7 +33,7 @@ export class InngestExecutionService {
   async executeFlow(
     flowId: string,
     tenant: TenantContext,
-    inputVariables: any = {},
+    inputVariables: Record<string, unknown> = {},
   ): Promise<InngestFlowExecution> {
     const executionId = this.generateExecutionId();
 
@@ -69,7 +70,7 @@ export class InngestExecutionService {
         executionId: executionId,
         stepKey: 'flow_start',
         status: 'queued',
-        inputs: inputVariables,
+        inputs: inputVariables as unknown as Prisma.InputJsonValue,
         outputs: undefined,
       },
     });
@@ -164,7 +165,11 @@ export class InngestExecutionService {
   ): Promise<any[]> {
     const { limit = 50, offset = 0, status } = options;
 
-    const whereClause: any = {
+    const whereClause: {
+      flowId: string;
+      orgId: string;
+      status?: string;
+    } = {
       flowId,
       orgId: tenant.orgId,
     };
@@ -284,7 +289,16 @@ export class InngestExecutionService {
   ): Promise<any> {
     const { startDate, endDate } = timeRange;
 
-    const whereClause: any = {
+    interface MetricsWhereClause {
+      flowId: string;
+      orgId: string;
+      createdAt?: {
+        gte?: Date;
+        lte?: Date;
+      };
+    }
+
+    const whereClause: MetricsWhereClause = {
       flowId,
       orgId: tenant.orgId,
     };
@@ -323,7 +337,7 @@ export class InngestExecutionService {
     };
   }
 
-  private parseFlowSteps(stepsData: any): FlowStep[] {
+  private parseFlowSteps(stepsData: unknown): FlowStep[] {
     if (Array.isArray(stepsData)) {
       return stepsData;
     }

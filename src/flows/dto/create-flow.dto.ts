@@ -1,5 +1,21 @@
 import { IsObject, IsNotEmpty, IsNumber, IsOptional, Min } from 'class-validator';
 
+interface RetryPolicy {
+  maxRetries: number;
+  backoffStrategy: 'fixed' | 'exponential';
+  delayMs: number;
+}
+
+interface FlowStep {
+  id: string;
+  type: string;
+  name: string;
+  config: Record<string, unknown>;
+  executeIf?: string | Record<string, unknown>;
+  dependsOn?: string[];
+  retryPolicy?: RetryPolicy;
+}
+
 export class CreateFlowDto {
   @IsNumber()
   @IsOptional()
@@ -8,17 +24,5 @@ export class CreateFlowDto {
 
   @IsObject()
   @IsNotEmpty()
-  steps: Array<{
-    id: string;
-    type: string;
-    name: string;
-    config: Record<string, unknown>;
-    executeIf?: string | Record<string, unknown>;
-    dependsOn?: string[];
-    retryPolicy?: {
-      maxRetries: number;
-      backoffStrategy: 'fixed' | 'exponential';
-      delayMs: number;
-    };
-  }>;
+  steps: FlowStep[];
 }

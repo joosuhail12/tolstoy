@@ -321,7 +321,7 @@ describe('RedisCacheService', () => {
       });
 
       it('should set multiple key-value pairs', async () => {
-        const keyValuePairs: Array<[string, any, number?]> = [
+        const keyValuePairs: [string, unknown, number?][] = [
           ['key1', 'value1', 300],
           ['key2', 'value2'],
           ['key3', 'value3', 600],

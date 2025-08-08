@@ -35,7 +35,8 @@ export class ActionsController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Create Action',
-    description: 'Create a reusable action template for workflows. Actions define API calls that can be executed within workflow steps.',
+    description:
+      'Create a reusable action template for workflows. Actions define API calls that can be executed within workflow steps.',
   })
   @ApiBody({
     description: 'Action template configuration',
@@ -73,7 +74,7 @@ export class ActionsController {
           description: 'HTTP headers required for the action',
           example: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer {token}',
+            Authorization: 'Bearer {token}',
           },
         },
         inputSchema: {
@@ -211,7 +212,10 @@ export class ActionsController {
         toolId: { type: 'string', example: 'tool_slack_123' },
         method: { type: 'string', example: 'POST' },
         endpoint: { type: 'string', example: '/api/chat.postMessage' },
-        headers: { type: 'object', example: { 'Content-Type': 'application/json', 'Authorization': 'Bearer {token}' } },
+        headers: {
+          type: 'object',
+          example: { 'Content-Type': 'application/json', Authorization: 'Bearer {token}' },
+        },
         inputSchema: {
           type: 'array',
           example: [
@@ -290,7 +294,7 @@ export class ActionsController {
           description: 'HTTP headers required for the action',
           example: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer {token}',
+            Authorization: 'Bearer {token}',
           },
         },
         inputSchema: {
@@ -363,7 +367,8 @@ export class ActionsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete Action',
-    description: 'Delete an action template permanently. This will affect any workflows that use this action.',
+    description:
+      'Delete an action template permanently. This will affect any workflows that use this action.',
   })
   @ApiParam({
     name: 'id',

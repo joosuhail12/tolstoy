@@ -12,8 +12,25 @@ import * as path from 'path';
 import { AppModule } from './app.module';
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
 
+interface FastifyInstance {
+  route(options: {
+    method: string;
+    url: string;
+    handler: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
+  }): Promise<void>;
+}
+
+interface FastifyRequest {
+  [key: string]: unknown;
+}
+
+interface FastifyReply {
+  header(name: string, value: string): FastifyReply;
+  [key: string]: unknown;
+}
+
 async function bootstrap() {
-  const app = await NestFactory.create<NestFastifyApplication>(
+  const app: NestFastifyApplication = await NestFactory.create(
     AppModule,
     new FastifyAdapter({ logger: false }),
     { bufferLogs: true },
@@ -47,18 +64,18 @@ async function bootstrap() {
         type: 'apiKey',
         name: 'x-org-id',
         in: 'header',
-        description: 'Organization ID for multi-tenant access'
+        description: 'Organization ID for multi-tenant access',
       },
-      'x-org-id'
+      'x-org-id',
     )
     .addApiKey(
       {
         type: 'apiKey',
-        name: 'x-user-id', 
+        name: 'x-user-id',
         in: 'header',
-        description: 'User ID for request context'
+        description: 'User ID for request context',
       },
-      'x-user-id'
+      'x-user-id',
     )
     .build();
 
@@ -86,17 +103,18 @@ async function bootstrap() {
   });
 
   // Add a dedicated CORS-enabled OpenAPI spec endpoint for Stainless
-  app.register(async (fastify: any) => {
-    await fastify.route({
+  app.register(async (fastify: unknown) => {
+    const fastifyInstance = fastify as FastifyInstance;
+    await fastifyInstance.route({
       method: 'GET',
       url: '/openapi.json',
-      handler: async (request: any, reply: any) => {
+      handler: async (request: FastifyRequest, reply: FastifyReply) => {
         reply.header('Access-Control-Allow-Origin', '*');
         reply.header('Access-Control-Allow-Methods', 'GET');
         reply.header('Access-Control-Allow-Headers', 'Content-Type');
         reply.header('Content-Type', 'application/json');
         return document;
-      }
+      },
     });
   });
 

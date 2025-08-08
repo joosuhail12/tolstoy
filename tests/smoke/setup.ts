@@ -15,7 +15,7 @@ beforeAll(() => {
 
 // Global test configuration
 expect.extend({
-  toBeHealthy(received: any) {
+  toBeHealthy(received: { status: number; body?: { status?: string } }) {
     const pass = received.status === 200 && received.body?.status === 'ok';
     if (pass) {
       return {
@@ -31,10 +31,14 @@ expect.extend({
   },
 });
 
+interface CustomMatchers<R = unknown> {
+  toBeHealthy(): R;
+}
+
 declare global {
   namespace jest {
-    interface Matchers<R> {
-      toBeHealthy(): R;
-    }
+    interface Expect extends CustomMatchers {}
+    interface Matchers<R> extends CustomMatchers<R> {}
+    interface InverseAsymmetricMatchers extends CustomMatchers {}
   }
 }

@@ -48,6 +48,15 @@ export interface InngestHandlerParams {
   event: InngestEvent;
 }
 
+interface WebhookDispatchResult {
+  success: boolean;
+  webhookId: string;
+  url: string;
+  statusCode?: number;
+  deliveryId: string;
+  duration: number;
+}
+
 @Injectable()
 export class DispatchWebhookHandler {
   constructor(
@@ -89,14 +98,7 @@ export class DispatchWebhookHandler {
       'Found webhooks for dispatch',
     );
 
-    const results: Array<{
-      success: boolean;
-      webhookId: string;
-      url: string;
-      statusCode?: number;
-      deliveryId: string;
-      duration: number;
-    }> = [];
+    const results: WebhookDispatchResult[] = [];
 
     // Dispatch to each webhook with individual retry logic
     for (const webhook of webhooks) {

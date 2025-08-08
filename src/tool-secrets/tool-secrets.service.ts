@@ -18,6 +18,15 @@ export interface StoredCredentials {
   updatedAt: Date;
 }
 
+export interface ToolWithCredentials {
+  toolId: string;
+  toolName: string;
+  baseUrl: string;
+  authType: string;
+  hasCredentials: boolean;
+  credentialKeys?: string[];
+}
+
 @Injectable()
 export class ToolSecretsService {
   constructor(
@@ -322,16 +331,7 @@ export class ToolSecretsService {
     }
   }
 
-  async listToolsWithCredentials(orgId: string): Promise<
-    Array<{
-      toolId: string;
-      toolName: string;
-      baseUrl: string;
-      authType: string;
-      hasCredentials: boolean;
-      credentialKeys?: string[];
-    }>
-  > {
+  async listToolsWithCredentials(orgId: string): Promise<ToolWithCredentials[]> {
     this.logger.info({ orgId }, 'Listing tools with credentials for organization');
 
     // Try to get the tools list from cache first

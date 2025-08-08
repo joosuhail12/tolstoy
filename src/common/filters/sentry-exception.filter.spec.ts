@@ -81,7 +81,7 @@ describe('SentryExceptionFilter', () => {
       ],
     }).compile();
 
-    filter = module.get<SentryExceptionFilter>(SentryExceptionFilter);
+    filter = module.get(SentryExceptionFilter) as SentryExceptionFilter;
   });
 
   afterEach(() => {

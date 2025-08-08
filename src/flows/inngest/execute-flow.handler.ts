@@ -10,40 +10,174 @@ import {
   ConditionContext,
 } from '../../common/services/condition-evaluator.service';
 import { PrismaService } from '../../prisma.service';
+import { Prisma } from '@prisma/client';
 import { ExecutionLogsService } from '../../execution-logs/execution-logs.service';
 import { MetricsService, StepMetricLabels } from '../../metrics/metrics.service';
 
-export interface FlowExecutionEvent {
-  data: {
-    orgId: string;
-    userId: string;
-    flowId: string;
-    executionId: string;
-    steps: Array<{
-      id: string;
-      type: string;
-      name: string;
-      config: any;
-      dependsOn?: string[];
-    }>;
-    variables: any;
+// Step Configuration Interfaces
+interface SandboxSyncConfig {
+  code: string;
+  language?: string;
+  critical?: boolean;
+}
+
+interface SandboxAsyncConfig {
+  code: string;
+  language?: string;
+  waitForCompletion?: boolean;
+  pollInterval?: number;
+  maxPollAttempts?: number;
+  critical?: boolean;
+}
+
+interface HttpRequestConfig {
+  url: string;
+  method?: string;
+  headers?: Record<string, string>;
+  body?: Record<string, unknown>;
+  critical?: boolean;
+}
+
+interface DataTransformConfig {
+  script: string;
+  useSandbox?: boolean;
+  critical?: boolean;
+}
+
+interface ConditionalConfig {
+  condition: string;
+  useSandbox?: boolean;
+  critical?: boolean;
+}
+
+interface DelayConfig {
+  delayMs: number;
+  critical?: boolean;
+}
+
+interface CodeExecutionConfig {
+  code: string;
+  language?: string;
+  mode?: 'sync' | 'async';
+  waitForCompletion?: boolean;
+  pollInterval?: number;
+  maxPollAttempts?: number;
+  critical?: boolean;
+}
+
+type StepConfigType =
+  | SandboxSyncConfig
+  | SandboxAsyncConfig
+  | HttpRequestConfig
+  | DataTransformConfig
+  | ConditionalConfig
+  | DelayConfig
+  | CodeExecutionConfig;
+
+interface RateLimitConfig {
+  maxExecutions: number;
+  perMilliseconds: number;
+}
+
+interface RetryConfig {
+  maxAttempts: number;
+  backoff: {
+    type: 'fixed' | 'exponential';
+    delay: number;
   };
+}
+
+interface StepThrottlingConfig {
+  concurrency?: number;
+  rateLimit?: RateLimitConfig;
+  retry?: RetryConfig;
+}
+
+interface FlowExecutionEventStep {
+  id: string;
+  type: string;
+  name: string;
+  config: StepConfigType;
+  dependsOn?: string[];
+  executeIf?: string | Record<string, unknown>;
+}
+
+interface FlowExecutionEventData {
+  orgId: string;
+  userId: string;
+  flowId: string;
+  executionId: string;
+  steps: FlowExecutionEventStep[];
+  variables: Record<string, unknown>;
+}
+
+export interface FlowExecutionEvent {
+  data: FlowExecutionEventData;
+}
+
+interface StepExecutionError {
+  message: string;
+  code?: string;
+  stack?: string;
+}
+
+interface StepExecutionMetadata {
+  duration: number;
+  skipReason?: string;
+  stepType?: string;
+  stepId?: string;
+  timestamp?: string;
+  executionTime?: number;
+  sandboxMode?: string;
+  sessionId?: string;
+  pollAttempts?: number;
+  executionMode?: string;
+  [key: string]: unknown;
 }
 
 interface StepExecutionResult {
   success: boolean;
-  skipped?: boolean; // New field to indicate if step was skipped due to executeIf condition
-  output?: any;
-  error?: {
-    message: string;
-    code?: string;
-    stack?: string;
-  };
-  metadata?: {
-    duration: number;
-    skipReason?: string; // Reason for skipping the step
-    [key: string]: any;
-  };
+  skipped?: boolean;
+  output?: Record<string, unknown>;
+  error?: StepExecutionError;
+  metadata?: StepExecutionMetadata;
+}
+
+interface HandlerEvent {
+  data: FlowExecutionEventData;
+}
+
+interface InngestStep {
+  run<T>(name: string, fn: () => Promise<T>): Promise<T>;
+}
+
+interface HandlerParams {
+  event: HandlerEvent;
+  step: InngestStep;
+}
+
+interface FlowStepConfig {
+  id: string;
+  type: string;
+  name: string;
+  config: StepConfigType;
+  dependsOn?: string[];
+  executeIf?: string | Record<string, unknown>;
+}
+
+interface ExecutionContext {
+  orgId: string;
+  userId: string;
+  flowId: string;
+  executionId: string;
+  variables: Record<string, unknown>;
+  stepOutputs: Record<string, unknown>;
+}
+
+interface WebhookDispatchPayload {
+  orgId: string;
+  executionId: string;
+  [key: string]: unknown;
 }
 
 /**
@@ -77,7 +211,7 @@ export class ExecuteFlowHandler {
     },
     retries: 3,
   })
-  async handler({ event, step }: any): Promise<any> {
+  async handler({ event, step }: HandlerParams): Promise<unknown> {
     const { orgId, userId, flowId, executionId, steps, variables } = event.data;
 
     this.logger.info(
@@ -117,10 +251,10 @@ export class ExecuteFlowHandler {
       return { status: 'execution_started' };
     });
 
-    const stepOutputs: any = {};
+    const stepOutputs: Record<string, unknown> = {};
     let completedSteps = 0;
     let failedSteps = 0;
-    let executionError: any = null;
+    let executionError: StepExecutionError | undefined = undefined;
 
     // Execute each step durably
     for (const flowStep of steps) {
@@ -128,45 +262,41 @@ export class ExecuteFlowHandler {
         const stepStartTime = Date.now();
         let retryCount = 0;
 
-        const stepResult = await step.run(
-          `execute-step-${flowStep.id}`,
-          async () => {
-            retryCount++;
+        const stepResult = await step.run(`execute-step-${flowStep.id}`, async () => {
+          retryCount++;
 
-            // Prepare metrics labels
-            const metricLabels: StepMetricLabels = {
-              orgId,
-              flowId,
-              stepKey: flowStep.id,
-            };
+          // Prepare metrics labels
+          const metricLabels: StepMetricLabels = {
+            orgId,
+            flowId,
+            stepKey: flowStep.id,
+          };
 
-            // Log retry attempts and increment retry metrics
-            if (retryCount > 1) {
-              this.metricsService.incrementStepRetries(metricLabels);
+          // Log retry attempts and increment retry metrics
+          if (retryCount > 1) {
+            this.metricsService.incrementStepRetries(metricLabels);
 
-              this.logger.info(
-                {
-                  stepId: flowStep.id,
-                  stepType: flowStep.type,
-                  executionId,
-                  retryAttempt: retryCount - 1,
-                  totalRetriesAllowed: this.getStepConfiguration(flowStep).retry?.maxAttempts || 3,
-                },
-                'Step retry attempt due to throttling or failure',
-              );
-            }
+            this.logger.info(
+              {
+                stepId: flowStep.id,
+                stepType: flowStep.type,
+                executionId,
+                retryAttempt: retryCount - 1,
+                totalRetriesAllowed: this.getStepConfiguration(flowStep).retry?.maxAttempts || 3,
+              },
+              'Step retry attempt due to throttling or failure',
+            );
+          }
 
-            return this.executeStep(flowStep, {
-              orgId,
-              userId,
-              flowId,
-              executionId,
-              variables,
-              stepOutputs,
-            });
-          },
-          this.getStepConfiguration(flowStep),
-        );
+          return this.executeStep(flowStep, {
+            orgId,
+            userId,
+            flowId,
+            executionId,
+            variables,
+            stepOutputs,
+          });
+        });
 
         const stepEndTime = Date.now();
         const stepTotalTime = stepEndTime - stepStartTime;
@@ -185,26 +315,22 @@ export class ExecuteFlowHandler {
           );
 
           // Publish step skipped event
-          await step.run(
-            `publish-step-skipped-${flowStep.id}`,
-            async () => {
-              await this.ablyService.publishStepEvent({
-                stepId: flowStep.id,
-                status: 'skipped',
-                timestamp: new Date().toISOString(),
-                executionId,
-                orgId,
-                flowId,
-                stepName: flowStep.name,
-                duration: stepResult.metadata?.duration,
-                metadata: {
-                  skipReason: stepResult.metadata?.skipReason,
-                  executeIf: flowStep.executeIf,
-                },
-              });
-            },
-            this.getEventPublishingConfiguration(),
-          );
+          await step.run(`publish-step-skipped-${flowStep.id}`, async () => {
+            await this.ablyService.publishStepEvent({
+              stepId: flowStep.id,
+              status: 'skipped',
+              timestamp: new Date().toISOString(),
+              executionId,
+              orgId,
+              flowId,
+              stepName: flowStep.name,
+              duration: stepResult.metadata?.duration,
+              metadata: {
+                skipReason: stepResult.metadata?.skipReason,
+                executeIf: flowStep.executeIf,
+              },
+            });
+          });
 
           // Skipped steps don't contribute output but don't fail the flow
           continue;
@@ -213,23 +339,19 @@ export class ExecuteFlowHandler {
           completedSteps++;
 
           // Publish step completed event
-          await step.run(
-            `publish-step-completed-${flowStep.id}`,
-            async () => {
-              await this.ablyService.publishStepEvent({
-                stepId: flowStep.id,
-                status: 'completed',
-                timestamp: new Date().toISOString(),
-                executionId,
-                orgId,
-                flowId,
-                stepName: flowStep.name,
-                output: stepResult.output,
-                duration: stepResult.metadata?.duration,
-              });
-            },
-            this.getEventPublishingConfiguration(),
-          );
+          await step.run(`publish-step-completed-${flowStep.id}`, async () => {
+            await this.ablyService.publishStepEvent({
+              stepId: flowStep.id,
+              status: 'completed',
+              timestamp: new Date().toISOString(),
+              executionId,
+              orgId,
+              flowId,
+              stepName: flowStep.name,
+              output: stepResult.output,
+              duration: stepResult.metadata?.duration,
+            });
+          });
 
           // Calculate potential throttling overhead (time spent waiting vs actual execution)
           const actualExecutionTime = stepResult.metadata?.duration || 0;
@@ -260,23 +382,19 @@ export class ExecuteFlowHandler {
           executionError = stepResult.error;
 
           // Publish step failed event
-          await step.run(
-            `publish-step-failed-${flowStep.id}`,
-            async () => {
-              await this.ablyService.publishStepEvent({
-                stepId: flowStep.id,
-                status: 'failed',
-                timestamp: new Date().toISOString(),
-                executionId,
-                orgId,
-                flowId,
-                stepName: flowStep.name,
-                error: stepResult.error,
-                duration: stepResult.metadata?.duration,
-              });
-            },
-            this.getEventPublishingConfiguration(),
-          );
+          await step.run(`publish-step-failed-${flowStep.id}`, async () => {
+            await this.ablyService.publishStepEvent({
+              stepId: flowStep.id,
+              status: 'failed',
+              timestamp: new Date().toISOString(),
+              executionId,
+              orgId,
+              flowId,
+              stepName: flowStep.name,
+              error: stepResult.error,
+              duration: stepResult.metadata?.duration,
+            });
+          });
 
           // Calculate throttling metrics for failed steps too
           const actualExecutionTime = stepResult.metadata?.duration || 0;
@@ -321,8 +439,8 @@ export class ExecuteFlowHandler {
         executionError = {
           message: error instanceof Error ? error.message : 'Unknown error',
           code:
-            error instanceof Error && (error as any).code
-              ? (error as any).code
+            error instanceof Error && 'code' in error && typeof error.code === 'string'
+              ? error.code
               : 'STEP_EXECUTION_ERROR',
         };
 
@@ -350,7 +468,7 @@ export class ExecuteFlowHandler {
         where: { id: executionId },
         data: {
           status: executionStatus,
-          outputs: stepOutputs,
+          outputs: stepOutputs as unknown as Prisma.InputJsonValue,
         },
       });
 
@@ -414,15 +532,8 @@ export class ExecuteFlowHandler {
    * Execute a single flow step with proper context and error handling
    */
   private async executeStep(
-    step: any,
-    context: {
-      orgId: string;
-      userId: string;
-      flowId: string;
-      executionId: string;
-      variables: any;
-      stepOutputs: Record<string, any>;
-    },
+    step: FlowStepConfig,
+    context: ExecutionContext,
   ): Promise<StepExecutionResult> {
     const startTime = Date.now();
 
@@ -440,10 +551,10 @@ export class ExecuteFlowHandler {
     if (step.executeIf) {
       try {
         const conditionContext: ConditionContext = {
-          inputs: context.variables,
-          variables: context.variables,
-          stepOutputs: context.stepOutputs,
-          currentStep: step,
+          inputs: context.variables as Record<string, unknown>,
+          variables: context.variables as Record<string, unknown>,
+          stepOutputs: context.stepOutputs as Record<string, unknown>,
+          currentStep: step as unknown as Record<string, unknown>,
           orgId: context.orgId,
           userId: context.userId,
           meta: {
@@ -572,8 +683,8 @@ export class ExecuteFlowHandler {
         error: {
           message: error instanceof Error ? error.message : 'Unknown error',
           code:
-            error instanceof Error && (error as any).code
-              ? (error as any).code
+            error instanceof Error && 'code' in error && typeof error.code === 'string'
+              ? error.code
               : 'STEP_EXECUTION_ERROR',
           stack: error instanceof Error ? error.stack : 'No stack trace',
         },
@@ -582,8 +693,12 @@ export class ExecuteFlowHandler {
     }
   }
 
-  private async executeSandboxSync(step: any, context: any): Promise<StepExecutionResult> {
-    const { code, language } = step.config;
+  private async executeSandboxSync(
+    step: FlowStepConfig,
+    context: ExecutionContext,
+  ): Promise<StepExecutionResult> {
+    const config = step.config as SandboxSyncConfig;
+    const { code, language } = config;
 
     if (!code) {
       return {
@@ -611,7 +726,7 @@ export class ExecuteFlowHandler {
       flowId: context.flowId,
       stepId: step.id,
       executionId: context.executionId,
-      variables: context.variables,
+      variables: context.variables as Record<string, unknown>,
       stepOutputs: context.stepOutputs,
     };
 
@@ -619,7 +734,7 @@ export class ExecuteFlowHandler {
 
     return {
       success: result.success,
-      output: result.output,
+      output: result.output as Record<string, unknown>,
       error: result.error,
       metadata: {
         duration: result.executionTime || 0,
@@ -630,13 +745,12 @@ export class ExecuteFlowHandler {
     };
   }
 
-  private async executeSandboxAsync(step: any, context: any): Promise<StepExecutionResult> {
-    const {
-      code,
-      waitForCompletion = false,
-      pollInterval = 1000,
-      maxPollAttempts = 300,
-    } = step.config;
+  private async executeSandboxAsync(
+    step: FlowStepConfig,
+    context: ExecutionContext,
+  ): Promise<StepExecutionResult> {
+    const config = step.config as SandboxAsyncConfig;
+    const { code, waitForCompletion = false, pollInterval = 1000, maxPollAttempts = 300 } = config;
 
     if (!code) {
       return {
@@ -664,7 +778,7 @@ export class ExecuteFlowHandler {
       flowId: context.flowId,
       stepId: step.id,
       executionId: context.executionId,
-      variables: context.variables,
+      variables: context.variables as Record<string, unknown>,
       stepOutputs: context.stepOutputs,
     };
 
@@ -697,7 +811,7 @@ export class ExecuteFlowHandler {
         const result = asyncResult.result;
         return {
           success: result?.success || false,
-          output: result?.output,
+          output: result?.output as Record<string, unknown>,
           error: result?.error,
           metadata: {
             duration: result?.executionTime || 0,
@@ -727,8 +841,12 @@ export class ExecuteFlowHandler {
     };
   }
 
-  private async executeCodeExecution(step: any, context: any): Promise<StepExecutionResult> {
-    const { mode = 'sync' } = step.config;
+  private async executeCodeExecution(
+    step: FlowStepConfig,
+    context: ExecutionContext,
+  ): Promise<StepExecutionResult> {
+    const config = step.config as CodeExecutionConfig;
+    const { mode = 'sync' } = config;
 
     if (mode === 'async') {
       return this.executeSandboxAsync(step, context);
@@ -737,8 +855,12 @@ export class ExecuteFlowHandler {
     }
   }
 
-  private async executeDataTransform(step: any, context: any): Promise<StepExecutionResult> {
-    const { script, useSandbox = true } = step.config;
+  private async executeDataTransform(
+    step: FlowStepConfig,
+    context: ExecutionContext,
+  ): Promise<StepExecutionResult> {
+    const config = step.config as DataTransformConfig;
+    const { script, useSandbox = true } = config;
 
     if (useSandbox && this.sandboxService && this.sandboxService.isConfigured()) {
       const sandboxCode = `
@@ -762,7 +884,7 @@ export class ExecuteFlowHandler {
 
       return {
         success: result.success,
-        output: result.output,
+        output: result.output as Record<string, unknown>,
         error: result.error,
         metadata: {
           duration: result.executionTime || 0,
@@ -797,8 +919,12 @@ export class ExecuteFlowHandler {
     }
   }
 
-  private async executeConditional(step: any, context: any): Promise<StepExecutionResult> {
-    const { condition, useSandbox = true } = step.config;
+  private async executeConditional(
+    step: FlowStepConfig,
+    context: ExecutionContext,
+  ): Promise<StepExecutionResult> {
+    const config = step.config as ConditionalConfig;
+    const { condition, useSandbox = true } = config;
 
     if (useSandbox && this.sandboxService && this.sandboxService.isConfigured()) {
       const sandboxCode = `
@@ -855,8 +981,12 @@ export class ExecuteFlowHandler {
     }
   }
 
-  private async executeHttpRequest(step: any, _context: any): Promise<StepExecutionResult> {
-    const { url, method = 'GET', headers = {}, body } = step.config;
+  private async executeHttpRequest(
+    step: FlowStepConfig,
+    _context: ExecutionContext,
+  ): Promise<StepExecutionResult> {
+    const config = step.config as HttpRequestConfig;
+    const { url, method = 'GET', headers = {}, body } = config;
 
     try {
       const response = await fetch(url, {
@@ -883,7 +1013,7 @@ export class ExecuteFlowHandler {
           status: response.status,
           statusText: response.statusText,
           data: parsedData,
-          headers: Object.fromEntries(response.headers.entries()),
+          headers: Object.fromEntries(response.headers as unknown as Iterable<[string, string]>),
         },
         error: response.ok
           ? undefined
@@ -903,8 +1033,12 @@ export class ExecuteFlowHandler {
     }
   }
 
-  private async executeDelay(step: any, _context: any): Promise<StepExecutionResult> {
-    const { delayMs } = step.config;
+  private async executeDelay(
+    step: FlowStepConfig,
+    _context: ExecutionContext,
+  ): Promise<StepExecutionResult> {
+    const config = step.config as DelayConfig;
+    const { delayMs } = config;
 
     await new Promise(resolve => setTimeout(resolve, delayMs));
 
@@ -918,7 +1052,7 @@ export class ExecuteFlowHandler {
    * Get step-specific configuration for throttling and retry behavior
    * Different step types have different resource requirements and failure tolerance
    */
-  private getStepConfiguration(step: any): any {
+  private getStepConfiguration(step: FlowStepConfig): StepThrottlingConfig {
     const stepType = step.type;
     const isCritical = this.isStepCritical(step);
 
@@ -1023,7 +1157,7 @@ export class ExecuteFlowHandler {
    * Get configuration for event publishing steps
    * Event publishing should be fast and reliable but not block execution
    */
-  private getEventPublishingConfiguration(): any {
+  private getEventPublishingConfiguration(): StepThrottlingConfig {
     return {
       concurrency: 20, // Higher concurrency for event publishing
       rateLimit: {
@@ -1043,18 +1177,22 @@ export class ExecuteFlowHandler {
   /**
    * Calculate step type distribution for throttling analytics
    */
-  private getStepTypeDistribution(steps: any[]): any {
-    return steps.reduce((acc, step) => {
-      acc[step.type] = (acc[step.type] || 0) + 1;
-      return acc;
-    }, {} as any);
+  private getStepTypeDistribution(steps: FlowStepConfig[]): Record<string, number> {
+    return steps.reduce(
+      (acc, step) => {
+        acc[step.type] = (acc[step.type] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
   }
 
-  private isStepCritical(step: any): boolean {
-    return step.config?.critical !== false;
+  private isStepCritical(step: FlowStepConfig): boolean {
+    const config = step.config as { critical?: boolean };
+    return config.critical !== false;
   }
 
-  private async dispatchWebhook(eventType: string, payload: any): Promise<void> {
+  private async dispatchWebhook(eventType: string, payload: WebhookDispatchPayload): Promise<void> {
     if (!this.inngestService) {
       this.logger.debug('InngestService not available, skipping webhook dispatch');
       return;

@@ -12,8 +12,8 @@ export class SentryExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
-    const request = ctx.getRequest<FastifyRequest>();
-    const reply = ctx.getResponse<FastifyReply>();
+    const request = ctx.getRequest() as FastifyRequest;
+    const reply = ctx.getResponse() as FastifyReply;
 
     // Extract request context for Sentry
     const requestContext = {

@@ -35,7 +35,8 @@ export class ExecutionLogsController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
     summary: 'Create Execution Log',
-    description: 'Create a log entry for workflow step execution. This tracks the execution history, inputs, outputs, and any errors.',
+    description:
+      'Create a log entry for workflow step execution. This tracks the execution history, inputs, outputs, and any errors.',
   })
   @ApiBody({
     description: 'Execution log entry data',
@@ -138,7 +139,8 @@ export class ExecutionLogsController {
   @Get()
   @ApiOperation({
     summary: 'List Execution Logs',
-    description: 'Get all execution logs for the organization. This provides a complete history of workflow step executions.',
+    description:
+      'Get all execution logs for the organization. This provides a complete history of workflow step executions.',
   })
   @ApiResponse({
     status: 200,
@@ -253,7 +255,8 @@ export class ExecutionLogsController {
   @Put(':id')
   @ApiOperation({
     summary: 'Update Execution Log',
-    description: 'Update execution log entry. Typically used to add outputs or update status after step completion.',
+    description:
+      'Update execution log entry. Typically used to add outputs or update status after step completion.',
   })
   @ApiParam({
     name: 'id',
@@ -317,7 +320,8 @@ export class ExecutionLogsController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({
     summary: 'Delete Execution Log',
-    description: 'Delete an execution log entry. Use with caution as this removes audit trail information.',
+    description:
+      'Delete an execution log entry. Use with caution as this removes audit trail information.',
   })
   @ApiParam({
     name: 'id',

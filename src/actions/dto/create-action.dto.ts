@@ -1,5 +1,12 @@
 import { IsString, IsNotEmpty, IsObject, IsOptional, IsArray, IsNumber } from 'class-validator';
 
+interface InputSchemaItem {
+  name: string;
+  type: string;
+  required?: boolean;
+  description?: string;
+}
+
 export class CreateActionDto {
   @IsString()
   @IsNotEmpty()
@@ -27,12 +34,7 @@ export class CreateActionDto {
 
   @IsArray()
   @IsNotEmpty()
-  inputSchema: Array<{
-    name: string;
-    type: string;
-    required?: boolean;
-    description?: string;
-  }>;
+  inputSchema: InputSchemaItem[];
 
   @IsObject()
   @IsOptional()

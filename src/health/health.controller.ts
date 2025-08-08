@@ -1,9 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { HealthService, HealthCheck, DatabaseHealthCheck } from './health.service';
 
 @ApiTags('Health')
@@ -36,7 +32,8 @@ export class HealthController {
   @Get('detailed')
   @ApiOperation({
     summary: 'Detailed Health Check',
-    description: 'Get comprehensive health status including database, environment, and system information',
+    description:
+      'Get comprehensive health status including database, environment, and system information',
   })
   @ApiResponse({
     status: 200,

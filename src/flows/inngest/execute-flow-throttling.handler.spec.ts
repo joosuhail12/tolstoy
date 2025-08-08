@@ -291,8 +291,18 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
           flowId: 'test-flow',
           executionId: 'test-execution',
           steps: [
-            { id: 'http-step', type: 'http_request', config: {}, name: 'HTTP Request' },
-            { id: 'transform-step', type: 'data_transform', config: {}, name: 'Data Transform' },
+            {
+              id: 'http-step',
+              type: 'http_request',
+              config: { url: 'http://test.com' },
+              name: 'HTTP Request',
+            },
+            {
+              id: 'transform-step',
+              type: 'data_transform',
+              config: { script: 'test' },
+              name: 'Data Transform',
+            },
           ],
           variables: {},
         },
@@ -372,8 +382,18 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
           flowId: 'test-flow',
           executionId: 'test-execution',
           steps: [
-            { id: 'http-step', type: 'http_request', config: {}, name: 'HTTP Request' },
-            { id: 'transform-step', type: 'data_transform', config: {}, name: 'Transform' },
+            {
+              id: 'http-step',
+              type: 'http_request',
+              config: { url: 'http://test.com' },
+              name: 'HTTP Request',
+            },
+            {
+              id: 'transform-step',
+              type: 'data_transform',
+              config: { script: 'test' },
+              name: 'Transform',
+            },
           ],
           variables: {},
         },

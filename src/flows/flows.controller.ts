@@ -10,7 +10,6 @@ import {
   HttpStatus,
   HttpCode,
   Optional,
-  Query,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -18,7 +17,6 @@ import {
   ApiResponse,
   ApiParam,
   ApiBody,
-  ApiQuery,
   ApiSecurity,
 } from '@nestjs/swagger';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
@@ -286,7 +284,8 @@ export class FlowsController {
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
     summary: 'Execute Flow',
-    description: 'Execute a workflow either synchronously or asynchronously with optional input variables',
+    description:
+      'Execute a workflow either synchronously or asynchronously with optional input variables',
   })
   @ApiParam({
     name: 'id',

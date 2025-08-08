@@ -6,6 +6,8 @@ import { AblyService } from '../../ably/ably.service';
 import { InputValidatorService } from '../../common/services/input-validator.service';
 import { ConditionEvaluatorService } from '../../common/services/condition-evaluator.service';
 import { PrismaService } from '../../prisma.service';
+import { ExecutionLogsService } from '../../execution-logs/execution-logs.service';
+import { MetricsService } from '../../metrics/metrics.service';
 
 describe('ExecuteFlowHandler', () => {
   let handler: ExecuteFlowHandler;
@@ -69,7 +71,7 @@ describe('ExecuteFlowHandler', () => {
         { provide: ConditionEvaluatorService, useValue: mockConditionEvaluator },
         { provide: PrismaService, useValue: mockPrismaService },
         {
-          provide: 'ExecutionLogsService',
+          provide: ExecutionLogsService,
           useValue: {
             createStepLog: jest.fn(),
             markStepStarted: jest.fn(),
@@ -79,11 +81,13 @@ describe('ExecuteFlowHandler', () => {
           },
         },
         {
-          provide: 'MetricsService',
+          provide: MetricsService,
           useValue: {
             startStepTimer: jest.fn(() => jest.fn()),
             incrementStepExecution: jest.fn(),
             incrementFlowExecution: jest.fn(),
+            incrementStepRetries: jest.fn(),
+            incrementStepErrors: jest.fn(),
           },
         },
         {
@@ -122,6 +126,7 @@ describe('ExecuteFlowHandler', () => {
       const stepConfig = {
         id: 'step-1',
         type: 'sandbox_sync',
+        name: 'Test Sandbox Sync Step',
         config: { code: 'return "hello";' },
       };
 
@@ -145,7 +150,8 @@ describe('ExecuteFlowHandler', () => {
       const stepConfig = {
         id: 'step-1',
         type: 'unknown_type',
-        config: {},
+        name: 'Test Unknown Step',
+        config: { code: 'test' } as any,
       };
 
       const context = {
@@ -167,9 +173,24 @@ describe('ExecuteFlowHandler', () => {
 
   describe('utility methods', () => {
     it('should identify critical steps correctly', () => {
-      const criticalStep = { config: { critical: true } };
-      const nonCriticalStep = { config: { critical: false } };
-      const defaultStep = { config: {} };
+      const criticalStep = {
+        id: 'critical-step',
+        type: 'test',
+        name: 'Critical Test Step',
+        config: { code: 'test', critical: true } as any,
+      };
+      const nonCriticalStep = {
+        id: 'non-critical-step',
+        type: 'test',
+        name: 'Non-Critical Test Step',
+        config: { code: 'test', critical: false } as any,
+      };
+      const defaultStep = {
+        id: 'default-step',
+        type: 'test',
+        name: 'Default Test Step',
+        config: { code: 'test' } as any,
+      };
 
       expect(handler['isStepCritical'](criticalStep)).toBe(true);
       expect(handler['isStepCritical'](nonCriticalStep)).toBe(false);
@@ -182,7 +203,8 @@ describe('ExecuteFlowHandler', () => {
       const stepConfig = {
         id: 'step-1',
         type: 'sandbox_sync',
-        config: { code: null }, // Invalid config to trigger error
+        name: 'Test Error Step',
+        config: { code: null } as any, // Invalid config to trigger error
       };
 
       const context = {
