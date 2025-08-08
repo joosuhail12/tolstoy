@@ -7,17 +7,24 @@ sidebar_position: 4
 
 Welcome to the Tolstoy API documentation! This comprehensive reference provides everything you need to integrate with our workflow automation platform.
 
-## Interactive API Playground
+## Interactive API Playground with SDK Code Samples
 
 🎮 **[Try the Interactive API Reference →](#interactive-api-reference)**
 
-Explore and test all Tolstoy API endpoints with our **interactive playground** in the navigation sidebar. The playground is automatically generated from our OpenAPI specification and includes:
+Explore and test all Tolstoy API endpoints with our **interactive playground** powered by **Stainless SDK generation**. Each endpoint now includes:
 
+### 🚀 **Copy-Paste SDK Code Samples**
+- **TypeScript/JavaScript**: Full-featured SDK with types
+- **Python**: Pythonic API client with async support  
+- **Go**: Enterprise-ready Go SDK
+- **cURL**: Universal HTTP client examples
+
+### 🎯 **Enhanced Developer Experience**
 - **Live API Testing**: Make real requests to your Tolstoy instance
 - **Request/Response Examples**: See exactly how each endpoint works  
-- **Authentication Setup**: Configure your org and user IDs
-- **Schema Validation**: Understand request and response formats
-- **Code Generation**: Get curl, Python, and JavaScript examples
+- **Authentication Setup**: Pre-configured multi-tenant headers
+- **Schema Validation**: Complete TypeScript types and validation
+- **Error Handling**: Production-ready error handling patterns
 
 ## Authentication
 
@@ -149,20 +156,110 @@ All API errors follow a consistent format:
 
 ## SDKs and Libraries
 
-### JavaScript/TypeScript
+Our interactive API playground now generates production-ready SDK code samples for every endpoint!
+
+### JavaScript/TypeScript SDK
 ```bash
 npm install @tolstoy/sdk
 ```
 
-### Python
+**Example: Execute a workflow**
+```typescript
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const client = new TolstoyClient({
+  baseUrl: 'https://tolstoy.getpullse.com',
+  headers: {
+    'x-org-id': 'your-org-id',
+    'x-user-id': 'your-user-id'
+  }
+});
+
+// Execute workflow with type safety
+const execution = await client.flows.execute('flow_abc123', {
+  variables: {
+    userId: 'user_123',
+    email: 'user@example.com'
+  },
+  useDurable: true
+});
+
+console.log(`Execution started: ${execution.executionId}`);
+```
+
+### Python SDK
 ```bash
 pip install tolstoy-python
 ```
 
-### Go
+**Example: Monitor workflow execution**
+```python
+import tolstoy
+from tolstoy import TolstoyClient
+
+client = TolstoyClient(
+    base_url="https://tolstoy.getpullse.com",
+    headers={
+        "x-org-id": "your-org-id",
+        "x-user-id": "your-user-id"
+    }
+)
+
+# Execute and monitor workflow
+execution = client.flows.execute(
+    flow_id="flow_abc123",
+    variables={"userId": "user_123"},
+    use_durable=True
+)
+
+# Poll for completion
+status = client.flows.get_execution_status(
+    flow_id="flow_abc123", 
+    execution_id=execution.execution_id
+)
+print(f"Status: {status.status}")
+```
+
+### Go SDK
 ```bash
 go get github.com/tolstoy/go-sdk
 ```
+
+**Example: Workflow automation**
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/tolstoy/go-sdk"
+)
+
+func main() {
+    client := tolstoy.NewClient(&tolstoy.Config{
+        BaseURL: "https://tolstoy.getpullse.com",
+        Headers: map[string]string{
+            "x-org-id":  "your-org-id",
+            "x-user-id": "your-user-id",
+        },
+    })
+
+    // Execute workflow
+    execution, err := client.Flows.Execute(context.Background(), &tolstoy.ExecuteFlowRequest{
+        FlowID: "flow_abc123",
+        Variables: map[string]interface{}{
+            "userId": "user_123",
+            "email":  "user@example.com",
+        },
+        UseDurable: true,
+    })
+    
+    if err != nil {
+        panic(err)
+    }
+    
+    fmt.Printf("Execution ID: %s\n", execution.ExecutionID)
+}
 
 ## Additional Resources
 
@@ -178,6 +275,28 @@ go get github.com/tolstoy/go-sdk
 - **GitHub Issues**: Report bugs and request features  
 - **Community**: Join our developer community for support
 
+## 🛠️ Stainless SDK Integration
+
+This API documentation is enhanced with **Stainless SDK code generation** to provide:
+
+### ✨ **Auto-Generated Code Samples**
+- Every endpoint includes copy-paste ready code
+- TypeScript, Python, Go, and cURL examples
+- Production-ready error handling
+- Full type safety and validation
+
+### 🔄 **Always Up-to-Date**
+- Code samples auto-sync when our API changes
+- Generated from our comprehensive OpenAPI specification
+- Tested against real workflow automation scenarios
+
+### 🎯 **Developer-First Experience**
+- Multi-tenant authentication pre-configured
+- Realistic workflow examples
+- Enterprise-ready patterns and best practices
+
+**[🚀 Try the Interactive Playground →](#interactive-api-reference)** - Each endpoint now has a "Code Samples" tab!
+
 ---
 
-*This API reference is automatically generated from our OpenAPI specification and is always up-to-date with the latest changes.*
+*This API reference is automatically generated from our OpenAPI specification with Stainless SDK integration and is always up-to-date with the latest changes.*

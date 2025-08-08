@@ -5,11 +5,20 @@
   "description": "Workflow automation platform documentation - Learn how to create, manage, and execute workflows with Tolstoy",
   "api": {
     "playground": {
-      "mode": "show"
+      "mode": "show",
+      "showCodeSamples": true
     },
-    "baseUrl": ["https://tolstoy.getpullse.com", "http://localhost:3000"]
+    "baseUrl": ["https://tolstoy.getpullse.com", "http://localhost:3000"],
+    "auth": {
+      "method": "custom",
+      "headers": {
+        "x-org-id": "your-organization-id",
+        "x-user-id": "your-user-id"
+      }
+    }
   },
-  "openapi": "docs/openapi.json",
+  "openapi": "https://stainless.app/projects/tolstoy/releases/latest/openapi.json",
+  "fallbackOpenapi": "docs/openapi.json",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"

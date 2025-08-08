@@ -1,0 +1,50 @@
+# Stainless SDK Configuration for Tolstoy API
+# This configuration enables automatic SDK code sample generation for Mintlify documentation
+
+project: tolstoy
+
+# OpenAPI specification configuration
+openapi:
+  # Generate code samples in Mintlify-compatible format
+  code_samples: 'mintlify'
+  
+  # Specify which programming languages to generate samples for
+  languages:
+    - typescript  # Primary SDK language for JavaScript/Node.js
+    - python      # Popular for automation and integrations
+    - go          # Enterprise backend language
+    - curl        # Universal HTTP client testing
+
+# SDK generation settings (optional - for future SDK generation)
+sdk:
+  # Package names for different languages
+  package_name:
+    typescript: "@tolstoy/sdk"
+    python: "tolstoy-python" 
+    go: "github.com/tolstoy/go-sdk"
+
+# Documentation settings
+docs:
+  # Include authentication examples in code samples
+  include_auth: true
+  
+  # Multi-tenant header configuration for code samples
+  auth_headers:
+    - "x-org-id"
+    - "x-user-id"
+  
+  # Base URLs for different environments
+  base_urls:
+    production: "https://tolstoy.getpullse.com"
+    development: "http://localhost:3000"
+
+# Code sample customization
+code_samples:
+  # Include realistic workflow automation examples
+  realistic_examples: true
+  
+  # Show error handling in code samples
+  include_error_handling: true
+  
+  # Include TypeScript types in samples
+  include_types: true

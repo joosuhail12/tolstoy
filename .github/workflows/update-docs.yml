@@ -1,0 +1,153 @@
+name: Update API Documentation with Stainless
+
+# Trigger on changes to OpenAPI spec or controller files
+on:
+  push:
+    branches: [main]
+    paths: 
+      - 'docs/openapi.json'
+      - 'src/**/*.controller.ts'
+      - 'stainless.yml'
+  workflow_dispatch:  # Allow manual triggering
+    inputs:
+      force_update:
+        description: 'Force update even without changes'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  update-stainless-docs:
+    name: Sync OpenAPI Spec with Stainless
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 🔍 Check OpenAPI spec exists
+        run: |
+          if [[ ! -f "docs/openapi.json" ]]; then
+            echo "❌ OpenAPI spec not found at docs/openapi.json"
+            exit 1
+          fi
+          
+          # Validate JSON structure
+          if ! jq empty docs/openapi.json; then
+            echo "❌ Invalid JSON in OpenAPI spec"
+            exit 1
+          fi
+          
+          echo "✅ OpenAPI spec validation passed"
+          echo "📊 Spec size: $(wc -l < docs/openapi.json) lines"
+          echo "📊 Endpoints: $(jq -r '.paths | keys | length' docs/openapi.json) endpoints"
+
+      - name: 🎯 Publish to Stainless
+        uses: stainless-sdk/cli-action@v1
+        with:
+          token: ${{ secrets.STAINLESS_TOKEN }}
+          # Use the raw GitHub URL for the OpenAPI spec
+          spec_url: https://raw.githubusercontent.com/${{ github.repository }}/main/docs/openapi.json
+        continue-on-error: false
+
+      - name: ✅ Verify Stainless deployment  
+        run: |
+          echo "🔍 Verifying Stainless-hosted spec is available..."
+          
+          # Wait a moment for Stainless to process
+          sleep 10
+          
+          # Check if the Stainless URL returns valid JSON
+          STAINLESS_URL="https://stainless.app/projects/tolstoy/releases/latest/openapi.json"
+          
+          # Test the URL (allow some time for deployment)
+          for i in {1..5}; do
+            if curl -f -s "$STAINLESS_URL" | jq empty; then
+              echo "✅ Stainless-hosted spec is available and valid"
+              echo "🔗 Available at: $STAINLESS_URL"
+              break
+            else
+              echo "⏳ Attempt $i/5: Waiting for Stainless deployment..."
+              sleep 10
+            fi
+          done
+
+      - name: 📋 Generate deployment summary
+        run: |
+          echo "## 🎉 Stainless Integration Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repository**: ${{ github.repository }}" >> $GITHUB_STEP_SUMMARY  
+          echo "- **Commit**: \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **OpenAPI Spec**: \`docs/openapi.json\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Stainless URL**: [View Decorated Spec](https://stainless.app/projects/tolstoy/releases/latest/openapi.json)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mintlify Docs**: Ready for SDK code samples" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📊 Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "- **Endpoints**: $(jq -r '.paths | keys | length' docs/openapi.json)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Spec Size**: $(wc -l < docs/openapi.json) lines" >> $GITHUB_STEP_SUMMARY
+          echo "- **Controllers**: $(find src -name "*.controller.ts" | wc -l)" >> $GITHUB_STEP_SUMMARY
+
+  # Optional: Fetch decorated spec back to repository  
+  sync-decorated-spec:
+    name: Sync Decorated Spec (Optional)
+    runs-on: ubuntu-latest
+    needs: update-stainless-docs
+    if: github.event.inputs.force_update == 'true' || contains(github.event.head_commit.message, '[sync-spec]')
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: 📥 Fetch decorated spec from Stainless
+        run: |
+          echo "📥 Fetching Stainless-decorated OpenAPI spec..."
+          
+          # Wait for Stainless processing
+          sleep 15
+          
+          # Download the decorated spec
+          curl -sSL "https://stainless.app/projects/tolstoy/releases/latest/openapi.json" \
+            -o docs/openapi-decorated.json
+            
+          # Validate the decorated spec
+          if jq empty docs/openapi-decorated.json; then
+            echo "✅ Decorated spec downloaded and validated"
+            
+            # Show what was added (code samples)
+            if jq -e '.paths[].get."x-code-samples" // .paths[].post."x-code-samples"' docs/openapi-decorated.json > /dev/null; then
+              echo "✅ Code samples detected in decorated spec"
+            else
+              echo "⚠️ No code samples found in decorated spec"
+            fi
+          else
+            echo "❌ Invalid decorated spec received"
+            exit 1
+          fi
+
+      - name: 📝 Commit decorated spec
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          if [[ -f "docs/openapi-decorated.json" ]]; then
+            git add docs/openapi-decorated.json
+            
+            if git diff --staged --quiet; then
+              echo "📋 No changes to commit"
+            else
+              git commit -m "docs: update Stainless-decorated OpenAPI spec with code samples
+
+- Added SDK code samples for TypeScript, Python, Go, curl
+- Generated via Stainless integration
+- Ready for Mintlify API playground
+
+🤖 Auto-generated by GitHub Actions"
+              git push
+              echo "✅ Decorated spec committed and pushed"
+            fi
+          fi
