@@ -9,6 +9,8 @@ import {
   ValidationPipe,
   HttpStatus,
   HttpCode,
+  Headers,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -17,10 +19,13 @@ import {
   ApiParam,
   ApiBody,
   ApiSecurity,
+  ApiBearerAuth,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { ActionsService } from './actions.service';
 import { CreateActionDto } from './dto/create-action.dto';
 import { UpdateActionDto } from './dto/update-action.dto';
+import { ExecuteActionDto } from './dto/execute-action.dto';
 import { Tenant } from '../common/decorators/tenant.decorator';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
 
@@ -389,5 +394,111 @@ export class ActionsController {
   })
   remove(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     return this.actionsService.remove(id, tenant);
+  }
+
+  @Post(':key/execute')
+  @ApiBearerAuth()
+  @ApiOperation({ 
+    summary: 'Execute a single Action by key',
+    description: 'Execute a standalone action with provided inputs. This endpoint allows you to run individual actions outside of workflow contexts.'
+  })
+  @ApiParam({
+    name: 'key',
+    description: 'Unique action key identifier',
+    example: 'slack_send_message'
+  })
+  @ApiHeader({
+    name: 'X-Org-ID',
+    description: 'Organization ID',
+    required: true,
+    example: 'org_123456'
+  })
+  @ApiHeader({
+    name: 'X-User-ID',
+    description: 'User ID for user-scoped authentication (optional)',
+    required: false,
+    example: 'user_789'
+  })
+  @ApiBody({
+    description: 'Action execution inputs',
+    type: ExecuteActionDto,
+    schema: {
+      type: 'object',
+      properties: {
+        inputs: {
+          type: 'object',
+          description: 'Input parameters matching the action\'s inputSchema',
+          example: {
+            channel: '#general',
+            text: 'Hello from Tolstoy!',
+            user_id: 'U123456'
+          }
+        }
+      },
+      required: ['inputs']
+    }
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Action executed successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        executionId: { type: 'string', example: 'exec_abc123' },
+        duration: { type: 'number', example: 1250 },
+        data: { 
+          type: 'object', 
+          description: 'Action execution result',
+          example: { messageId: 'msg_456', status: 'sent' }
+        },
+        outputs: {
+          type: 'object',
+          description: 'Additional output data from action',
+          example: { channel: '#general', timestamp: '2024-01-15T10:30:00Z' }
+        }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad request - missing headers or invalid inputs',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 400 },
+        message: { type: 'string', example: 'X-Org-ID header required' },
+        error: { type: 'string', example: 'Bad Request' }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Action not found',
+    schema: {
+      type: 'object',
+      properties: {
+        statusCode: { type: 'number', example: 404 },
+        message: { type: 'string', example: 'Action "invalid_key" not found' },
+        error: { type: 'string', example: 'Not Found' }
+      }
+    }
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - invalid or missing authentication'
+  })
+  @ApiResponse({
+    status: 500,
+    description: 'Internal server error during action execution'
+  })
+  async execute(
+    @Headers('X-Org-ID') orgId: string,
+    @Headers('X-User-ID') userId: string,
+    @Param('key') actionKey: string,
+    @Body(ValidationPipe) dto: ExecuteActionDto,
+  ) {
+    if (!orgId) throw new BadRequestException('X-Org-ID header required');
+    return this.actionsService.executeAction(orgId, userId, actionKey, dto.inputs);
   }
 }

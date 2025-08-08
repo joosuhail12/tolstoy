@@ -1768,6 +1768,179 @@
         ]
       }
     },
+    "/actions/{key}/execute": {
+      "post": {
+        "description": "Execute a standalone action with provided inputs. This endpoint allows you to run individual actions outside of workflow contexts.",
+        "operationId": "ActionsController_execute",
+        "parameters": [
+          {
+            "name": "X-Org-ID",
+            "required": true,
+            "in": "header",
+            "description": "Organization ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-User-ID",
+            "required": false,
+            "in": "header",
+            "description": "User ID for user-scoped authentication (optional)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "description": "Unique action key identifier",
+            "schema": {
+              "example": "slack_send_message",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Action execution inputs",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "inputs": {
+                    "type": "object",
+                    "description": "Input parameters matching the action's inputSchema",
+                    "example": {
+                      "channel": "#general",
+                      "text": "Hello from Tolstoy!",
+                      "user_id": "U123456"
+                    }
+                  }
+                },
+                "required": [
+                  "inputs"
+                ],
+                "$ref": "#/components/schemas/ExecuteActionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Action executed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "executionId": {
+                      "type": "string",
+                      "example": "exec_abc123"
+                    },
+                    "duration": {
+                      "type": "number",
+                      "example": 1250
+                    },
+                    "data": {
+                      "type": "object",
+                      "description": "Action execution result",
+                      "example": {
+                        "messageId": "msg_456",
+                        "status": "sent"
+                      }
+                    },
+                    "outputs": {
+                      "type": "object",
+                      "description": "Additional output data from action",
+                      "example": {
+                        "channel": "#general",
+                        "timestamp": "2024-01-15T10:30:00Z"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - missing headers or invalid inputs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 400
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "X-Org-ID header required"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Bad Request"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized - invalid or missing authentication"
+          },
+          "404": {
+            "description": "Action not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "statusCode": {
+                      "type": "number",
+                      "example": 404
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Action \"invalid_key\" not found"
+                    },
+                    "error": {
+                      "type": "string",
+                      "example": "Not Found"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error during action execution"
+          }
+        },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Execute a single Action by key",
+        "tags": [
+          "Actions"
+        ]
+      }
+    },
     "/flows": {
       "post": {
         "description": "Create a new workflow with steps and configuration",
@@ -3908,6 +4081,333 @@
         ]
       }
     },
+    "/tools/{toolId}/auth": {
+      "post": {
+        "description": "Configures authentication settings (API Key or OAuth2) for a specific tool within an organization. This endpoint supports both creating new configurations and updating existing ones.",
+        "operationId": "ToolAuthController_upsert",
+        "parameters": [
+          {
+            "name": "X-Org-ID",
+            "required": true,
+            "in": "header",
+            "description": "Organization identifier",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toolId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the tool to configure",
+            "schema": {
+              "example": "tool-123",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAuthConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Auth configuration created or updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data or validation errors"
+          },
+          "404": {
+            "description": "Tool not found or organization does not have access"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create or update organization-level auth configuration for a tool",
+        "tags": [
+          "Tool Authentication"
+        ]
+      },
+      "get": {
+        "description": "Retrieves the authentication configuration for a specific tool within an organization. Sensitive values may be masked in the response.",
+        "operationId": "ToolAuthController_get",
+        "parameters": [
+          {
+            "name": "X-Org-ID",
+            "required": true,
+            "in": "header",
+            "description": "Organization identifier",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toolId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the tool",
+            "schema": {
+              "example": "tool-123",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auth configuration retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Auth configuration not found for this tool and organization"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fetch current auth configuration for a tool",
+        "tags": [
+          "Tool Authentication"
+        ]
+      },
+      "delete": {
+        "description": "Removes the authentication configuration for a specific tool within an organization. This action also cleans up associated secrets and cache entries.",
+        "operationId": "ToolAuthController_remove",
+        "parameters": [
+          {
+            "name": "X-Org-ID",
+            "required": true,
+            "in": "header",
+            "description": "Organization identifier",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toolId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the tool",
+            "schema": {
+              "example": "tool-123",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auth configuration deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteAuthConfigResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Auth configuration not found for this tool and organization"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete auth configuration for a tool",
+        "tags": [
+          "Tool Authentication"
+        ]
+      }
+    },
+    "/auth/{toolKey}/login": {
+      "get": {
+        "description": "Redirects the user to the OAuth provider authorization page. The user must grant permission, after which they will be redirected back to the callback endpoint.",
+        "operationId": "OAuthController_initiateLogin",
+        "parameters": [
+          {
+            "name": "toolKey",
+            "required": true,
+            "in": "path",
+            "description": "Tool identifier (e.g., \"github\", \"google\")",
+            "schema": {
+              "example": "github",
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "query",
+            "description": "User ID for whom to initiate OAuth",
+            "schema": {
+              "example": "user_123",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Org-ID",
+            "required": true,
+            "in": "header",
+            "description": "Organization identifier",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirects to OAuth provider authorization URL"
+          },
+          "400": {
+            "description": "Invalid request parameters or tool not configured for OAuth",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid organization ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Initiate OAuth2 login for a user",
+        "tags": [
+          "OAuth Authentication"
+        ]
+      }
+    },
+    "/auth/{toolKey}/callback": {
+      "get": {
+        "description": "Processes the authorization code returned by the OAuth provider, exchanges it for access tokens, and stores the user credentials.",
+        "operationId": "OAuthController_handleCallback",
+        "parameters": [
+          {
+            "name": "toolKey",
+            "required": true,
+            "in": "path",
+            "description": "Tool identifier that matches the login request",
+            "schema": {
+              "example": "github",
+              "type": "string"
+            }
+          },
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "description": "Authorization code from OAuth provider",
+            "schema": {
+              "example": "abc123def456",
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "description": "State parameter to validate request origin",
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "type": "string"
+            }
+          },
+          {
+            "name": "error",
+            "required": false,
+            "in": "query",
+            "description": "Error code if authorization was denied",
+            "schema": {
+              "example": "access_denied",
+              "type": "string"
+            }
+          },
+          {
+            "name": "error_description",
+            "required": false,
+            "in": "query",
+            "description": "Human-readable error description",
+            "schema": {
+              "example": "The user denied the request",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth callback processed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthCallbackResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid callback parameters or authorization error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired state parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Handle OAuth2 callback from provider",
+        "tags": [
+          "OAuth Authentication"
+        ]
+      }
+    },
     "/": {
       "get": {
         "description": "Get a welcome message from the Tolstoy API",
@@ -3969,7 +4469,7 @@
   "info": {
     "title": "Tolstoy API",
     "description": "Interactive API reference for Tolstoy workflow automation platform",
-    "version": "1.0.1",
+    "version": "1.0.0",
     "contact": {}
   },
   "tags": [],
@@ -3998,6 +4498,178 @@
         "description": "User ID for request context"
       }
     },
-    "schemas": {}
+    "schemas": {
+      "ExecuteActionDto": {
+        "type": "object",
+        "properties": {
+          "inputs": {
+            "type": "object",
+            "description": "Inputs matching the action's inputSchema",
+            "example": {
+              "channel": "#general",
+              "text": "Hello World",
+              "user_id": "U123456"
+            }
+          }
+        },
+        "required": [
+          "inputs"
+        ]
+      },
+      "CreateAuthConfigDto": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "apiKey",
+              "oauth2"
+            ],
+            "description": "Type of authentication configuration",
+            "example": "apiKey"
+          },
+          "config": {
+            "type": "object",
+            "description": "Authentication configuration JSON",
+            "examples": {
+              "apiKey": {
+                "summary": "API Key Configuration",
+                "value": {
+                  "apiKey": "your-api-key-here",
+                  "header": "X-API-Key"
+                }
+              },
+              "oauth2": {
+                "summary": "OAuth2 Configuration",
+                "value": {
+                  "clientId": "your-client-id",
+                  "clientSecret": "your-client-secret",
+                  "redirectUri": "https://your-app.com/oauth/callback",
+                  "scope": "read write"
+                }
+              }
+            }
+          }
+        },
+        "required": [
+          "type",
+          "config"
+        ]
+      },
+      "AuthConfigResponseDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the auth config"
+          },
+          "orgId": {
+            "type": "string",
+            "description": "Organization ID"
+          },
+          "toolId": {
+            "type": "string",
+            "description": "Tool ID"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "apiKey",
+              "oauth2"
+            ],
+            "description": "Type of authentication configuration"
+          },
+          "config": {
+            "type": "object",
+            "description": "Authentication configuration (sensitive values may be masked)"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Creation timestamp"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Last update timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "orgId",
+          "toolId",
+          "type",
+          "config",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "DeleteAuthConfigResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Operation success status",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "example": "Auth configuration deleted successfully"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "OAuthErrorResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether the operation was successful",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "description": "Error message describing what went wrong",
+            "example": "Invalid OAuth state parameter"
+          },
+          "code": {
+            "type": "string",
+            "description": "Error code for programmatic handling",
+            "example": "INVALID_STATE"
+          }
+        },
+        "required": [
+          "success",
+          "message"
+        ]
+      },
+      "OAuthCallbackResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "description": "Whether OAuth callback was successful",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "description": "Success message",
+            "example": "OAuth authorization completed successfully"
+          },
+          "credentialId": {
+            "type": "string",
+            "description": "User credential ID that was created/updated",
+            "example": "cred_123456789"
+          }
+        },
+        "required": [
+          "success"
+        ]
+      }
+    }
   }
 }
