@@ -1,0 +1,623 @@
+---
+title: listUsers()
+sidebar_position: 12
+---
+
+# listUsers()
+
+List all users in the organization.
+
+## Signature
+
+```typescript
+listUsers(): Promise<UserList>
+```
+
+## Parameters
+
+None - this method uses the organization context from the TolstoyClient constructor.
+
+## Returns
+
+Returns a `Promise<UserList>`:
+
+```typescript
+interface UserList {
+  data: User[];
+}
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  status: 'active' | 'invited' | 'suspended';
+  avatar?: string;
+  lastLoginAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  permissions: {
+    canCreateFlows: boolean;
+    canExecuteFlows: boolean;
+    canManageUsers: boolean;
+    canViewAnalytics: boolean;
+    canManageIntegrations: boolean;
+  };
+}
+```
+
+## Usage Examples
+
+### Basic User Listing
+```typescript
+const users = await client.listUsers();
+
+console.log(`Organization has ${users.data.length} users:`);
+users.data.forEach(user => {
+  console.log(`- ${user.name} (${user.email})`);
+  console.log(`  Role: ${user.role}`);
+  console.log(`  Status: ${user.status}`);
+  
+  const lastLogin = user.lastLoginAt 
+    ? new Date(user.lastLoginAt).toLocaleDateString()
+    : 'Never';
+  console.log(`  Last Login: ${lastLogin}`);
+});
+```
+
+### Active Users Only
+```typescript
+const users = await client.listUsers();
+const activeUsers = users.data.filter(user => user.status === 'active');
+
+console.log(`Active users (${activeUsers.length}):`);
+activeUsers.forEach(user => {
+  const daysSinceLogin = user.lastLoginAt 
+    ? Math.floor((Date.now() - new Date(user.lastLoginAt).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  
+  console.log(`- ${user.name}: ${daysSinceLogin ? `${daysSinceLogin} days ago` : 'Never logged in'}`);
+});
+```
+
+### User Permissions Summary
+```typescript
+const users = await client.listUsers();
+
+console.log('User Permissions Summary:');
+users.data.forEach(user => {
+  console.log(`\n${user.name} (${user.role}):`);
+  console.log(`  Create Flows: ${user.permissions.canCreateFlows ? '✅' : '❌'}`);
+  console.log(`  Execute Flows: ${user.permissions.canExecuteFlows ? '✅' : '❌'}`);
+  console.log(`  Manage Users: ${user.permissions.canManageUsers ? '✅' : '❌'}`);
+  console.log(`  View Analytics: ${user.permissions.canViewAnalytics ? '✅' : '❌'}`);
+  console.log(`  Manage Integrations: ${user.permissions.canManageIntegrations ? '✅' : '❌'}`);
+});
+```
+
+### User Activity Analysis
+```typescript
+const users = await client.listUsers();
+const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+const activityReport = {
+  total: users.data.length,
+  active: users.data.filter(u => u.status === 'active').length,
+  invited: users.data.filter(u => u.status === 'invited').length,
+  suspended: users.data.filter(u => u.status === 'suspended').length,
+  recentlyActive: 0,
+  inactive: 0,
+  neverLoggedIn: 0
+};
+
+users.data.forEach(user => {
+  if (!user.lastLoginAt) {
+    activityReport.neverLoggedIn++;
+  } else {
+    const lastLogin = new Date(user.lastLoginAt);
+    if (lastLogin > thirtyDaysAgo) {
+      activityReport.recentlyActive++;
+    } else {
+      activityReport.inactive++;
+    }
+  }
+});
+
+console.log('User Activity Report:');
+console.log(`  Total Users: ${activityReport.total}`);
+console.log(`  Active: ${activityReport.active}`);
+console.log(`  Invited: ${activityReport.invited}`);
+console.log(`  Suspended: ${activityReport.suspended}`);
+console.log(`  Recently Active (30 days): ${activityReport.recentlyActive}`);
+console.log(`  Inactive: ${activityReport.inactive}`);
+console.log(`  Never Logged In: ${activityReport.neverLoggedIn}`);
+```
+
+## Error Handling
+
+```typescript
+import { AxiosError } from 'axios';
+
+try {
+  const users = await client.listUsers();
+  
+  if (users.data.length === 0) {
+    console.log('No users found in this organization');
+  }
+} catch (error) {
+  const apiError = error as AxiosError;
+  
+  if (apiError.response?.status === 403) {
+    console.error('Access denied - you may not have permission to view users');
+  } else if (apiError.response?.status === 401) {
+    console.error('Authentication failed - check credentials');
+  } else {
+    console.error('Failed to list users:', error.message);
+  }
+}
+```
+
+## Advanced Usage
+
+### User Management Dashboard
+```typescript
+class UserManager {
+  private userCache: Map<string, User> = new Map();
+  private lastFetch = 0;
+  private cacheTTL = 2 * 60 * 1000; // 2 minutes
+  
+  async getUsers(forceRefresh = false): Promise<User[]> {
+    const now = Date.now();
+    
+    if (forceRefresh || (now - this.lastFetch) > this.cacheTTL) {
+      const users = await client.listUsers();
+      
+      // Update cache
+      this.userCache.clear();
+      users.data.forEach(user => {
+        this.userCache.set(user.id, user);
+      });
+      
+      this.lastFetch = now;
+      return users.data;
+    }
+    
+    return Array.from(this.userCache.values());
+  }
+  
+  async getUserById(id: string): Promise<User | null> {
+    const users = await this.getUsers();
+    return users.find(user => user.id === id) || null;
+  }
+  
+  async getUserByEmail(email: string): Promise<User | null> {
+    const users = await this.getUsers();
+    return users.find(user => user.email.toLowerCase() === email.toLowerCase()) || null;
+  }
+  
+  async getUsersByRole(role: User['role']): Promise<User[]> {
+    const users = await this.getUsers();
+    return users.filter(user => user.role === role);
+  }
+  
+  async getInactiveUsers(daysSinceLogin = 30): Promise<User[]> {
+    const users = await this.getUsers();
+    const cutoff = new Date(Date.now() - daysSinceLogin * 24 * 60 * 60 * 1000);
+    
+    return users.filter(user => 
+      !user.lastLoginAt || new Date(user.lastLoginAt) < cutoff
+    );
+  }
+  
+  async getUsersWithPermission(permission: keyof User['permissions']): Promise<User[]> {
+    const users = await this.getUsers();
+    return users.filter(user => user.permissions[permission]);
+  }
+  
+  async generateUserReport(): Promise<void> {
+    const users = await this.getUsers();
+    
+    console.log('USER MANAGEMENT REPORT');
+    console.log('=====================');
+    
+    // Role distribution
+    const roleCount = users.reduce((acc, user) => {
+      acc[user.role] = (acc[user.role] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    console.log('\nRole Distribution:');
+    Object.entries(roleCount).forEach(([role, count]) => {
+      console.log(`  ${role}: ${count}`);
+    });
+    
+    // Activity analysis
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const inactive = users.filter(user => 
+      !user.lastLoginAt || new Date(user.lastLoginAt) < thirtyDaysAgo
+    );
+    
+    console.log('\nActivity Status:');
+    console.log(`  Active (30 days): ${users.length - inactive.length}`);
+    console.log(`  Inactive: ${inactive.length}`);
+    
+    if (inactive.length > 0) {
+      console.log('\nInactive Users:');
+      inactive.forEach(user => {
+        const lastLogin = user.lastLoginAt 
+          ? new Date(user.lastLoginAt).toLocaleDateString()
+          : 'Never';
+        console.log(`  - ${user.name} (${user.email}): Last login ${lastLogin}`);
+      });
+    }
+    
+    // Permission analysis
+    console.log('\nPermission Summary:');
+    const permissionCounts = users.reduce((acc, user) => {
+      Object.entries(user.permissions).forEach(([perm, hasPermission]) => {
+        if (!acc[perm]) acc[perm] = 0;
+        if (hasPermission) acc[perm]++;
+      });
+      return acc;
+    }, {} as Record<string, number>);
+    
+    Object.entries(permissionCounts).forEach(([permission, count]) => {
+      console.log(`  ${permission}: ${count}/${users.length} users`);
+    });
+  }
+}
+
+const userManager = new UserManager();
+await userManager.generateUserReport();
+
+// Get inactive users
+const inactiveUsers = await userManager.getInactiveUsers(60); // 60 days
+console.log(`Found ${inactiveUsers.length} inactive users (60+ days)`);
+```
+
+### User Onboarding Tracker
+```typescript
+class OnboardingTracker {
+  async trackOnboardingStatus(): Promise<void> {
+    const users = await client.listUsers();
+    
+    const onboardingStats = {
+      invited: users.filter(u => u.status === 'invited').length,
+      neverLoggedIn: users.filter(u => u.status === 'active' && !u.lastLoginAt).length,
+      recentlyJoined: 0,
+      fullyOnboarded: 0
+    };
+    
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    
+    users.forEach(user => {
+      const createdDate = new Date(user.createdAt);
+      
+      if (createdDate > sevenDaysAgo) {
+        onboardingStats.recentlyJoined++;
+      }
+      
+      // Consider fully onboarded if logged in and has some permissions
+      if (user.lastLoginAt && (
+        user.permissions.canCreateFlows || 
+        user.permissions.canExecuteFlows
+      )) {
+        onboardingStats.fullyOnboarded++;
+      }
+    });
+    
+    console.log('User Onboarding Status:');
+    console.log(`  Pending Invites: ${onboardingStats.invited}`);
+    console.log(`  Never Logged In: ${onboardingStats.neverLoggedIn}`);
+    console.log(`  Recently Joined (7 days): ${onboardingStats.recentlyJoined}`);
+    console.log(`  Fully Onboarded: ${onboardingStats.fullyOnboarded}`);
+    
+    // Calculate onboarding completion rate
+    const totalUsers = users.length;
+    const completionRate = (onboardingStats.fullyOnboarded / totalUsers * 100).toFixed(1);
+    console.log(`  Onboarding Completion Rate: ${completionRate}%`);
+  }
+  
+  async getOnboardingCandidates(): Promise<User[]> {
+    const users = await client.listUsers();
+    
+    // Users who haven't logged in yet or have limited permissions
+    return users.filter(user => 
+      !user.lastLoginAt || 
+      (!user.permissions.canCreateFlows && !user.permissions.canExecuteFlows)
+    );
+  }
+}
+
+const onboarding = new OnboardingTracker();
+await onboarding.trackOnboardingStatus();
+
+const candidates = await onboarding.getOnboardingCandidates();
+console.log(`${candidates.length} users need onboarding assistance`);
+```
+
+### Role-based Access Control
+```typescript
+class RoleManager {
+  private readonly roleHierarchy = ['viewer', 'member', 'admin', 'owner'];
+  
+  async getUsersWithMinimumRole(minRole: User['role']): Promise<User[]> {
+    const users = await client.listUsers();
+    const minIndex = this.roleHierarchy.indexOf(minRole);
+    
+    return users.filter(user => {
+      const userIndex = this.roleHierarchy.indexOf(user.role);
+      return userIndex >= minIndex;
+    });
+  }
+  
+  async auditPermissions(): Promise<void> {
+    const users = await client.listUsers();
+    const issues: string[] = [];
+    
+    users.forEach(user => {
+      // Check for permission inconsistencies
+      if (user.role === 'viewer' && user.permissions.canCreateFlows) {
+        issues.push(`${user.name} (viewer) has create flows permission`);
+      }
+      
+      if (user.role === 'owner' && !user.permissions.canManageUsers) {
+        issues.push(`${user.name} (owner) missing manage users permission`);
+      }
+      
+      if (user.status === 'suspended' && user.lastLoginAt) {
+        const lastLogin = new Date(user.lastLoginAt);
+        const recentLogin = Date.now() - lastLogin.getTime() < 24 * 60 * 60 * 1000;
+        if (recentLogin) {
+          issues.push(`${user.name} is suspended but logged in recently`);
+        }
+      }
+    });
+    
+    if (issues.length > 0) {
+      console.warn('Permission Audit Issues:');
+      issues.forEach(issue => console.warn(`  ⚠️ ${issue}`));
+    } else {
+      console.log('✅ No permission issues found');
+    }
+  }
+  
+  async getRoleDistribution(): Promise<Record<User['role'], number>> {
+    const users = await client.listUsers();
+    return users.reduce((acc, user) => {
+      acc[user.role] = (acc[user.role] || 0) + 1;
+      return acc;
+    }, {} as Record<User['role'], number>);
+  }
+}
+
+const roleManager = new RoleManager();
+
+// Get all admins and owners
+const admins = await roleManager.getUsersWithMinimumRole('admin');
+console.log(`${admins.length} users with admin+ privileges`);
+
+// Audit permissions
+await roleManager.auditPermissions();
+
+// Get role distribution
+const distribution = await roleManager.getRoleDistribution();
+console.log('Role Distribution:', distribution);
+```
+
+## Integration Patterns
+
+### User Directory Component
+```typescript
+// React component example
+interface UserDirectoryProps {
+  onUserSelect: (user: User) => void;
+}
+
+function UserDirectory({ onUserSelect }: UserDirectoryProps) {
+  const [users, setUsers] = useState<User[]>([]);
+  const [filter, setFilter] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  useEffect(() => {
+    async function loadUsers() {
+      try {
+        const userList = await client.listUsers();
+        setUsers(userList.data);
+      } catch (error) {
+        console.error('Failed to load users:', error);
+      }
+    }
+    
+    loadUsers();
+  }, []);
+  
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    if (filter === 'active') return user.status === 'active' && matchesSearch;
+    if (filter === 'inactive') return user.status !== 'active' && matchesSearch;
+    return matchesSearch;
+  });
+  
+  return (
+    <div className="user-directory">
+      <div className="filters">
+        <input 
+          placeholder="Search users..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+        <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+          <option value="all">All Users</option>
+          <option value="active">Active</option>
+          <option value="inactive">Inactive</option>
+        </select>
+      </div>
+      
+      <div className="user-list">
+        {filteredUsers.map(user => (
+          <div 
+            key={user.id} 
+            className="user-card"
+            onClick={() => onUserSelect(user)}
+          >
+            <div className="user-info">
+              <h3>{user.name}</h3>
+              <p>{user.email}</p>
+              <span className={`role ${user.role}`}>{user.role}</span>
+              <span className={`status ${user.status}`}>{user.status}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+### User Analytics Dashboard
+```typescript
+async function generateUserAnalyticsDashboard(): Promise<void> {
+  const users = await client.listUsers();
+  
+  console.log('USER ANALYTICS DASHBOARD');
+  console.log('=======================');
+  
+  // Basic stats
+  const stats = {
+    total: users.length,
+    active: users.filter(u => u.status === 'active').length,
+    invited: users.filter(u => u.status === 'invited').length,
+    suspended: users.filter(u => u.status === 'suspended').length
+  };
+  
+  console.log(`\nUser Count: ${stats.total}`);
+  console.log(`  Active: ${stats.active} (${(stats.active/stats.total*100).toFixed(1)}%)`);
+  console.log(`  Invited: ${stats.invited} (${(stats.invited/stats.total*100).toFixed(1)}%)`);
+  console.log(`  Suspended: ${stats.suspended} (${(stats.suspended/stats.total*100).toFixed(1)}%)`);
+  
+  // Activity analysis
+  const now = Date.now();
+  const activityBuckets = {
+    today: 0,
+    thisWeek: 0,
+    thisMonth: 0,
+    older: 0,
+    never: 0
+  };
+  
+  users.forEach(user => {
+    if (!user.lastLoginAt) {
+      activityBuckets.never++;
+      return;
+    }
+    
+    const lastLogin = new Date(user.lastLoginAt).getTime();
+    const daysSince = (now - lastLogin) / (1000 * 60 * 60 * 24);
+    
+    if (daysSince < 1) activityBuckets.today++;
+    else if (daysSince < 7) activityBuckets.thisWeek++;
+    else if (daysSince < 30) activityBuckets.thisMonth++;
+    else activityBuckets.older++;
+  });
+  
+  console.log('\nLast Login Activity:');
+  console.log(`  Today: ${activityBuckets.today}`);
+  console.log(`  This Week: ${activityBuckets.thisWeek}`);
+  console.log(`  This Month: ${activityBuckets.thisMonth}`);
+  console.log(`  Older: ${activityBuckets.older}`);
+  console.log(`  Never: ${activityBuckets.never}`);
+  
+  // Growth analysis
+  const usersByMonth = users.reduce((acc, user) => {
+    const month = user.createdAt.substring(0, 7); // YYYY-MM
+    acc[month] = (acc[month] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  
+  console.log('\nUser Growth (by month):');
+  Object.entries(usersByMonth)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .forEach(([month, count]) => {
+      console.log(`  ${month}: +${count} users`);
+    });
+}
+
+await generateUserAnalyticsDashboard();
+```
+
+## Best Practices
+
+### Pagination Support
+```typescript
+interface PaginatedUserList {
+  users: User[];
+  totalPages: number;
+  currentPage: number;
+  hasNextPage: boolean;
+}
+
+async function getPaginatedUsers(
+  page = 1, 
+  limit = 20,
+  filters?: { role?: User['role']; status?: User['status'] }
+): Promise<PaginatedUserList> {
+  const allUsers = await client.listUsers();
+  let filteredUsers = allUsers.data;
+  
+  // Apply filters
+  if (filters?.role) {
+    filteredUsers = filteredUsers.filter(user => user.role === filters.role);
+  }
+  if (filters?.status) {
+    filteredUsers = filteredUsers.filter(user => user.status === filters.status);
+  }
+  
+  // Paginate
+  const startIndex = (page - 1) * limit;
+  const endIndex = startIndex + limit;
+  const users = filteredUsers.slice(startIndex, endIndex);
+  
+  return {
+    users,
+    totalPages: Math.ceil(filteredUsers.length / limit),
+    currentPage: page,
+    hasNextPage: endIndex < filteredUsers.length
+  };
+}
+```
+
+### Caching Strategy
+```typescript
+let cachedUsers: User[] = [];
+let lastFetch = 0;
+const CACHE_DURATION = 3 * 60 * 1000; // 3 minutes
+
+async function getCachedUsers(): Promise<User[]> {
+  const now = Date.now();
+  
+  if (cachedUsers.length === 0 || (now - lastFetch) > CACHE_DURATION) {
+    const users = await client.listUsers();
+    cachedUsers = users.data;
+    lastFetch = now;
+  }
+  
+  return cachedUsers;
+}
+```
+
+## Related Methods
+
+- [createUser()](/sdk/methods/create-user) - Add new users to organization
+- [getUser()](/sdk/methods/get-user) - Get specific user details
+- [updateUser()](/sdk/methods/update-user) - Update user information
+- [deleteUser()](/sdk/methods/delete-user) - Remove user from organization
+- [TolstoyClient](/sdk/methods/tolstoy-client) - Client setup
+
+## See Also
+
+- [List Users API](/api/users/get-users) - Direct API documentation
+- [User Management Guide](/docs/users) - Comprehensive user management
+- [Role-based Access Control](/docs/rbac) - Permission management patterns

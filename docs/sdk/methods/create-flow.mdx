@@ -1,0 +1,699 @@
+---
+title: createFlow()
+sidebar_position: 17
+---
+
+# createFlow()
+
+Create a new workflow in your organization.
+
+## Signature
+
+```typescript
+createFlow(flowData: CreateFlowDto): Promise<Flow>
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `flowData` | `CreateFlowDto` | Workflow configuration |
+
+### CreateFlowDto Interface
+
+```typescript
+interface CreateFlowDto {
+  name: string;
+  description?: string;
+  definition: FlowDefinition;
+  active?: boolean;
+  tags?: string[];
+  version?: string;
+  settings?: {
+    timeout?: number;
+    retries?: number;
+    errorHandling?: 'stop' | 'continue' | 'retry';
+  };
+}
+
+interface FlowDefinition {
+  nodes: FlowNode[];
+  edges: FlowEdge[];
+  variables?: Record<string, any>;
+}
+```
+
+## Returns
+
+Returns a `Promise<Flow>`:
+
+```typescript
+interface Flow {
+  data: {
+    id: string;
+    name: string;
+    description?: string;
+    definition: FlowDefinition;
+    active: boolean;
+    version: string;
+    createdAt: string;
+    updatedAt: string;
+    createdBy: string;
+    tags: string[];
+    executionCount: number;
+    lastExecuted?: string;
+  };
+}
+```
+
+## Usage Examples
+
+### Simple Linear Workflow
+```typescript
+const emailWorkflow = await client.createFlow({
+  name: 'Welcome Email Sequence',
+  description: 'Send welcome emails to new users',
+  definition: {
+    nodes: [
+      {
+        id: 'start',
+        type: 'trigger',
+        data: {
+          trigger: 'manual'
+        },
+        position: { x: 100, y: 100 }
+      },
+      {
+        id: 'send-welcome',
+        type: 'action',
+        data: {
+          actionId: 'action_send_email',
+          inputs: {
+            to: '{{user.email}}',
+            subject: 'Welcome to {{org.name}}!',
+            template: 'welcome'
+          }
+        },
+        position: { x: 300, y: 100 }
+      }
+    ],
+    edges: [
+      {
+        id: 'start-to-welcome',
+        source: 'start',
+        target: 'send-welcome'
+      }
+    ],
+    variables: {
+      user: { type: 'object', required: true },
+      org: { type: 'object', required: false }
+    }
+  },
+  active: true,
+  tags: ['email', 'onboarding']
+});
+
+console.log(`Created workflow: ${emailWorkflow.data.name}`);
+console.log(`Workflow ID: ${emailWorkflow.data.id}`);
+```
+
+### Complex Conditional Workflow
+```typescript
+const orderProcessing = await client.createFlow({
+  name: 'Order Processing Pipeline',
+  description: 'Process new orders with payment verification and fulfillment',
+  definition: {
+    nodes: [
+      {
+        id: 'order-received',
+        type: 'trigger',
+        data: {
+          trigger: 'webhook',
+          event: 'order.created'
+        },
+        position: { x: 100, y: 100 }
+      },
+      {
+        id: 'verify-payment',
+        type: 'action',
+        data: {
+          actionId: 'action_verify_payment',
+          inputs: {
+            orderId: '{{trigger.order.id}}',
+            amount: '{{trigger.order.total}}'
+          }
+        },
+        position: { x: 300, y: 100 }
+      },
+      {
+        id: 'payment-check',
+        type: 'condition',
+        data: {
+          condition: '{{verify_payment.success}} === true'
+        },
+        position: { x: 500, y: 100 }
+      },
+      {
+        id: 'fulfill-order',
+        type: 'action',
+        data: {
+          actionId: 'action_fulfill_order',
+          inputs: {
+            orderId: '{{trigger.order.id}}'
+          }
+        },
+        position: { x: 700, y: 50 }
+      },
+      {
+        id: 'send-failure-email',
+        type: 'action',
+        data: {
+          actionId: 'action_send_email',
+          inputs: {
+            to: '{{trigger.order.customerEmail}}',
+            subject: 'Payment Failed',
+            template: 'payment-failed'
+          }
+        },
+        position: { x: 700, y: 150 }
+      }
+    ],
+    edges: [
+      { id: 'e1', source: 'order-received', target: 'verify-payment' },
+      { id: 'e2', source: 'verify-payment', target: 'payment-check' },
+      { id: 'e3', source: 'payment-check', target: 'fulfill-order', condition: 'true' },
+      { id: 'e4', source: 'payment-check', target: 'send-failure-email', condition: 'false' }
+    ]
+  },
+  active: true,
+  tags: ['e-commerce', 'payment', 'fulfillment'],
+  settings: {
+    timeout: 300000, // 5 minutes
+    retries: 3,
+    errorHandling: 'retry'
+  }
+});
+
+console.log(`Created order processing workflow: ${orderProcessing.data.id}`);
+```
+
+### Multi-step Data Processing Workflow
+```typescript
+const dataProcessor = await client.createFlow({
+  name: 'Customer Data Processing',
+  description: 'Process and enrich customer data from multiple sources',
+  definition: {
+    nodes: [
+      {
+        id: 'data-trigger',
+        type: 'trigger',
+        data: { trigger: 'schedule', schedule: '0 2 * * *' } // Daily at 2 AM
+      },
+      {
+        id: 'fetch-customers',
+        type: 'action',
+        data: {
+          actionId: 'action_fetch_crm_data',
+          inputs: { source: 'salesforce', updated_since: '{{yesterday}}' }
+        }
+      },
+      {
+        id: 'enrich-data',
+        type: 'action',
+        data: {
+          actionId: 'action_enrich_customer_data',
+          inputs: { customers: '{{fetch_customers.data}}' }
+        }
+      },
+      {
+        id: 'update-database',
+        type: 'action',
+        data: {
+          actionId: 'action_update_database',
+          inputs: { 
+            table: 'customers', 
+            data: '{{enrich_data.enriched}}' 
+          }
+        }
+      },
+      {
+        id: 'generate-report',
+        type: 'action',
+        data: {
+          actionId: 'action_generate_report',
+          inputs: {
+            template: 'daily_customer_update',
+            data: '{{update_database.summary}}'
+          }
+        }
+      }
+    ],
+    edges: [
+      { id: 'e1', source: 'data-trigger', target: 'fetch-customers' },
+      { id: 'e2', source: 'fetch-customers', target: 'enrich-data' },
+      { id: 'e3', source: 'enrich-data', target: 'update-database' },
+      { id: 'e4', source: 'update-database', target: 'generate-report' }
+    ],
+    variables: {
+      yesterday: { 
+        type: 'string', 
+        default: '{{date.subtract(1, "day").format("YYYY-MM-DD")}}' 
+      }
+    }
+  },
+  active: true,
+  tags: ['data-processing', 'automation', 'daily']
+});
+```
+
+## Error Handling
+
+```typescript
+import { AxiosError } from 'axios';
+
+try {
+  const flow = await client.createFlow({
+    name: 'My Workflow',
+    definition: {
+      nodes: [],
+      edges: []
+    }
+  });
+  
+  console.log(`✅ Workflow created: ${flow.data.id}`);
+} catch (error) {
+  const apiError = error as AxiosError;
+  
+  if (apiError.response) {
+    const { status, data } = apiError.response;
+    
+    switch (data.error.code) {
+      case 'VALIDATION_ERROR':
+        console.error('Invalid workflow definition:', data.error.details);
+        break;
+      case 'QUOTA_EXCEEDED':
+        console.error('Workflow limit reached for current plan');
+        break;
+      case 'INVALID_DEFINITION':
+        console.error('Workflow definition contains errors');
+        break;
+      default:
+        console.error(`API Error ${status}:`, data.error.message);
+    }
+  }
+}
+```
+
+## Advanced Usage
+
+### Workflow Template System
+```typescript
+class WorkflowTemplateManager {
+  private templates = new Map<string, Partial<CreateFlowDto>>();
+  
+  constructor() {
+    this.initializeTemplates();
+  }
+  
+  private initializeTemplates(): void {
+    // Email sequence template
+    this.templates.set('email-sequence', {
+      definition: {
+        nodes: [
+          {
+            id: 'trigger',
+            type: 'trigger',
+            data: { trigger: 'manual' },
+            position: { x: 100, y: 100 }
+          },
+          {
+            id: 'send-email',
+            type: 'action',
+            data: {
+              actionId: 'action_send_email',
+              inputs: {
+                to: '{{recipient.email}}',
+                subject: '{{email.subject}}',
+                template: '{{email.template}}'
+              }
+            },
+            position: { x: 300, y: 100 }
+          }
+        ],
+        edges: [
+          { id: 'e1', source: 'trigger', target: 'send-email' }
+        ],
+        variables: {
+          recipient: { type: 'object', required: true },
+          email: { type: 'object', required: true }
+        }
+      },
+      tags: ['email', 'template']
+    });
+    
+    // API processing template
+    this.templates.set('api-processor', {
+      definition: {
+        nodes: [
+          {
+            id: 'webhook-trigger',
+            type: 'trigger',
+            data: { trigger: 'webhook' },
+            position: { x: 100, y: 100 }
+          },
+          {
+            id: 'process-data',
+            type: 'action',
+            data: {
+              actionId: 'action_process_api_data',
+              inputs: { data: '{{trigger.body}}' }
+            },
+            position: { x: 300, y: 100 }
+          },
+          {
+            id: 'respond',
+            type: 'action',
+            data: {
+              actionId: 'action_http_response',
+              inputs: {
+                status: 200,
+                body: '{{process_data.result}}'
+              }
+            },
+            position: { x: 500, y: 100 }
+          }
+        ],
+        edges: [
+          { id: 'e1', source: 'webhook-trigger', target: 'process-data' },
+          { id: 'e2', source: 'process-data', target: 'respond' }
+        ]
+      },
+      tags: ['api', 'webhook', 'template']
+    });
+  }
+  
+  async createFromTemplate(
+    templateName: string,
+    customization: Partial<CreateFlowDto>
+  ): Promise<Flow> {
+    const template = this.templates.get(templateName);
+    if (!template) {
+      throw new Error(`Template '${templateName}' not found`);
+    }
+    
+    const flowData: CreateFlowDto = {
+      ...template,
+      ...customization,
+      definition: {
+        ...template.definition!,
+        ...customization.definition,
+        nodes: customization.definition?.nodes || template.definition!.nodes,
+        edges: customization.definition?.edges || template.definition!.edges
+      },
+      tags: [...(template.tags || []), ...(customization.tags || [])]
+    };
+    
+    return client.createFlow(flowData);
+  }
+  
+  listTemplates(): string[] {
+    return Array.from(this.templates.keys());
+  }
+}
+
+const templateManager = new WorkflowTemplateManager();
+
+// Create workflow from template
+const emailFlow = await templateManager.createFromTemplate('email-sequence', {
+  name: 'Customer Welcome Email',
+  description: 'Welcome new customers with personalized email',
+  tags: ['customer', 'onboarding']
+});
+
+// List available templates
+console.log('Available templates:', templateManager.listTemplates());
+```
+
+### Workflow Validation
+```typescript
+class WorkflowValidator {
+  validateDefinition(definition: FlowDefinition): ValidationResult {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    
+    // Check for nodes
+    if (!definition.nodes || definition.nodes.length === 0) {
+      errors.push('Workflow must have at least one node');
+    }
+    
+    // Check for trigger node
+    const triggerNodes = definition.nodes.filter(node => node.type === 'trigger');
+    if (triggerNodes.length === 0) {
+      errors.push('Workflow must have at least one trigger node');
+    } else if (triggerNodes.length > 1) {
+      warnings.push('Multiple trigger nodes found - only one will be active');
+    }
+    
+    // Validate edges
+    definition.edges.forEach(edge => {
+      const sourceExists = definition.nodes.some(node => node.id === edge.source);
+      const targetExists = definition.nodes.some(node => node.id === edge.target);
+      
+      if (!sourceExists) {
+        errors.push(`Edge references non-existent source node: ${edge.source}`);
+      }
+      if (!targetExists) {
+        errors.push(`Edge references non-existent target node: ${edge.target}`);
+      }
+    });
+    
+    // Check for disconnected nodes
+    const connectedNodeIds = new Set<string>();
+    definition.edges.forEach(edge => {
+      connectedNodeIds.add(edge.source);
+      connectedNodeIds.add(edge.target);
+    });
+    
+    definition.nodes.forEach(node => {
+      if (node.type !== 'trigger' && !connectedNodeIds.has(node.id)) {
+        warnings.push(`Node '${node.id}' is not connected to any other nodes`);
+      }
+    });
+    
+    // Validate action nodes
+    definition.nodes.forEach(node => {
+      if (node.type === 'action' && !node.data?.actionId) {
+        errors.push(`Action node '${node.id}' missing actionId`);
+      }
+    });
+    
+    return {
+      isValid: errors.length === 0,
+      errors,
+      warnings
+    };
+  }
+  
+  async validateAndCreate(flowData: CreateFlowDto): Promise<Flow> {
+    const validation = this.validateDefinition(flowData.definition);
+    
+    if (!validation.isValid) {
+      throw new Error(`Workflow validation failed: ${validation.errors.join(', ')}`);
+    }
+    
+    if (validation.warnings.length > 0) {
+      console.warn('Workflow warnings:', validation.warnings);
+    }
+    
+    return client.createFlow(flowData);
+  }
+}
+
+interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+const validator = new WorkflowValidator();
+
+// Validate before creating
+try {
+  const flow = await validator.validateAndCreate({
+    name: 'Validated Workflow',
+    definition: {
+      nodes: [
+        { id: 'start', type: 'trigger', data: { trigger: 'manual' } },
+        { id: 'action1', type: 'action', data: { actionId: 'send_email' } }
+      ],
+      edges: [
+        { id: 'e1', source: 'start', target: 'action1' }
+      ]
+    }
+  });
+  console.log('Workflow created successfully:', flow.data.id);
+} catch (error) {
+  console.error('Validation failed:', error.message);
+}
+```
+
+### Workflow Builder Helper
+```typescript
+class WorkflowBuilder {
+  private nodes: FlowNode[] = [];
+  private edges: FlowEdge[] = [];
+  private variables: Record<string, any> = {};
+  
+  addTrigger(id: string, triggerType: string, config?: any): this {
+    this.nodes.push({
+      id,
+      type: 'trigger',
+      data: { trigger: triggerType, ...config },
+      position: { x: 100, y: 100 }
+    });
+    return this;
+  }
+  
+  addAction(id: string, actionId: string, inputs?: any): this {
+    this.nodes.push({
+      id,
+      type: 'action',
+      data: { actionId, inputs },
+      position: { x: 300 + this.nodes.length * 200, y: 100 }
+    });
+    return this;
+  }
+  
+  addCondition(id: string, condition: string): this {
+    this.nodes.push({
+      id,
+      type: 'condition',
+      data: { condition },
+      position: { x: 300 + this.nodes.length * 200, y: 100 }
+    });
+    return this;
+  }
+  
+  connect(sourceId: string, targetId: string, condition?: string): this {
+    this.edges.push({
+      id: `${sourceId}-${targetId}`,
+      source: sourceId,
+      target: targetId,
+      condition
+    });
+    return this;
+  }
+  
+  setVariable(name: string, config: any): this {
+    this.variables[name] = config;
+    return this;
+  }
+  
+  async build(name: string, options?: Partial<CreateFlowDto>): Promise<Flow> {
+    const flowData: CreateFlowDto = {
+      name,
+      definition: {
+        nodes: this.nodes,
+        edges: this.edges,
+        variables: this.variables
+      },
+      ...options
+    };
+    
+    return client.createFlow(flowData);
+  }
+  
+  reset(): this {
+    this.nodes = [];
+    this.edges = [];
+    this.variables = {};
+    return this;
+  }
+}
+
+// Usage example
+const builder = new WorkflowBuilder();
+
+const flow = await builder
+  .addTrigger('start', 'webhook', { event: 'user.created' })
+  .addAction('send-welcome', 'action_send_email', {
+    to: '{{trigger.user.email}}',
+    template: 'welcome'
+  })
+  .addAction('create-record', 'action_create_record', {
+    table: 'user_activities',
+    data: { userId: '{{trigger.user.id}}', action: 'welcome_sent' }
+  })
+  .connect('start', 'send-welcome')
+  .connect('send-welcome', 'create-record')
+  .setVariable('trigger', { type: 'object', required: true })
+  .build('User Welcome Workflow', {
+    description: 'Automated user welcome process',
+    tags: ['user', 'welcome', 'automation']
+  });
+
+console.log(`Built workflow: ${flow.data.id}`);
+```
+
+## Best Practices
+
+### Workflow Naming Convention
+```typescript
+function generateWorkflowName(purpose: string, trigger: string, version?: string): string {
+  const parts = [
+    purpose.replace(/\s+/g, ' ').trim(),
+    `(${trigger})`,
+    version ? `v${version}` : ''
+  ].filter(Boolean);
+  
+  return parts.join(' ');
+}
+
+// Usage
+const workflowName = generateWorkflowName('Customer Onboarding', 'webhook', '2.1');
+console.log(workflowName); // "Customer Onboarding (webhook) v2.1"
+```
+
+### Version Management
+```typescript
+async function createWorkflowVersion(
+  baseWorkflowId: string,
+  updates: Partial<CreateFlowDto>
+): Promise<Flow> {
+  // Get the base workflow
+  const baseWorkflow = await client.getFlow(baseWorkflowId);
+  
+  // Generate new version number
+  const baseVersion = baseWorkflow.data.version || '1.0';
+  const [major, minor] = baseVersion.split('.').map(Number);
+  const newVersion = `${major}.${minor + 1}`;
+  
+  // Create new workflow with updates
+  const newWorkflowData: CreateFlowDto = {
+    name: updates.name || `${baseWorkflow.data.name} v${newVersion}`,
+    description: updates.description || baseWorkflow.data.description,
+    definition: updates.definition || baseWorkflow.data.definition,
+    active: false, // New versions start inactive
+    tags: [...(baseWorkflow.data.tags || []), ...(updates.tags || [])],
+    version: newVersion,
+    settings: { ...baseWorkflow.data.settings, ...updates.settings }
+  };
+  
+  return client.createFlow(newWorkflowData);
+}
+```
+
+## Related Methods
+
+- [listFlows()](/sdk/methods/list-flows) - List all workflows
+- [getFlow()](/sdk/methods/get-flow) - Get workflow details
+- [updateFlow()](/sdk/methods/update-flow) - Update workflow
+- [deleteFlow()](/sdk/methods/delete-flow) - Delete workflow
+- [runFlow()](/sdk/methods/run-flow) - Execute workflow
+- [TolstoyClient](/sdk/methods/tolstoy-client) - Client setup
+
+## See Also
+
+- [Create Flow API](/api/flows/post-flows) - Direct API documentation
+- [Workflow Definition Guide](/docs/flow-definition) - Comprehensive workflow building
+- [Action Reference](/docs/action-reference) - Available actions for workflows

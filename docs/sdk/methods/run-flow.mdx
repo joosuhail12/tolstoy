@@ -1,0 +1,316 @@
+---
+title: runFlow()
+sidebar_position: 2
+---
+
+# runFlow()
+
+Execute a workflow with inputs using the simplified helper method.
+
+## Signature
+
+```typescript
+runFlow(
+  flowId: string, 
+  inputs: any, 
+  useDurable?: boolean
+): Promise<ExecutionResult>
+```
+
+## Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `flowId` | `string` | - | Workflow ID to execute |
+| `inputs` | `any` | - | Input variables for the workflow |
+| `useDurable` | `boolean` | `true` | Use async execution (recommended) |
+
+## Returns
+
+Returns a `Promise<ExecutionResult>`:
+
+```typescript
+interface ExecutionResult {
+  data: {
+    executionId: string;
+    status: 'running' | 'completed' | 'failed';
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+```
+
+## Usage Examples
+
+### Basic Workflow Execution
+```typescript
+const execution = await client.runFlow('flow_123', {
+  userId: 'user_456',
+  email: 'user@example.com'
+});
+
+console.log(`Execution started: ${execution.data.executionId}`);
+```
+
+### User Onboarding Workflow
+```typescript
+const onboardingExecution = await client.runFlow('flow_onboarding', {
+  user: {
+    email: 'john@example.com',
+    name: 'John Doe',
+    plan: 'pro'
+  },
+  source: 'web_signup',
+  timestamp: new Date().toISOString()
+});
+
+console.log(`Onboarding started: ${onboardingExecution.data.executionId}`);
+```
+
+### Order Processing Workflow
+```typescript
+const orderExecution = await client.runFlow('flow_order_processing', {
+  order: {
+    id: 'order_123',
+    customerId: 'cust_456',
+    items: [{ sku: 'PROD-001', quantity: 2 }],
+    totalAmount: 99.99
+  },
+  priority: 'high'
+}, true); // Use durable execution
+```
+
+### Marketing Campaign
+```typescript
+const campaignExecution = await client.runFlow('flow_marketing', {
+  campaign: {
+    name: 'Welcome Series',
+    audience: ['user_123', 'user_456'],
+    template: 'welcome_email_v2'
+  },
+  personalization: {
+    dynamicContent: true,
+    timezone: 'America/New_York'
+  }
+});
+```
+
+## Execution Modes
+
+### Asynchronous Execution (Default - Recommended)
+```typescript
+const execution = await client.runFlow('flow_123', inputs, true);
+// or
+const execution = await client.runFlow('flow_123', inputs); // defaults to true
+```
+
+**Use for:**
+- Long-running workflows (>30 seconds)
+- Workflows with external API calls
+- Multi-step automation processes
+- Production workflows
+
+### Synchronous Execution
+```typescript
+const execution = await client.runFlow('flow_123', inputs, false);
+```
+
+**Use for:**
+- Simple, fast workflows (<10 seconds)
+- Testing and development
+- Immediate response requirements
+
+## Error Handling
+
+```typescript
+import { AxiosError } from 'axios';
+
+try {
+  const execution = await client.runFlow('flow_123', {
+    userId: 'user_456',
+    email: 'user@example.com'
+  });
+  
+  console.log(`Started: ${execution.data.executionId}`);
+} catch (error) {
+  const apiError = error as AxiosError;
+  
+  if (apiError.response) {
+    const { status, data } = apiError.response;
+    
+    switch (data.error.code) {
+      case 'NOT_FOUND':
+        console.error('Flow not found:', flowId);
+        break;
+      case 'VALIDATION_ERROR':
+        console.error('Invalid inputs:', data.error.details);
+        break;
+      case 'RATE_LIMITED':
+        console.error('Rate limited. Retry after:', 
+          apiError.response.headers['retry-after']);
+        break;
+      default:
+        console.error(`API Error ${status}:`, data.error.message);
+    }
+  } else {
+    console.error('Network error:', apiError.message);
+  }
+}
+```
+
+## Common Error Responses
+
+### Flow Not Found (404)
+```json
+{
+  "success": false,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Flow with ID 'flow_123' not found"
+  }
+}
+```
+
+### Invalid Variables (400)
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR", 
+    "message": "Required variable 'userId' is missing",
+    "details": {
+      "missingFields": ["userId"],
+      "providedFields": ["email"]
+    }
+  }
+}
+```
+
+## Monitoring Execution
+
+After starting a workflow, monitor its progress:
+
+```typescript
+const execution = await client.runFlow('flow_123', inputs);
+
+// Monitor status
+const status = await client.getFlowExecution(
+  'flow_123', 
+  execution.data.executionId
+);
+
+console.log(`Status: ${status.data.status}`);
+```
+
+## Best Practices
+
+### Input Validation
+```typescript
+function validateInputs(inputs: any): void {
+  if (!inputs.userId) {
+    throw new Error('userId is required');
+  }
+  if (!inputs.email || !inputs.email.includes('@')) {
+    throw new Error('Valid email is required');
+  }
+}
+
+try {
+  validateInputs(inputs);
+  const execution = await client.runFlow('flow_123', inputs);
+} catch (error) {
+  console.error('Validation failed:', error.message);
+}
+```
+
+### Retry Logic
+```typescript
+async function runFlowWithRetry(
+  flowId: string, 
+  inputs: any, 
+  maxRetries = 3
+): Promise<ExecutionResult> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await client.runFlow(flowId, inputs);
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      
+      const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error('Max retries exceeded');
+}
+```
+
+### Batch Execution
+```typescript
+async function runFlowsBatch(
+  flowId: string, 
+  inputsList: any[]
+): Promise<ExecutionResult[]> {
+  const promises = inputsList.map(inputs => 
+    client.runFlow(flowId, inputs)
+  );
+  
+  return Promise.all(promises);
+}
+
+const executions = await runFlowsBatch('flow_123', [
+  { userId: 'user_1', email: 'user1@example.com' },
+  { userId: 'user_2', email: 'user2@example.com' },
+  { userId: 'user_3', email: 'user3@example.com' }
+]);
+```
+
+## Advanced Usage
+
+### Custom Headers
+```typescript
+// Direct API access for custom headers
+const execution = await client.raw.flows.flowsControllerExecuteFlow(
+  'flow_123',
+  { 
+    variables: inputs, 
+    useDurable: true 
+  },
+  {
+    headers: {
+      'X-Request-ID': 'req_abc123',
+      'X-Priority': 'high'
+    }
+  }
+);
+```
+
+### Execution Tracking
+```typescript
+class FlowExecutionTracker {
+  private executions: Map<string, ExecutionResult> = new Map();
+  
+  async runAndTrack(flowId: string, inputs: any): Promise<string> {
+    const execution = await client.runFlow(flowId, inputs);
+    this.executions.set(execution.data.executionId, execution);
+    return execution.data.executionId;
+  }
+  
+  getExecution(executionId: string): ExecutionResult | undefined {
+    return this.executions.get(executionId);
+  }
+}
+
+const tracker = new FlowExecutionTracker();
+const executionId = await tracker.runAndTrack('flow_123', inputs);
+```
+
+## Related Methods
+
+- [getFlowExecution()](/sdk/methods/get-flow-execution) - Monitor execution status
+- [listFlows()](/sdk/methods/list-flows) - List available workflows
+- [TolstoyClient](/sdk/methods/tolstoy-client) - Client setup and configuration
+
+## See Also
+
+- [Flow Execution API](/api/flows/post-flows-execute) - Direct API documentation
+- [Workflow Examples](/sdk/examples) - Real-world implementation patterns

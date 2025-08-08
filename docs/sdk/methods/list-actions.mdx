@@ -1,0 +1,668 @@
+---
+title: listActions()
+sidebar_position: 13
+---
+
+# listActions()
+
+List all actions available in the organization. Actions are reusable operations that can be used within workflows.
+
+## Signature
+
+```typescript
+listActions(): Promise<ActionList>
+```
+
+## Parameters
+
+None - this method uses the organization context from the TolstoyClient constructor.
+
+## Returns
+
+Returns a `Promise<ActionList>`:
+
+```typescript
+interface ActionList {
+  data: Action[];
+}
+
+interface Action {
+  id: string;
+  name: string;
+  description?: string;
+  category: string;
+  toolId?: string;
+  toolName?: string;
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  endpoint: string;
+  inputSchema: {
+    type: 'object';
+    properties: Record<string, any>;
+    required?: string[];
+  };
+  outputSchema?: {
+    type: 'object';
+    properties: Record<string, any>;
+  };
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastUsed?: string;
+  usageCount: number;
+}
+```
+
+## Usage Examples
+
+### Basic Action Listing
+```typescript
+const actions = await client.listActions();
+
+console.log(`Found ${actions.data.length} actions:`);
+actions.data.forEach(action => {
+  console.log(`- ${action.name} (${action.category})`);
+  console.log(`  Method: ${action.method} ${action.endpoint}`);
+  console.log(`  Tool: ${action.toolName || 'Built-in'}`);
+  console.log(`  Used: ${action.usageCount} times`);
+  
+  const lastUsed = action.lastUsed 
+    ? new Date(action.lastUsed).toLocaleDateString()
+    : 'Never';
+  console.log(`  Last Used: ${lastUsed}`);
+});
+```
+
+### Actions by Category
+```typescript
+const actions = await client.listActions();
+const actionsByCategory = new Map<string, Action[]>();
+
+actions.data.forEach(action => {
+  if (!actionsByCategory.has(action.category)) {
+    actionsByCategory.set(action.category, []);
+  }
+  actionsByCategory.get(action.category)!.push(action);
+});
+
+console.log('Actions by Category:');
+actionsByCategory.forEach((actions, category) => {
+  console.log(`\n${category} (${actions.length}):`);
+  actions.forEach(action => {
+    console.log(`  - ${action.name}: ${action.method} ${action.endpoint}`);
+  });
+});
+```
+
+### Most Used Actions
+```typescript
+const actions = await client.listActions();
+const mostUsed = actions.data
+  .filter(action => action.usageCount > 0)
+  .sort((a, b) => b.usageCount - a.usageCount)
+  .slice(0, 10);
+
+console.log('Top 10 Most Used Actions:');
+mostUsed.forEach((action, index) => {
+  console.log(`${index + 1}. ${action.name}: ${action.usageCount} uses`);
+  console.log(`   ${action.description || 'No description'}`);
+});
+```
+
+### Action Schema Analysis
+```typescript
+const actions = await client.listActions();
+
+console.log('Action Input Schema Analysis:');
+actions.data.forEach(action => {
+  const schema = action.inputSchema;
+  const requiredFields = schema.required || [];
+  const optionalFields = Object.keys(schema.properties).filter(
+    key => !requiredFields.includes(key)
+  );
+  
+  console.log(`\n${action.name}:`);
+  console.log(`  Required inputs: ${requiredFields.length}`);
+  console.log(`    - ${requiredFields.join(', ') || 'None'}`);
+  console.log(`  Optional inputs: ${optionalFields.length}`);
+  console.log(`    - ${optionalFields.join(', ') || 'None'}`);
+});
+```
+
+## Error Handling
+
+```typescript
+import { AxiosError } from 'axios';
+
+try {
+  const actions = await client.listActions();
+  
+  if (actions.data.length === 0) {
+    console.log('No actions found. Create actions to build reusable workflow operations.');
+  }
+} catch (error) {
+  const apiError = error as AxiosError;
+  
+  if (apiError.response?.status === 403) {
+    console.error('Access denied - check permissions to view actions');
+  } else if (apiError.response?.status === 401) {
+    console.error('Authentication failed - check credentials');
+  } else {
+    console.error('Failed to list actions:', error.message);
+  }
+}
+```
+
+## Advanced Usage
+
+### Action Discovery Engine
+```typescript
+class ActionDiscovery {
+  private actionCache: Map<string, Action> = new Map();
+  private lastFetch = 0;
+  private cacheTTL = 5 * 60 * 1000; // 5 minutes
+  
+  async getActions(forceRefresh = false): Promise<Action[]> {
+    const now = Date.now();
+    
+    if (forceRefresh || (now - this.lastFetch) > this.cacheTTL) {
+      const actions = await client.listActions();
+      
+      // Update cache
+      this.actionCache.clear();
+      actions.data.forEach(action => {
+        this.actionCache.set(action.id, action);
+      });
+      
+      this.lastFetch = now;
+      return actions.data;
+    }
+    
+    return Array.from(this.actionCache.values());
+  }
+  
+  async findActionsByName(pattern: string): Promise<Action[]> {
+    const actions = await this.getActions();
+    const regex = new RegExp(pattern, 'i');
+    return actions.filter(action => regex.test(action.name));
+  }
+  
+  async findActionsByCategory(category: string): Promise<Action[]> {
+    const actions = await this.getActions();
+    return actions.filter(action => 
+      action.category.toLowerCase() === category.toLowerCase()
+    );
+  }
+  
+  async findActionsByTool(toolName: string): Promise<Action[]> {
+    const actions = await this.getActions();
+    return actions.filter(action => 
+      action.toolName?.toLowerCase().includes(toolName.toLowerCase())
+    );
+  }
+  
+  async findActionsByMethod(method: Action['method']): Promise<Action[]> {
+    const actions = await this.getActions();
+    return actions.filter(action => action.method === method);
+  }
+  
+  async getUnusedActions(daysSinceUse = 90): Promise<Action[]> {
+    const actions = await this.getActions();
+    const cutoff = new Date(Date.now() - daysSinceUse * 24 * 60 * 60 * 1000);
+    
+    return actions.filter(action => 
+      action.usageCount === 0 || 
+      (action.lastUsed && new Date(action.lastUsed) < cutoff)
+    );
+  }
+  
+  async suggestActionsForUseCase(useCase: string): Promise<Action[]> {
+    const actions = await this.getActions();
+    const keywords = useCase.toLowerCase().split(' ');
+    
+    return actions.filter(action => {
+      const searchText = `${action.name} ${action.description || ''} ${action.category}`.toLowerCase();
+      return keywords.some(keyword => searchText.includes(keyword));
+    });
+  }
+}
+
+const discovery = new ActionDiscovery();
+
+// Find email-related actions
+const emailActions = await discovery.suggestActionsForUseCase('send email notification');
+console.log(`Found ${emailActions.length} email-related actions`);
+
+// Find unused actions for cleanup
+const unusedActions = await discovery.getUnusedActions(60);
+console.log(`Found ${unusedActions.length} actions unused for 60+ days`);
+```
+
+### Action Analytics
+```typescript
+class ActionAnalytics {
+  async generateUsageReport(): Promise<void> {
+    const actions = await client.listActions();
+    
+    console.log('ACTION USAGE ANALYTICS');
+    console.log('=====================');
+    
+    const analytics = {
+      total: actions.data.length,
+      active: actions.data.filter(a => a.active).length,
+      inactive: actions.data.filter(a => !a.active).length,
+      used: actions.data.filter(a => a.usageCount > 0).length,
+      unused: actions.data.filter(a => a.usageCount === 0).length,
+      totalUsage: actions.data.reduce((sum, a) => sum + a.usageCount, 0),
+      averageUsage: 0
+    };
+    
+    analytics.averageUsage = analytics.total > 0 ? analytics.totalUsage / analytics.total : 0;
+    
+    console.log(`\nOverall Statistics:`);
+    console.log(`  Total Actions: ${analytics.total}`);
+    console.log(`  Active: ${analytics.active}`);
+    console.log(`  Inactive: ${analytics.inactive}`);
+    console.log(`  Used: ${analytics.used}`);
+    console.log(`  Unused: ${analytics.unused}`);
+    console.log(`  Total Usage: ${analytics.totalUsage}`);
+    console.log(`  Average Usage: ${analytics.averageUsage.toFixed(2)}`);
+    
+    // Category breakdown
+    const categoryStats = actions.data.reduce((acc, action) => {
+      if (!acc[action.category]) {
+        acc[action.category] = { count: 0, usage: 0 };
+      }
+      acc[action.category].count++;
+      acc[action.category].usage += action.usageCount;
+      return acc;
+    }, {} as Record<string, { count: number; usage: number }>);
+    
+    console.log(`\nCategory Breakdown:`);
+    Object.entries(categoryStats)
+      .sort(([,a], [,b]) => b.usage - a.usage)
+      .forEach(([category, stats]) => {
+        console.log(`  ${category}: ${stats.count} actions, ${stats.usage} total uses`);
+      });
+    
+    // Method distribution
+    const methodStats = actions.data.reduce((acc, action) => {
+      acc[action.method] = (acc[action.method] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    console.log(`\nHTTP Method Distribution:`);
+    Object.entries(methodStats)
+      .sort(([,a], [,b]) => b - a)
+      .forEach(([method, count]) => {
+        console.log(`  ${method}: ${count} actions`);
+      });
+  }
+  
+  async identifyPopularActions(limit = 10): Promise<Action[]> {
+    const actions = await client.listActions();
+    return actions.data
+      .filter(action => action.usageCount > 0)
+      .sort((a, b) => b.usageCount - a.usageCount)
+      .slice(0, limit);
+  }
+  
+  async identifyStaleActions(daysSinceUse = 90): Promise<Action[]> {
+    const actions = await client.listActions();
+    const cutoff = new Date(Date.now() - daysSinceUse * 24 * 60 * 60 * 1000);
+    
+    return actions.data.filter(action => 
+      action.lastUsed && new Date(action.lastUsed) < cutoff
+    );
+  }
+  
+  async getActionComplexityMetrics(): Promise<any> {
+    const actions = await client.listActions();
+    
+    return actions.data.map(action => {
+      const requiredFields = action.inputSchema.required?.length || 0;
+      const totalFields = Object.keys(action.inputSchema.properties).length;
+      const complexity = requiredFields + (totalFields * 0.5); // Weight required fields more
+      
+      return {
+        name: action.name,
+        requiredInputs: requiredFields,
+        totalInputs: totalFields,
+        complexity: complexity,
+        usageCount: action.usageCount,
+        usageComplexityRatio: action.usageCount / Math.max(complexity, 1)
+      };
+    });
+  }
+}
+
+const analytics = new ActionAnalytics();
+await analytics.generateUsageReport();
+
+// Get most popular actions
+const popularActions = await analytics.identifyPopularActions(5);
+console.log('\nTop 5 Popular Actions:');
+popularActions.forEach((action, index) => {
+  console.log(`${index + 1}. ${action.name} (${action.usageCount} uses)`);
+});
+
+// Analyze action complexity
+const complexityMetrics = await analytics.getActionComplexityMetrics();
+const mostEfficient = complexityMetrics
+  .sort((a, b) => b.usageComplexityRatio - a.usageComplexityRatio)
+  .slice(0, 5);
+
+console.log('\nMost Efficient Actions (usage/complexity):');
+mostEfficient.forEach((action, index) => {
+  console.log(`${index + 1}. ${action.name}: ${action.usageComplexityRatio.toFixed(2)} ratio`);
+});
+```
+
+### Action Library Builder
+```typescript
+class ActionLibraryBuilder {
+  async buildActionLibrary(): Promise<ActionLibrary> {
+    const actions = await client.listActions();
+    
+    const library: ActionLibrary = {
+      categories: new Map(),
+      tools: new Map(),
+      methods: new Map(),
+      totalActions: actions.data.length,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    actions.data.forEach(action => {
+      // Organize by category
+      if (!library.categories.has(action.category)) {
+        library.categories.set(action.category, []);
+      }
+      library.categories.get(action.category)!.push(action);
+      
+      // Organize by tool
+      const toolName = action.toolName || 'built-in';
+      if (!library.tools.has(toolName)) {
+        library.tools.set(toolName, []);
+      }
+      library.tools.get(toolName)!.push(action);
+      
+      // Organize by HTTP method
+      if (!library.methods.has(action.method)) {
+        library.methods.set(action.method, []);
+      }
+      library.methods.get(action.method)!.push(action);
+    });
+    
+    return library;
+  }
+  
+  async generateActionDocumentation(): Promise<string> {
+    const library = await this.buildActionLibrary();
+    let documentation = '# Action Library Documentation\n\n';
+    
+    documentation += `Generated: ${new Date().toISOString()}\n`;
+    documentation += `Total Actions: ${library.totalActions}\n\n`;
+    
+    // Document by category
+    library.categories.forEach((actions, category) => {
+      documentation += `## ${category} (${actions.length} actions)\n\n`;
+      
+      actions.forEach(action => {
+        documentation += `### ${action.name}\n\n`;
+        documentation += `- **Method**: ${action.method} ${action.endpoint}\n`;
+        documentation += `- **Tool**: ${action.toolName || 'Built-in'}\n`;
+        documentation += `- **Usage**: ${action.usageCount} times\n`;
+        
+        if (action.description) {
+          documentation += `- **Description**: ${action.description}\n`;
+        }
+        
+        // Required inputs
+        const required = action.inputSchema.required || [];
+        if (required.length > 0) {
+          documentation += `- **Required Inputs**: ${required.join(', ')}\n`;
+        }
+        
+        // Optional inputs
+        const allInputs = Object.keys(action.inputSchema.properties);
+        const optional = allInputs.filter(input => !required.includes(input));
+        if (optional.length > 0) {
+          documentation += `- **Optional Inputs**: ${optional.join(', ')}\n`;
+        }
+        
+        documentation += '\n';
+      });
+    });
+    
+    return documentation;
+  }
+}
+
+interface ActionLibrary {
+  categories: Map<string, Action[]>;
+  tools: Map<string, Action[]>;
+  methods: Map<string, Action[]>;
+  totalActions: number;
+  lastUpdated: string;
+}
+
+const libraryBuilder = new ActionLibraryBuilder();
+const library = await libraryBuilder.buildActionLibrary();
+
+console.log(`Action Library built with ${library.totalActions} actions`);
+console.log(`Categories: ${Array.from(library.categories.keys()).join(', ')}`);
+console.log(`Tools: ${Array.from(library.tools.keys()).join(', ')}`);
+
+// Generate documentation
+const docs = await libraryBuilder.generateActionDocumentation();
+// console.log(docs); // Uncomment to see full documentation
+```
+
+## Integration Patterns
+
+### Workflow Builder Integration
+```typescript
+// Action picker for workflow builder
+interface ActionPickerProps {
+  onActionSelect: (action: Action) => void;
+  category?: string;
+  toolId?: string;
+}
+
+function ActionPicker({ onActionSelect, category, toolId }: ActionPickerProps) {
+  const [actions, setActions] = useState<Action[]>([]);
+  const [filteredActions, setFilteredActions] = useState<Action[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  useEffect(() => {
+    async function loadActions() {
+      try {
+        const actionList = await client.listActions();
+        let filtered = actionList.data.filter(action => action.active);
+        
+        if (category) {
+          filtered = filtered.filter(action => action.category === category);
+        }
+        
+        if (toolId) {
+          filtered = filtered.filter(action => action.toolId === toolId);
+        }
+        
+        setActions(filtered);
+        setFilteredActions(filtered);
+      } catch (error) {
+        console.error('Failed to load actions:', error);
+      }
+    }
+    
+    loadActions();
+  }, [category, toolId]);
+  
+  useEffect(() => {
+    const filtered = actions.filter(action =>
+      action.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      action.description?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredActions(filtered);
+  }, [searchTerm, actions]);
+  
+  return (
+    <div className="action-picker">
+      <input
+        placeholder="Search actions..."
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+      />
+      
+      <div className="action-grid">
+        {filteredActions.map(action => (
+          <div
+            key={action.id}
+            className="action-card"
+            onClick={() => onActionSelect(action)}
+          >
+            <h3>{action.name}</h3>
+            <p className="method">{action.method} {action.endpoint}</p>
+            <p className="tool">{action.toolName || 'Built-in'}</p>
+            <p className="description">{action.description}</p>
+            <div className="usage-badge">
+              Used {action.usageCount} times
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+```
+
+### Action Validation
+```typescript
+class ActionValidator {
+  async validateActionInputs(actionId: string, inputs: any): Promise<ValidationResult> {
+    const actions = await client.listActions();
+    const action = actions.data.find(a => a.id === actionId);
+    
+    if (!action) {
+      return { valid: false, errors: [`Action ${actionId} not found`] };
+    }
+    
+    const errors: string[] = [];
+    const schema = action.inputSchema;
+    
+    // Check required fields
+    const required = schema.required || [];
+    required.forEach(field => {
+      if (!(field in inputs)) {
+        errors.push(`Required field '${field}' is missing`);
+      }
+    });
+    
+    // Check field types (basic validation)
+    Object.entries(inputs).forEach(([field, value]) => {
+      const fieldSchema = schema.properties[field];
+      if (!fieldSchema) {
+        errors.push(`Unknown field '${field}'`);
+        return;
+      }
+      
+      // Basic type checking
+      if (fieldSchema.type === 'string' && typeof value !== 'string') {
+        errors.push(`Field '${field}' must be a string`);
+      } else if (fieldSchema.type === 'number' && typeof value !== 'number') {
+        errors.push(`Field '${field}' must be a number`);
+      } else if (fieldSchema.type === 'boolean' && typeof value !== 'boolean') {
+        errors.push(`Field '${field}' must be a boolean`);
+      }
+    });
+    
+    return {
+      valid: errors.length === 0,
+      errors,
+      action: action
+    };
+  }
+}
+
+interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+  action?: Action;
+}
+
+const validator = new ActionValidator();
+
+// Validate action inputs before execution
+const validation = await validator.validateActionInputs('action_123', {
+  email: 'user@example.com',
+  subject: 'Test Email'
+});
+
+if (!validation.valid) {
+  console.error('Validation errors:', validation.errors);
+} else {
+  console.log('✅ Action inputs are valid');
+}
+```
+
+## Best Practices
+
+### Action Performance Monitoring
+```typescript
+async function monitorActionPerformance(): Promise<void> {
+  const actions = await client.listActions();
+  
+  // Identify high-usage actions that might need optimization
+  const highUsageActions = actions.data.filter(action => action.usageCount > 1000);
+  
+  console.log(`High-usage actions (${highUsageActions.length}):`);
+  highUsageActions.forEach(action => {
+    console.log(`- ${action.name}: ${action.usageCount} uses`);
+    console.log(`  Complexity: ${Object.keys(action.inputSchema.properties).length} inputs`);
+  });
+  
+  // Identify unused actions for potential cleanup
+  const unusedActions = actions.data.filter(action => action.usageCount === 0);
+  
+  console.log(`\nUnused actions (${unusedActions.length}):`);
+  unusedActions.forEach(action => {
+    const age = Math.floor(
+      (Date.now() - new Date(action.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+    );
+    console.log(`- ${action.name}: Created ${age} days ago`);
+  });
+}
+```
+
+### Caching Strategy
+```typescript
+let cachedActions: Action[] = [];
+let lastFetch = 0;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+async function getCachedActions(): Promise<Action[]> {
+  const now = Date.now();
+  
+  if (cachedActions.length === 0 || (now - lastFetch) > CACHE_DURATION) {
+    const actions = await client.listActions();
+    cachedActions = actions.data;
+    lastFetch = now;
+  }
+  
+  return cachedActions;
+}
+```
+
+## Related Methods
+
+- [createAction()](/sdk/methods/create-action) - Create new actions
+- [getAction()](/sdk/methods/get-action) - Get specific action details
+- [updateAction()](/sdk/methods/update-action) - Update action configuration
+- [deleteAction()](/sdk/methods/delete-action) - Remove actions
+- [listTools()](/sdk/methods/list-tools) - View available tools for actions
+- [TolstoyClient](/sdk/methods/tolstoy-client) - Client setup
+
+## See Also
+
+- [List Actions API](/api/actions/get-actions) - Direct API documentation
+- [Action Development Guide](/docs/actions) - Creating and managing actions
+- [Workflow Building](/docs/workflows) - Using actions in workflows

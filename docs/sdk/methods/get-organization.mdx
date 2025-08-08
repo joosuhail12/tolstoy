@@ -1,0 +1,576 @@
+---
+title: getOrganization()
+sidebar_position: 15
+---
+
+# getOrganization()
+
+Get detailed information about a specific organization.
+
+## Signature
+
+```typescript
+getOrganization(organizationId: string): Promise<OrganizationDetails>
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `organizationId` | `string` | The ID of the organization to retrieve |
+
+## Returns
+
+Returns a `Promise<OrganizationDetails>`:
+
+```typescript
+interface OrganizationDetails {
+  data: {
+    id: string;
+    name: string;
+    slug: string;
+    description?: string;
+    settings: {
+      timezone: string;
+      dateFormat: string;
+      currency: string;
+      features: {
+        advancedAnalytics: boolean;
+        customBranding: boolean;
+        ssoIntegration: boolean;
+        auditLogs: boolean;
+      };
+    };
+    subscription: {
+      plan: 'free' | 'pro' | 'enterprise';
+      status: 'active' | 'trialing' | 'past_due' | 'cancelled';
+      currentPeriodStart: string;
+      currentPeriodEnd: string;
+      trialEnd?: string;
+    };
+    usage: {
+      workflows: number;
+      executions: number;
+      users: number;
+      storage: number; // in MB
+    };
+    limits: {
+      workflows: number;
+      executionsPerMonth: number;
+      users: number;
+      storage: number; // in MB
+    };
+    billing: {
+      customerId?: string;
+      paymentMethod?: {
+        type: 'card' | 'bank' | 'paypal';
+        last4?: string;
+        brand?: string;
+      };
+    };
+    createdAt: string;
+    updatedAt: string;
+    owner: {
+      id: string;
+      name: string;
+      email: string;
+    };
+  };
+}
+```
+
+## Usage Examples
+
+### Basic Organization Details
+```typescript
+const organization = await client.getOrganization('org_abc123');
+
+console.log(`Organization: ${organization.data.name}`);
+console.log(`Plan: ${organization.data.subscription.plan}`);
+console.log(`Status: ${organization.data.subscription.status}`);
+console.log(`Owner: ${organization.data.owner.name} (${organization.data.owner.email})`);
+```
+
+### Usage Monitoring
+```typescript
+const organization = await client.getOrganization('org_abc123');
+const usage = organization.data.usage;
+const limits = organization.data.limits;
+
+console.log('Usage Statistics:');
+console.log(`Workflows: ${usage.workflows}/${limits.workflows} (${(usage.workflows/limits.workflows*100).toFixed(1)}%)`);
+console.log(`Executions: ${usage.executions}/${limits.executionsPerMonth} (${(usage.executions/limits.executionsPerMonth*100).toFixed(1)}%)`);
+console.log(`Users: ${usage.users}/${limits.users} (${(usage.users/limits.users*100).toFixed(1)}%)`);
+console.log(`Storage: ${usage.storage}/${limits.storage} MB (${(usage.storage/limits.storage*100).toFixed(1)}%)`);
+
+// Check for approaching limits
+if (usage.workflows / limits.workflows > 0.8) {
+  console.warn('⚠️ Approaching workflow limit');
+}
+if (usage.executions / limits.executionsPerMonth > 0.9) {
+  console.warn('⚠️ Approaching execution limit - consider upgrading plan');
+}
+```
+
+### Subscription Management
+```typescript
+const organization = await client.getOrganization('org_abc123');
+const subscription = organization.data.subscription;
+
+console.log('Subscription Information:');
+console.log(`Plan: ${subscription.plan.toUpperCase()}`);
+console.log(`Status: ${subscription.status}`);
+
+const periodEnd = new Date(subscription.currentPeriodEnd);
+const daysUntilRenewal = Math.ceil((periodEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+console.log(`Current period ends: ${periodEnd.toLocaleDateString()} (${daysUntilRenewal} days)`);
+
+if (subscription.trialEnd) {
+  const trialEnd = new Date(subscription.trialEnd);
+  const trialDaysLeft = Math.ceil((trialEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  
+  if (trialDaysLeft > 0) {
+    console.log(`🔄 Trial ends in ${trialDaysLeft} days`);
+  } else {
+    console.log('✅ Trial has ended');
+  }
+}
+
+// Check subscription health
+switch (subscription.status) {
+  case 'active':
+    console.log('✅ Subscription is active');
+    break;
+  case 'trialing':
+    console.log('🔄 Currently in trial period');
+    break;
+  case 'past_due':
+    console.warn('⚠️ Payment is past due');
+    break;
+  case 'cancelled':
+    console.error('❌ Subscription has been cancelled');
+    break;
+}
+```
+
+## Error Handling
+
+```typescript
+import { AxiosError } from 'axios';
+
+try {
+  const organization = await client.getOrganization('org_abc123');
+  console.log(`Retrieved organization: ${organization.data.name}`);
+} catch (error) {
+  const apiError = error as AxiosError;
+  
+  if (apiError.response?.status === 404) {
+    console.error('Organization not found');
+  } else if (apiError.response?.status === 403) {
+    console.error('Access denied - you may not have permission to view this organization');
+  } else if (apiError.response?.status === 401) {
+    console.error('Authentication failed - check credentials');
+  } else {
+    console.error('Failed to get organization:', error.message);
+  }
+}
+```
+
+## Advanced Usage
+
+### Organization Dashboard
+```typescript
+class OrganizationDashboard {
+  async generateDashboard(organizationId: string): Promise<void> {
+    const organization = await client.getOrganization(organizationId);
+    const org = organization.data;
+    
+    console.log('='.repeat(60));
+    console.log(`ORGANIZATION DASHBOARD: ${org.name.toUpperCase()}`);
+    console.log('='.repeat(60));
+    
+    // Basic info
+    console.log(`\nBASIC INFORMATION:`);
+    console.log(`  Name: ${org.name}`);
+    console.log(`  Slug: ${org.slug}`);
+    console.log(`  Description: ${org.description || 'None'}`);
+    console.log(`  Owner: ${org.owner.name} (${org.owner.email})`);
+    console.log(`  Created: ${new Date(org.createdAt).toLocaleDateString()}`);
+    
+    // Settings
+    console.log(`\nSETTINGS:`);
+    console.log(`  Timezone: ${org.settings.timezone}`);
+    console.log(`  Date Format: ${org.settings.dateFormat}`);
+    console.log(`  Currency: ${org.settings.currency}`);
+    
+    // Features
+    console.log(`\nFEATURES:`);
+    console.log(`  Advanced Analytics: ${org.settings.features.advancedAnalytics ? '✅' : '❌'}`);
+    console.log(`  Custom Branding: ${org.settings.features.customBranding ? '✅' : '❌'}`);
+    console.log(`  SSO Integration: ${org.settings.features.ssoIntegration ? '✅' : '❌'}`);
+    console.log(`  Audit Logs: ${org.settings.features.auditLogs ? '✅' : '❌'}`);
+    
+    // Subscription
+    console.log(`\nSUBSCRIPTION:`);
+    console.log(`  Plan: ${org.subscription.plan.toUpperCase()}`);
+    console.log(`  Status: ${org.subscription.status}`);
+    
+    const periodEnd = new Date(org.subscription.currentPeriodEnd);
+    console.log(`  Period End: ${periodEnd.toLocaleDateString()}`);
+    
+    // Usage metrics
+    console.log(`\nUSAGE METRICS:`);
+    const metrics = [
+      { name: 'Workflows', used: org.usage.workflows, limit: org.limits.workflows },
+      { name: 'Executions', used: org.usage.executions, limit: org.limits.executionsPerMonth },
+      { name: 'Users', used: org.usage.users, limit: org.limits.users },
+      { name: 'Storage (MB)', used: org.usage.storage, limit: org.limits.storage }
+    ];
+    
+    metrics.forEach(metric => {
+      const percentage = (metric.used / metric.limit * 100).toFixed(1);
+      const status = metric.used / metric.limit > 0.9 ? '🔴' : 
+                    metric.used / metric.limit > 0.7 ? '🟡' : '🟢';
+      console.log(`  ${metric.name}: ${metric.used}/${metric.limit} (${percentage}%) ${status}`);
+    });
+    
+    // Billing
+    if (org.billing.paymentMethod) {
+      console.log(`\nBILLING:`);
+      console.log(`  Payment Method: ${org.billing.paymentMethod.type}`);
+      if (org.billing.paymentMethod.brand && org.billing.paymentMethod.last4) {
+        console.log(`  Card: ${org.billing.paymentMethod.brand} ending in ${org.billing.paymentMethod.last4}`);
+      }
+    }
+    
+    console.log('='.repeat(60));
+  }
+}
+
+const dashboard = new OrganizationDashboard();
+await dashboard.generateDashboard('org_abc123');
+```
+
+### Health Monitoring
+```typescript
+class OrganizationHealthMonitor {
+  async checkOrganizationHealth(organizationId: string): Promise<HealthReport> {
+    const organization = await client.getOrganization(organizationId);
+    const org = organization.data;
+    
+    const report: HealthReport = {
+      organizationId: org.id,
+      organizationName: org.name,
+      overallHealth: 'healthy',
+      issues: [],
+      warnings: [],
+      recommendations: []
+    };
+    
+    // Check subscription status
+    if (org.subscription.status !== 'active') {
+      report.issues.push(`Subscription status is ${org.subscription.status}`);
+      report.overallHealth = 'critical';
+    }
+    
+    // Check usage limits
+    const usageChecks = [
+      { name: 'workflows', used: org.usage.workflows, limit: org.limits.workflows },
+      { name: 'executions', used: org.usage.executions, limit: org.limits.executionsPerMonth },
+      { name: 'users', used: org.usage.users, limit: org.limits.users },
+      { name: 'storage', used: org.usage.storage, limit: org.limits.storage }
+    ];
+    
+    usageChecks.forEach(check => {
+      const percentage = check.used / check.limit;
+      
+      if (percentage >= 1.0) {
+        report.issues.push(`${check.name} usage at 100% (${check.used}/${check.limit})`);
+        report.overallHealth = 'critical';
+      } else if (percentage >= 0.9) {
+        report.warnings.push(`${check.name} usage at ${(percentage * 100).toFixed(1)}%`);
+        if (report.overallHealth === 'healthy') report.overallHealth = 'warning';
+      } else if (percentage >= 0.8) {
+        report.recommendations.push(`Consider monitoring ${check.name} usage (${(percentage * 100).toFixed(1)}%)`);
+      }
+    });
+    
+    // Check subscription renewal
+    const periodEnd = new Date(org.subscription.currentPeriodEnd);
+    const daysUntilRenewal = Math.ceil((periodEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    
+    if (daysUntilRenewal <= 7 && daysUntilRenewal > 0) {
+      report.warnings.push(`Subscription renews in ${daysUntilRenewal} days`);
+      if (report.overallHealth === 'healthy') report.overallHealth = 'warning';
+    } else if (daysUntilRenewal <= 0) {
+      report.issues.push('Subscription has expired');
+      report.overallHealth = 'critical';
+    }
+    
+    // Check trial status
+    if (org.subscription.trialEnd) {
+      const trialEnd = new Date(org.subscription.trialEnd);
+      const trialDaysLeft = Math.ceil((trialEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      
+      if (trialDaysLeft <= 3 && trialDaysLeft > 0) {
+        report.warnings.push(`Trial ends in ${trialDaysLeft} days`);
+        if (report.overallHealth === 'healthy') report.overallHealth = 'warning';
+      }
+    }
+    
+    return report;
+  }
+  
+  async monitorMultipleOrganizations(organizationIds: string[]): Promise<HealthReport[]> {
+    const reports = await Promise.all(
+      organizationIds.map(id => this.checkOrganizationHealth(id))
+    );
+    
+    const criticalCount = reports.filter(r => r.overallHealth === 'critical').length;
+    const warningCount = reports.filter(r => r.overallHealth === 'warning').length;
+    
+    console.log(`Health monitoring completed for ${reports.length} organizations:`);
+    console.log(`  Critical: ${criticalCount}`);
+    console.log(`  Warning: ${warningCount}`);
+    console.log(`  Healthy: ${reports.length - criticalCount - warningCount}`);
+    
+    return reports;
+  }
+}
+
+interface HealthReport {
+  organizationId: string;
+  organizationName: string;
+  overallHealth: 'healthy' | 'warning' | 'critical';
+  issues: string[];
+  warnings: string[];
+  recommendations: string[];
+}
+
+const healthMonitor = new OrganizationHealthMonitor();
+const report = await healthMonitor.checkOrganizationHealth('org_abc123');
+
+console.log(`Health Status: ${report.overallHealth.toUpperCase()}`);
+if (report.issues.length > 0) {
+  console.log('Issues:', report.issues);
+}
+if (report.warnings.length > 0) {
+  console.log('Warnings:', report.warnings);
+}
+```
+
+### Feature Access Controller
+```typescript
+class FeatureAccessController {
+  private organization: OrganizationDetails['data'] | null = null;
+  
+  async loadOrganization(organizationId: string): Promise<void> {
+    const org = await client.getOrganization(organizationId);
+    this.organization = org.data;
+  }
+  
+  canAccessFeature(feature: keyof OrganizationDetails['data']['settings']['features']): boolean {
+    if (!this.organization) {
+      throw new Error('Organization not loaded. Call loadOrganization() first.');
+    }
+    
+    return this.organization.settings.features[feature];
+  }
+  
+  hasUsageCapacity(resource: 'workflows' | 'executions' | 'users' | 'storage'): boolean {
+    if (!this.organization) {
+      throw new Error('Organization not loaded. Call loadOrganization() first.');
+    }
+    
+    const usage = this.organization.usage[resource];
+    const limit = this.organization.limits[resource];
+    
+    return usage < limit;
+  }
+  
+  getRemainingCapacity(resource: 'workflows' | 'executions' | 'users' | 'storage'): number {
+    if (!this.organization) {
+      throw new Error('Organization not loaded. Call loadOrganization() first.');
+    }
+    
+    const usage = this.organization.usage[resource];
+    const limit = this.organization.limits[resource];
+    
+    return Math.max(0, limit - usage);
+  }
+  
+  isPlanActive(): boolean {
+    if (!this.organization) {
+      throw new Error('Organization not loaded. Call loadOrganization() first.');
+    }
+    
+    return this.organization.subscription.status === 'active';
+  }
+  
+  getPlanLevel(): 'free' | 'pro' | 'enterprise' {
+    if (!this.organization) {
+      throw new Error('Organization not loaded. Call loadOrganization() first.');
+    }
+    
+    return this.organization.subscription.plan;
+  }
+  
+  generateFeatureReport(): FeatureReport {
+    if (!this.organization) {
+      throw new Error('Organization not loaded. Call loadOrganization() first.');
+    }
+    
+    return {
+      plan: this.organization.subscription.plan,
+      features: this.organization.settings.features,
+      usage: this.organization.usage,
+      limits: this.organization.limits,
+      capacityRemaining: {
+        workflows: this.getRemainingCapacity('workflows'),
+        executions: this.getRemainingCapacity('executions'),
+        users: this.getRemainingCapacity('users'),
+        storage: this.getRemainingCapacity('storage')
+      }
+    };
+  }
+}
+
+interface FeatureReport {
+  plan: string;
+  features: Record<string, boolean>;
+  usage: Record<string, number>;
+  limits: Record<string, number>;
+  capacityRemaining: Record<string, number>;
+}
+
+const accessController = new FeatureAccessController();
+await accessController.loadOrganization('org_abc123');
+
+// Check feature access
+if (accessController.canAccessFeature('advancedAnalytics')) {
+  console.log('✅ Advanced analytics available');
+} else {
+  console.log('❌ Advanced analytics not available - upgrade plan');
+}
+
+// Check capacity
+const remainingWorkflows = accessController.getRemainingCapacity('workflows');
+console.log(`Can create ${remainingWorkflows} more workflows`);
+
+// Generate report
+const report = accessController.generateFeatureReport();
+console.log('Feature Report:', report);
+```
+
+## Integration Patterns
+
+### Organization Context Provider
+```typescript
+// React context for organization data
+interface OrganizationContextType {
+  organization: OrganizationDetails['data'] | null;
+  loading: boolean;
+  error: string | null;
+  refreshOrganization: () => Promise<void>;
+}
+
+const OrganizationContext = createContext<OrganizationContextType>({
+  organization: null,
+  loading: true,
+  error: null,
+  refreshOrganization: async () => {}
+});
+
+export function OrganizationProvider({ 
+  organizationId, 
+  children 
+}: { 
+  organizationId: string;
+  children: React.ReactNode;
+}) {
+  const [organization, setOrganization] = useState<OrganizationDetails['data'] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  const loadOrganization = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const org = await client.getOrganization(organizationId);
+      setOrganization(org.data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [organizationId]);
+  
+  useEffect(() => {
+    loadOrganization();
+  }, [loadOrganization]);
+  
+  return (
+    <OrganizationContext.Provider value={{
+      organization,
+      loading,
+      error,
+      refreshOrganization: loadOrganization
+    }}>
+      {children}
+    </OrganizationContext.Provider>
+  );
+}
+
+export const useOrganization = () => useContext(OrganizationContext);
+```
+
+## Best Practices
+
+### Caching Strategy
+```typescript
+class OrganizationCache {
+  private cache = new Map<string, { data: OrganizationDetails['data']; timestamp: number }>();
+  private readonly TTL = 5 * 60 * 1000; // 5 minutes
+  
+  async getOrganization(organizationId: string): Promise<OrganizationDetails['data']> {
+    const cached = this.cache.get(organizationId);
+    const now = Date.now();
+    
+    if (cached && (now - cached.timestamp) < this.TTL) {
+      return cached.data;
+    }
+    
+    const fresh = await client.getOrganization(organizationId);
+    this.cache.set(organizationId, {
+      data: fresh.data,
+      timestamp: now
+    });
+    
+    return fresh.data;
+  }
+  
+  invalidate(organizationId: string): void {
+    this.cache.delete(organizationId);
+  }
+  
+  clear(): void {
+    this.cache.clear();
+  }
+}
+```
+
+## Related Methods
+
+- [listOrganizations()](/sdk/methods/list-organizations) - List all organizations
+- [createOrganization()](/sdk/methods/create-organization) - Create new organization
+- [updateOrganization()](/sdk/methods/update-organization) - Update organization
+- [deleteOrganization()](/sdk/methods/delete-organization) - Delete organization
+- [TolstoyClient](/sdk/methods/tolstoy-client) - Client setup
+
+## See Also
+
+- [Get Organization API](/api/organizations/get-organizations-1) - Direct API documentation
+- [Organization Management Guide](/docs/organizations) - Comprehensive setup guide
+- [Subscription Management](/docs/billing) - Managing subscriptions and billing

@@ -194,9 +194,67 @@
             ]
           },
           {
-            "group": "Reference",
+            "group": "API Reference",
             "pages": [
               "docs/sdk/api-reference"
+            ]
+          },
+          {
+            "group": "Core Methods",
+            "pages": [
+              "docs/sdk/methods/tolstoy-client"
+            ]
+          },
+          {
+            "group": "Health & Status",
+            "pages": [
+              "docs/sdk/methods/get-health",
+              "docs/sdk/methods/get-detailed-health"
+            ]
+          },
+          {
+            "group": "Organizations",
+            "pages": [
+              "docs/sdk/methods/list-organizations",
+              "docs/sdk/methods/create-organization",
+              "docs/sdk/methods/get-organization"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "docs/sdk/methods/list-users",
+              "docs/sdk/methods/create-user"
+            ]
+          },
+          {
+            "group": "Workflows",
+            "pages": [
+              "docs/sdk/methods/list-flows",
+              "docs/sdk/methods/create-flow",
+              "docs/sdk/methods/run-flow",
+              "docs/sdk/methods/get-flow-execution"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "docs/sdk/methods/list-tools",
+              "docs/sdk/methods/create-tool"
+            ]
+          },
+          {
+            "group": "Actions",
+            "pages": [
+              "docs/sdk/methods/list-actions",
+              "docs/sdk/methods/create-action"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "docs/sdk/methods/list-webhooks",
+              "docs/sdk/methods/create-webhook"
             ]
           }
         ]

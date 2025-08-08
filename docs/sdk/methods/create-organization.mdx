@@ -1,0 +1,671 @@
+---
+title: createOrganization()
+sidebar_position: 14
+---
+
+# createOrganization()
+
+Create a new organization for your Tolstoy account.
+
+## Signature
+
+```typescript
+createOrganization(organizationData: CreateOrganizationDto): Promise<Organization>
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `organizationData` | `CreateOrganizationDto` | Organization configuration |
+
+### CreateOrganizationDto Interface
+
+```typescript
+interface CreateOrganizationDto {
+  name: string;
+  slug: string;
+  description?: string;
+  settings?: {
+    timezone?: string;
+    dateFormat?: string;
+    currency?: string;
+  };
+  plan?: 'free' | 'pro' | 'enterprise';
+}
+```
+
+## Returns
+
+Returns a `Promise<Organization>`:
+
+```typescript
+interface Organization {
+  data: {
+    id: string;
+    name: string;
+    slug: string;
+    description?: string;
+    settings: {
+      timezone: string;
+      dateFormat: string;
+      currency: string;
+    };
+    subscription: {
+      plan: 'free' | 'pro' | 'enterprise';
+      status: 'active' | 'trialing' | 'past_due' | 'cancelled';
+      currentPeriodEnd: string;
+    };
+    usage: {
+      workflows: number;
+      executions: number;
+      users: number;
+    };
+    limits: {
+      workflows: number;
+      executionsPerMonth: number;
+      users: number;
+    };
+    createdAt: string;
+    updatedAt: string;
+  };
+}
+```
+
+## Usage Examples
+
+### Basic Organization Creation
+```typescript
+const organization = await client.createOrganization({
+  name: 'Acme Corporation',
+  slug: 'acme-corp',
+  description: 'Main organization for Acme Corporation workflow automation'
+});
+
+console.log(`Created organization: ${organization.data.name}`);
+console.log(`Organization ID: ${organization.data.id}`);
+console.log(`Plan: ${organization.data.subscription.plan}`);
+```
+
+### Organization with Custom Settings
+```typescript
+const organization = await client.createOrganization({
+  name: 'Global Tech Solutions',
+  slug: 'global-tech',
+  description: 'International workflow automation platform',
+  settings: {
+    timezone: 'America/New_York',
+    dateFormat: 'MM/DD/YYYY',
+    currency: 'USD'
+  },
+  plan: 'pro'
+});
+
+console.log(`Created organization with custom settings:`);
+console.log(`  Timezone: ${organization.data.settings.timezone}`);
+console.log(`  Currency: ${organization.data.settings.currency}`);
+```
+
+### Multi-tenant Setup
+```typescript
+async function setupMultiTenantOrganizations(): Promise<Organization[]> {
+  const organizations = await Promise.all([
+    client.createOrganization({
+      name: 'Development Environment',
+      slug: 'dev-env',
+      description: 'Development and testing workflows',
+      plan: 'free'
+    }),
+    client.createOrganization({
+      name: 'Staging Environment', 
+      slug: 'staging-env',
+      description: 'Pre-production workflow testing',
+      plan: 'pro'
+    }),
+    client.createOrganization({
+      name: 'Production Environment',
+      slug: 'prod-env', 
+      description: 'Production workflow automation',
+      plan: 'enterprise',
+      settings: {
+        timezone: 'UTC',
+        dateFormat: 'YYYY-MM-DD',
+        currency: 'USD'
+      }
+    })
+  ]);
+  
+  console.log(`Created ${organizations.length} organizations for multi-tenant setup`);
+  return organizations;
+}
+
+const orgs = await setupMultiTenantOrganizations();
+```
+
+## Error Handling
+
+```typescript
+import { AxiosError } from 'axios';
+
+try {
+  const organization = await client.createOrganization({
+    name: 'My Organization',
+    slug: 'my-org'
+  });
+  
+  console.log(`✅ Organization created: ${organization.data.id}`);
+} catch (error) {
+  const apiError = error as AxiosError;
+  
+  if (apiError.response) {
+    const { status, data } = apiError.response;
+    
+    switch (data.error.code) {
+      case 'VALIDATION_ERROR':
+        console.error('Invalid organization data:', data.error.details);
+        break;
+      case 'CONFLICT':
+        console.error('Organization slug already exists');
+        break;
+      case 'RATE_LIMITED':
+        console.error('Too many organization creation requests');
+        break;
+      case 'FORBIDDEN':
+        console.error('You do not have permission to create organizations');
+        break;
+      default:
+        console.error(`API Error ${status}:`, data.error.message);
+    }
+  } else {
+    console.error('Network error:', error.message);
+  }
+}
+```
+
+## Advanced Usage
+
+### Organization Factory
+```typescript
+class OrganizationFactory {
+  static async createFromTemplate(
+    template: 'startup' | 'enterprise' | 'agency',
+    customization: Partial<CreateOrganizationDto>
+  ): Promise<Organization> {
+    const templates = {
+      startup: {
+        plan: 'free' as const,
+        settings: {
+          timezone: 'America/Los_Angeles',
+          dateFormat: 'MM/DD/YYYY',
+          currency: 'USD'
+        }
+      },
+      enterprise: {
+        plan: 'enterprise' as const,
+        settings: {
+          timezone: 'UTC',
+          dateFormat: 'YYYY-MM-DD',
+          currency: 'USD'
+        }
+      },
+      agency: {
+        plan: 'pro' as const,
+        settings: {
+          timezone: 'America/New_York',
+          dateFormat: 'MM/DD/YYYY',
+          currency: 'USD'
+        }
+      }
+    };
+    
+    const baseConfig = templates[template];
+    const organizationData = {
+      ...baseConfig,
+      ...customization,
+      settings: {
+        ...baseConfig.settings,
+        ...customization.settings
+      }
+    };
+    
+    return client.createOrganization(organizationData);
+  }
+  
+  static async createWithOwner(
+    organizationData: CreateOrganizationDto,
+    ownerEmail: string
+  ): Promise<{ organization: Organization; invitation?: any }> {
+    // Create organization first
+    const organization = await client.createOrganization(organizationData);
+    
+    let invitation;
+    try {
+      // Switch context to new organization and invite owner
+      const orgClient = new TolstoyClient(
+        client.baseUrl,
+        organization.data.id,
+        'system' // System context for initial setup
+      );
+      
+      // Invite the owner (this would use a user invitation method)
+      // invitation = await orgClient.inviteUser({
+      //   email: ownerEmail,
+      //   role: 'owner'
+      // });
+    } catch (error) {
+      console.warn('Failed to invite owner:', error.message);
+    }
+    
+    return { organization, invitation };
+  }
+}
+
+// Usage
+const startupOrg = await OrganizationFactory.createFromTemplate('startup', {
+  name: 'TechStart Inc',
+  slug: 'techstart',
+  description: 'Startup workflow automation'
+});
+
+const enterpriseOrg = await OrganizationFactory.createFromTemplate('enterprise', {
+  name: 'MegaCorp Global',
+  slug: 'megacorp',
+  settings: {
+    timezone: 'Europe/London' // Override template timezone
+  }
+});
+```
+
+### Organization Provisioning Pipeline
+```typescript
+class OrganizationProvisioner {
+  async provisionOrganization(config: OrganizationProvisionConfig): Promise<ProvisionResult> {
+    const result: ProvisionResult = {
+      organization: null,
+      users: [],
+      initialSetup: {
+        workflows: [],
+        tools: [],
+        webhooks: []
+      },
+      errors: []
+    };
+    
+    try {
+      // 1. Create organization
+      result.organization = await client.createOrganization(config.organization);
+      
+      // 2. Switch to organization context
+      const orgClient = new TolstoyClient(
+        client.baseUrl,
+        result.organization.data.id,
+        'system'
+      );
+      
+      // 3. Create initial users
+      if (config.initialUsers) {
+        for (const userData of config.initialUsers) {
+          try {
+            // const user = await orgClient.createUser(userData);
+            // result.users.push(user);
+          } catch (error) {
+            result.errors.push(`Failed to create user ${userData.email}: ${error.message}`);
+          }
+        }
+      }
+      
+      // 4. Set up initial tools
+      if (config.initialTools) {
+        for (const toolData of config.initialTools) {
+          try {
+            const tool = await orgClient.createTool(toolData);
+            result.initialSetup.tools.push(tool);
+          } catch (error) {
+            result.errors.push(`Failed to create tool ${toolData.name}: ${error.message}`);
+          }
+        }
+      }
+      
+      // 5. Set up initial webhooks
+      if (config.initialWebhooks) {
+        for (const webhookData of config.initialWebhooks) {
+          try {
+            const webhook = await orgClient.createWebhook(webhookData);
+            result.initialSetup.webhooks.push(webhook);
+          } catch (error) {
+            result.errors.push(`Failed to create webhook ${webhookData.name}: ${error.message}`);
+          }
+        }
+      }
+      
+      console.log(`✅ Organization provisioned: ${result.organization.data.name}`);
+      if (result.errors.length > 0) {
+        console.warn(`⚠️ ${result.errors.length} issues during provisioning`);
+      }
+      
+    } catch (error) {
+      result.errors.push(`Failed to create organization: ${error.message}`);
+      throw error;
+    }
+    
+    return result;
+  }
+}
+
+interface OrganizationProvisionConfig {
+  organization: CreateOrganizationDto;
+  initialUsers?: Array<{
+    email: string;
+    name: string;
+    role: 'admin' | 'member';
+  }>;
+  initialTools?: Array<{
+    name: string;
+    baseUrl: string;
+    authType: string;
+  }>;
+  initialWebhooks?: Array<{
+    name: string;
+    url: string;
+    events: string[];
+  }>;
+}
+
+interface ProvisionResult {
+  organization: Organization | null;
+  users: any[];
+  initialSetup: {
+    workflows: any[];
+    tools: any[];
+    webhooks: any[];
+  };
+  errors: string[];
+}
+
+const provisioner = new OrganizationProvisioner();
+
+const provisionConfig: OrganizationProvisionConfig = {
+  organization: {
+    name: 'New Customer Org',
+    slug: 'new-customer',
+    plan: 'pro'
+  },
+  initialUsers: [
+    { email: 'admin@customer.com', name: 'Admin User', role: 'admin' }
+  ],
+  initialTools: [
+    {
+      name: 'Customer Slack',
+      baseUrl: 'https://slack.com/api',
+      authType: 'bearer'
+    }
+  ],
+  initialWebhooks: [
+    {
+      name: 'Customer Notifications',
+      url: 'https://customer.com/webhooks/tolstoy',
+      events: ['flow.completed', 'flow.failed']
+    }
+  ]
+};
+
+const result = await provisioner.provisionOrganization(provisionConfig);
+```
+
+## Integration Patterns
+
+### SaaS Onboarding Flow
+```typescript
+// React component for organization creation during signup
+interface OrganizationSetupProps {
+  onComplete: (organization: Organization) => void;
+}
+
+function OrganizationSetup({ onComplete }: OrganizationSetupProps) {
+  const [formData, setFormData] = useState({
+    name: '',
+    slug: '',
+    description: '',
+    plan: 'free',
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+  });
+  const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState('');
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreating(true);
+    setError('');
+    
+    try {
+      const organization = await client.createOrganization({
+        name: formData.name,
+        slug: formData.slug,
+        description: formData.description || undefined,
+        plan: formData.plan as any,
+        settings: {
+          timezone: formData.timezone,
+          dateFormat: 'MM/DD/YYYY',
+          currency: 'USD'
+        }
+      });
+      
+      onComplete(organization);
+    } catch (error: any) {
+      setError(error.response?.data?.error?.message || 'Failed to create organization');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+  
+  return (
+    <form onSubmit={handleSubmit} className="organization-setup">
+      <h2>Set up your organization</h2>
+      
+      <div className="form-group">
+        <label>Organization Name</label>
+        <input
+          type="text"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          required
+          placeholder="Acme Corporation"
+        />
+      </div>
+      
+      <div className="form-group">
+        <label>Organization Slug</label>
+        <input
+          type="text"
+          value={formData.slug}
+          onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
+          required
+          placeholder="acme-corp"
+          pattern="[a-z0-9-]+"
+        />
+        <small>Used in URLs - lowercase letters, numbers, and hyphens only</small>
+      </div>
+      
+      <div className="form-group">
+        <label>Description (Optional)</label>
+        <textarea
+          value={formData.description}
+          onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+          placeholder="Brief description of your organization"
+        />
+      </div>
+      
+      <div className="form-group">
+        <label>Plan</label>
+        <select
+          value={formData.plan}
+          onChange={(e) => setFormData({ ...formData, plan: e.target.value })}
+        >
+          <option value="free">Free</option>
+          <option value="pro">Pro</option>
+          <option value="enterprise">Enterprise</option>
+        </select>
+      </div>
+      
+      {error && <div className="error">{error}</div>}
+      
+      <button type="submit" disabled={isCreating}>
+        {isCreating ? 'Creating...' : 'Create Organization'}
+      </button>
+    </form>
+  );
+}
+```
+
+### Automated Organization Setup
+```typescript
+async function automatedOrganizationSetup(
+  customerData: CustomerData
+): Promise<Organization> {
+  const slugSuggestion = customerData.companyName
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  
+  // Determine plan based on team size
+  const plan = customerData.teamSize > 50 
+    ? 'enterprise' 
+    : customerData.teamSize > 10 
+      ? 'pro' 
+      : 'free';
+  
+  const organizationData: CreateOrganizationDto = {
+    name: customerData.companyName,
+    slug: slugSuggestion,
+    description: `${customerData.companyName} workflow automation`,
+    plan,
+    settings: {
+      timezone: customerData.timezone || 'UTC',
+      dateFormat: customerData.region === 'US' ? 'MM/DD/YYYY' : 'DD/MM/YYYY',
+      currency: customerData.currency || 'USD'
+    }
+  };
+  
+  try {
+    const organization = await client.createOrganization(organizationData);
+    
+    // Log for analytics
+    console.log(`Automated setup completed for ${organization.data.name}`, {
+      organizationId: organization.data.id,
+      plan: organization.data.subscription.plan,
+      teamSize: customerData.teamSize,
+      region: customerData.region
+    });
+    
+    return organization;
+  } catch (error: any) {
+    if (error.response?.data?.error?.code === 'CONFLICT') {
+      // Try with a numeric suffix
+      const fallbackSlug = `${slugSuggestion}-${Date.now()}`;
+      return client.createOrganization({
+        ...organizationData,
+        slug: fallbackSlug
+      });
+    }
+    throw error;
+  }
+}
+
+interface CustomerData {
+  companyName: string;
+  teamSize: number;
+  region: string;
+  timezone?: string;
+  currency?: string;
+}
+```
+
+## Best Practices
+
+### Slug Validation
+```typescript
+function validateOrganizationSlug(slug: string): string[] {
+  const errors: string[] = [];
+  
+  if (!slug) {
+    errors.push('Slug is required');
+    return errors;
+  }
+  
+  if (slug.length < 3) {
+    errors.push('Slug must be at least 3 characters');
+  }
+  
+  if (slug.length > 50) {
+    errors.push('Slug cannot exceed 50 characters');
+  }
+  
+  if (!/^[a-z0-9-]+$/.test(slug)) {
+    errors.push('Slug can only contain lowercase letters, numbers, and hyphens');
+  }
+  
+  if (slug.startsWith('-') || slug.endsWith('-')) {
+    errors.push('Slug cannot start or end with a hyphen');
+  }
+  
+  if (slug.includes('--')) {
+    errors.push('Slug cannot contain consecutive hyphens');
+  }
+  
+  // Reserved slugs
+  const reserved = ['api', 'www', 'admin', 'support', 'help', 'docs', 'app', 'dashboard'];
+  if (reserved.includes(slug)) {
+    errors.push('This slug is reserved and cannot be used');
+  }
+  
+  return errors;
+}
+
+// Usage
+const slugErrors = validateOrganizationSlug('my-org-123');
+if (slugErrors.length > 0) {
+  console.error('Slug validation errors:', slugErrors);
+}
+```
+
+### Retry Logic
+```typescript
+async function createOrganizationWithRetry(
+  organizationData: CreateOrganizationDto,
+  maxRetries = 3
+): Promise<Organization> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await client.createOrganization(organizationData);
+    } catch (error: any) {
+      if (attempt === maxRetries) throw error;
+      
+      // Don't retry validation errors or conflicts
+      if (error.response?.data?.error?.code === 'VALIDATION_ERROR' ||
+          error.response?.data?.error?.code === 'CONFLICT') {
+        throw error;
+      }
+      
+      const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
+      console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error('Should never reach here');
+}
+```
+
+## Related Methods
+
+- [listOrganizations()](/sdk/methods/list-organizations) - List all organizations
+- [getOrganization()](/sdk/methods/get-organization) - Get organization details
+- [updateOrganization()](/sdk/methods/update-organization) - Update organization
+- [deleteOrganization()](/sdk/methods/delete-organization) - Delete organization
+- [TolstoyClient](/sdk/methods/tolstoy-client) - Client setup
+
+## See Also
+
+- [Create Organization API](/api/organizations/post-organizations) - Direct API documentation
+- [Organization Management Guide](/docs/organizations) - Comprehensive setup guide
+- [Multi-tenant Architecture](/docs/multi-tenant) - Building multi-tenant applications

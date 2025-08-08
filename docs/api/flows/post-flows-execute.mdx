@@ -1,3 +1,191 @@
 ---
 openapi: "post /flows/{id}/execute"
 ---
+
+# Execute Workflow
+
+Execute a workflow with custom variables and configuration. This is the primary endpoint for triggering workflow automation in Tolstoy.
+
+## Overview
+
+The workflow execution endpoint allows you to:
+- ⚡ **Execute workflows** synchronously or asynchronously
+- 📊 **Pass custom variables** for workflow personalization  
+- 🔄 **Choose execution modes** based on workflow complexity
+- 🎯 **Get immediate execution tracking** with unique execution IDs
+
+## Execution Modes
+
+### Asynchronous Execution (Recommended)
+Use `useDurable: true` for:
+- Long-running workflows (>30 seconds)
+- Workflows with external API calls
+- Multi-step automation processes
+- Production workflows
+
+### Synchronous Execution  
+Use `useDurable: false` for:
+- Simple, fast workflows (<10 seconds)
+- Testing and development
+- Immediate response requirements
+
+## Common Use Cases
+
+### User Onboarding
+```json
+{
+  "variables": {
+    "user": {
+      "email": "john@example.com",
+      "name": "John Doe",
+      "plan": "pro"
+    },
+    "source": "web_signup",
+    "timestamp": "2024-01-15T10:30:00Z"
+  },
+  "useDurable": true
+}
+```
+
+### Order Processing
+```json
+{
+  "variables": {
+    "order": {
+      "id": "order_123",
+      "customerId": "cust_456",
+      "items": [{"sku": "PROD-001", "quantity": 2}],
+      "totalAmount": 99.99
+    },
+    "priority": "high"
+  },
+  "useDurable": true
+}
+```
+
+### Marketing Campaign
+```json
+{
+  "variables": {
+    "campaign": {
+      "name": "Welcome Series",
+      "audience": ["user_123", "user_456"],
+      "template": "welcome_email_v2"
+    },
+    "personalization": {
+      "dynamicContent": true,
+      "timezone": "America/New_York"
+    }
+  },
+  "useDurable": true
+}
+```
+
+## Response Details
+
+### Successful Execution Response
+```json
+{
+  "executionId": "exec_abc123def456",
+  "status": "running",
+  "flowId": "flow_123",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "estimatedDuration": 180000,
+  "variables": {
+    "userId": "user_123"
+  }
+}
+```
+
+### Error Responses
+
+#### Flow Not Found (404)
+```json
+{
+  "success": false,
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Flow with ID 'flow_123' not found",
+    "details": {
+      "flowId": "flow_123",
+      "orgId": "org_abc123"
+    }
+  }
+}
+```
+
+#### Invalid Variables (400)
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR", 
+    "message": "Required variable 'userId' is missing",
+    "details": {
+      "missingFields": ["userId"],
+      "providedFields": ["email"]
+    }
+  }
+}
+```
+
+## Best Practices
+
+### 🔒 Security
+- Always validate input variables before sending
+- Use organization and user context headers
+- Never expose sensitive data in variables
+
+### ⚡ Performance  
+- Use async execution for workflows longer than 10 seconds
+- Batch similar executions when possible
+- Monitor execution status with polling intervals
+
+### 🎯 Reliability
+- Implement retry logic for network failures
+- Store execution IDs for tracking and debugging
+- Use webhooks for completion notifications
+
+## Monitoring Execution
+
+After triggering a workflow, monitor its progress:
+
+```bash
+# Check execution status
+curl "https://tolstoy.getpullse.com/flows/{flowId}/executions/{executionId}" \
+  -H "x-org-id: your-org-id" \
+  -H "x-user-id: your-user-id"
+```
+
+## SDK Integration
+
+The TypeScript SDK provides a simplified interface:
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient(
+  'https://tolstoy.getpullse.com',
+  'your-org-id',
+  'your-user-id'
+);
+
+// Execute with helper method
+const execution = await client.runFlow('flow_123', {
+  userId: 'user_456',
+  email: 'user@example.com'
+});
+
+console.log(`Started execution: ${execution.data.executionId}`);
+```
+
+## Related Endpoints
+
+- **[Get Execution Status](/api/flows/get-flows-executions-1)** - Monitor workflow progress
+- **[List Flow Executions](/api/flows/get-flows-executions)** - View execution history  
+- **[Cancel Execution](/api/flows/post-flows-executions-cancel)** - Stop running workflow
+- **[Retry Execution](/api/flows/post-flows-executions-retry)** - Retry failed workflow
+
+---
+
+*This endpoint supports the interactive playground below with live testing and auto-generated code samples.*

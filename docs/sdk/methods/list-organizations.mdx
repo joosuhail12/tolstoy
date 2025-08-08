@@ -1,0 +1,549 @@
+---
+title: listOrganizations()
+sidebar_position: 11
+---
+
+# listOrganizations()
+
+List all organizations the current user has access to.
+
+## Signature
+
+```typescript
+listOrganizations(): Promise<OrganizationList>
+```
+
+## Parameters
+
+None - this method lists organizations based on the current user's permissions.
+
+## Returns
+
+Returns a `Promise<OrganizationList>`:
+
+```typescript
+interface OrganizationList {
+  data: Organization[];
+}
+
+interface Organization {
+  id: string;
+  name: string;
+  slug: string;
+  description?: string;
+  settings: {
+    timezone: string;
+    dateFormat: string;
+    currency: string;
+  };
+  subscription: {
+    plan: 'free' | 'pro' | 'enterprise';
+    status: 'active' | 'trialing' | 'past_due' | 'cancelled';
+    currentPeriodEnd: string;
+  };
+  usage: {
+    workflows: number;
+    executions: number;
+    users: number;
+  };
+  limits: {
+    workflows: number;
+    executionsPerMonth: number;
+    users: number;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+## Usage Examples
+
+### Basic Organization Listing
+```typescript
+const organizations = await client.listOrganizations();
+
+console.log(`You have access to ${organizations.data.length} organizations:`);
+organizations.data.forEach(org => {
+  console.log(`- ${org.name} (${org.slug})`);
+  console.log(`  Plan: ${org.subscription.plan}`);
+  console.log(`  Users: ${org.usage.users}/${org.limits.users}`);
+  console.log(`  Workflows: ${org.usage.workflows}/${org.limits.workflows}`);
+});
+```
+
+### Organization Selection
+```typescript
+async function selectOrganization(): Promise<Organization | null> {
+  const organizations = await client.listOrganizations();
+  
+  if (organizations.data.length === 0) {
+    console.log('No organizations found');
+    return null;
+  }
+  
+  if (organizations.data.length === 1) {
+    console.log(`Using organization: ${organizations.data[0].name}`);
+    return organizations.data[0];
+  }
+  
+  console.log('Available organizations:');
+  organizations.data.forEach((org, index) => {
+    console.log(`${index + 1}. ${org.name} (${org.subscription.plan})`);
+    console.log(`   ${org.description || 'No description'}`);
+  });
+  
+  // In a real app, you'd prompt the user for selection
+  return organizations.data[0]; // Return first for example
+}
+
+const selectedOrg = await selectOrganization();
+```
+
+### Subscription Status Check
+```typescript
+const organizations = await client.listOrganizations();
+
+organizations.data.forEach(org => {
+  const sub = org.subscription;
+  console.log(`\n${org.name}:`);
+  
+  switch (sub.status) {
+    case 'active':
+      console.log('✅ Subscription active');
+      break;
+    case 'trialing':
+      console.log('🔄 Trial period active');
+      break;
+    case 'past_due':
+      console.log('⚠️ Payment past due');
+      break;
+    case 'cancelled':
+      console.log('❌ Subscription cancelled');
+      break;
+  }
+  
+  const endDate = new Date(sub.currentPeriodEnd);
+  console.log(`Period ends: ${endDate.toLocaleDateString()}`);
+});
+```
+
+### Usage Analytics
+```typescript
+const organizations = await client.listOrganizations();
+
+console.log('Organization Usage Summary:');
+organizations.data.forEach(org => {
+  const usage = org.usage;
+  const limits = org.limits;
+  
+  console.log(`\n${org.name}:`);
+  console.log(`  Workflows: ${usage.workflows}/${limits.workflows} (${(usage.workflows/limits.workflows*100).toFixed(1)}%)`);
+  console.log(`  Users: ${usage.users}/${limits.users} (${(usage.users/limits.users*100).toFixed(1)}%)`);
+  console.log(`  Executions: ${usage.executions}/${limits.executionsPerMonth} (${(usage.executions/limits.executionsPerMonth*100).toFixed(1)}%)`);
+  
+  // Warn about approaching limits
+  if (usage.workflows / limits.workflows > 0.8) {
+    console.warn('  ⚠️ Approaching workflow limit');
+  }
+  if (usage.executions / limits.executionsPerMonth > 0.8) {
+    console.warn('  ⚠️ Approaching execution limit');
+  }
+});
+```
+
+## Error Handling
+
+```typescript
+import { AxiosError } from 'axios';
+
+try {
+  const organizations = await client.listOrganizations();
+  
+  if (organizations.data.length === 0) {
+    console.log('No organizations found. You may need to create one first.');
+  }
+} catch (error) {
+  const apiError = error as AxiosError;
+  
+  if (apiError.response?.status === 401) {
+    console.error('Authentication failed - check your credentials');
+  } else if (apiError.response?.status === 403) {
+    console.error('Access denied - you may not have permission to list organizations');
+  } else {
+    console.error('Failed to list organizations:', error.message);
+  }
+}
+```
+
+## Advanced Usage
+
+### Organization Manager
+```typescript
+class OrganizationManager {
+  private orgCache: Map<string, Organization> = new Map();
+  private lastFetch = 0;
+  private cacheTTL = 5 * 60 * 1000; // 5 minutes
+  
+  async getOrganizations(forceRefresh = false): Promise<Organization[]> {
+    const now = Date.now();
+    
+    if (forceRefresh || (now - this.lastFetch) > this.cacheTTL) {
+      const orgs = await client.listOrganizations();
+      
+      // Update cache
+      this.orgCache.clear();
+      orgs.data.forEach(org => {
+        this.orgCache.set(org.id, org);
+      });
+      
+      this.lastFetch = now;
+      return orgs.data;
+    }
+    
+    return Array.from(this.orgCache.values());
+  }
+  
+  async getOrganizationById(id: string): Promise<Organization | null> {
+    const orgs = await this.getOrganizations();
+    return orgs.find(org => org.id === id) || null;
+  }
+  
+  async getOrganizationBySlug(slug: string): Promise<Organization | null> {
+    const orgs = await this.getOrganizations();
+    return orgs.find(org => org.slug === slug) || null;
+  }
+  
+  async getActiveOrganizations(): Promise<Organization[]> {
+    const orgs = await this.getOrganizations();
+    return orgs.filter(org => org.subscription.status === 'active');
+  }
+  
+  async getOrganizationsNearLimits(threshold = 0.8): Promise<Organization[]> {
+    const orgs = await this.getOrganizations();
+    return orgs.filter(org => {
+      const workflowUsage = org.usage.workflows / org.limits.workflows;
+      const executionUsage = org.usage.executions / org.limits.executionsPerMonth;
+      const userUsage = org.usage.users / org.limits.users;
+      
+      return workflowUsage > threshold || 
+             executionUsage > threshold || 
+             userUsage > threshold;
+    });
+  }
+}
+
+const orgManager = new OrganizationManager();
+
+// Get active organizations
+const activeOrgs = await orgManager.getActiveOrganizations();
+console.log(`${activeOrgs.length} active organizations`);
+
+// Check organizations near limits
+const nearLimits = await orgManager.getOrganizationsNearLimits();
+if (nearLimits.length > 0) {
+  console.warn(`${nearLimits.length} organizations approaching limits`);
+}
+```
+
+### Multi-tenant Context Switching
+```typescript
+class MultiTenantClient {
+  private clients: Map<string, TolstoyClient> = new Map();
+  
+  async initializeClients(): Promise<void> {
+    const orgs = await client.listOrganizations();
+    
+    orgs.data.forEach(org => {
+      const orgClient = new TolstoyClient(
+        'https://tolstoy.getpullse.com',
+        org.id,
+        'current-user-id' // You'd get this from your auth system
+      );
+      this.clients.set(org.id, orgClient);
+    });
+    
+    console.log(`Initialized clients for ${this.clients.size} organizations`);
+  }
+  
+  getClient(orgId: string): TolstoyClient {
+    const client = this.clients.get(orgId);
+    if (!client) {
+      throw new Error(`No client found for organization: ${orgId}`);
+    }
+    return client;
+  }
+  
+  async executeWorkflowInOrg(
+    orgId: string, 
+    flowId: string, 
+    inputs: any
+  ): Promise<any> {
+    const client = this.getClient(orgId);
+    return client.runFlow(flowId, inputs);
+  }
+  
+  async getAllOrganizationFlows(): Promise<Map<string, any[]>> {
+    const flowsByOrg = new Map<string, any[]>();
+    
+    for (const [orgId, client] of this.clients) {
+      try {
+        const flows = await client.listFlows();
+        flowsByOrg.set(orgId, flows.data);
+      } catch (error) {
+        console.error(`Failed to get flows for org ${orgId}:`, error.message);
+        flowsByOrg.set(orgId, []);
+      }
+    }
+    
+    return flowsByOrg;
+  }
+}
+
+const multiClient = new MultiTenantClient();
+await multiClient.initializeClients();
+
+// Execute workflow in specific organization
+await multiClient.executeWorkflowInOrg('org_123', 'flow_456', { userId: 'user_789' });
+```
+
+### Billing Dashboard
+```typescript
+class BillingDashboard {
+  async generateBillingReport(): Promise<void> {
+    const orgs = await client.listOrganizations();
+    
+    console.log('BILLING DASHBOARD');
+    console.log('================');
+    
+    let totalRevenue = 0;
+    const planCounts = { free: 0, pro: 0, enterprise: 0 };
+    
+    orgs.data.forEach(org => {
+      planCounts[org.subscription.plan]++;
+      
+      console.log(`\n${org.name}:`);
+      console.log(`  Plan: ${org.subscription.plan.toUpperCase()}`);
+      console.log(`  Status: ${org.subscription.status}`);
+      console.log(`  Period End: ${new Date(org.subscription.currentPeriodEnd).toLocaleDateString()}`);
+      
+      // Usage percentages
+      const workflowPct = (org.usage.workflows / org.limits.workflows * 100).toFixed(1);
+      const executionPct = (org.usage.executions / org.limits.executionsPerMonth * 100).toFixed(1);
+      const userPct = (org.usage.users / org.limits.users * 100).toFixed(1);
+      
+      console.log(`  Usage:`);
+      console.log(`    Workflows: ${workflowPct}%`);
+      console.log(`    Executions: ${executionPct}%`);
+      console.log(`    Users: ${userPct}%`);
+      
+      // Estimate revenue (example pricing)
+      const revenue = this.estimateRevenue(org);
+      totalRevenue += revenue;
+      console.log(`  Est. Revenue: $${revenue}/month`);
+    });
+    
+    console.log(`\nSUMMARY:`);
+    console.log(`  Total Organizations: ${orgs.data.length}`);
+    console.log(`  Free: ${planCounts.free}`);
+    console.log(`  Pro: ${planCounts.pro}`);
+    console.log(`  Enterprise: ${planCounts.enterprise}`);
+    console.log(`  Estimated MRR: $${totalRevenue}`);
+  }
+  
+  private estimateRevenue(org: Organization): number {
+    const pricing = { free: 0, pro: 49, enterprise: 199 };
+    return pricing[org.subscription.plan] || 0;
+  }
+  
+  async getUpcomingRenewals(days = 30): Promise<Organization[]> {
+    const orgs = await client.listOrganizations();
+    const cutoff = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    
+    return orgs.data.filter(org => {
+      const renewalDate = new Date(org.subscription.currentPeriodEnd);
+      return renewalDate <= cutoff && org.subscription.status === 'active';
+    });
+  }
+}
+
+const billing = new BillingDashboard();
+await billing.generateBillingReport();
+
+// Get upcoming renewals
+const upcomingRenewals = await billing.getUpcomingRenewals(14); // Next 14 days
+console.log(`${upcomingRenewals.length} subscriptions renewing in the next 14 days`);
+```
+
+## Integration Patterns
+
+### Organization Switcher Component
+```typescript
+// React component example
+interface OrgSwitcherProps {
+  onOrgChange: (orgId: string) => void;
+}
+
+function OrganizationSwitcher({ onOrgChange }: OrgSwitcherProps) {
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [selectedOrg, setSelectedOrg] = useState<string>('');
+  
+  useEffect(() => {
+    async function loadOrganizations() {
+      try {
+        const orgs = await client.listOrganizations();
+        setOrganizations(orgs.data);
+        
+        // Auto-select first active organization
+        const active = orgs.data.find(org => org.subscription.status === 'active');
+        if (active) {
+          setSelectedOrg(active.id);
+          onOrgChange(active.id);
+        }
+      } catch (error) {
+        console.error('Failed to load organizations:', error);
+      }
+    }
+    
+    loadOrganizations();
+  }, []);
+  
+  const handleOrgChange = (orgId: string) => {
+    setSelectedOrg(orgId);
+    onOrgChange(orgId);
+  };
+  
+  return (
+    <select value={selectedOrg} onChange={(e) => handleOrgChange(e.target.value)}>
+      {organizations.map(org => (
+        <option key={org.id} value={org.id}>
+          {org.name} ({org.subscription.plan})
+        </option>
+      ))}
+    </select>
+  );
+}
+```
+
+### Organization Analytics
+```typescript
+async function analyzeOrganizationMetrics(): Promise<void> {
+  const orgs = await client.listOrganizations();
+  
+  const analytics = {
+    totalOrgs: orgs.data.length,
+    activeSubscriptions: 0,
+    trialSubscriptions: 0,
+    totalUsers: 0,
+    totalWorkflows: 0,
+    totalExecutions: 0,
+    averageUsage: {
+      workflows: 0,
+      users: 0,
+      executions: 0
+    },
+    planDistribution: { free: 0, pro: 0, enterprise: 0 },
+    healthyOrgs: 0,
+    atRiskOrgs: 0
+  };
+  
+  orgs.data.forEach(org => {
+    // Count subscription statuses
+    if (org.subscription.status === 'active') analytics.activeSubscriptions++;
+    if (org.subscription.status === 'trialing') analytics.trialSubscriptions++;
+    
+    // Sum totals
+    analytics.totalUsers += org.usage.users;
+    analytics.totalWorkflows += org.usage.workflows;
+    analytics.totalExecutions += org.usage.executions;
+    
+    // Plan distribution
+    analytics.planDistribution[org.subscription.plan]++;
+    
+    // Health assessment
+    const workflowUsage = org.usage.workflows / org.limits.workflows;
+    const executionUsage = org.usage.executions / org.limits.executionsPerMonth;
+    
+    if (workflowUsage < 0.1 && executionUsage < 0.1 && org.subscription.status === 'active') {
+      analytics.atRiskOrgs++; // Low usage, might churn
+    } else {
+      analytics.healthyOrgs++;
+    }
+  });
+  
+  // Calculate averages
+  if (orgs.data.length > 0) {
+    analytics.averageUsage.workflows = analytics.totalWorkflows / orgs.data.length;
+    analytics.averageUsage.users = analytics.totalUsers / orgs.data.length;
+    analytics.averageUsage.executions = analytics.totalExecutions / orgs.data.length;
+  }
+  
+  console.log('Organization Analytics:');
+  console.log(`  Total Organizations: ${analytics.totalOrgs}`);
+  console.log(`  Active Subscriptions: ${analytics.activeSubscriptions}`);
+  console.log(`  Trial Subscriptions: ${analytics.trialSubscriptions}`);
+  console.log(`  Total Users: ${analytics.totalUsers}`);
+  console.log(`  Total Workflows: ${analytics.totalWorkflows}`);
+  console.log(`  Total Executions: ${analytics.totalExecutions}`);
+  console.log(`  Plan Distribution:`);
+  console.log(`    Free: ${analytics.planDistribution.free}`);
+  console.log(`    Pro: ${analytics.planDistribution.pro}`);
+  console.log(`    Enterprise: ${analytics.planDistribution.enterprise}`);
+  console.log(`  Health:`);
+  console.log(`    Healthy: ${analytics.healthyOrgs}`);
+  console.log(`    At Risk: ${analytics.atRiskOrgs}`);
+}
+
+await analyzeOrganizationMetrics();
+```
+
+## Best Practices
+
+### Caching Strategy
+```typescript
+let cachedOrganizations: Organization[] = [];
+let lastFetch = 0;
+const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+
+async function getCachedOrganizations(): Promise<Organization[]> {
+  const now = Date.now();
+  
+  if (cachedOrganizations.length === 0 || (now - lastFetch) > CACHE_DURATION) {
+    const orgs = await client.listOrganizations();
+    cachedOrganizations = orgs.data;
+    lastFetch = now;
+  }
+  
+  return cachedOrganizations;
+}
+```
+
+### Error Recovery
+```typescript
+async function robustListOrganizations(retries = 3): Promise<Organization[]> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const orgs = await client.listOrganizations();
+      return orgs.data;
+    } catch (error) {
+      if (attempt === retries) throw error;
+      
+      console.warn(`Attempt ${attempt} failed, retrying...`);
+      await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+    }
+  }
+  return [];
+}
+```
+
+## Related Methods
+
+- [getOrganization()](/sdk/methods/get-organization) - Get specific organization details
+- [createOrganization()](/sdk/methods/create-organization) - Create new organization
+- [updateOrganization()](/sdk/methods/update-organization) - Update organization settings
+- [TolstoyClient](/sdk/methods/tolstoy-client) - Client setup
+
+## See Also
+
+- [List Organizations API](/api/organizations/get-organizations) - Direct API documentation
+- [Organization Management Guide](/docs/organizations) - Comprehensive organization setup
+- [Multi-tenant Architecture](/docs/multi-tenant) - Building multi-tenant applications

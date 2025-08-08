@@ -1,3 +1,276 @@
 ---
 openapi: "post /webhooks"
 ---
+
+# Create Webhook
+
+Create a webhook to receive real-time notifications about events in your Tolstoy workflows. Webhooks enable event-driven integrations and automatic responses to workflow state changes.
+
+## Overview
+
+Webhooks allow you to:
+- 🔔 **Real-time Notifications** - Get instant updates when events occur
+- 🎯 **Event-Driven Architecture** - Trigger actions based on workflow events  
+- 🔗 **System Integration** - Connect Tolstoy with your existing systems
+- 🛡️ **Secure Delivery** - HTTPS endpoints with signature verification
+
+## Event Types
+
+### Workflow Events
+- `flow.started` - Workflow execution began
+- `flow.completed` - Workflow finished successfully
+- `flow.failed` - Workflow failed with error
+- `flow.cancelled` - Workflow was cancelled
+- `flow.step_completed` - Individual step completed
+- `flow.step_failed` - Individual step failed
+
+### Tool Events  
+- `tool.connected` - Tool integration established
+- `tool.failed` - Tool integration failed
+- `tool.updated` - Tool configuration changed
+
+### Organization Events
+- `org.updated` - Organization settings changed
+- `org.user_added` - User added to organization
+- `org.user_removed` - User removed from organization
+
+### User Events
+- `user.created` - New user account created
+- `user.updated` - User profile updated
+- `user.deleted` - User account deleted
+
+## Common Use Cases
+
+### Workflow Completion Notifications
+```json
+{
+  "name": "Workflow Monitor",
+  "url": "https://your-app.com/webhooks/workflow-events",
+  "events": ["flow.completed", "flow.failed"],
+  "active": true,
+  "metadata": {
+    "purpose": "workflow_monitoring",
+    "team": "operations"
+  }
+}
+```
+
+### User Activity Tracking
+```json
+{
+  "name": "User Activity Tracker", 
+  "url": "https://analytics.company.com/tolstoy/events",
+  "events": ["user.created", "user.updated", "org.user_added"],
+  "active": true,
+  "headers": {
+    "X-Analytics-Key": "your-analytics-key"
+  }
+}
+```
+
+### Integration Monitoring
+```json
+{
+  "name": "Tool Health Monitor",
+  "url": "https://monitoring.company.com/webhooks/tools",
+  "events": ["tool.connected", "tool.failed"],
+  "active": true,
+  "timeout": 15000,
+  "retries": 3
+}
+```
+
+## Webhook Security
+
+### Signature Verification
+Enable signature verification to ensure webhook authenticity:
+
+```json
+{
+  "name": "Secure Webhook",
+  "url": "https://your-app.com/webhooks/secure",
+  "events": ["flow.completed"],
+  "secret": "your_webhook_secret_key",
+  "active": true
+}
+```
+
+### HTTPS Enforcement
+```json
+{
+  "name": "HTTPS Only Webhook",
+  "url": "https://secure.company.com/webhooks",
+  "events": ["flow.started"],
+  "verifySSL": true,
+  "active": true
+}
+```
+
+## Webhook Payload Structure
+
+### Workflow Completion Event
+```json
+{
+  "event": "flow.completed",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "data": {
+    "flowId": "flow_abc123",
+    "executionId": "exec_def456",
+    "status": "completed",
+    "duration": 45000,
+    "variables": {
+      "userId": "user_123",
+      "email": "user@example.com"
+    },
+    "result": {
+      "success": true,
+      "outputs": {
+        "emailSent": true,
+        "accountCreated": "acc_789"
+      }
+    }
+  },
+  "metadata": {
+    "orgId": "org_abc123",
+    "userId": "user_123"
+  }
+}
+```
+
+### Tool Connection Event
+```json
+{
+  "event": "tool.connected",
+  "timestamp": "2024-01-15T10:30:00Z", 
+  "data": {
+    "toolId": "tool_ghi789",
+    "toolName": "GitHub API",
+    "connectionStatus": "active",
+    "lastTested": "2024-01-15T10:30:00Z"
+  },
+  "metadata": {
+    "orgId": "org_abc123",
+    "userId": "user_123"
+  }
+}
+```
+
+## Response Handling
+
+### Expected Response
+Your webhook endpoint should return HTTP 200-299 for successful processing:
+
+```json
+{
+  "received": true,
+  "processedAt": "2024-01-15T10:30:00Z"
+}
+```
+
+### Error Responses
+Non-2xx responses trigger retry attempts:
+
+```json
+{
+  "error": "Temporary processing error",
+  "retryAfter": 300
+}
+```
+
+## Retry Logic
+
+Tolstoy automatically retries failed webhook deliveries:
+- **Initial retry**: After 1 second
+- **Subsequent retries**: Exponential backoff (2s, 4s, 8s, 16s, 32s)
+- **Maximum attempts**: 5 retries over 24 hours
+- **Timeout**: Configurable (default 10 seconds)
+
+## Testing Webhooks
+
+### Test Webhook Delivery
+```bash
+# Test webhook endpoint
+curl -X POST "https://tolstoy.getpullse.com/webhooks/{webhookId}/test" \
+  -H "x-org-id: your-org-id" \
+  -H "x-user-id: your-user-id"
+```
+
+### Webhook Development Tips
+
+1. **Use ngrok for local testing**:
+   ```bash
+   ngrok http 3000
+   # Use the HTTPS URL for webhook endpoint
+   ```
+
+2. **Implement idempotency**:
+   ```javascript
+   app.post('/webhooks/tolstoy', (req, res) => {
+     const eventId = req.headers['x-tolstoy-event-id'];
+     if (processedEvents.has(eventId)) {
+       return res.status(200).send('Already processed');
+     }
+     
+     // Process event
+     processedEvents.add(eventId);
+     res.status(200).send('OK');
+   });
+   ```
+
+3. **Verify signatures**:
+   ```javascript
+   const crypto = require('crypto');
+   
+   function verifySignature(payload, signature, secret) {
+     const expectedSignature = crypto
+       .createHmac('sha256', secret)
+       .update(payload)
+       .digest('hex');
+     return crypto.timingSafeEqual(
+       Buffer.from(signature),
+       Buffer.from(expectedSignature)
+     );
+   }
+   ```
+
+## SDK Integration
+
+Use the TypeScript SDK for webhook management:
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient(
+  'https://tolstoy.getpullse.com',
+  'your-org-id', 
+  'your-user-id'
+);
+
+// Create webhook
+const webhook = await client.createWebhook({
+  name: 'Workflow Monitor',
+  url: 'https://your-app.com/webhooks/tolstoy',
+  events: ['flow.completed', 'flow.failed'],
+  active: true,
+  secret: process.env.WEBHOOK_SECRET
+});
+
+console.log(`Webhook created: ${webhook.data.id}`);
+
+// Test webhook delivery
+const testResult = await client.raw.webhooks.webhooksControllerTest(webhook.data.id);
+console.log(`Test result: ${testResult.data.success}`);
+```
+
+## Related Endpoints
+
+- **[List Webhooks](/api/webhooks/get-webhooks)** - View all webhook configurations
+- **[Get Webhook](/api/webhooks/get-webhooks-1)** - Retrieve specific webhook details
+- **[Update Webhook](/api/webhooks/put-webhooks)** - Modify webhook settings
+- **[Toggle Webhook](/api/webhooks/patch-webhooks-toggle)** - Enable/disable webhook
+- **[Test Webhook](/api/webhooks/post-webhooks-test)** - Test webhook delivery
+- **[List Event Types](/api/webhooks/get-webhooksevent-types)** - Get available event types
+
+---
+
+*This endpoint supports the interactive playground below with live testing and auto-generated code samples.*

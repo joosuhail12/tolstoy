@@ -1,3 +1,132 @@
 ---
 openapi: "post /tools"
 ---
+
+# Create Tool Integration
+
+Create a new tool integration to connect external APIs and services with your Tolstoy workflows. Tools enable seamless data exchange between Tolstoy and third-party platforms.
+
+## Overview
+
+Tool integrations allow you to:
+- 🔗 **Connect External APIs** - Integrate with popular services (GitHub, Slack, SendGrid, etc.)
+- 🔐 **Manage Authentication** - Support multiple auth methods (API keys, OAuth, Bearer tokens)
+- ⚙️ **Configure Endpoints** - Set up base URLs, headers, and request parameters
+- 🎯 **Test Connections** - Validate integrations before using in workflows
+
+## Authentication Types
+
+### API Key Authentication
+Most common for REST APIs with static authentication.
+
+```json
+{
+  "name": "SendGrid Email API",
+  "baseUrl": "https://api.sendgrid.com/v3",
+  "authType": "apikey",
+  "description": "Send transactional emails",
+  "headers": {
+    "Content-Type": "application/json"
+  }
+}
+```
+
+### Bearer Token Authentication  
+Used for APIs requiring Bearer tokens in Authorization header.
+
+```json
+{
+  "name": "GitHub API",
+  "baseUrl": "https://api.github.com", 
+  "authType": "bearer",
+  "description": "Access GitHub repositories and issues",
+  "headers": {
+    "Accept": "application/vnd.github.v3+json",
+    "User-Agent": "Tolstoy-Integration"
+  }
+}
+```
+
+### OAuth 2.0 Authentication
+For services requiring OAuth flow for user authorization.
+
+```json
+{
+  "name": "Google Sheets API",
+  "baseUrl": "https://sheets.googleapis.com/v4",
+  "authType": "oauth2",
+  "description": "Read and write Google Sheets data",
+  "oauthConfig": {
+    "authUrl": "https://accounts.google.com/o/oauth2/auth",
+    "tokenUrl": "https://oauth2.googleapis.com/token",
+    "scopes": ["https://www.googleapis.com/auth/spreadsheets"]
+  }
+}
+```
+
+## Popular Integrations
+
+### Communication Tools
+
+#### Slack Integration
+```json
+{
+  "name": "Slack Workspace",
+  "baseUrl": "https://slack.com/api",
+  "authType": "bearer",
+  "description": "Send notifications and manage channels",
+  "headers": {
+    "Content-Type": "application/json"
+  }
+}
+```
+
+### E-commerce Platforms
+
+#### Shopify Integration
+```json
+{
+  "name": "Shopify Store",
+  "baseUrl": "https://your-store.myshopify.com/admin/api/2023-10",
+  "authType": "apikey",
+  "description": "Manage products, orders, and customers",
+  "headers": {
+    "Content-Type": "application/json"
+  }
+}
+```
+
+## SDK Integration
+
+Use the TypeScript SDK for simplified tool management:
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient(
+  'https://tolstoy.getpullse.com',
+  'your-org-id',
+  'your-user-id'
+);
+
+// Create tool integration
+const tool = await client.createTool({
+  name: 'GitHub API',
+  baseUrl: 'https://api.github.com',
+  authType: 'bearer',
+  description: 'GitHub integration for repository management'
+});
+
+console.log(`Tool created: ${tool.data.id}`);
+```
+
+## Related Endpoints
+
+- **[List Tools](/api/tools/get-tools)** - View all tool integrations
+- **[Get Tool Details](/api/tools/get-tools-1)** - Retrieve specific tool configuration  
+- **[Update Tool](/api/tools/put-tools)** - Modify tool settings
+- **[Delete Tool](/api/tools/delete-tools)** - Remove tool integration
+
+---
+
+*This endpoint supports the interactive playground below with live testing and auto-generated code samples.*

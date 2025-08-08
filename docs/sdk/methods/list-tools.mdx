@@ -1,0 +1,608 @@
+---
+title: listTools()
+sidebar_position: 6
+---
+
+# listTools()
+
+List all tool integrations in the organization.
+
+## Signature
+
+```typescript
+listTools(): Promise<ToolList>
+```
+
+## Parameters
+
+None - this method uses the organization context from the TolstoyClient constructor.
+
+## Returns
+
+Returns a `Promise<ToolList>`:
+
+```typescript
+interface ToolList {
+  data: Tool[];
+}
+
+interface Tool {
+  id: string;
+  name: string;
+  baseUrl: string;
+  authType: string;
+  description?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+  lastUsed?: string;
+}
+```
+
+## Usage Examples
+
+### Basic Tool Listing
+```typescript
+const tools = await client.listTools();
+
+console.log(`Found ${tools.data.length} tool integrations:`);
+tools.data.forEach(tool => {
+  console.log(`- ${tool.name} (${tool.authType})`);
+  console.log(`  URL: ${tool.baseUrl}`);
+  console.log(`  Status: ${tool.active ? 'Active' : 'Inactive'}`);
+});
+```
+
+### Active Tools Only
+```typescript
+const tools = await client.listTools();
+const activeTools = tools.data.filter(tool => tool.active);
+
+console.log(`Active integrations (${activeTools.length}):`);
+activeTools.forEach(tool => {
+  const lastUsed = tool.lastUsed 
+    ? new Date(tool.lastUsed).toLocaleDateString()
+    : 'Never';
+  
+  console.log(`- ${tool.name}: Last used ${lastUsed}`);
+});
+```
+
+### Tools by Authentication Type
+```typescript
+const tools = await client.listTools();
+const toolsByAuth = new Map<string, Tool[]>();
+
+tools.data.forEach(tool => {
+  if (!toolsByAuth.has(tool.authType)) {
+    toolsByAuth.set(tool.authType, []);
+  }
+  toolsByAuth.get(tool.authType)!.push(tool);
+});
+
+toolsByAuth.forEach((tools, authType) => {
+  console.log(`\n${authType.toUpperCase()} Authentication (${tools.length}):`);
+  tools.forEach(tool => {
+    console.log(`  - ${tool.name}`);
+  });
+});
+```
+
+### Tool Health Check
+```typescript
+const tools = await client.listTools();
+const healthReport = {
+  total: tools.data.length,
+  active: 0,
+  inactive: 0,
+  recentlyUsed: 0,
+  stale: 0
+};
+
+const oneWeekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+tools.data.forEach(tool => {
+  if (tool.active) {
+    healthReport.active++;
+  } else {
+    healthReport.inactive++;
+  }
+  
+  if (tool.lastUsed && new Date(tool.lastUsed) > oneWeekAgo) {
+    healthReport.recentlyUsed++;
+  } else if (tool.lastUsed) {
+    healthReport.stale++;
+  }
+});
+
+console.log('Tool Integration Health:');
+console.log(`  Total: ${healthReport.total}`);
+console.log(`  Active: ${healthReport.active}`);
+console.log(`  Inactive: ${healthReport.inactive}`);
+console.log(`  Recently Used (7 days): ${healthReport.recentlyUsed}`);
+console.log(`  Stale: ${healthReport.stale}`);
+```
+
+## Tool Properties
+
+### Basic Information
+```typescript
+const tools = await client.listTools();
+const tool = tools.data[0];
+
+console.log('Tool Details:');
+console.log(`  ID: ${tool.id}`);
+console.log(`  Name: ${tool.name}`);
+console.log(`  Base URL: ${tool.baseUrl}`);
+console.log(`  Auth Type: ${tool.authType}`);
+console.log(`  Description: ${tool.description || 'None'}`);
+console.log(`  Status: ${tool.active ? 'Active' : 'Inactive'}`);
+```
+
+### Usage Analytics
+```typescript
+const tools = await client.listTools();
+
+console.log('Usage Analytics:');
+tools.data.forEach(tool => {
+  const created = new Date(tool.createdAt);
+  const lastUsed = tool.lastUsed ? new Date(tool.lastUsed) : null;
+  
+  console.log(`\n${tool.name}:`);
+  console.log(`  Created: ${created.toLocaleDateString()}`);
+  
+  if (lastUsed) {
+    const daysSinceUse = Math.floor(
+      (Date.now() - lastUsed.getTime()) / (1000 * 60 * 60 * 24)
+    );
+    console.log(`  Last Used: ${lastUsed.toLocaleDateString()} (${daysSinceUse} days ago)`);
+    
+    if (daysSinceUse > 30) {
+      console.log(`  ⚠️ Unused for over 30 days`);
+    }
+  } else {
+    console.log(`  Last Used: Never`);
+    console.log(`  ⚠️ Tool has never been used`);
+  }
+});
+```
+
+## Error Handling
+
+```typescript
+import { AxiosError } from 'axios';
+
+try {
+  const tools = await client.listTools();
+  
+  if (tools.data.length === 0) {
+    console.log('No tool integrations found in this organization');
+    console.log('Create your first integration with createTool()');
+  } else {
+    console.log(`Found ${tools.data.length} tool integrations`);
+  }
+} catch (error) {
+  const apiError = error as AxiosError;
+  
+  if (apiError.response?.status === 403) {
+    console.error('Access denied - check organization permissions');
+  } else if (apiError.response?.status === 401) {
+    console.error('Authentication failed - check credentials');
+  } else {
+    console.error('Failed to list tools:', error.message);
+  }
+}
+```
+
+## Advanced Usage
+
+### Tool Discovery
+```typescript
+class ToolDiscovery {
+  async findToolsByName(pattern: string): Promise<Tool[]> {
+    const tools = await client.listTools();
+    return tools.data.filter(tool => 
+      tool.name.toLowerCase().includes(pattern.toLowerCase())
+    );
+  }
+  
+  async findToolsByDomain(domain: string): Promise<Tool[]> {
+    const tools = await client.listTools();
+    return tools.data.filter(tool => 
+      tool.baseUrl.includes(domain)
+    );
+  }
+  
+  async getUnusedTools(daysSinceUse = 30): Promise<Tool[]> {
+    const tools = await client.listTools();
+    const cutoff = new Date(Date.now() - daysSinceUse * 24 * 60 * 60 * 1000);
+    
+    return tools.data.filter(tool => 
+      !tool.lastUsed || new Date(tool.lastUsed) < cutoff
+    );
+  }
+  
+  async getToolsByAuthType(authType: string): Promise<Tool[]> {
+    const tools = await client.listTools();
+    return tools.data.filter(tool => tool.authType === authType);
+  }
+}
+
+const discovery = new ToolDiscovery();
+
+// Find GitHub-related tools
+const githubTools = await discovery.findToolsByDomain('github.com');
+console.log(`Found ${githubTools.length} GitHub integrations`);
+
+// Find OAuth tools that might need token refresh
+const oauthTools = await discovery.getToolsByAuthType('oauth2');
+console.log(`Found ${oauthTools.length} OAuth2 integrations`);
+
+// Find unused tools for cleanup
+const unusedTools = await discovery.getUnusedTools(60); // 60 days
+console.log(`Found ${unusedTools.length} tools unused for 60+ days`);
+```
+
+### Tool Management
+```typescript
+class ToolManager {
+  async getActiveToolsCount(): Promise<number> {
+    const tools = await client.listTools();
+    return tools.data.filter(tool => tool.active).length;
+  }
+  
+  async getToolByName(name: string): Promise<Tool | null> {
+    const tools = await client.listTools();
+    return tools.data.find(tool => tool.name === name) || null;
+  }
+  
+  async validateToolHealth(): Promise<ToolHealthReport> {
+    const tools = await client.listTools();
+    const issues: string[] = [];
+    const warnings: string[] = [];
+    
+    tools.data.forEach(tool => {
+      // Check for inactive tools
+      if (!tool.active) {
+        warnings.push(`Tool ${tool.name} is inactive`);
+      }
+      
+      // Check for missing descriptions
+      if (!tool.description) {
+        warnings.push(`Tool ${tool.name} has no description`);
+      }
+      
+      // Check for never-used tools
+      if (!tool.lastUsed) {
+        warnings.push(`Tool ${tool.name} has never been used`);
+      }
+      
+      // Check for stale tools (not used in 90 days)
+      if (tool.lastUsed) {
+        const daysSinceUse = (Date.now() - new Date(tool.lastUsed).getTime()) 
+          / (1000 * 60 * 60 * 24);
+        if (daysSinceUse > 90) {
+          issues.push(`Tool ${tool.name} hasn't been used in ${Math.round(daysSinceUse)} days`);
+        }
+      }
+    });
+    
+    return {
+      totalTools: tools.data.length,
+      activeTools: tools.data.filter(t => t.active).length,
+      issues,
+      warnings
+    };
+  }
+}
+
+interface ToolHealthReport {
+  totalTools: number;
+  activeTools: number;
+  issues: string[];
+  warnings: string[];
+}
+
+const manager = new ToolManager();
+const healthReport = await manager.validateToolHealth();
+
+console.log(`Tool Health Report:`);
+console.log(`  Total Tools: ${healthReport.totalTools}`);
+console.log(`  Active Tools: ${healthReport.activeTools}`);
+
+if (healthReport.issues.length > 0) {
+  console.log(`\nIssues (${healthReport.issues.length}):`);
+  healthReport.issues.forEach(issue => console.log(`  ❌ ${issue}`));
+}
+
+if (healthReport.warnings.length > 0) {
+  console.log(`\nWarnings (${healthReport.warnings.length}):`);
+  healthReport.warnings.forEach(warning => console.log(`  ⚠️ ${warning}`));
+}
+```
+
+### Tool Registry with Caching
+```typescript
+class ToolRegistry {
+  private toolCache: Map<string, Tool> = new Map();
+  private lastFetch = 0;
+  private cacheTTL = 5 * 60 * 1000; // 5 minutes
+  
+  async getTools(forceRefresh = false): Promise<Tool[]> {
+    const now = Date.now();
+    
+    if (forceRefresh || (now - this.lastFetch) > this.cacheTTL) {
+      const tools = await client.listTools();
+      
+      // Update cache
+      this.toolCache.clear();
+      tools.data.forEach(tool => {
+        this.toolCache.set(tool.id, tool);
+      });
+      
+      this.lastFetch = now;
+      return tools.data;
+    }
+    
+    return Array.from(this.toolCache.values());
+  }
+  
+  async getToolById(id: string): Promise<Tool | null> {
+    const tools = await this.getTools();
+    return tools.find(tool => tool.id === id) || null;
+  }
+  
+  async getToolByName(name: string): Promise<Tool | null> {
+    const tools = await this.getTools();
+    return tools.find(tool => tool.name === name) || null;
+  }
+  
+  async searchTools(query: string): Promise<Tool[]> {
+    const tools = await this.getTools();
+    const lowercaseQuery = query.toLowerCase();
+    
+    return tools.filter(tool =>
+      tool.name.toLowerCase().includes(lowercaseQuery) ||
+      tool.description?.toLowerCase().includes(lowercaseQuery) ||
+      tool.baseUrl.toLowerCase().includes(lowercaseQuery)
+    );
+  }
+  
+  clearCache(): void {
+    this.toolCache.clear();
+    this.lastFetch = 0;
+  }
+}
+
+const registry = new ToolRegistry();
+
+// Use cached data
+const emailTools = await registry.searchTools('email');
+const slackTool = await registry.getToolByName('Slack API');
+
+// Force refresh
+const freshTools = await registry.getTools(true);
+```
+
+## Integration Patterns
+
+### Tool Dashboard
+```typescript
+async function createToolDashboard(): Promise<void> {
+  const tools = await client.listTools();
+  
+  console.log('='.repeat(60));
+  console.log('TOOL INTEGRATION DASHBOARD');
+  console.log('='.repeat(60));
+  
+  // Summary stats
+  const stats = {
+    total: tools.data.length,
+    active: tools.data.filter(t => t.active).length,
+    byAuthType: new Map<string, number>()
+  };
+  
+  tools.data.forEach(tool => {
+    const count = stats.byAuthType.get(tool.authType) || 0;
+    stats.byAuthType.set(tool.authType, count + 1);
+  });
+  
+  console.log(`\nSUMMARY:`);
+  console.log(`  Total Integrations: ${stats.total}`);
+  console.log(`  Active: ${stats.active}`);
+  console.log(`  Inactive: ${stats.total - stats.active}`);
+  
+  console.log(`\nBY AUTHENTICATION TYPE:`);
+  stats.byAuthType.forEach((count, authType) => {
+    console.log(`  ${authType}: ${count}`);
+  });
+  
+  // Recent activity
+  const recentlyUsed = tools.data
+    .filter(tool => tool.lastUsed)
+    .sort((a, b) => new Date(b.lastUsed!).getTime() - new Date(a.lastUsed!).getTime())
+    .slice(0, 5);
+    
+  console.log(`\nRECENT ACTIVITY (Top 5):`);
+  recentlyUsed.forEach((tool, index) => {
+    const lastUsed = new Date(tool.lastUsed!).toLocaleDateString();
+    console.log(`  ${index + 1}. ${tool.name} - ${lastUsed}`);
+  });
+  
+  console.log('='.repeat(60));
+}
+
+await createToolDashboard();
+```
+
+### Tool Inventory Export
+```typescript
+async function exportToolInventory(): Promise<string> {
+  const tools = await client.listTools();
+  
+  const inventory = {
+    exportDate: new Date().toISOString(),
+    totalTools: tools.data.length,
+    tools: tools.data.map(tool => ({
+      id: tool.id,
+      name: tool.name,
+      baseUrl: tool.baseUrl,
+      authType: tool.authType,
+      description: tool.description,
+      active: tool.active,
+      createdAt: tool.createdAt,
+      lastUsed: tool.lastUsed,
+      daysSinceCreated: Math.floor(
+        (Date.now() - new Date(tool.createdAt).getTime()) / (1000 * 60 * 60 * 24)
+      ),
+      daysSinceLastUsed: tool.lastUsed ? Math.floor(
+        (Date.now() - new Date(tool.lastUsed).getTime()) / (1000 * 60 * 60 * 24)
+      ) : null
+    }))
+  };
+  
+  return JSON.stringify(inventory, null, 2);
+}
+
+const inventory = await exportToolInventory();
+console.log('Tool Inventory:');
+console.log(inventory);
+
+// Or save to file
+// require('fs').writeFileSync('tool-inventory.json', inventory);
+```
+
+### Integration Recommendations
+```typescript
+class IntegrationRecommendations {
+  private static readonly POPULAR_INTEGRATIONS = [
+    { name: 'GitHub API', domain: 'github.com', category: 'Development' },
+    { name: 'Slack API', domain: 'slack.com', category: 'Communication' },
+    { name: 'SendGrid API', domain: 'sendgrid.com', category: 'Email' },
+    { name: 'Stripe API', domain: 'stripe.com', category: 'Payments' },
+    { name: 'HubSpot API', domain: 'hubspot.com', category: 'CRM' }
+  ];
+  
+  async getRecommendations(): Promise<IntegrationRecommendation[]> {
+    const tools = await client.listTools();
+    const existingDomains = new Set(
+      tools.data.map(tool => new URL(tool.baseUrl).hostname)
+    );
+    
+    return IntegrationRecommendations.POPULAR_INTEGRATIONS
+      .filter(rec => !existingDomains.has(rec.domain))
+      .map(rec => ({
+        ...rec,
+        reason: `Popular ${rec.category} integration - not yet configured`
+      }));
+  }
+  
+  async getMissingByCategory(): Promise<Map<string, IntegrationRecommendation[]>> {
+    const recommendations = await this.getRecommendations();
+    const byCategory = new Map<string, IntegrationRecommendation[]>();
+    
+    recommendations.forEach(rec => {
+      if (!byCategory.has(rec.category)) {
+        byCategory.set(rec.category, []);
+      }
+      byCategory.get(rec.category)!.push(rec);
+    });
+    
+    return byCategory;
+  }
+}
+
+interface IntegrationRecommendation {
+  name: string;
+  domain: string;
+  category: string;
+  reason: string;
+}
+
+const recommendations = new IntegrationRecommendations();
+const missing = await recommendations.getMissingByCategory();
+
+console.log('Integration Recommendations:');
+missing.forEach((recs, category) => {
+  console.log(`\n${category}:`);
+  recs.forEach(rec => {
+    console.log(`  - ${rec.name} (${rec.domain})`);
+    console.log(`    ${rec.reason}`);
+  });
+});
+```
+
+## Best Practices
+
+### Periodic Cleanup
+```typescript
+async function cleanupUnusedTools(dryRun = true): Promise<void> {
+  const tools = await client.listTools();
+  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+  
+  const toCleanup = tools.data.filter(tool => 
+    !tool.active && 
+    (!tool.lastUsed || new Date(tool.lastUsed) < ninetyDaysAgo)
+  );
+  
+  console.log(`Found ${toCleanup.length} tools for cleanup:`);
+  toCleanup.forEach(tool => {
+    const lastUsed = tool.lastUsed ? new Date(tool.lastUsed).toLocaleDateString() : 'Never';
+    console.log(`  - ${tool.name} (Last used: ${lastUsed})`);
+  });
+  
+  if (!dryRun && toCleanup.length > 0) {
+    console.log('\nCleaning up tools...');
+    for (const tool of toCleanup) {
+      try {
+        await client.raw.tools.toolsControllerRemove(tool.id);
+        console.log(`✅ Deleted: ${tool.name}`);
+      } catch (error) {
+        console.error(`❌ Failed to delete ${tool.name}:`, error.message);
+      }
+    }
+  } else {
+    console.log('\nDry run - no tools deleted. Set dryRun=false to actually delete.');
+  }
+}
+
+// Dry run first
+await cleanupUnusedTools(true);
+
+// Actually cleanup (uncomment to run)
+// await cleanupUnusedTools(false);
+```
+
+### Caching Strategy
+```typescript
+let cachedTools: Tool[] = [];
+let lastFetch = 0;
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
+
+async function getCachedTools(): Promise<Tool[]> {
+  const now = Date.now();
+  
+  if (cachedTools.length === 0 || (now - lastFetch) > CACHE_DURATION) {
+    const tools = await client.listTools();
+    cachedTools = tools.data;
+    lastFetch = now;
+  }
+  
+  return cachedTools;
+}
+
+// Usage
+const tools = await getCachedTools(); // Uses cache if available
+```
+
+## Related Methods
+
+- [createTool()](/sdk/methods/create-tool) - Create new tool integrations
+- [runFlow()](/sdk/methods/run-flow) - Use tools in workflows
+- [TolstoyClient](/sdk/methods/tolstoy-client) - Client setup
+
+## See Also
+
+- [List Tools API](/api/tools/get-tools) - Direct API documentation
+- [Tool Management Guide](/docs/tools) - Comprehensive tool management
+- [SDK Examples](/sdk/examples) - Real-world tool usage patterns

@@ -1,0 +1,701 @@
+---
+title: listWebhooks()
+sidebar_position: 8
+---
+
+# listWebhooks()
+
+List all webhooks configured in the organization.
+
+## Signature
+
+```typescript
+listWebhooks(): Promise<WebhookList>
+```
+
+## Parameters
+
+None - this method uses the organization context from the TolstoyClient constructor.
+
+## Returns
+
+Returns a `Promise<WebhookList>`:
+
+```typescript
+interface WebhookList {
+  data: Webhook[];
+}
+
+interface Webhook {
+  id: string;
+  name: string;
+  url: string;
+  events: string[];
+  active: boolean;
+  secret?: string;
+  createdAt: string;
+  updatedAt: string;
+  lastDelivery?: string;
+  deliveryCount: number;
+  failureCount: number;
+}
+```
+
+## Usage Examples
+
+### Basic Webhook Listing
+```typescript
+const webhooks = await client.listWebhooks();
+
+console.log(`Found ${webhooks.data.length} webhooks:`);
+webhooks.data.forEach(webhook => {
+  console.log(`- ${webhook.name}`);
+  console.log(`  URL: ${webhook.url}`);
+  console.log(`  Events: ${webhook.events.join(', ')}`);
+  console.log(`  Status: ${webhook.active ? 'Active' : 'Inactive'}`);
+  console.log(`  Deliveries: ${webhook.deliveryCount} (${webhook.failureCount} failed)`);
+});
+```
+
+### Active Webhooks Only
+```typescript
+const webhooks = await client.listWebhooks();
+const activeWebhooks = webhooks.data.filter(webhook => webhook.active);
+
+console.log(`Active webhooks (${activeWebhooks.length}):`);
+activeWebhooks.forEach(webhook => {
+  const successRate = webhook.deliveryCount > 0 
+    ? ((webhook.deliveryCount - webhook.failureCount) / webhook.deliveryCount * 100).toFixed(1)
+    : 'N/A';
+    
+  console.log(`- ${webhook.name}: ${successRate}% success rate`);
+});
+```
+
+### Webhook Health Report
+```typescript
+const webhooks = await client.listWebhooks();
+const healthReport = {
+  total: webhooks.data.length,
+  active: 0,
+  inactive: 0,
+  healthy: 0,
+  problematic: 0,
+  totalDeliveries: 0,
+  totalFailures: 0
+};
+
+webhooks.data.forEach(webhook => {
+  if (webhook.active) {
+    healthReport.active++;
+  } else {
+    healthReport.inactive++;
+  }
+  
+  healthReport.totalDeliveries += webhook.deliveryCount;
+  healthReport.totalFailures += webhook.failureCount;
+  
+  // Consider webhook problematic if failure rate > 10%
+  const failureRate = webhook.deliveryCount > 0 
+    ? webhook.failureCount / webhook.deliveryCount
+    : 0;
+    
+  if (failureRate > 0.1) {
+    healthReport.problematic++;
+  } else {
+    healthReport.healthy++;
+  }
+});
+
+const overallSuccessRate = healthReport.totalDeliveries > 0
+  ? ((healthReport.totalDeliveries - healthReport.totalFailures) / healthReport.totalDeliveries * 100).toFixed(1)
+  : '0';
+
+console.log('Webhook Health Report:');
+console.log(`  Total: ${healthReport.total}`);
+console.log(`  Active: ${healthReport.active}`);
+console.log(`  Inactive: ${healthReport.inactive}`);
+console.log(`  Healthy: ${healthReport.healthy}`);
+console.log(`  Problematic: ${healthReport.problematic}`);
+console.log(`  Overall Success Rate: ${overallSuccessRate}%`);
+```
+
+### Webhooks by Event Type
+```typescript
+const webhooks = await client.listWebhooks();
+const eventCounts = new Map<string, number>();
+
+webhooks.data.forEach(webhook => {
+  webhook.events.forEach(event => {
+    eventCounts.set(event, (eventCounts.get(event) || 0) + 1);
+  });
+});
+
+console.log('Event subscriptions:');
+Array.from(eventCounts.entries())
+  .sort(([,a], [,b]) => b - a)
+  .forEach(([event, count]) => {
+    console.log(`  ${event}: ${count} webhooks`);
+  });
+```
+
+## Webhook Properties
+
+### Basic Information
+```typescript
+const webhooks = await client.listWebhooks();
+const webhook = webhooks.data[0];
+
+console.log('Webhook Details:');
+console.log(`  ID: ${webhook.id}`);
+console.log(`  Name: ${webhook.name}`);
+console.log(`  URL: ${webhook.url}`);
+console.log(`  Events: ${webhook.events.join(', ')}`);
+console.log(`  Status: ${webhook.active ? 'Active' : 'Inactive'}`);
+console.log(`  Has Secret: ${webhook.secret ? 'Yes' : 'No'}`);
+```
+
+### Delivery Statistics
+```typescript
+const webhooks = await client.listWebhooks();
+
+console.log('Delivery Statistics:');
+webhooks.data.forEach(webhook => {
+  const successCount = webhook.deliveryCount - webhook.failureCount;
+  const successRate = webhook.deliveryCount > 0 
+    ? (successCount / webhook.deliveryCount * 100).toFixed(1)
+    : '0';
+  
+  console.log(`\n${webhook.name}:`);
+  console.log(`  Total Deliveries: ${webhook.deliveryCount}`);
+  console.log(`  Successful: ${successCount}`);
+  console.log(`  Failed: ${webhook.failureCount}`);
+  console.log(`  Success Rate: ${successRate}%`);
+  
+  if (webhook.lastDelivery) {
+    const lastDelivery = new Date(webhook.lastDelivery);
+    console.log(`  Last Delivery: ${lastDelivery.toLocaleString()}`);
+  }
+});
+```
+
+### Activity Timeline
+```typescript
+const webhooks = await client.listWebhooks();
+
+// Sort by last delivery date
+const recentActivity = webhooks.data
+  .filter(webhook => webhook.lastDelivery)
+  .sort((a, b) => new Date(b.lastDelivery!).getTime() - new Date(a.lastDelivery!).getTime())
+  .slice(0, 10);
+
+console.log('Recent Activity (Top 10):');
+recentActivity.forEach((webhook, index) => {
+  const lastDelivery = new Date(webhook.lastDelivery!);
+  const hoursAgo = Math.floor((Date.now() - lastDelivery.getTime()) / (1000 * 60 * 60));
+  
+  console.log(`${index + 1}. ${webhook.name}`);
+  console.log(`   Last active: ${hoursAgo} hours ago`);
+});
+```
+
+## Error Handling
+
+```typescript
+import { AxiosError } from 'axios';
+
+try {
+  const webhooks = await client.listWebhooks();
+  
+  if (webhooks.data.length === 0) {
+    console.log('No webhooks configured in this organization');
+    console.log('Create your first webhook with createWebhook()');
+  } else {
+    console.log(`Found ${webhooks.data.length} webhooks`);
+  }
+} catch (error) {
+  const apiError = error as AxiosError;
+  
+  if (apiError.response?.status === 403) {
+    console.error('Access denied - check organization permissions');
+  } else if (apiError.response?.status === 401) {
+    console.error('Authentication failed - check credentials');
+  } else {
+    console.error('Failed to list webhooks:', error.message);
+  }
+}
+```
+
+## Advanced Usage
+
+### Webhook Discovery
+```typescript
+class WebhookDiscovery {
+  async findWebhooksByUrl(urlPattern: string): Promise<Webhook[]> {
+    const webhooks = await client.listWebhooks();
+    return webhooks.data.filter(webhook => 
+      webhook.url.includes(urlPattern)
+    );
+  }
+  
+  async findWebhooksByEvent(eventType: string): Promise<Webhook[]> {
+    const webhooks = await client.listWebhooks();
+    return webhooks.data.filter(webhook => 
+      webhook.events.includes(eventType)
+    );
+  }
+  
+  async getProblematicWebhooks(failureThreshold = 0.1): Promise<Webhook[]> {
+    const webhooks = await client.listWebhooks();
+    return webhooks.data.filter(webhook => {
+      if (webhook.deliveryCount === 0) return false;
+      const failureRate = webhook.failureCount / webhook.deliveryCount;
+      return failureRate > failureThreshold;
+    });
+  }
+  
+  async getUnusedWebhooks(daysSinceLastDelivery = 30): Promise<Webhook[]> {
+    const webhooks = await client.listWebhooks();
+    const cutoff = new Date(Date.now() - daysSinceLastDelivery * 24 * 60 * 60 * 1000);
+    
+    return webhooks.data.filter(webhook => 
+      !webhook.lastDelivery || new Date(webhook.lastDelivery) < cutoff
+    );
+  }
+}
+
+const discovery = new WebhookDiscovery();
+
+// Find Slack webhooks
+const slackWebhooks = await discovery.findWebhooksByUrl('slack.com');
+console.log(`Found ${slackWebhooks.length} Slack webhooks`);
+
+// Find flow failure monitors
+const failureMonitors = await discovery.findWebhooksByEvent('flow.failed');
+console.log(`Found ${failureMonitors.length} failure monitoring webhooks`);
+
+// Find problematic webhooks
+const problematic = await discovery.getProblematicWebhooks(0.2); // 20% failure rate
+console.log(`Found ${problematic.length} webhooks with >20% failure rate`);
+```
+
+### Webhook Analytics
+```typescript
+interface WebhookAnalytics {
+  totalWebhooks: number;
+  activeWebhooks: number;
+  totalDeliveries: number;
+  totalFailures: number;
+  overallSuccessRate: number;
+  eventDistribution: Map<string, number>;
+  domainDistribution: Map<string, number>;
+  averageDeliveriesPerWebhook: number;
+}
+
+async function analyzeWebhooks(): Promise<WebhookAnalytics> {
+  const webhooks = await client.listWebhooks();
+  
+  const analytics: WebhookAnalytics = {
+    totalWebhooks: webhooks.data.length,
+    activeWebhooks: 0,
+    totalDeliveries: 0,
+    totalFailures: 0,
+    overallSuccessRate: 0,
+    eventDistribution: new Map(),
+    domainDistribution: new Map(),
+    averageDeliveriesPerWebhook: 0
+  };
+  
+  webhooks.data.forEach(webhook => {
+    if (webhook.active) {
+      analytics.activeWebhooks++;
+    }
+    
+    analytics.totalDeliveries += webhook.deliveryCount;
+    analytics.totalFailures += webhook.failureCount;
+    
+    // Event distribution
+    webhook.events.forEach(event => {
+      const count = analytics.eventDistribution.get(event) || 0;
+      analytics.eventDistribution.set(event, count + 1);
+    });
+    
+    // Domain distribution
+    try {
+      const domain = new URL(webhook.url).hostname;
+      const count = analytics.domainDistribution.get(domain) || 0;
+      analytics.domainDistribution.set(domain, count + 1);
+    } catch {
+      // Invalid URL, skip
+    }
+  });
+  
+  analytics.overallSuccessRate = analytics.totalDeliveries > 0
+    ? ((analytics.totalDeliveries - analytics.totalFailures) / analytics.totalDeliveries) * 100
+    : 0;
+    
+  analytics.averageDeliveriesPerWebhook = analytics.totalWebhooks > 0
+    ? analytics.totalDeliveries / analytics.totalWebhooks
+    : 0;
+  
+  return analytics;
+}
+
+const analytics = await analyzeWebhooks();
+
+console.log('Webhook Analytics:');
+console.log(`  Total Webhooks: ${analytics.totalWebhooks}`);
+console.log(`  Active: ${analytics.activeWebhooks}`);
+console.log(`  Overall Success Rate: ${analytics.overallSuccessRate.toFixed(1)}%`);
+console.log(`  Avg Deliveries per Webhook: ${analytics.averageDeliveriesPerWebhook.toFixed(1)}`);
+
+console.log('\nTop Event Types:');
+Array.from(analytics.eventDistribution.entries())
+  .sort(([,a], [,b]) => b - a)
+  .slice(0, 5)
+  .forEach(([event, count]) => {
+    console.log(`  ${event}: ${count} webhooks`);
+  });
+```
+
+### Webhook Registry with Caching
+```typescript
+class WebhookRegistry {
+  private webhookCache: Map<string, Webhook> = new Map();
+  private lastFetch = 0;
+  private cacheTTL = 5 * 60 * 1000; // 5 minutes
+  
+  async getWebhooks(forceRefresh = false): Promise<Webhook[]> {
+    const now = Date.now();
+    
+    if (forceRefresh || (now - this.lastFetch) > this.cacheTTL) {
+      const webhooks = await client.listWebhooks();
+      
+      // Update cache
+      this.webhookCache.clear();
+      webhooks.data.forEach(webhook => {
+        this.webhookCache.set(webhook.id, webhook);
+      });
+      
+      this.lastFetch = now;
+      return webhooks.data;
+    }
+    
+    return Array.from(this.webhookCache.values());
+  }
+  
+  async getWebhookById(id: string): Promise<Webhook | null> {
+    const webhooks = await this.getWebhooks();
+    return webhooks.find(webhook => webhook.id === id) || null;
+  }
+  
+  async getWebhookByName(name: string): Promise<Webhook | null> {
+    const webhooks = await this.getWebhooks();
+    return webhooks.find(webhook => webhook.name === name) || null;
+  }
+  
+  async searchWebhooks(query: string): Promise<Webhook[]> {
+    const webhooks = await this.getWebhooks();
+    const lowercaseQuery = query.toLowerCase();
+    
+    return webhooks.filter(webhook =>
+      webhook.name.toLowerCase().includes(lowercaseQuery) ||
+      webhook.url.toLowerCase().includes(lowercaseQuery) ||
+      webhook.events.some(event => event.toLowerCase().includes(lowercaseQuery))
+    );
+  }
+  
+  clearCache(): void {
+    this.webhookCache.clear();
+    this.lastFetch = 0;
+  }
+}
+
+const registry = new WebhookRegistry();
+
+// Use cached data
+const errorWebhooks = await registry.searchWebhooks('error');
+const slackWebhook = await registry.getWebhookByName('Slack Notifications');
+
+// Force refresh
+const freshWebhooks = await registry.getWebhooks(true);
+```
+
+## Integration Patterns
+
+### Webhook Dashboard
+```typescript
+async function createWebhookDashboard(): Promise<void> {
+  const webhooks = await client.listWebhooks();
+  
+  console.log('='.repeat(60));
+  console.log('WEBHOOK DASHBOARD');
+  console.log('='.repeat(60));
+  
+  // Summary
+  const summary = {
+    total: webhooks.data.length,
+    active: webhooks.data.filter(w => w.active).length,
+    totalDeliveries: webhooks.data.reduce((sum, w) => sum + w.deliveryCount, 0),
+    totalFailures: webhooks.data.reduce((sum, w) => sum + w.failureCount, 0)
+  };
+  
+  const successRate = summary.totalDeliveries > 0
+    ? ((summary.totalDeliveries - summary.totalFailures) / summary.totalDeliveries * 100).toFixed(1)
+    : '0';
+  
+  console.log(`SUMMARY:`);
+  console.log(`  Total Webhooks: ${summary.total}`);
+  console.log(`  Active: ${summary.active}`);
+  console.log(`  Total Deliveries: ${summary.totalDeliveries}`);
+  console.log(`  Success Rate: ${successRate}%`);
+  
+  // Top performers
+  const topPerformers = webhooks.data
+    .filter(w => w.deliveryCount > 0)
+    .sort((a, b) => {
+      const aRate = (a.deliveryCount - a.failureCount) / a.deliveryCount;
+      const bRate = (b.deliveryCount - b.failureCount) / b.deliveryCount;
+      return bRate - aRate;
+    })
+    .slice(0, 3);
+  
+  console.log(`\nTOP PERFORMERS:`);
+  topPerformers.forEach((webhook, index) => {
+    const rate = ((webhook.deliveryCount - webhook.failureCount) / webhook.deliveryCount * 100).toFixed(1);
+    console.log(`  ${index + 1}. ${webhook.name}: ${rate}% success`);
+  });
+  
+  // Recent activity
+  const recentActivity = webhooks.data
+    .filter(w => w.lastDelivery)
+    .sort((a, b) => new Date(b.lastDelivery!).getTime() - new Date(a.lastDelivery!).getTime())
+    .slice(0, 3);
+  
+  console.log(`\nRECENT ACTIVITY:`);
+  recentActivity.forEach((webhook, index) => {
+    const lastDelivery = new Date(webhook.lastDelivery!).toLocaleDateString();
+    console.log(`  ${index + 1}. ${webhook.name}: ${lastDelivery}`);
+  });
+  
+  console.log('='.repeat(60));
+}
+
+await createWebhookDashboard();
+```
+
+### Webhook Monitoring
+```typescript
+class WebhookMonitor {
+  async checkWebhookHealth(): Promise<HealthReport[]> {
+    const webhooks = await client.listWebhooks();
+    return webhooks.data.map(webhook => {
+      const successRate = webhook.deliveryCount > 0 
+        ? ((webhook.deliveryCount - webhook.failureCount) / webhook.deliveryCount) * 100
+        : 100;
+      
+      let status: 'healthy' | 'warning' | 'critical' = 'healthy';
+      const issues: string[] = [];
+      
+      if (!webhook.active) {
+        status = 'warning';
+        issues.push('Webhook is inactive');
+      }
+      
+      if (webhook.deliveryCount === 0) {
+        status = 'warning';
+        issues.push('No deliveries recorded');
+      } else if (successRate < 50) {
+        status = 'critical';
+        issues.push(`High failure rate: ${(100 - successRate).toFixed(1)}%`);
+      } else if (successRate < 90) {
+        status = 'warning';
+        issues.push(`Moderate failure rate: ${(100 - successRate).toFixed(1)}%`);
+      }
+      
+      if (webhook.lastDelivery) {
+        const daysSinceLastDelivery = (Date.now() - new Date(webhook.lastDelivery).getTime()) 
+          / (1000 * 60 * 60 * 24);
+        if (daysSinceLastDelivery > 7) {
+          status = status === 'critical' ? 'critical' : 'warning';
+          issues.push(`No recent activity (${Math.round(daysSinceLastDelivery)} days)`);
+        }
+      }
+      
+      return {
+        webhook,
+        status,
+        successRate,
+        issues
+      };
+    });
+  }
+  
+  async generateHealthReport(): Promise<void> {
+    const healthReports = await this.checkWebhookHealth();
+    
+    const statusCounts = {
+      healthy: healthReports.filter(r => r.status === 'healthy').length,
+      warning: healthReports.filter(r => r.status === 'warning').length,
+      critical: healthReports.filter(r => r.status === 'critical').length
+    };
+    
+    console.log('Webhook Health Report:');
+    console.log(`  Healthy: ${statusCounts.healthy}`);
+    console.log(`  Warning: ${statusCounts.warning}`);
+    console.log(`  Critical: ${statusCounts.critical}`);
+    
+    const criticalIssues = healthReports.filter(r => r.status === 'critical');
+    if (criticalIssues.length > 0) {
+      console.log('\nCRITICAL ISSUES:');
+      criticalIssues.forEach(report => {
+        console.log(`  ❌ ${report.webhook.name}:`);
+        report.issues.forEach(issue => {
+          console.log(`     - ${issue}`);
+        });
+      });
+    }
+  }
+}
+
+interface HealthReport {
+  webhook: Webhook;
+  status: 'healthy' | 'warning' | 'critical';
+  successRate: number;
+  issues: string[];
+}
+
+const monitor = new WebhookMonitor();
+await monitor.generateHealthReport();
+```
+
+### Webhook Cleanup
+```typescript
+async function cleanupWebhooks(dryRun = true): Promise<void> {
+  const webhooks = await client.listWebhooks();
+  const toCleanup: Webhook[] = [];
+  
+  webhooks.data.forEach(webhook => {
+    // Mark for cleanup if inactive and no recent deliveries
+    if (!webhook.active && webhook.deliveryCount === 0) {
+      toCleanup.push(webhook);
+      return;
+    }
+    
+    // Mark for cleanup if very high failure rate
+    if (webhook.deliveryCount > 10 && webhook.failureCount / webhook.deliveryCount > 0.9) {
+      toCleanup.push(webhook);
+      return;
+    }
+    
+    // Mark for cleanup if no activity for 90 days
+    if (webhook.lastDelivery) {
+      const daysSinceLastDelivery = (Date.now() - new Date(webhook.lastDelivery).getTime()) 
+        / (1000 * 60 * 60 * 24);
+      if (daysSinceLastDelivery > 90) {
+        toCleanup.push(webhook);
+      }
+    }
+  });
+  
+  console.log(`Found ${toCleanup.length} webhooks for cleanup:`);
+  toCleanup.forEach(webhook => {
+    const reason = !webhook.active && webhook.deliveryCount === 0 
+      ? 'Inactive with no deliveries'
+      : webhook.deliveryCount > 10 && webhook.failureCount / webhook.deliveryCount > 0.9
+      ? `High failure rate (${(webhook.failureCount / webhook.deliveryCount * 100).toFixed(1)}%)`
+      : 'No recent activity';
+    
+    console.log(`  - ${webhook.name}: ${reason}`);
+  });
+  
+  if (!dryRun && toCleanup.length > 0) {
+    console.log('\nDeleting webhooks...');
+    for (const webhook of toCleanup) {
+      try {
+        await client.raw.webhooks.webhooksControllerRemove(webhook.id);
+        console.log(`✅ Deleted: ${webhook.name}`);
+      } catch (error) {
+        console.error(`❌ Failed to delete ${webhook.name}:`, error.message);
+      }
+    }
+  } else {
+    console.log('\nDry run - no webhooks deleted. Set dryRun=false to actually delete.');
+  }
+}
+
+// Dry run first
+await cleanupWebhooks(true);
+
+// Actually cleanup (uncomment to run)
+// await cleanupWebhooks(false);
+```
+
+## Best Practices
+
+### Caching Strategy
+```typescript
+let cachedWebhooks: Webhook[] = [];
+let lastFetch = 0;
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
+
+async function getCachedWebhooks(): Promise<Webhook[]> {
+  const now = Date.now();
+  
+  if (cachedWebhooks.length === 0 || (now - lastFetch) > CACHE_DURATION) {
+    const webhooks = await client.listWebhooks();
+    cachedWebhooks = webhooks.data;
+    lastFetch = now;
+  }
+  
+  return cachedWebhooks;
+}
+
+// Usage
+const webhooks = await getCachedWebhooks(); // Uses cache if available
+```
+
+### Error Recovery
+```typescript
+async function robustListWebhooks(retries = 3): Promise<Webhook[]> {
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const webhooks = await client.listWebhooks();
+      return webhooks.data;
+    } catch (error) {
+      if (attempt === retries) throw error;
+      
+      console.warn(`Attempt ${attempt} failed, retrying...`);
+      await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+    }
+  }
+  return [];
+}
+```
+
+### Performance Monitoring
+```typescript
+async function monitorWebhookPerformance(): Promise<void> {
+  const start = Date.now();
+  const webhooks = await client.listWebhooks();
+  const duration = Date.now() - start;
+  
+  console.log(`Listed ${webhooks.data.length} webhooks in ${duration}ms`);
+  
+  if (duration > 5000) {
+    console.warn('Webhook listing is slow - consider implementing caching');
+  }
+}
+```
+
+## Related Methods
+
+- [createWebhook()](/sdk/methods/create-webhook) - Create new webhooks
+- [runFlow()](/sdk/methods/run-flow) - Trigger events that webhooks receive
+- [TolstoyClient](/sdk/methods/tolstoy-client) - Client setup
+
+## See Also
+
+- [List Webhooks API](/api/webhooks/get-webhooks) - Direct API documentation
+- [Webhook Management Guide](/docs/webhooks) - Comprehensive webhook setup
+- [SDK Examples](/sdk/examples) - Real-world webhook patterns

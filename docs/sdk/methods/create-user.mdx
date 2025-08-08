@@ -1,0 +1,687 @@
+---
+title: createUser()
+sidebar_position: 16
+---
+
+# createUser()
+
+Create a new user in the organization.
+
+## Signature
+
+```typescript
+createUser(userData: CreateUserDto): Promise<User>
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `userData` | `CreateUserDto` | User configuration |
+
+### CreateUserDto Interface
+
+```typescript
+interface CreateUserDto {
+  email: string;
+  name: string;
+  role: 'owner' | 'admin' | 'member' | 'viewer';
+  sendInvitation?: boolean;
+  permissions?: {
+    canCreateFlows?: boolean;
+    canExecuteFlows?: boolean;
+    canManageUsers?: boolean;
+    canViewAnalytics?: boolean;
+    canManageIntegrations?: boolean;
+  };
+}
+```
+
+## Returns
+
+Returns a `Promise<User>`:
+
+```typescript
+interface User {
+  data: {
+    id: string;
+    email: string;
+    name: string;
+    role: 'owner' | 'admin' | 'member' | 'viewer';
+    status: 'active' | 'invited' | 'suspended';
+    avatar?: string;
+    lastLoginAt?: string;
+    createdAt: string;
+    updatedAt: string;
+    permissions: {
+      canCreateFlows: boolean;
+      canExecuteFlows: boolean;
+      canManageUsers: boolean;
+      canViewAnalytics: boolean;
+      canManageIntegrations: boolean;
+    };
+  };
+}
+```
+
+## Usage Examples
+
+### Basic User Creation
+```typescript
+const user = await client.createUser({
+  email: 'john.doe@company.com',
+  name: 'John Doe',
+  role: 'member',
+  sendInvitation: true
+});
+
+console.log(`Created user: ${user.data.name} (${user.data.email})`);
+console.log(`Role: ${user.data.role}`);
+console.log(`Status: ${user.data.status}`);
+```
+
+### Admin User with Custom Permissions
+```typescript
+const adminUser = await client.createUser({
+  email: 'admin@company.com',
+  name: 'Admin User',
+  role: 'admin',
+  sendInvitation: true,
+  permissions: {
+    canCreateFlows: true,
+    canExecuteFlows: true,
+    canManageUsers: true,
+    canViewAnalytics: true,
+    canManageIntegrations: true
+  }
+});
+
+console.log(`Created admin: ${adminUser.data.name}`);
+console.log('Permissions:', adminUser.data.permissions);
+```
+
+### Bulk User Creation
+```typescript
+async function createUsersFromList(userList: Array<{ email: string; name: string; role: string }>): Promise<User[]> {
+  const createdUsers: User[] = [];
+  const errors: string[] = [];
+  
+  for (const userData of userList) {
+    try {
+      const user = await client.createUser({
+        email: userData.email,
+        name: userData.name,
+        role: userData.role as any,
+        sendInvitation: true
+      });
+      
+      createdUsers.push(user);
+      console.log(`✅ Created: ${userData.name} (${userData.email})`);
+    } catch (error: any) {
+      const errorMsg = `❌ Failed to create ${userData.name}: ${error.message}`;
+      errors.push(errorMsg);
+      console.error(errorMsg);
+    }
+    
+    // Rate limiting - wait between requests
+    await new Promise(resolve => setTimeout(resolve, 500));
+  }
+  
+  console.log(`\nBulk creation completed:`);
+  console.log(`  Success: ${createdUsers.length}`);
+  console.log(`  Errors: ${errors.length}`);
+  
+  return createdUsers;
+}
+
+const userList = [
+  { email: 'dev1@company.com', name: 'Developer One', role: 'member' },
+  { email: 'dev2@company.com', name: 'Developer Two', role: 'member' },
+  { email: 'manager@company.com', name: 'Project Manager', role: 'admin' }
+];
+
+const users = await createUsersFromList(userList);
+```
+
+## Error Handling
+
+```typescript
+import { AxiosError } from 'axios';
+
+try {
+  const user = await client.createUser({
+    email: 'newuser@company.com',
+    name: 'New User',
+    role: 'member'
+  });
+  
+  console.log(`✅ User created: ${user.data.id}`);
+} catch (error) {
+  const apiError = error as AxiosError;
+  
+  if (apiError.response) {
+    const { status, data } = apiError.response;
+    
+    switch (data.error.code) {
+      case 'VALIDATION_ERROR':
+        console.error('Invalid user data:', data.error.details);
+        break;
+      case 'CONFLICT':
+        console.error('User with this email already exists');
+        break;
+      case 'FORBIDDEN':
+        console.error('You do not have permission to create users');
+        break;
+      case 'QUOTA_EXCEEDED':
+        console.error('User limit reached for current plan');
+        break;
+      default:
+        console.error(`API Error ${status}:`, data.error.message);
+    }
+  } else {
+    console.error('Network error:', error.message);
+  }
+}
+```
+
+## Advanced Usage
+
+### User Provisioning System
+```typescript
+class UserProvisioner {
+  async provisionUser(userData: CreateUserDto & { department?: string; startDate?: string }): Promise<ProvisioningResult> {
+    const result: ProvisioningResult = {
+      user: null,
+      invitationSent: false,
+      permissions: {},
+      errors: []
+    };
+    
+    try {
+      // 1. Create user
+      result.user = await client.createUser(userData);
+      
+      // 2. Set role-based permissions
+      const permissions = this.getRolePermissions(userData.role);
+      result.permissions = permissions;
+      
+      // 3. Send welcome email if invitation enabled
+      if (userData.sendInvitation !== false) {
+        try {
+          // This would typically be done by the API automatically
+          result.invitationSent = true;
+          console.log(`📧 Invitation sent to ${userData.email}`);
+        } catch (error: any) {
+          result.errors.push(`Failed to send invitation: ${error.message}`);
+        }
+      }
+      
+      // 4. Log user creation for audit
+      console.log(`👤 User provisioned: ${userData.name} (${userData.role})`);
+      
+      return result;
+    } catch (error: any) {
+      result.errors.push(`User creation failed: ${error.message}`);
+      throw error;
+    }
+  }
+  
+  private getRolePermissions(role: string): Record<string, boolean> {
+    const permissions = {
+      viewer: {
+        canCreateFlows: false,
+        canExecuteFlows: false,
+        canManageUsers: false,
+        canViewAnalytics: true,
+        canManageIntegrations: false
+      },
+      member: {
+        canCreateFlows: true,
+        canExecuteFlows: true,
+        canManageUsers: false,
+        canViewAnalytics: true,
+        canManageIntegrations: false
+      },
+      admin: {
+        canCreateFlows: true,
+        canExecuteFlows: true,
+        canManageUsers: true,
+        canViewAnalytics: true,
+        canManageIntegrations: true
+      },
+      owner: {
+        canCreateFlows: true,
+        canExecuteFlows: true,
+        canManageUsers: true,
+        canViewAnalytics: true,
+        canManageIntegrations: true
+      }
+    };
+    
+    return permissions[role] || permissions.member;
+  }
+  
+  async provisionTeam(teamData: TeamProvisioningData): Promise<TeamProvisioningResult> {
+    const results: ProvisioningResult[] = [];
+    
+    for (const member of teamData.members) {
+      try {
+        const result = await this.provisionUser({
+          ...member,
+          sendInvitation: teamData.sendInvitations
+        });
+        results.push(result);
+      } catch (error: any) {
+        results.push({
+          user: null,
+          invitationSent: false,
+          permissions: {},
+          errors: [error.message]
+        });
+      }
+    }
+    
+    const successful = results.filter(r => r.user !== null);
+    const failed = results.filter(r => r.user === null);
+    
+    console.log(`Team provisioning completed:`);
+    console.log(`  Successful: ${successful.length}`);
+    console.log(`  Failed: ${failed.length}`);
+    
+    return {
+      teamName: teamData.teamName,
+      successful,
+      failed,
+      totalAttempted: teamData.members.length
+    };
+  }
+}
+
+interface ProvisioningResult {
+  user: User | null;
+  invitationSent: boolean;
+  permissions: Record<string, boolean>;
+  errors: string[];
+}
+
+interface TeamProvisioningData {
+  teamName: string;
+  sendInvitations: boolean;
+  members: Array<CreateUserDto & { department?: string }>;
+}
+
+interface TeamProvisioningResult {
+  teamName: string;
+  successful: ProvisioningResult[];
+  failed: ProvisioningResult[];
+  totalAttempted: number;
+}
+
+const provisioner = new UserProvisioner();
+
+// Provision individual user
+const userResult = await provisioner.provisionUser({
+  email: 'engineer@company.com',
+  name: 'Software Engineer',
+  role: 'member',
+  department: 'Engineering'
+});
+
+// Provision entire team
+const teamResult = await provisioner.provisionTeam({
+  teamName: 'Engineering Team',
+  sendInvitations: true,
+  members: [
+    { email: 'lead@company.com', name: 'Tech Lead', role: 'admin', department: 'Engineering' },
+    { email: 'dev1@company.com', name: 'Developer 1', role: 'member', department: 'Engineering' },
+    { email: 'dev2@company.com', name: 'Developer 2', role: 'member', department: 'Engineering' }
+  ]
+});
+```
+
+### CSV Import System
+```typescript
+class UserImporter {
+  async importFromCSV(csvData: string): Promise<ImportResult> {
+    const lines = csvData.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.trim());
+    
+    // Validate headers
+    const requiredHeaders = ['email', 'name', 'role'];
+    const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+    
+    if (missingHeaders.length > 0) {
+      throw new Error(`Missing required headers: ${missingHeaders.join(', ')}`);
+    }
+    
+    const results: ImportResult = {
+      successful: [],
+      failed: [],
+      skipped: [],
+      totalProcessed: 0
+    };
+    
+    // Process each row
+    for (let i = 1; i < lines.length; i++) {
+      const values = lines[i].split(',').map(v => v.trim());
+      const row: Record<string, string> = {};
+      
+      headers.forEach((header, index) => {
+        row[header] = values[index] || '';
+      });
+      
+      results.totalProcessed++;
+      
+      // Validate required fields
+      if (!row.email || !row.name || !row.role) {
+        results.skipped.push({
+          row: i + 1,
+          reason: 'Missing required fields',
+          data: row
+        });
+        continue;
+      }
+      
+      // Validate email format
+      if (!this.isValidEmail(row.email)) {
+        results.failed.push({
+          row: i + 1,
+          reason: 'Invalid email format',
+          data: row,
+          error: null
+        });
+        continue;
+      }
+      
+      // Validate role
+      if (!['viewer', 'member', 'admin', 'owner'].includes(row.role)) {
+        results.failed.push({
+          row: i + 1,
+          reason: 'Invalid role',
+          data: row,
+          error: null
+        });
+        continue;
+      }
+      
+      try {
+        const user = await client.createUser({
+          email: row.email,
+          name: row.name,
+          role: row.role as any,
+          sendInvitation: row.sendInvitation !== 'false'
+        });
+        
+        results.successful.push({
+          row: i + 1,
+          user: user.data,
+          data: row
+        });
+        
+        console.log(`✅ Row ${i + 1}: Created ${row.name}`);
+      } catch (error: any) {
+        results.failed.push({
+          row: i + 1,
+          reason: 'API error',
+          data: row,
+          error: error.message
+        });
+        
+        console.error(`❌ Row ${i + 1}: Failed to create ${row.name} - ${error.message}`);
+      }
+      
+      // Rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    return results;
+  }
+  
+  private isValidEmail(email: string): boolean {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  }
+  
+  generateReport(results: ImportResult): string {
+    let report = 'USER IMPORT REPORT\n';
+    report += '==================\n\n';
+    
+    report += `Total Processed: ${results.totalProcessed}\n`;
+    report += `Successful: ${results.successful.length}\n`;
+    report += `Failed: ${results.failed.length}\n`;
+    report += `Skipped: ${results.skipped.length}\n\n`;
+    
+    if (results.failed.length > 0) {
+      report += 'FAILED IMPORTS:\n';
+      results.failed.forEach(failure => {
+        report += `Row ${failure.row}: ${failure.reason}\n`;
+        if (failure.error) {
+          report += `  Error: ${failure.error}\n`;
+        }
+        report += `  Data: ${JSON.stringify(failure.data)}\n\n`;
+      });
+    }
+    
+    if (results.skipped.length > 0) {
+      report += 'SKIPPED ROWS:\n';
+      results.skipped.forEach(skip => {
+        report += `Row ${skip.row}: ${skip.reason}\n`;
+        report += `  Data: ${JSON.stringify(skip.data)}\n\n`;
+      });
+    }
+    
+    return report;
+  }
+}
+
+interface ImportResult {
+  successful: Array<{ row: number; user: any; data: Record<string, string> }>;
+  failed: Array<{ row: number; reason: string; data: Record<string, string>; error: string | null }>;
+  skipped: Array<{ row: number; reason: string; data: Record<string, string> }>;
+  totalProcessed: number;
+}
+
+const importer = new UserImporter();
+
+const csvData = `
+email,name,role,sendInvitation
+john@company.com,John Doe,member,true
+jane@company.com,Jane Smith,admin,true
+bob@company.com,Bob Johnson,viewer,false
+`;
+
+const results = await importer.importFromCSV(csvData);
+console.log(importer.generateReport(results));
+```
+
+## Integration Patterns
+
+### User Onboarding Workflow
+```typescript
+// React component for user creation form
+interface UserCreationFormProps {
+  onUserCreated: (user: User) => void;
+}
+
+function UserCreationForm({ onUserCreated }: UserCreationFormProps) {
+  const [formData, setFormData] = useState({
+    email: '',
+    name: '',
+    role: 'member',
+    sendInvitation: true
+  });
+  const [isCreating, setIsCreating] = useState(false);
+  const [error, setError] = useState('');
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsCreating(true);
+    setError('');
+    
+    try {
+      const user = await client.createUser({
+        email: formData.email,
+        name: formData.name,
+        role: formData.role as any,
+        sendInvitation: formData.sendInvitation
+      });
+      
+      onUserCreated(user);
+      
+      // Reset form
+      setFormData({
+        email: '',
+        name: '',
+        role: 'member',
+        sendInvitation: true
+      });
+    } catch (error: any) {
+      setError(error.response?.data?.error?.message || 'Failed to create user');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+  
+  return (
+    <form onSubmit={handleSubmit} className="user-creation-form">
+      <h3>Add New User</h3>
+      
+      <div className="form-group">
+        <label>Email *</label>
+        <input
+          type="email"
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          required
+        />
+      </div>
+      
+      <div className="form-group">
+        <label>Full Name *</label>
+        <input
+          type="text"
+          value={formData.name}
+          onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+          required
+        />
+      </div>
+      
+      <div className="form-group">
+        <label>Role *</label>
+        <select
+          value={formData.role}
+          onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+        >
+          <option value="viewer">Viewer</option>
+          <option value="member">Member</option>
+          <option value="admin">Admin</option>
+          <option value="owner">Owner</option>
+        </select>
+      </div>
+      
+      <div className="form-group">
+        <label>
+          <input
+            type="checkbox"
+            checked={formData.sendInvitation}
+            onChange={(e) => setFormData({ ...formData, sendInvitation: e.target.checked })}
+          />
+          Send invitation email
+        </label>
+      </div>
+      
+      {error && <div className="error">{error}</div>}
+      
+      <button type="submit" disabled={isCreating}>
+        {isCreating ? 'Creating...' : 'Create User'}
+      </button>
+    </form>
+  );
+}
+```
+
+## Best Practices
+
+### Input Validation
+```typescript
+function validateUserData(userData: CreateUserDto): string[] {
+  const errors: string[] = [];
+  
+  // Email validation
+  if (!userData.email) {
+    errors.push('Email is required');
+  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userData.email)) {
+    errors.push('Invalid email format');
+  }
+  
+  // Name validation
+  if (!userData.name) {
+    errors.push('Name is required');
+  } else if (userData.name.length < 2) {
+    errors.push('Name must be at least 2 characters');
+  }
+  
+  // Role validation
+  const validRoles = ['viewer', 'member', 'admin', 'owner'];
+  if (!validRoles.includes(userData.role)) {
+    errors.push('Invalid role specified');
+  }
+  
+  return errors;
+}
+
+// Usage
+const userData: CreateUserDto = {
+  email: 'user@example.com',
+  name: 'Test User',
+  role: 'member'
+};
+
+const validationErrors = validateUserData(userData);
+if (validationErrors.length > 0) {
+  console.error('Validation errors:', validationErrors);
+} else {
+  const user = await client.createUser(userData);
+}
+```
+
+### Retry Logic
+```typescript
+async function createUserWithRetry(
+  userData: CreateUserDto,
+  maxRetries = 3
+): Promise<User> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await client.createUser(userData);
+    } catch (error: any) {
+      if (attempt === maxRetries) throw error;
+      
+      // Don't retry validation errors or conflicts
+      if (error.response?.data?.error?.code === 'VALIDATION_ERROR' ||
+          error.response?.data?.error?.code === 'CONFLICT') {
+        throw error;
+      }
+      
+      const delay = Math.pow(2, attempt - 1) * 1000;
+      console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error('Should never reach here');
+}
+```
+
+## Related Methods
+
+- [listUsers()](/sdk/methods/list-users) - List all users
+- [getUser()](/sdk/methods/get-user) - Get user details
+- [updateUser()](/sdk/methods/update-user) - Update user information
+- [deleteUser()](/sdk/methods/delete-user) - Remove user
+- [TolstoyClient](/sdk/methods/tolstoy-client) - Client setup
+
+## See Also
+
+- [Create User API](/api/users/post-users) - Direct API documentation
+- [User Management Guide](/docs/users) - Comprehensive user management
+- [Role-based Access Control](/docs/rbac) - Managing user permissions

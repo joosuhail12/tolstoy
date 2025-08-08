@@ -1,0 +1,598 @@
+---
+title: createTool()
+sidebar_position: 5
+---
+
+# createTool()
+
+Create a new tool integration to connect external APIs and services with your Tolstoy workflows.
+
+## Signature
+
+```typescript
+createTool(toolData: CreateToolDto): Promise<Tool>
+```
+
+## Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `toolData` | `CreateToolDto` | Tool configuration object |
+
+### CreateToolDto Interface
+
+```typescript
+interface CreateToolDto {
+  name: string;
+  baseUrl: string;
+  authType: 'none' | 'bearer' | 'apikey' | 'oauth2' | 'basic';
+  description?: string;
+  headers?: Record<string, string>;
+  timeout?: number;
+  retries?: number;
+  oauthConfig?: {
+    authUrl: string;
+    tokenUrl: string;
+    clientId?: string;
+    scopes?: string[];
+  };
+}
+```
+
+## Returns
+
+Returns a `Promise<Tool>`:
+
+```typescript
+interface Tool {
+  data: {
+    id: string;
+    name: string;
+    baseUrl: string;
+    authType: string;
+    description?: string;
+    active: boolean;
+    createdAt: string;
+    updatedAt: string;
+    lastUsed?: string;
+  };
+}
+```
+
+## Usage Examples
+
+### API Key Authentication
+```typescript
+const sendGridTool = await client.createTool({
+  name: 'SendGrid Email API',
+  baseUrl: 'https://api.sendgrid.com/v3',
+  authType: 'apikey',
+  description: 'Send transactional emails',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  timeout: 30000,
+  retries: 3
+});
+
+console.log(`Created tool: ${sendGridTool.data.id}`);
+```
+
+### Bearer Token Authentication
+```typescript
+const githubTool = await client.createTool({
+  name: 'GitHub API',
+  baseUrl: 'https://api.github.com',
+  authType: 'bearer',
+  description: 'Access GitHub repositories and issues',
+  headers: {
+    'Accept': 'application/vnd.github.v3+json',
+    'User-Agent': 'Tolstoy-Integration'
+  }
+});
+
+console.log(`GitHub tool created: ${githubTool.data.id}`);
+```
+
+### OAuth 2.0 Authentication
+```typescript
+const googleSheetsTool = await client.createTool({
+  name: 'Google Sheets API',
+  baseUrl: 'https://sheets.googleapis.com/v4',
+  authType: 'oauth2',
+  description: 'Read and write Google Sheets data',
+  oauthConfig: {
+    authUrl: 'https://accounts.google.com/o/oauth2/auth',
+    tokenUrl: 'https://oauth2.googleapis.com/token',
+    scopes: ['https://www.googleapis.com/auth/spreadsheets']
+  }
+});
+
+console.log(`Google Sheets tool: ${googleSheetsTool.data.id}`);
+```
+
+### Basic Authentication
+```typescript
+const legacyApiTool = await client.createTool({
+  name: 'Legacy CRM API',
+  baseUrl: 'https://legacy-crm.company.com/api',
+  authType: 'basic',
+  description: 'Legacy CRM system integration',
+  timeout: 60000, // Longer timeout for legacy systems
+  retries: 1
+});
+```
+
+### No Authentication
+```typescript
+const publicApiTool = await client.createTool({
+  name: 'Public Weather API',
+  baseUrl: 'https://api.weatherapi.com/v1',
+  authType: 'none',
+  description: 'Public weather data API',
+  headers: {
+    'User-Agent': 'Tolstoy-Weather-Bot'
+  }
+});
+```
+
+## Popular Integrations
+
+### Communication Tools
+
+#### Slack Integration
+```typescript
+const slackTool = await client.createTool({
+  name: 'Slack Workspace',
+  baseUrl: 'https://slack.com/api',
+  authType: 'bearer',
+  description: 'Send notifications and manage channels',
+  headers: {
+    'Content-Type': 'application/json'
+  },
+  timeout: 15000
+});
+```
+
+#### Discord Integration
+```typescript
+const discordTool = await client.createTool({
+  name: 'Discord Bot',
+  baseUrl: 'https://discord.com/api/v10',
+  authType: 'bearer',
+  description: 'Discord server management and notifications',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+```
+
+### E-commerce Platforms
+
+#### Shopify Integration
+```typescript
+const shopifyTool = await client.createTool({
+  name: 'Shopify Store',
+  baseUrl: 'https://your-store.myshopify.com/admin/api/2023-10',
+  authType: 'apikey',
+  description: 'Manage products, orders, and customers',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+```
+
+#### WooCommerce Integration
+```typescript
+const wooCommerceTool = await client.createTool({
+  name: 'WooCommerce Store',
+  baseUrl: 'https://your-store.com/wp-json/wc/v3',
+  authType: 'basic',
+  description: 'WordPress WooCommerce integration',
+  timeout: 30000
+});
+```
+
+### Marketing and Analytics
+
+#### HubSpot Integration
+```typescript
+const hubspotTool = await client.createTool({
+  name: 'HubSpot CRM',
+  baseUrl: 'https://api.hubapi.com',
+  authType: 'bearer',
+  description: 'CRM and marketing automation',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+```
+
+#### Mailchimp Integration
+```typescript
+const mailchimpTool = await client.createTool({
+  name: 'Mailchimp API',
+  baseUrl: 'https://us1.api.mailchimp.com/3.0', // Replace us1 with your datacenter
+  authType: 'apikey',
+  description: 'Email marketing and audience management',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+```
+
+### Database and Storage
+
+#### Airtable Integration
+```typescript
+const airtableTool = await client.createTool({
+  name: 'Airtable Base',
+  baseUrl: 'https://api.airtable.com/v0',
+  authType: 'bearer',
+  description: 'Collaborative database platform',
+  headers: {
+    'Content-Type': 'application/json'
+  }
+});
+```
+
+## Error Handling
+
+```typescript
+import { AxiosError } from 'axios';
+
+try {
+  const tool = await client.createTool({
+    name: 'GitHub API',
+    baseUrl: 'https://api.github.com',
+    authType: 'bearer',
+    description: 'GitHub integration'
+  });
+  
+  console.log(`Tool created successfully: ${tool.data.id}`);
+} catch (error) {
+  const apiError = error as AxiosError;
+  
+  if (apiError.response) {
+    const { status, data } = apiError.response;
+    
+    switch (data.error.code) {
+      case 'VALIDATION_ERROR':
+        console.error('Invalid tool configuration:', data.error.details);
+        break;
+      case 'CONFLICT':
+        console.error('Tool with this name already exists');
+        break;
+      case 'RATE_LIMITED':
+        console.error('Too many tool creation requests');
+        break;
+      default:
+        console.error(`API Error ${status}:`, data.error.message);
+    }
+  } else {
+    console.error('Network error:', error.message);
+  }
+}
+```
+
+## Advanced Usage
+
+### Tool Factory
+```typescript
+class ToolFactory {
+  static async createEmailTool(
+    provider: 'sendgrid' | 'mailgun' | 'ses',
+    apiKey: string
+  ): Promise<Tool> {
+    const configs = {
+      sendgrid: {
+        name: 'SendGrid Email',
+        baseUrl: 'https://api.sendgrid.com/v3',
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      },
+      mailgun: {
+        name: 'Mailgun Email',
+        baseUrl: 'https://api.mailgun.net/v3',
+        headers: { 'Authorization': `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}` }
+      },
+      ses: {
+        name: 'AWS SES',
+        baseUrl: 'https://email.us-east-1.amazonaws.com',
+        authType: 'apikey' as const
+      }
+    };
+    
+    const config = configs[provider];
+    return client.createTool({
+      ...config,
+      authType: 'apikey',
+      description: `${config.name} integration for transactional emails`,
+      timeout: 30000
+    });
+  }
+  
+  static async createCRMTool(
+    provider: 'hubspot' | 'salesforce' | 'pipedrive',
+    credentials: any
+  ): Promise<Tool> {
+    const baseConfigs = {
+      hubspot: {
+        name: 'HubSpot CRM',
+        baseUrl: 'https://api.hubapi.com',
+        authType: 'bearer' as const
+      },
+      salesforce: {
+        name: 'Salesforce CRM',
+        baseUrl: 'https://your-instance.salesforce.com/services/data/v58.0',
+        authType: 'oauth2' as const
+      },
+      pipedrive: {
+        name: 'Pipedrive CRM',
+        baseUrl: 'https://api.pipedrive.com/v1',
+        authType: 'apikey' as const
+      }
+    };
+    
+    return client.createTool({
+      ...baseConfigs[provider],
+      description: `${baseConfigs[provider].name} integration`,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+  }
+}
+
+// Usage
+const sendGridTool = await ToolFactory.createEmailTool('sendgrid', 'SG.xxx');
+const hubspotTool = await ToolFactory.createCRMTool('hubspot', { token: 'pat-xxx' });
+```
+
+### Tool Validation
+```typescript
+async function validateToolSetup(toolData: CreateToolDto): Promise<string[]> {
+  const issues: string[] = [];
+  
+  // Validate required fields
+  if (!toolData.name.trim()) {
+    issues.push('Tool name is required');
+  }
+  
+  if (!toolData.baseUrl.trim()) {
+    issues.push('Base URL is required');
+  }
+  
+  // Validate URL format
+  try {
+    new URL(toolData.baseUrl);
+  } catch {
+    issues.push('Base URL must be a valid URL');
+  }
+  
+  // Validate OAuth configuration
+  if (toolData.authType === 'oauth2' && !toolData.oauthConfig) {
+    issues.push('OAuth configuration required for oauth2 auth type');
+  }
+  
+  if (toolData.oauthConfig) {
+    if (!toolData.oauthConfig.authUrl) {
+      issues.push('OAuth auth URL is required');
+    }
+    if (!toolData.oauthConfig.tokenUrl) {
+      issues.push('OAuth token URL is required');
+    }
+  }
+  
+  // Validate timeout
+  if (toolData.timeout && (toolData.timeout < 1000 || toolData.timeout > 300000)) {
+    issues.push('Timeout must be between 1000ms and 300000ms (5 minutes)');
+  }
+  
+  return issues;
+}
+
+// Usage
+const toolConfig = {
+  name: 'My API',
+  baseUrl: 'https://api.example.com',
+  authType: 'bearer' as const
+};
+
+const issues = await validateToolSetup(toolConfig);
+if (issues.length > 0) {
+  console.error('Configuration issues:', issues);
+} else {
+  const tool = await client.createTool(toolConfig);
+}
+```
+
+### Tool Testing
+```typescript
+async function testToolConnection(tool: Tool): Promise<boolean> {
+  try {
+    // Test basic connectivity to the tool's base URL
+    const response = await fetch(tool.data.baseUrl, {
+      method: 'HEAD',
+      signal: AbortSignal.timeout(5000)
+    });
+    
+    return response.ok || response.status < 500; // Accept 4xx as "reachable"
+  } catch (error) {
+    console.error(`Failed to reach ${tool.data.name}:`, error.message);
+    return false;
+  }
+}
+
+const tool = await client.createTool({
+  name: 'Test API',
+  baseUrl: 'https://api.example.com',
+  authType: 'none'
+});
+
+const isReachable = await testToolConnection(tool);
+console.log(`Tool ${tool.data.name} is ${isReachable ? 'reachable' : 'unreachable'}`);
+```
+
+## Integration Patterns
+
+### Batch Tool Creation
+```typescript
+async function createToolsFromConfig(toolConfigs: CreateToolDto[]): Promise<Tool[]> {
+  const results: Tool[] = [];
+  const errors: string[] = [];
+  
+  for (const config of toolConfigs) {
+    try {
+      const tool = await client.createTool(config);
+      results.push(tool);
+      console.log(`✅ Created: ${config.name}`);
+    } catch (error) {
+      errors.push(`❌ Failed to create ${config.name}: ${error.message}`);
+    }
+  }
+  
+  if (errors.length > 0) {
+    console.error('Some tools failed to create:');
+    errors.forEach(error => console.error(error));
+  }
+  
+  return results;
+}
+
+const toolConfigs: CreateToolDto[] = [
+  {
+    name: 'GitHub API',
+    baseUrl: 'https://api.github.com',
+    authType: 'bearer'
+  },
+  {
+    name: 'Slack API',
+    baseUrl: 'https://slack.com/api',
+    authType: 'bearer'
+  }
+];
+
+const createdTools = await createToolsFromConfig(toolConfigs);
+```
+
+### Tool Registry
+```typescript
+class ToolRegistry {
+  private static readonly PRESETS: Record<string, Partial<CreateToolDto>> = {
+    github: {
+      name: 'GitHub API',
+      baseUrl: 'https://api.github.com',
+      authType: 'bearer',
+      description: 'GitHub repository management',
+      headers: {
+        'Accept': 'application/vnd.github.v3+json',
+        'User-Agent': 'Tolstoy-Integration'
+      }
+    },
+    slack: {
+      name: 'Slack API',
+      baseUrl: 'https://slack.com/api',
+      authType: 'bearer',
+      description: 'Slack workspace integration'
+    },
+    sendgrid: {
+      name: 'SendGrid API',
+      baseUrl: 'https://api.sendgrid.com/v3',
+      authType: 'bearer',
+      description: 'Email delivery service'
+    }
+  };
+  
+  static async createFromPreset(
+    preset: keyof typeof ToolRegistry.PRESETS,
+    overrides: Partial<CreateToolDto> = {}
+  ): Promise<Tool> {
+    const baseConfig = ToolRegistry.PRESETS[preset];
+    if (!baseConfig) {
+      throw new Error(`Unknown preset: ${preset}`);
+    }
+    
+    const config = { ...baseConfig, ...overrides } as CreateToolDto;
+    return client.createTool(config);
+  }
+}
+
+// Usage
+const githubTool = await ToolRegistry.createFromPreset('github');
+const customSlack = await ToolRegistry.createFromPreset('slack', {
+  name: 'Team Slack Workspace'
+});
+```
+
+## Best Practices
+
+### Naming Conventions
+```typescript
+// Good: Descriptive and specific names
+await client.createTool({
+  name: 'Production SendGrid API',
+  baseUrl: 'https://api.sendgrid.com/v3',
+  authType: 'bearer'
+});
+
+// Avoid: Generic or unclear names
+await client.createTool({
+  name: 'API', // Too generic
+  baseUrl: 'https://api.sendgrid.com/v3',
+  authType: 'bearer'
+});
+```
+
+### Environment-Specific Tools
+```typescript
+const environment = process.env.NODE_ENV || 'development';
+
+const stripeConfig = {
+  development: {
+    name: 'Stripe API (Dev)',
+    baseUrl: 'https://api.stripe.com/v1'
+  },
+  production: {
+    name: 'Stripe API (Prod)',
+    baseUrl: 'https://api.stripe.com/v1'
+  }
+};
+
+const stripeTool = await client.createTool({
+  ...stripeConfig[environment],
+  authType: 'bearer',
+  description: `Stripe payment processing (${environment})`
+});
+```
+
+### Error Recovery
+```typescript
+async function createToolWithRetry(
+  toolData: CreateToolDto, 
+  maxRetries = 3
+): Promise<Tool> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await client.createTool(toolData);
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      
+      console.warn(`Attempt ${attempt} failed, retrying...`);
+      await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+    }
+  }
+  throw new Error('Should never reach here');
+}
+```
+
+## Related Methods
+
+- [listTools()](/sdk/methods/list-tools) - View all tool integrations
+- [runFlow()](/sdk/methods/run-flow) - Use tools in workflow execution
+- [TolstoyClient](/sdk/methods/tolstoy-client) - Client setup
+
+## See Also
+
+- [Create Tool API](/api/tools/post-tools) - Direct API documentation
+- [Tool Integration Guide](/docs/tools) - Comprehensive tool setup guide
+- [SDK Examples](/sdk/examples) - Real-world integration patterns

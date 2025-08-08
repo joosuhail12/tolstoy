@@ -1,0 +1,298 @@
+---
+title: getHealth()
+sidebar_position: 9
+---
+
+# getHealth()
+
+Check the health status of the Tolstoy API service.
+
+## Signature
+
+```typescript
+getHealth(): Promise<HealthStatus>
+```
+
+## Parameters
+
+None - this method checks the overall API health.
+
+## Returns
+
+Returns a `Promise<HealthStatus>`:
+
+```typescript
+interface HealthStatus {
+  data: {
+    status: 'ok' | 'error';
+    timestamp: string;
+    uptime: number;
+    version: string;
+  };
+}
+```
+
+## Usage Examples
+
+### Basic Health Check
+```typescript
+const health = await client.getHealth();
+
+console.log(`API Status: ${health.data.status}`);
+console.log(`Version: ${health.data.version}`);
+console.log(`Uptime: ${health.data.uptime} seconds`);
+```
+
+### Connection Verification
+```typescript
+async function verifyConnection(): Promise<boolean> {
+  try {
+    const health = await client.getHealth();
+    return health.data.status === 'ok';
+  } catch (error) {
+    console.error('Health check failed:', error.message);
+    return false;
+  }
+}
+
+const isHealthy = await verifyConnection();
+console.log(`API is ${isHealthy ? 'healthy' : 'unhealthy'}`);
+```
+
+### Service Monitoring
+```typescript
+async function monitorService(): Promise<void> {
+  setInterval(async () => {
+    try {
+      const health = await client.getHealth();
+      console.log(`[${new Date().toISOString()}] API Status: ${health.data.status}`);
+      
+      if (health.data.status !== 'ok') {
+        console.error('⚠️ API is unhealthy!');
+        // Send alert or take corrective action
+      }
+    } catch (error) {
+      console.error('❌ Health check failed:', error.message);
+    }
+  }, 30000); // Check every 30 seconds
+}
+
+await monitorService();
+```
+
+## Error Handling
+
+```typescript
+try {
+  const health = await client.getHealth();
+  
+  if (health.data.status === 'ok') {
+    console.log('✅ API is healthy');
+  } else {
+    console.warn('⚠️ API reported unhealthy status');
+  }
+} catch (error) {
+  console.error('❌ Unable to reach API:', error.message);
+  // Handle network errors or API downtime
+}
+```
+
+## Advanced Usage
+
+### Health Dashboard
+```typescript
+class HealthDashboard {
+  private healthHistory: HealthStatus[] = [];
+  
+  async checkHealth(): Promise<HealthStatus> {
+    const health = await client.getHealth();
+    this.healthHistory.push(health);
+    
+    // Keep only last 100 health checks
+    if (this.healthHistory.length > 100) {
+      this.healthHistory.shift();
+    }
+    
+    return health;
+  }
+  
+  getUptime(): number {
+    if (this.healthHistory.length === 0) return 0;
+    
+    const okChecks = this.healthHistory.filter(h => h.data.status === 'ok').length;
+    return (okChecks / this.healthHistory.length) * 100;
+  }
+  
+  getAverageResponseTime(): number {
+    // Implementation would track response times
+    return 0; // Placeholder
+  }
+}
+
+const dashboard = new HealthDashboard();
+const health = await dashboard.checkHealth();
+console.log(`Uptime: ${dashboard.getUptime().toFixed(2)}%`);
+```
+
+### Circuit Breaker Pattern
+```typescript
+class HealthAwareClient {
+  private failureCount = 0;
+  private lastFailure = 0;
+  private circuitOpen = false;
+  private readonly maxFailures = 5;
+  private readonly timeout = 60000; // 1 minute
+  
+  async executeWithCircuitBreaker<T>(operation: () => Promise<T>): Promise<T> {
+    // Check if circuit is open
+    if (this.circuitOpen) {
+      if (Date.now() - this.lastFailure < this.timeout) {
+        throw new Error('Circuit breaker is open');
+      } else {
+        this.circuitOpen = false; // Try to close circuit
+        this.failureCount = 0;
+      }
+    }
+    
+    try {
+      const result = await operation();
+      this.failureCount = 0; // Reset on success
+      return result;
+    } catch (error) {
+      this.failureCount++;
+      this.lastFailure = Date.now();
+      
+      if (this.failureCount >= this.maxFailures) {
+        this.circuitOpen = true;
+        console.error('🔴 Circuit breaker opened due to repeated failures');
+      }
+      
+      throw error;
+    }
+  }
+  
+  async safeGetHealth(): Promise<HealthStatus | null> {
+    try {
+      return await this.executeWithCircuitBreaker(() => client.getHealth());
+    } catch (error) {
+      console.error('Health check blocked by circuit breaker');
+      return null;
+    }
+  }
+}
+
+const healthAwareClient = new HealthAwareClient();
+const health = await healthAwareClient.safeGetHealth();
+```
+
+## Integration Patterns
+
+### Startup Validation
+```typescript
+async function validateStartup(): Promise<void> {
+  console.log('Validating API connection...');
+  
+  try {
+    const health = await client.getHealth();
+    
+    if (health.data.status === 'ok') {
+      console.log('✅ API connection validated');
+      console.log(`   Version: ${health.data.version}`);
+      console.log(`   Uptime: ${Math.floor(health.data.uptime / 60)} minutes`);
+    } else {
+      throw new Error('API is not healthy');
+    }
+  } catch (error) {
+    console.error('❌ Startup validation failed:', error.message);
+    process.exit(1);
+  }
+}
+
+// Run during application startup
+await validateStartup();
+```
+
+### Load Balancer Health Check
+```typescript
+// Express.js health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    const health = await client.getHealth();
+    
+    if (health.data.status === 'ok') {
+      res.status(200).json({
+        status: 'ok',
+        dependencies: {
+          tolstoy: 'healthy'
+        },
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.status(503).json({
+        status: 'error',
+        dependencies: {
+          tolstoy: 'unhealthy'
+        },
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    res.status(503).json({
+      status: 'error',
+      dependencies: {
+        tolstoy: 'unreachable'
+      },
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+```
+
+## Best Practices
+
+### Retry Logic
+```typescript
+async function healthCheckWithRetry(maxRetries = 3): Promise<HealthStatus> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await client.getHealth();
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      
+      const delay = Math.pow(2, attempt - 1) * 1000; // Exponential backoff
+      console.warn(`Health check attempt ${attempt} failed, retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error('Should never reach here');
+}
+```
+
+### Caching
+```typescript
+let cachedHealth: HealthStatus | null = null;
+let lastHealthCheck = 0;
+const HEALTH_CACHE_TTL = 30000; // 30 seconds
+
+async function getCachedHealth(): Promise<HealthStatus> {
+  const now = Date.now();
+  
+  if (!cachedHealth || (now - lastHealthCheck) > HEALTH_CACHE_TTL) {
+    cachedHealth = await client.getHealth();
+    lastHealthCheck = now;
+  }
+  
+  return cachedHealth;
+}
+```
+
+## Related Methods
+
+- [getDetailedHealth()](/sdk/methods/get-detailed-health) - Get comprehensive health information
+- [TolstoyClient](/sdk/methods/tolstoy-client) - Client setup and configuration
+
+## See Also
+
+- [Health Status API](/api/health/get-status) - Direct API documentation
+- [Service Monitoring Guide](/docs/monitoring) - Comprehensive monitoring setup
