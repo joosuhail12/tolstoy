@@ -1,5 +1,8 @@
 {
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
   "name": "Tolstoy Docs",
+  "description": "Workflow automation platform documentation - Learn how to create, manage, and execute workflows with Tolstoy",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"
@@ -10,10 +13,12 @@
     "light": "#3b82f6",
     "dark": "#1d4ed8"
   },
-  "theme": "mint",
-  "topbarCtaButton": {
-    "name": "Dashboard",
-    "url": "https://app.tolstoy.dev"
+  "navbar": {
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://app.tolstoy.dev"
+    }
   },
   "navigation": {
     "dropdowns": [
@@ -23,18 +28,20 @@
           {
             "group": "Getting Started",
             "pages": [
-              "quickstart/index",
-              "flow-definition/index",
-              "action-reference/index", 
-              "onboarding/index"
+              "docs/quickstart/index",
+              "docs/flow-definition/index",
+              "docs/action-reference/index", 
+              "docs/onboarding/index"
             ]
           }
         ]
       }
     ]
   },
-  "footerSocials": {
-    "twitter": "https://twitter.com/tolstoy_dev",
-    "github": "https://github.com/tolstoy-dev"
+  "footer": {
+    "socials": {
+      "twitter": "https://twitter.com/tolstoy_dev",
+      "github": "https://github.com/tolstoy-dev"
+    }
   }
 }
