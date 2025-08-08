@@ -8,5 +8,17 @@ export class CreateFlowDto {
 
   @IsObject()
   @IsNotEmpty()
-  steps: any;
+  steps: Array<{
+    id: string;
+    type: string;
+    name: string;
+    config: Record<string, unknown>;
+    executeIf?: string | Record<string, unknown>;
+    dependsOn?: string[];
+    retryPolicy?: {
+      maxRetries: number;
+      backoffStrategy: 'fixed' | 'exponential';
+      delayMs: number;
+    };
+  }>;
 }

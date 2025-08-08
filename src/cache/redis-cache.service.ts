@@ -59,12 +59,17 @@ export class RedisCacheService {
       let redisToken: string | undefined;
 
       try {
-        redisUrl = await this.awsSecretsService.getSecret('conductor-db-secret', 'UPSTASH_REDIS_REST_URL');
+        redisUrl = await this.awsSecretsService.getSecret(
+          'conductor-db-secret',
+          'UPSTASH_REDIS_REST_URL',
+        );
         redisToken = await this.awsSecretsService.getSecret(
           'conductor-db-secret',
           'UPSTASH_REDIS_REST_TOKEN',
         );
-        this.logger.info('Retrieved Redis credentials from AWS Secrets Manager (conductor-db-secret)');
+        this.logger.info(
+          'Retrieved Redis credentials from AWS Secrets Manager (conductor-db-secret)',
+        );
       } catch {
         // Fallback to environment variables
         redisUrl = this.configService.get('UPSTASH_REDIS_REST_URL');
@@ -140,7 +145,7 @@ export class RedisCacheService {
    * @param value Value to cache
    * @param options Cache options including TTL
    */
-  async set(key: string, value: any, options: CacheSetOptions = {}): Promise<void> {
+  async set(key: string, value: unknown, options: CacheSetOptions = {}): Promise<void> {
     if (!this.isRedisAvailable()) {
       return;
     }
@@ -150,21 +155,16 @@ export class RedisCacheService {
 
       const { ttl = CacheKeys.TTL.MEDIUM, nx, px } = options;
 
-      const redisOptions: any = {};
-
-      // Set TTL (prefer px for milliseconds, fallback to ex for seconds)
-      if (px) {
-        redisOptions.px = px;
+      // Build Redis set options - use explicit conditional calls for better type safety
+      if (px && nx) {
+        await this.redis!.set(key, value, { px, nx: true });
+      } else if (px) {
+        await this.redis!.set(key, value, { px });
+      } else if (nx) {
+        await this.redis!.set(key, value, { ex: ttl, nx: true });
       } else {
-        redisOptions.ex = ttl;
+        await this.redis!.set(key, value, { ex: ttl });
       }
-
-      // Set only if key doesn't exist
-      if (nx) {
-        redisOptions.nx = true;
-      }
-
-      await this.redis!.set(key, value, redisOptions);
 
       this.logger.debug(
         {
@@ -327,7 +327,7 @@ export class RedisCacheService {
    * Set multiple key-value pairs at once
    * @param keyValuePairs Array of [key, value, ttl?] tuples
    */
-  async mset(keyValuePairs: any[]): Promise<void> {
+  async mset(keyValuePairs: Array<[string, unknown, number?]>): Promise<void> {
     if (!this.isRedisAvailable() || keyValuePairs.length === 0) {
       return;
     }

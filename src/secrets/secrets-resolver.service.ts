@@ -63,7 +63,11 @@ export class SecretsResolver {
         await this.cacheService.set(cacheKey, credentials, { ttl: CacheKeys.TTL.SECRETS });
       } catch (cacheError) {
         this.logger.warn(
-          { toolName, orgId, error: cacheError instanceof Error ? cacheError.message : 'Unknown cache error' },
+          {
+            toolName,
+            orgId,
+            error: cacheError instanceof Error ? cacheError.message : 'Unknown cache error',
+          },
           'Failed to cache credentials, but returning AWS result',
         );
       }

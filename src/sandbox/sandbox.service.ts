@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { DaytonaClientImpl } from './daytona-client';
 import { AwsSecretsService } from '../aws-secrets.service';
+import { ExecutionContext } from './interfaces/daytona-client.interface';
 
 export interface SandboxExecutionContext {
   orgId: string;
@@ -10,13 +11,13 @@ export interface SandboxExecutionContext {
   flowId: string;
   stepId: string;
   executionId: string;
-  variables?: any;
-  stepOutputs?: any;
+  variables?: Record<string, unknown>;
+  stepOutputs?: Record<string, unknown>;
 }
 
 export interface SandboxExecutionResult {
   success: boolean;
-  output?: any;
+  output?: unknown;
   error?: {
     message: string;
     code?: string;
@@ -401,43 +402,15 @@ export class SandboxService {
     }
   }
 
-  private buildExecutionContext(context: SandboxExecutionContext): any {
+  private buildExecutionContext(context: SandboxExecutionContext): ExecutionContext {
     return {
-      // Provide access to flow variables and step outputs
       variables: context.variables || {},
       stepOutputs: context.stepOutputs || {},
-
-      // Metadata for the execution
-      meta: {
-        orgId: context.orgId,
-        userId: context.userId,
-        flowId: context.flowId,
-        stepId: context.stepId,
-        executionId: context.executionId,
-        timestamp: new Date().toISOString(),
-      },
-
-      // Utility functions available in sandbox
-      utils: {
-        log: (message: string, data?: any) => ({
-          type: 'log',
-          message,
-          data,
-          timestamp: new Date().toISOString(),
-        }),
-        error: (message: string, data?: any) => ({
-          type: 'error',
-          message,
-          data,
-          timestamp: new Date().toISOString(),
-        }),
-        warn: (message: string, data?: any) => ({
-          type: 'warn',
-          message,
-          data,
-          timestamp: new Date().toISOString(),
-        }),
-      },
+      orgId: context.orgId,
+      userId: context.userId,
+      flowId: context.flowId,
+      stepId: context.stepId,
+      executionId: context.executionId,
     };
   }
 

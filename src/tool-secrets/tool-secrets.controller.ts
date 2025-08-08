@@ -10,7 +10,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
-import { ToolSecretsService, StoredCredentials } from './tool-secrets.service';
+import { ToolSecretsService, StoredCredentials, ToolCredentials } from './tool-secrets.service';
 import { StoreCredentialsDto, CredentialResponseDto } from './dto/store-credentials.dto';
 import { Tenant } from '../common/decorators/tenant.decorator';
 
@@ -37,7 +37,7 @@ export class ToolSecretsController {
     const result = await this.toolSecretsService.storeCredentials(
       orgId,
       toolId,
-      storeCredentialsDto.credentials,
+      storeCredentialsDto.credentials as ToolCredentials,
     );
 
     this.logger.info(

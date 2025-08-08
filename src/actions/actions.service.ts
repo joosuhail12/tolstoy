@@ -21,7 +21,15 @@ export class ActionsService {
 
     return this.prisma.action.create({
       data: {
-        ...createActionDto,
+        name: createActionDto.name,
+        key: createActionDto.key,
+        toolId: createActionDto.toolId,
+        method: createActionDto.method,
+        endpoint: createActionDto.endpoint,
+        headers: createActionDto.headers as any,
+        inputSchema: createActionDto.inputSchema as any,
+        executeIf: createActionDto.executeIf as any,
+        version: createActionDto.version,
         orgId: tenant.orgId,
       },
     });
@@ -84,7 +92,17 @@ export class ActionsService {
     try {
       return await this.prisma.action.update({
         where: { id },
-        data: updateActionDto,
+        data: {
+          name: updateActionDto.name,
+          key: updateActionDto.key,
+          toolId: updateActionDto.toolId,
+          method: updateActionDto.method,
+          endpoint: updateActionDto.endpoint,
+          headers: updateActionDto.headers as any,
+          inputSchema: updateActionDto.inputSchema as any,
+          executeIf: updateActionDto.executeIf as any,
+          version: updateActionDto.version,
+        },
       });
     } catch (error) {
       if (error instanceof Error && (error as any).code === 'P2025') {

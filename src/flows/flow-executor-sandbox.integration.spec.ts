@@ -7,6 +7,8 @@ import { SecretsResolver } from '../secrets/secrets-resolver.service';
 import { OAuthTokenService } from '../oauth/oauth-token.service';
 import { InputValidatorService } from '../common/services/input-validator.service';
 import { ConditionEvaluatorService } from '../common/services/condition-evaluator.service';
+import { ExecutionLogsService } from '../execution-logs/execution-logs.service';
+import { InngestService } from 'nestjs-inngest';
 
 describe('FlowExecutorService - Sandbox Integration', () => {
   let flowExecutorService: FlowExecutorService;
@@ -73,6 +75,17 @@ describe('FlowExecutorService - Sandbox Integration', () => {
       debug: jest.fn(),
     };
 
+    const mockExecutionLogsService = {
+      markStepStarted: jest.fn().mockResolvedValue({ id: 'log-123' }),
+      markStepCompleted: jest.fn().mockResolvedValue({ id: 'log-123' }),
+      markStepFailed: jest.fn().mockResolvedValue({ id: 'log-123' }),
+      markStepSkipped: jest.fn().mockResolvedValue({ id: 'log-123' }),
+    };
+
+    const mockInngestService = {
+      send: jest.fn().mockResolvedValue(undefined),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FlowExecutorService,
@@ -83,6 +96,8 @@ describe('FlowExecutorService - Sandbox Integration', () => {
         { provide: OAuthTokenService, useValue: mockOAuthTokenService },
         { provide: InputValidatorService, useValue: mockInputValidatorService },
         { provide: ConditionEvaluatorService, useValue: mockConditionEvaluatorService },
+        { provide: ExecutionLogsService, useValue: mockExecutionLogsService },
+        { provide: InngestService, useValue: mockInngestService },
         { provide: `PinoLogger:${FlowExecutorService.name}`, useValue: mockLogger },
       ],
     }).compile();

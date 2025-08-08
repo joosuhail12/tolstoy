@@ -232,7 +232,7 @@ export class DaytonaClientImpl implements DaytonaClient {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 400));
 
-    const mockResponses: any = {
+    const mockResponses: Record<string, { status: number; json: () => Promise<unknown> }> = {
       '/run': {
         status: 200,
         json: async () => ({

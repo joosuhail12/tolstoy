@@ -6,21 +6,40 @@ import { WebhooksService } from './webhooks.service';
 import { WebhookSignatureService, WebhookPayload } from './webhook-signature.service';
 import { firstValueFrom } from 'rxjs';
 
+export interface WebhookEventPayload {
+  orgId: string;
+  flowId: string;
+  executionId: string;
+  stepKey?: string;
+  status: string;
+  output?: Record<string, unknown>;
+  error?: {
+    message: string;
+    code?: string;
+    stack?: string;
+  };
+  [key: string]: unknown;
+}
+
 export interface WebhookDispatchEvent {
   data: {
     orgId: string;
     eventType: string;
-    payload: {
-      orgId: string;
-      flowId: string;
-      executionId: string;
-      stepKey?: string;
-      status: string;
-      output?: any;
-      error?: any;
-      [key: string]: any;
-    };
+    payload: WebhookEventPayload;
   };
+}
+
+export interface InngestStepContext {
+  run: <T>(name: string, fn: () => Promise<T>) => Promise<T>;
+}
+
+export interface InngestEvent {
+  data: WebhookDispatchEvent['data'];
+}
+
+export interface InngestHandlerParams {
+  step: InngestStepContext;
+  event: InngestEvent;
 }
 
 @Injectable()
@@ -39,7 +58,7 @@ export class DispatchWebhookHandler {
     triggers: [{ event: 'webhook.dispatch' }],
     retries: 5,
   })
-  async handler({ step, event }: any) {
+  async handler({ step, event }: InngestHandlerParams) {
     const { orgId, eventType, payload } = event.data;
 
     this.logger.info(
@@ -66,94 +85,83 @@ export class DispatchWebhookHandler {
 
     // Dispatch to each webhook with individual retry logic
     for (const webhook of webhooks) {
-      const result = await step.run(
-        `webhook-${webhook.id}`,
-        async () => {
-          try {
-            // Create standardized webhook payload
-            const webhookPayload: WebhookPayload = this.webhookSignatureService.createWebhookPayload(
+      const result = await step.run(`webhook-${webhook.id}`, async () => {
+        try {
+          // Create standardized webhook payload
+          const webhookPayload: WebhookPayload = this.webhookSignatureService.createWebhookPayload(
+            eventType,
+            payload,
+            {
+              orgId,
+              webhookId: webhook.id,
+            },
+          );
+
+          // Generate headers with signature if webhook has a secret
+          const headers = this.webhookSignatureService.generateWebhookHeaders(
+            eventType,
+            webhookPayload,
+            webhook.secret || undefined,
+          );
+
+          this.logger.debug(
+            {
+              webhookId: webhook.id,
+              url: webhook.url,
               eventType,
-              payload,
-              {
-                orgId,
-                webhookId: webhook.id,
+              deliveryId: headers['x-webhook-delivery'],
+            },
+            'Sending webhook',
+          );
+
+          // Make HTTP request to webhook URL
+          const response = await firstValueFrom(
+            this.httpService.post(webhook.url, webhookPayload, {
+              headers: {
+                'Content-Type': 'application/json',
+                ...headers,
               },
-            );
+              timeout: 30000, // 30 second timeout
+              maxRedirects: 3,
+            }),
+          );
 
-            // Generate headers with signature if webhook has a secret
-            const headers = this.webhookSignatureService.generateWebhookHeaders(
-              eventType,
-              webhookPayload,
-              webhook.secret || undefined,
-            );
-
-            this.logger.debug(
-              { 
-                webhookId: webhook.id, 
-                url: webhook.url, 
-                eventType,
-                deliveryId: headers['x-webhook-delivery'] 
-              },
-              'Sending webhook',
-            );
-
-            // Make HTTP request to webhook URL
-            const response = await firstValueFrom(
-              this.httpService.post(webhook.url, webhookPayload, {
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...headers,
-                },
-                timeout: 30000, // 30 second timeout
-                maxRedirects: 3,
-              }),
-            );
-
-            this.logger.info(
-              {
-                webhookId: webhook.id,
-                url: webhook.url,
-                statusCode: response.status,
-                deliveryId: headers['x-webhook-delivery'],
-              },
-              'Webhook delivered successfully',
-            );
-
-            return {
-              success: true,
+          this.logger.info(
+            {
               webhookId: webhook.id,
               url: webhook.url,
               statusCode: response.status,
               deliveryId: headers['x-webhook-delivery'],
-            };
-          } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-            const statusCode = error?.response?.status || null;
-            
-            this.logger.error(
-              {
-                webhookId: webhook.id,
-                url: webhook.url,
-                error: errorMessage,
-                statusCode,
-              },
-              'Webhook delivery failed',
-            );
-
-            // Re-throw error to trigger Inngest retry
-            throw new Error(`Webhook ${webhook.url} failed: ${errorMessage}`);
-          }
-        },
-        {
-          retry: {
-            maxAttempts: 5,
-            backoff: {
-              type: 'exponential',
-              delay: 1000, // Start with 1s, then 2s, 4s, 8s, 16s
             },
-          },
-        },
-      );
+            'Webhook delivered successfully',
+          );
+
+          return {
+            success: true,
+            webhookId: webhook.id,
+            url: webhook.url,
+            statusCode: response.status,
+            deliveryId: headers['x-webhook-delivery'],
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          const statusCode =
+            (error as { response?: { status?: number } })?.response?.status || null;
+
+          this.logger.error(
+            {
+              webhookId: webhook.id,
+              url: webhook.url,
+              error: errorMessage,
+              statusCode,
+            },
+            'Webhook delivery failed',
+          );
+
+          // Re-throw error to trigger Inngest retry
+          throw new Error(`Webhook ${webhook.url} failed: ${errorMessage}`);
+        }
+      });
 
       results.push(result);
     }

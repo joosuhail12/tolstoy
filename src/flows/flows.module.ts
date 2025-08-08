@@ -7,10 +7,11 @@ import { SecretsResolver } from '../secrets/secrets-resolver.service';
 import { OAuthTokenService } from '../oauth/oauth-token.service';
 import { AwsSecretsService } from '../aws-secrets.service';
 import { SandboxModule } from '../sandbox/sandbox.module';
+import { ExecutionLogsModule } from '../execution-logs/execution-logs.module';
 import { InngestExecutionService } from './inngest/inngest-execution.service';
 
 @Module({
-  imports: [SandboxModule],
+  imports: [SandboxModule, ExecutionLogsModule],
   controllers: [FlowsController],
   providers: [
     FlowsService,

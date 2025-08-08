@@ -35,7 +35,7 @@ describe('FlowsService - Cache Integration', () => {
     executionLogs: [
       {
         id: 'log-1',
-        stepId: 'step1',
+        stepKey: 'step1',
         status: 'completed',
         createdAt: new Date(),
         user: { id: 'user-1', email: 'test@example.com' },
@@ -107,7 +107,14 @@ describe('FlowsService - Cache Integration', () => {
   describe('create', () => {
     const createFlowDto: CreateFlowDto = {
       version: 1,
-      steps: { step1: { type: 'http_request' } },
+      steps: [
+        {
+          id: 'step1',
+          name: 'Step 1',
+          type: 'http_request',
+          config: {},
+        },
+      ],
     };
 
     it('should create flow and invalidate flows list cache', async () => {
@@ -213,7 +220,7 @@ describe('FlowsService - Cache Integration', () => {
           executionLogs: {
             select: {
               id: true,
-              stepId: true,
+              stepKey: true,
               status: true,
               createdAt: true,
               user: { select: { id: true, email: true } },
@@ -276,7 +283,14 @@ describe('FlowsService - Cache Integration', () => {
     const flowId = 'flow-456';
     const updateFlowDto: UpdateFlowDto = {
       version: 2,
-      steps: { step1: { type: 'updated_request' } },
+      steps: [
+        {
+          id: 'step1',
+          name: 'Updated Step',
+          type: 'updated_request',
+          config: {},
+        },
+      ],
     };
 
     it('should update flow and invalidate caches', async () => {

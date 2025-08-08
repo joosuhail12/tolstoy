@@ -1,7 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
 import { InngestService } from 'nestjs-inngest';
-import { PinoLogger } from 'nestjs-pino';
 import { of } from 'rxjs';
 import { FlowExecutorService } from '../flows/flow-executor.service';
 import { WebhooksService } from './webhooks.service';
@@ -14,6 +13,7 @@ import { OAuthTokenService } from '../oauth/oauth-token.service';
 import { InputValidatorService } from '../common/services/input-validator.service';
 import { ConditionEvaluatorService } from '../common/services/condition-evaluator.service';
 import { SandboxService } from '../sandbox/sandbox.service';
+import { ExecutionLogsService } from '../execution-logs/execution-logs.service';
 
 describe('Webhook Dispatch Integration', () => {
   let flowExecutor: FlowExecutorService;
@@ -166,6 +166,15 @@ describe('Webhook Dispatch Integration', () => {
           },
         },
         {
+          provide: ExecutionLogsService,
+          useValue: {
+            markStepStarted: jest.fn().mockResolvedValue({ id: 'log-123' }),
+            markStepCompleted: jest.fn().mockResolvedValue({ id: 'log-123' }),
+            markStepFailed: jest.fn().mockResolvedValue({ id: 'log-123' }),
+            markStepSkipped: jest.fn().mockResolvedValue({ id: 'log-123' }),
+          },
+        },
+        {
           provide: `PinoLogger:${FlowExecutorService.name}`,
           useValue: mockLogger,
         },
@@ -219,7 +228,7 @@ describe('Webhook Dispatch Integration', () => {
 
       // Should not throw error even if dispatch fails
       await expect(
-        (flowExecutor as any).dispatchWebhook('step.completed', testPayload)
+        (flowExecutor as any).dispatchWebhook('step.completed', testPayload),
       ).resolves.not.toThrow();
     });
 
@@ -240,7 +249,8 @@ describe('Webhook Dispatch Integration', () => {
       };
 
       const mockStep = {
-        run: jest.fn()
+        run: jest
+          .fn()
           .mockImplementationOnce((name, callback) => callback())
           .mockImplementationOnce((name, callback) => callback()),
       };
@@ -306,6 +316,15 @@ describe('Webhook Dispatch Integration', () => {
           {
             provide: SandboxService,
             useValue: { executeSync: jest.fn().mockResolvedValue({ success: true, output: {} }) },
+          },
+          {
+            provide: ExecutionLogsService,
+            useValue: {
+              markStepStarted: jest.fn().mockResolvedValue({ id: 'log-123' }),
+              markStepCompleted: jest.fn().mockResolvedValue({ id: 'log-123' }),
+              markStepFailed: jest.fn().mockResolvedValue({ id: 'log-123' }),
+              markStepSkipped: jest.fn().mockResolvedValue({ id: 'log-123' }),
+            },
           },
           {
             provide: `PinoLogger:${FlowExecutorService.name}`,

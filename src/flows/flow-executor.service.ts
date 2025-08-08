@@ -1,6 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
-import { Flow, ExecutionLog } from '@prisma/client';
+import { Flow, ExecutionLog, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { AblyService } from '../ably/ably.service';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
@@ -13,13 +13,34 @@ import {
 } from '../common/services/condition-evaluator.service';
 import { SandboxService, SandboxExecutionContext } from '../sandbox/sandbox.service';
 import { InngestService } from 'nestjs-inngest';
+import { ExecutionLogsService } from '../execution-logs/execution-logs.service';
+
+export interface FlowStepConfig {
+  [key: string]: unknown;
+}
+
+export interface FlowStepCondition {
+  [key: string]: unknown;
+}
+
+export interface FlowVariables {
+  [key: string]: unknown;
+}
+
+export interface StepOutputs {
+  [key: string]: unknown;
+}
+
+export interface StepOutput {
+  [key: string]: unknown;
+}
 
 export interface FlowStep {
   id: string;
   type: string;
   name: string;
-  config: any;
-  executeIf?: any; // JSONLogic rule or condition for conditional execution
+  config: FlowStepConfig;
+  executeIf?: string | FlowStepCondition;
   dependsOn?: string[];
   retryPolicy?: {
     maxRetries: number;
@@ -34,25 +55,29 @@ export interface FlowExecutionContext {
   orgId: string;
   userId: string;
   startTime: Date;
-  variables: any;
-  stepOutputs: any;
+  variables: FlowVariables;
+  stepOutputs: StepOutputs;
+}
+
+export interface StepExecutionError {
+  message: string;
+  code?: string;
+  stack?: string;
+}
+
+export interface StepExecutionMetadata {
+  duration: number;
+  retryAttempt?: number;
+  skipReason?: string;
+  [key: string]: unknown;
 }
 
 export interface StepExecutionResult {
   success: boolean;
-  skipped?: boolean; // New field to indicate if step was skipped due to executeIf condition
-  output?: any;
-  error?: {
-    message: string;
-    code?: string;
-    stack?: string;
-  };
-  metadata?: {
-    duration: number;
-    retryAttempt?: number;
-    skipReason?: string; // Reason for skipping the step
-    [key: string]: any;
-  };
+  skipped?: boolean;
+  output?: StepOutput;
+  error?: StepExecutionError;
+  metadata?: StepExecutionMetadata;
 }
 
 @Injectable()
@@ -65,6 +90,7 @@ export class FlowExecutorService {
     private readonly inputValidator: InputValidatorService,
     private readonly conditionEvaluator: ConditionEvaluatorService,
     private readonly sandboxService: SandboxService,
+    private readonly executionLogsService: ExecutionLogsService,
     @Optional() private readonly inngestService: InngestService,
     @InjectPinoLogger(FlowExecutorService.name)
     private readonly logger: PinoLogger,
@@ -73,7 +99,7 @@ export class FlowExecutorService {
   async executeFlow(
     flowId: string,
     tenant: TenantContext,
-    inputVariables: any = {},
+    inputVariables: FlowVariables = {},
   ): Promise<ExecutionLog> {
     const startTime = new Date();
     const executionId = this.generateExecutionId();
@@ -255,6 +281,24 @@ export class FlowExecutorService {
   ): Promise<StepExecutionResult> {
     const startTime = Date.now();
 
+    // Create step execution log
+    const stepLog = await this.executionLogsService.markStepStarted(
+      context.orgId,
+      context.userId,
+      context.flowId,
+      context.executionId,
+      step.id,
+      {
+        stepName: step.name,
+        stepType: step.type,
+        config: step.config,
+        executeIf:
+          typeof step.executeIf === 'string' ? step.executeIf : JSON.stringify(step.executeIf),
+        variables: context.variables,
+        stepOutputs: context.stepOutputs,
+      },
+    );
+
     // Check executeIf condition before executing the step
     if (step.executeIf) {
       try {
@@ -289,6 +333,9 @@ export class FlowExecutorService {
             },
             'Step skipped due to executeIf condition',
           );
+
+          // Update step log to skipped
+          await this.executionLogsService.markStepSkipped(stepLog.id, skipReason);
 
           // Publish step skipped event
           await this.publishStepSkipped(step, context, skipReason);
@@ -347,8 +394,18 @@ export class FlowExecutorService {
       };
 
       if (result.success) {
+        // Update step log to completed
+        await this.executionLogsService.markStepCompleted(stepLog.id, {
+          output: result.output,
+          duration,
+          metadata: result.metadata,
+        });
+
         await this.publishStepCompleted(step, context, stepResult);
       } else {
+        // Update step log to failed
+        await this.executionLogsService.markStepFailed(stepLog.id, result.error);
+
         await this.publishStepFailed(step, context, stepResult);
       }
 
@@ -367,6 +424,9 @@ export class FlowExecutorService {
         },
         metadata: { duration },
       };
+
+      // Update step log to failed (for exception case)
+      await this.executionLogsService.markStepFailed(stepLog.id, stepResult.error);
 
       await this.publishStepFailed(step, context, stepResult);
       return stepResult;
@@ -414,13 +474,15 @@ export class FlowExecutorService {
     _context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     const { url, method = 'GET', headers = {}, body } = step.config;
+    const urlStr = url as string;
+    const methodStr = method as string;
 
     try {
-      const response = await fetch(url, {
-        method,
+      const response = await fetch(urlStr, {
+        method: methodStr,
         headers: {
           'Content-Type': 'application/json',
-          ...headers,
+          ...(typeof headers === 'object' && headers !== null ? headers : {}),
         },
         body: body ? JSON.stringify(body) : undefined,
       });
@@ -465,16 +527,19 @@ export class FlowExecutorService {
     context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     const { toolName, url, method = 'GET', headers = {}, body } = step.config;
+    const urlStr = url as string;
+    const methodStr = method as string;
+    const toolNameStr = toolName as string;
 
     try {
-      const accessToken = await this.oauthService.getValidAccessToken(toolName, context.orgId);
+      const accessToken = await this.oauthService.getValidAccessToken(toolNameStr, context.orgId);
 
-      const response = await fetch(url, {
-        method,
+      const response = await fetch(urlStr, {
+        method: methodStr,
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json',
-          ...headers,
+          ...(typeof headers === 'object' && headers !== null ? headers : {}),
         },
         body: body ? JSON.stringify(body) : undefined,
       });
@@ -555,7 +620,7 @@ export class FlowExecutorService {
 
         return {
           success: result.success,
-          output: result.output,
+          output: (result.output || {}) as StepOutput,
           error: result.error,
           metadata: {
             duration: result.executionTime || 0,
@@ -576,12 +641,12 @@ export class FlowExecutorService {
     } else {
       // Fallback to direct execution (less secure)
       try {
-        const transformFunction = new Function('input', 'context', script);
+        const transformFunction = new Function('input', 'context', script as string);
         const result = transformFunction(context.stepOutputs, context);
 
         return {
           success: true,
-          output: result,
+          output: (result || {}) as StepOutput,
           metadata: {
             duration: 0,
             executionMode: 'direct',
@@ -677,8 +742,9 @@ export class FlowExecutorService {
     context: FlowExecutionContext,
   ): Promise<StepExecutionResult> {
     const { actionId, inputs } = step.config;
+    const actionIdStr = actionId as string;
 
-    if (!actionId) {
+    if (!actionIdStr) {
       return {
         success: false,
         error: {
@@ -690,7 +756,7 @@ export class FlowExecutorService {
 
     try {
       const action = await this.prisma.action.findUnique({
-        where: { id: actionId },
+        where: { id: actionIdStr },
         include: { tool: true },
       });
 
@@ -730,8 +796,14 @@ export class FlowExecutorService {
         }
       }
 
-      const resolvedInputs = await this.resolveActionInputs(validatedInputs, context);
-      const executionResult = await this.executeActionRequest(action, resolvedInputs);
+      const resolvedInputs = await this.resolveActionInputs(
+        validatedInputs as Record<string, unknown>,
+        context,
+      );
+      const executionResult = await this.executeActionRequest(
+        action as unknown as Record<string, unknown>,
+        resolvedInputs as Record<string, unknown>,
+      );
 
       return {
         success: executionResult.success,
@@ -749,12 +821,15 @@ export class FlowExecutorService {
     }
   }
 
-  private async resolveActionInputs(inputs: any, context: FlowExecutionContext): Promise<any> {
+  private async resolveActionInputs(
+    inputs: unknown,
+    context: FlowExecutionContext,
+  ): Promise<unknown> {
     if (typeof inputs !== 'object' || inputs === null) {
       return inputs;
     }
 
-    const resolved: any = Array.isArray(inputs) ? [] : {};
+    const resolved: Record<string, unknown> | unknown[] = Array.isArray(inputs) ? [] : {};
 
     for (const [key, value] of Object.entries(inputs)) {
       if (typeof value === 'string' && value.includes('{{')) {
@@ -769,50 +844,57 @@ export class FlowExecutorService {
     return resolved;
   }
 
-  private resolveTemplate(template: string, context: FlowExecutionContext): any {
+  private resolveTemplate(template: string, context: FlowExecutionContext): string {
     return template.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
-      const trimmedPath = path.trim();
+      const trimmedPath = (path as string).trim();
 
       if (trimmedPath.startsWith('steps.')) {
         const stepPath = trimmedPath.substring(6);
-        return this.getNestedValue(context.stepOutputs, stepPath);
+        return String(this.getNestedValue(context.stepOutputs, stepPath));
       }
 
       if (trimmedPath.startsWith('variables.')) {
         const varPath = trimmedPath.substring(10);
-        return this.getNestedValue(context.variables, varPath);
+        return String(this.getNestedValue(context.variables, varPath));
       }
 
       if (context.variables[trimmedPath] !== undefined) {
-        return context.variables[trimmedPath];
+        return String(context.variables[trimmedPath]);
       }
 
       return match;
     });
   }
 
-  private getNestedValue(obj: any, path: string): any {
+  private getNestedValue(obj: Record<string, unknown>, path: string): unknown {
     return path.split('.').reduce((current, key) => {
-      return current && current[key] !== undefined ? current[key] : undefined;
-    }, obj);
+      return current && typeof current === 'object' && key in current
+        ? (current as Record<string, unknown>)[key]
+        : undefined;
+    }, obj as unknown);
   }
 
-  private async executeActionRequest(action: any, inputs: any): Promise<StepExecutionResult> {
+  private async executeActionRequest(
+    action: Record<string, unknown>,
+    inputs: Record<string, unknown>,
+  ): Promise<StepExecutionResult> {
     const { tool, endpoint, method, headers } = action;
-    const url = `${tool.baseUrl}${endpoint}`;
+    const toolObj = tool as { baseUrl: string };
+    const url = `${toolObj.baseUrl}${endpoint as string}`;
+    const methodStr = method as string;
 
     try {
       const requestHeaders = {
         'Content-Type': 'application/json',
-        ...headers,
+        ...(typeof headers === 'object' && headers !== null ? headers : {}),
       };
 
-      const requestBody = ['GET', 'HEAD'].includes(method.toUpperCase())
+      const requestBody = ['GET', 'HEAD'].includes(methodStr.toUpperCase())
         ? undefined
         : JSON.stringify(inputs);
 
       const response = await fetch(url, {
-        method: method.toUpperCase(),
+        method: methodStr.toUpperCase(),
         headers: requestHeaders,
         body: requestBody,
       });
@@ -883,11 +965,11 @@ export class FlowExecutorService {
         stepOutputs: context.stepOutputs,
       };
 
-      const result = await this.sandboxService.runSync(code, sandboxContext);
+      const result = await this.sandboxService.runSync(code as string, sandboxContext);
 
       return {
         success: result.success,
-        output: result.output,
+        output: (result.output || {}) as StepOutput,
         error: result.error,
         metadata: {
           duration: result.executionTime || 0,
@@ -939,14 +1021,16 @@ export class FlowExecutorService {
       };
 
       // Start async execution
-      const sessionId = await this.sandboxService.runAsync(code, sandboxContext);
+      const sessionId = await this.sandboxService.runAsync(code as string, sandboxContext);
 
       // Poll for completion or return session info for later retrieval
       if (step.config.waitForCompletion !== false) {
         // Poll for completion
         let attempts = 0;
-        while (attempts < maxPollAttempts) {
-          await new Promise(resolve => setTimeout(resolve, pollInterval));
+        const maxAttemptsNum = maxPollAttempts as number;
+        const pollIntervalNum = pollInterval as number;
+        while (attempts < maxAttemptsNum) {
+          await new Promise(resolve => setTimeout(resolve, pollIntervalNum));
           attempts++;
 
           const asyncResult = await this.sandboxService.getAsyncResult(sessionId, sandboxContext);
@@ -955,7 +1039,7 @@ export class FlowExecutorService {
             const result = asyncResult.result;
             return {
               success: result?.success || false,
-              output: result?.output,
+              output: (result?.output || {}) as StepOutput,
               error: result?.error,
               metadata: {
                 duration: result?.executionTime || 0,
@@ -974,11 +1058,11 @@ export class FlowExecutorService {
           success: false,
           output: { sessionId },
           error: {
-            message: `Async execution timed out after ${maxPollAttempts} attempts`,
+            message: `Async execution timed out after ${maxAttemptsNum} attempts`,
             code: 'SANDBOX_ASYNC_TIMEOUT',
           },
           metadata: {
-            duration: maxPollAttempts * pollInterval,
+            duration: maxAttemptsNum * pollIntervalNum,
             sandboxMode: 'async',
             sessionId,
             pollAttempts: attempts,
@@ -1035,7 +1119,7 @@ export class FlowExecutorService {
   ): Promise<StepExecutionResult> {
     const { delayMs } = step.config;
 
-    await new Promise(resolve => setTimeout(resolve, delayMs));
+    await new Promise(resolve => setTimeout(resolve, delayMs as number));
 
     return {
       success: true,
@@ -1212,7 +1296,7 @@ export class FlowExecutorService {
     });
   }
 
-  private parseFlowSteps(stepsData: any): FlowStep[] {
+  private parseFlowSteps(stepsData: unknown): FlowStep[] {
     if (Array.isArray(stepsData)) {
       return stepsData;
     }
@@ -1237,7 +1321,7 @@ export class FlowExecutorService {
     flowId: string,
     tenant: TenantContext,
     status: string,
-    input: any,
+    input: FlowVariables,
   ): Promise<ExecutionLog> {
     return this.prisma.executionLog.create({
       data: {
@@ -1245,9 +1329,10 @@ export class FlowExecutorService {
         flowId,
         orgId: tenant.orgId,
         userId: tenant.userId,
-        stepId: 'flow_start',
+        executionId: executionId,
+        stepKey: 'flow_start',
         status,
-        inputs: input,
+        inputs: input as unknown as Prisma.InputJsonValue,
         outputs: null,
       },
     });
@@ -1256,19 +1341,22 @@ export class FlowExecutorService {
   private async updateExecutionLog(
     executionId: string,
     status: string,
-    output: any,
+    output: StepOutputs,
     _error?: string,
   ): Promise<ExecutionLog> {
     return this.prisma.executionLog.update({
       where: { id: executionId },
       data: {
         status,
-        outputs: output,
+        outputs: output as unknown as Prisma.InputJsonValue,
       },
     });
   }
 
-  private async dispatchWebhook(eventType: string, payload: any): Promise<void> {
+  private async dispatchWebhook(
+    eventType: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
     if (!this.inngestService) {
       this.logger.debug('InngestService not available, skipping webhook dispatch');
       return;
@@ -1285,19 +1373,19 @@ export class FlowExecutorService {
       });
 
       this.logger.debug(
-        { 
-          eventType, 
-          orgId: payload.orgId, 
-          executionId: payload.executionId 
+        {
+          eventType,
+          orgId: payload.orgId,
+          executionId: payload.executionId,
         },
         'Webhook dispatch event queued',
       );
     } catch (error) {
       this.logger.error(
-        { 
-          eventType, 
-          orgId: payload.orgId, 
-          error: error instanceof Error ? error.message : 'Unknown error' 
+        {
+          eventType,
+          orgId: payload.orgId,
+          error: error instanceof Error ? error.message : 'Unknown error',
         },
         'Failed to queue webhook dispatch event',
       );

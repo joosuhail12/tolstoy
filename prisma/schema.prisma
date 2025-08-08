@@ -90,15 +90,21 @@ model ExecutionLog {
   orgId       String
   userId      String
   flowId      String
-  stepId      String
+  executionId String
+  stepKey     String
+  status      String   // 'started','completed','skipped','failed'
   inputs      Json
   outputs     Json?
-  status      String
+  error       Json?
   createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   organization Organization @relation(fields: [orgId], references: [id])
   user         User         @relation(fields: [userId], references: [id])
   flow         Flow         @relation(fields: [flowId], references: [id])
+
+  @@index([orgId, flowId, executionId])
+  @@index([executionId, stepKey])
 }
 
 model Webhook {

@@ -11,16 +11,26 @@ export interface DaytonaClientConfig {
   timeout?: number;
 }
 
+export interface ExecutionContext {
+  variables?: Record<string, unknown>;
+  stepOutputs?: Record<string, unknown>;
+  orgId: string;
+  userId: string;
+  flowId: string;
+  stepId: string;
+  executionId: string;
+}
+
 export interface DaytonaRunRequest {
   code: string;
-  context: any;
+  context: ExecutionContext;
   language?: string;
   timeout?: number;
 }
 
 export interface DaytonaRunResponse {
   success: boolean;
-  output: any;
+  output: unknown;
   error?: {
     message: string;
     code?: string;
@@ -31,7 +41,7 @@ export interface DaytonaRunResponse {
 
 export interface DaytonaSessionRequest {
   code: string;
-  context: any;
+  context: ExecutionContext;
   language?: string;
   timeout?: number;
 }
@@ -45,7 +55,7 @@ export interface DaytonaSessionResponse {
 export interface DaytonaSessionResult {
   sessionId: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
-  output?: any;
+  output?: unknown;
   error?: {
     message: string;
     code?: string;

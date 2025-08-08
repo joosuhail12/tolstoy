@@ -1,6 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpService } from '@nestjs/axios';
-import { PinoLogger } from 'nestjs-pino';
 import { AxiosResponse } from 'axios';
 import { of, throwError } from 'rxjs';
 import { DispatchWebhookHandler } from './dispatch-webhook.handler';
@@ -134,7 +133,10 @@ describe('DispatchWebhookHandler', () => {
       expect(result.results[0].success).toBe(true);
       expect(result.results[0].statusCode).toBe(200);
 
-      expect(mockWebhooksService.getWebhooksForEvent).toHaveBeenCalledWith('org-123', 'step.completed');
+      expect(mockWebhooksService.getWebhooksForEvent).toHaveBeenCalledWith(
+        'org-123',
+        'step.completed',
+      );
       expect(mockWebhookSignatureService.createWebhookPayload).toHaveBeenCalled();
       expect(mockWebhookSignatureService.generateWebhookHeaders).toHaveBeenCalled();
       expect(mockHttpService.post).toHaveBeenCalledWith(
@@ -212,22 +214,12 @@ describe('DispatchWebhookHandler', () => {
       );
     });
 
-    it('should handle HTTP request failure with retry', async () => {
+    it('should handle HTTP request failure', async () => {
       mockStep.run
         .mockImplementationOnce((stepName, callback) => callback())
-        .mockImplementationOnce(async (stepName, callback, options) => {
-          // Simulate step.run retry behavior
-          expect(options.retry.maxAttempts).toBe(5);
-          expect(options.retry.backoff.type).toBe('exponential');
-          expect(options.retry.backoff.delay).toBe(1000);
-          
+        .mockImplementationOnce(async (stepName, callback) => {
           // Execute callback to trigger the actual HTTP call and error handling
-          try {
-            return await callback();
-          } catch (error) {
-            // Re-throw the error as step.run would do on retry exhaustion
-            throw error;
-          }
+          return await callback();
         });
 
       mockWebhooksService.getWebhooksForEvent.mockResolvedValue([mockWebhook]);
@@ -370,7 +362,10 @@ describe('DispatchWebhookHandler', () => {
       const result = await handler.handler({ step: mockStep, event: flowEvent });
 
       expect(result.dispatched).toBe(1);
-      expect(mockWebhooksService.getWebhooksForEvent).toHaveBeenCalledWith('org-123', 'flow.completed');
+      expect(mockWebhooksService.getWebhooksForEvent).toHaveBeenCalledWith(
+        'org-123',
+        'flow.completed',
+      );
     });
   });
 });

@@ -10,6 +10,7 @@ import {
   ConditionContext,
 } from '../../common/services/condition-evaluator.service';
 import { PrismaService } from '../../prisma.service';
+import { ExecutionLogsService } from '../../execution-logs/execution-logs.service';
 
 export interface FlowExecutionEvent {
   data: {
@@ -59,6 +60,7 @@ export class ExecuteFlowHandler {
     private readonly inputValidator: InputValidatorService,
     private readonly conditionEvaluator: ConditionEvaluatorService,
     private readonly prisma: PrismaService,
+    private readonly executionLogsService: ExecutionLogsService,
     @Optional() private readonly inngestService: InngestService,
     @InjectPinoLogger(ExecuteFlowHandler.name)
     private readonly logger: PinoLogger,
@@ -1035,19 +1037,19 @@ export class ExecuteFlowHandler {
       });
 
       this.logger.debug(
-        { 
-          eventType, 
-          orgId: payload.orgId, 
-          executionId: payload.executionId 
+        {
+          eventType,
+          orgId: payload.orgId,
+          executionId: payload.executionId,
         },
         'Webhook dispatch event queued',
       );
     } catch (error) {
       this.logger.error(
-        { 
-          eventType, 
-          orgId: payload.orgId, 
-          error: error instanceof Error ? error.message : 'Unknown error' 
+        {
+          eventType,
+          orgId: payload.orgId,
+          error: error instanceof Error ? error.message : 'Unknown error',
         },
         'Failed to queue webhook dispatch event',
       );

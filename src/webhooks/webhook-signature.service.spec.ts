@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { WebhookSignatureService } from './webhook-signature.service';
+import { WebhookSignatureService, WebhookPayload } from './webhook-signature.service';
 
 describe('WebhookSignatureService', () => {
   let service: WebhookSignatureService;
@@ -18,7 +18,11 @@ describe('WebhookSignatureService', () => {
 
   describe('generateSignature', () => {
     it('should generate consistent signature for same payload and secret', () => {
-      const payload = { test: 'data' };
+      const payload: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
       const secret = 'test-secret';
 
       const signature1 = service.generateSignature(payload, secret);
@@ -30,8 +34,16 @@ describe('WebhookSignatureService', () => {
 
     it('should generate different signatures for different payloads', () => {
       const secret = 'test-secret';
-      const payload1 = { test: 'data1' };
-      const payload2 = { test: 'data2' };
+      const payload1: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data1' },
+      };
+      const payload2: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data2' },
+      };
 
       const signature1 = service.generateSignature(payload1, secret);
       const signature2 = service.generateSignature(payload2, secret);
@@ -40,7 +52,11 @@ describe('WebhookSignatureService', () => {
     });
 
     it('should generate different signatures for different secrets', () => {
-      const payload = { test: 'data' };
+      const payload: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
       const secret1 = 'secret1';
       const secret2 = 'secret2';
 
@@ -62,7 +78,11 @@ describe('WebhookSignatureService', () => {
 
   describe('verifySignature', () => {
     it('should verify valid signature', () => {
-      const payload = { test: 'data' };
+      const payload: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
       const secret = 'test-secret';
       const signature = service.generateSignature(payload, secret);
 
@@ -72,7 +92,11 @@ describe('WebhookSignatureService', () => {
     });
 
     it('should reject invalid signature', () => {
-      const payload = { test: 'data' };
+      const payload: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
       const secret = 'test-secret';
       const invalidSignature = 'sha256=invalid';
 
@@ -82,7 +106,11 @@ describe('WebhookSignatureService', () => {
     });
 
     it('should reject if signature is missing', () => {
-      const payload = { test: 'data' };
+      const payload: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
       const secret = 'test-secret';
 
       const isValid = service.verifySignature(payload, '', secret);
@@ -91,7 +119,11 @@ describe('WebhookSignatureService', () => {
     });
 
     it('should reject if secret is missing', () => {
-      const payload = { test: 'data' };
+      const payload: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
       const signature = 'sha256=somesignature';
 
       const isValid = service.verifySignature(payload, signature, '');
@@ -103,7 +135,11 @@ describe('WebhookSignatureService', () => {
   describe('generateWebhookHeaders', () => {
     it('should generate headers with signature when secret provided', () => {
       const eventType = 'flow.completed';
-      const payload = { test: 'data' };
+      const payload: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
       const secret = 'test-secret';
 
       const headers = service.generateWebhookHeaders(eventType, payload, secret);
@@ -116,7 +152,11 @@ describe('WebhookSignatureService', () => {
 
     it('should generate headers without signature when secret not provided', () => {
       const eventType = 'flow.completed';
-      const payload = { test: 'data' };
+      const payload: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
 
       const headers = service.generateWebhookHeaders(eventType, payload);
 
@@ -129,7 +169,11 @@ describe('WebhookSignatureService', () => {
 
   describe('verifyWebhookRequest', () => {
     it('should verify valid webhook request', () => {
-      const body = { test: 'data' };
+      const body: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
       const secret = 'test-secret';
       const timestamp = Date.now();
       const payloadWithTimestamp = { timestamp, ...body };
@@ -140,71 +184,115 @@ describe('WebhookSignatureService', () => {
         'x-webhook-timestamp': timestamp.toString(),
       };
 
-      const result = service.verifyWebhookRequest(body, headers, secret);
+      const result = service.verifyWebhookRequest(
+        body as unknown as Record<string, unknown>,
+        headers,
+        secret,
+      );
 
       expect(result.valid).toBe(true);
       expect(result.error).toBeUndefined();
     });
 
     it('should reject request with missing signature', () => {
-      const body = { test: 'data' };
+      const body: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
       const headers = {
         'x-webhook-timestamp': Date.now().toString(),
       };
 
-      const result = service.verifyWebhookRequest(body, headers, 'secret');
+      const result = service.verifyWebhookRequest(
+        body as unknown as Record<string, unknown>,
+        headers,
+        'secret',
+      );
 
       expect(result.valid).toBe(false);
       expect(result.error).toBe('Missing signature header');
     });
 
     it('should reject request with missing timestamp', () => {
-      const body = { test: 'data' };
+      const body: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
       const headers = {
         'x-webhook-signature': 'sha256=test',
       };
 
-      const result = service.verifyWebhookRequest(body, headers, 'secret');
+      const result = service.verifyWebhookRequest(
+        body as unknown as Record<string, unknown>,
+        headers,
+        'secret',
+      );
 
       expect(result.valid).toBe(false);
       expect(result.error).toBe('Missing timestamp header');
     });
 
     it('should reject request with invalid timestamp format', () => {
-      const body = { test: 'data' };
+      const body: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
       const headers = {
         'x-webhook-signature': 'sha256=test',
         'x-webhook-timestamp': 'invalid',
       };
 
-      const result = service.verifyWebhookRequest(body, headers, 'secret');
+      const result = service.verifyWebhookRequest(
+        body as unknown as Record<string, unknown>,
+        headers,
+        'secret',
+      );
 
       expect(result.valid).toBe(false);
       expect(result.error).toBe('Invalid timestamp format');
     });
 
     it('should reject request with old timestamp (replay attack)', () => {
-      const body = { test: 'data' };
+      const body: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
       const oldTimestamp = Date.now() - 10 * 60 * 1000; // 10 minutes ago
       const headers = {
         'x-webhook-signature': 'sha256=test',
         'x-webhook-timestamp': oldTimestamp.toString(),
       };
 
-      const result = service.verifyWebhookRequest(body, headers, 'secret');
+      const result = service.verifyWebhookRequest(
+        body as unknown as Record<string, unknown>,
+        headers,
+        'secret',
+      );
 
       expect(result.valid).toBe(false);
       expect(result.error).toContain('replay attack');
     });
 
     it('should reject request with invalid signature', () => {
-      const body = { test: 'data' };
+      const body: WebhookPayload = {
+        eventType: 'test.event',
+        timestamp: Date.now(),
+        data: { test: 'data' },
+      };
       const headers = {
         'x-webhook-signature': 'sha256=invalidsignature',
         'x-webhook-timestamp': Date.now().toString(),
       };
 
-      const result = service.verifyWebhookRequest(body, headers, 'secret');
+      const result = service.verifyWebhookRequest(
+        body as unknown as Record<string, unknown>,
+        headers,
+        'secret',
+      );
 
       expect(result.valid).toBe(false);
       expect(result.error).toBe('Invalid signature');

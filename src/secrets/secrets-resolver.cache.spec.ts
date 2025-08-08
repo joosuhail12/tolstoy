@@ -123,7 +123,7 @@ describe('SecretsResolver - Cache Integration', () => {
       mockCacheService.set.mockResolvedValue();
 
       await expect(service.getToolCredentials(toolName, orgId)).resolves.toEqual(mockCredentials);
-      
+
       // Should fallback to AWS and still work
       expect(mockAwsSecretsService.getSecretAsJson).toHaveBeenCalled();
     });

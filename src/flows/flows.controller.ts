@@ -99,7 +99,9 @@ export class FlowsController {
     if (useDurable) {
       // Use Inngest for durable execution
       if (!this.inngestExecutionService) {
-        throw new Error('Durable execution is not available - InngestExecutionService is not configured');
+        throw new Error(
+          'Durable execution is not available - InngestExecutionService is not configured',
+        );
       }
 
       const result = await this.inngestExecutionService.executeFlow(id, tenant, variables);
@@ -136,7 +138,9 @@ export class FlowsController {
   @Get(':id/executions')
   async getFlowExecutions(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     if (!this.inngestExecutionService) {
-      throw new Error('Durable execution monitoring is not available - InngestExecutionService is not configured');
+      throw new Error(
+        'Durable execution monitoring is not available - InngestExecutionService is not configured',
+      );
     }
     return this.inngestExecutionService.getFlowExecutions(id, tenant);
   }
@@ -148,7 +152,9 @@ export class FlowsController {
     @Tenant() tenant: TenantContext,
   ) {
     if (!this.inngestExecutionService) {
-      throw new Error('Durable execution monitoring is not available - InngestExecutionService is not configured');
+      throw new Error(
+        'Durable execution monitoring is not available - InngestExecutionService is not configured',
+      );
     }
     return this.inngestExecutionService.getExecutionStatus(executionId, tenant);
   }
@@ -170,7 +176,9 @@ export class FlowsController {
     );
 
     if (!this.inngestExecutionService) {
-      throw new Error('Durable execution cancellation is not available - InngestExecutionService is not configured');
+      throw new Error(
+        'Durable execution cancellation is not available - InngestExecutionService is not configured',
+      );
     }
     await this.inngestExecutionService.cancelExecution(executionId, tenant);
 
@@ -201,9 +209,13 @@ export class FlowsController {
     );
 
     if (!this.inngestExecutionService) {
-      throw new Error('Durable execution retry is not available - InngestExecutionService is not configured');
+      throw new Error(
+        'Durable execution retry is not available - InngestExecutionService is not configured',
+      );
     }
     const result = await this.inngestExecutionService.retryExecution(executionId, tenant);
+
+    return result;
 
     // this.logger.info(
     //   {
@@ -221,7 +233,9 @@ export class FlowsController {
   @Get(':id/metrics')
   async getExecutionMetrics(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     if (!this.inngestExecutionService) {
-      throw new Error('Execution metrics are not available - InngestExecutionService is not configured');
+      throw new Error(
+        'Execution metrics are not available - InngestExecutionService is not configured',
+      );
     }
     return this.inngestExecutionService.getExecutionMetrics(id, tenant);
   }

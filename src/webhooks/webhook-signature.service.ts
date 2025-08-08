@@ -4,7 +4,7 @@ import * as crypto from 'crypto';
 export interface WebhookPayload {
   eventType: string;
   timestamp: number;
-  data: any;
+  data: Record<string, unknown>;
   metadata?: {
     orgId: string;
     webhookId: string;
@@ -25,7 +25,7 @@ export class WebhookSignatureService {
   private readonly SIGNATURE_PREFIX = 'sha256=';
   private readonly TIMESTAMP_TOLERANCE_MS = 5 * 60 * 1000; // 5 minutes
 
-  generateSignature(payload: any, secret: string): string {
+  generateSignature(payload: WebhookPayload | string, secret: string): string {
     const payloadString = typeof payload === 'string' ? payload : JSON.stringify(payload);
 
     const signature = crypto
@@ -36,7 +36,7 @@ export class WebhookSignatureService {
     return `${this.SIGNATURE_PREFIX}${signature}`;
   }
 
-  verifySignature(payload: any, signature: string, secret: string): boolean {
+  verifySignature(payload: WebhookPayload | string, signature: string, secret: string): boolean {
     if (!signature || !secret) {
       return false;
     }
@@ -52,7 +52,11 @@ export class WebhookSignatureService {
     return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
   }
 
-  generateWebhookHeaders(eventType: string, payload: any, secret?: string): WebhookHeaders {
+  generateWebhookHeaders(
+    eventType: string,
+    payload: WebhookPayload,
+    secret?: string,
+  ): WebhookHeaders {
     const timestamp = Date.now();
     const deliveryId = this.generateDeliveryId();
 
@@ -74,7 +78,7 @@ export class WebhookSignatureService {
   }
 
   verifyWebhookRequest(
-    body: any,
+    body: string | Record<string, unknown>,
     headers: WebhookHeaders,
     secret: string,
   ): { valid: boolean; error?: string } {
@@ -104,11 +108,11 @@ export class WebhookSignatureService {
     // Verify signature with timestamp included
     const payloadWithTimestamp = {
       timestamp,
-      ...body,
+      ...(typeof body === 'object' && body !== null ? body : {}),
     };
 
     const isValid = this.verifySignature(
-      payloadWithTimestamp,
+      JSON.stringify(payloadWithTimestamp),
       headers['x-webhook-signature'],
       secret,
     );
@@ -126,7 +130,7 @@ export class WebhookSignatureService {
 
   createWebhookPayload(
     eventType: string,
-    data: any,
+    data: Record<string, unknown>,
     metadata?: {
       orgId: string;
       webhookId: string;

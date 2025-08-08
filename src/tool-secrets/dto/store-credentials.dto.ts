@@ -6,7 +6,7 @@ export class StoreCredentialsDto {
   @IsNotEmpty()
   @ValidateNested()
   @Type(() => Object)
-  credentials: any;
+  credentials: Record<string, unknown>;
 }
 
 export class CredentialResponseDto {
@@ -17,7 +17,7 @@ export class CredentialResponseDto {
   toolName: string;
 
   @IsObject()
-  maskedCredentials: any;
+  maskedCredentials: Record<string, string>;
 
   createdAt: Date;
 

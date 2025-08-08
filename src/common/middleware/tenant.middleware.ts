@@ -29,7 +29,7 @@ export class TenantMiddleware implements NestMiddleware {
       orgId: orgId.toString(),
       userId: userId.toString(),
     };
-    
+
     // Also set it on the raw request object for Fastify compatibility
     (req as any).raw = (req as any).raw || req;
     (req as any).raw.tenant = req.tenant;

@@ -23,15 +23,20 @@ export class CreateActionDto {
 
   @IsObject()
   @IsNotEmpty()
-  headers: any;
+  headers: Record<string, string>;
 
   @IsArray()
   @IsNotEmpty()
-  inputSchema: any[];
+  inputSchema: Array<{
+    name: string;
+    type: string;
+    required?: boolean;
+    description?: string;
+  }>;
 
   @IsObject()
   @IsOptional()
-  executeIf?: any;
+  executeIf?: Record<string, unknown>;
 
   @IsNumber()
   @IsOptional()

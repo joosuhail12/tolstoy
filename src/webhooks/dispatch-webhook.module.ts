@@ -10,15 +10,10 @@ import { PrismaService } from '../prisma.service';
     HttpModule.register({
       timeout: 30000,
       maxRedirects: 3,
-      validateStatus: (status) => status < 500, // Don't throw on 4xx errors, let handler decide
+      validateStatus: status => status < 500, // Don't throw on 4xx errors, let handler decide
     }),
   ],
-  providers: [
-    DispatchWebhookHandler,
-    WebhooksService,
-    WebhookSignatureService,
-    PrismaService,
-  ],
+  providers: [DispatchWebhookHandler, WebhooksService, WebhookSignatureService, PrismaService],
   exports: [DispatchWebhookHandler],
 })
 export class DispatchWebhookModule {}

@@ -703,6 +703,156 @@ Webhook dispatch events are logged with structured data:
 }
 ```
 
+## 📊 Execution Logs & Observability
+
+### Overview
+Tolstoy provides comprehensive execution logging for every flow step to create an auditable trail and enable Prometheus metrics. Each step execution is tracked with detailed information including inputs, outputs, status, timing, and error details.
+
+### Execution Log Model
+```typescript
+model ExecutionLog {
+  id          String   @id @default(cuid())
+  orgId       String
+  userId      String
+  flowId      String
+  executionId String
+  stepKey     String
+  status      String   // 'started', 'completed', 'skipped', 'failed'
+  inputs      Json
+  outputs     Json?
+  error       Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([orgId, flowId, executionId])
+  @@index([executionId, stepKey])
+}
+```
+
+### Step Logging Lifecycle
+For each step execution, the system creates exactly one execution log with the following lifecycle:
+
+1. **Step Started**: Log created with `status: 'started'`
+   - Captures step configuration, context variables, and inputs
+   - Records execution start timestamp
+
+2. **Step Completed**: Log updated with `status: 'completed'`
+   - Captures step outputs and execution results
+   - Records completion timestamp and duration
+
+3. **Step Failed**: Log updated with `status: 'failed'`
+   - Captures error details including message, code, and stack trace
+   - Records failure timestamp
+
+4. **Step Skipped**: Log updated with `status: 'skipped'`
+   - Records skip reason (e.g., executeIf condition failed)
+   - Captures context that led to step being skipped
+
+### API Endpoints
+
+#### Retrieve Execution Logs
+```bash
+# Get logs for a specific flow execution
+curl -X GET http://localhost:3000/execution-logs/exec-123 \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+#### Get Step-Level Logs
+```bash
+# Get logs for a specific flow and execution
+curl -X GET http://localhost:3000/execution-logs/flow-456/execution/exec-123 \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+#### Get Execution Statistics
+```bash
+# Get aggregated execution statistics
+curl -X GET http://localhost:3000/execution-logs/stats \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+With optional time range filtering:
+```bash
+curl -X GET "http://localhost:3000/execution-logs/stats?from=2024-01-01&to=2024-12-31" \
+  -H "X-Org-ID: your-org-id" \
+  -H "X-User-ID: your-user-id"
+```
+
+### Sample Execution Log Entry
+```json
+{
+  "id": "log-abc123",
+  "orgId": "org-456",
+  "userId": "user-789",
+  "flowId": "flow-123",
+  "executionId": "exec-456",
+  "stepKey": "transform-data",
+  "status": "completed",
+  "inputs": {
+    "stepName": "Transform Customer Data",
+    "stepType": "data_transform",
+    "config": {
+      "script": "return input.name.toUpperCase()",
+      "useSandbox": false
+    },
+    "executeIf": "variables.shouldTransform === true",
+    "variables": {
+      "shouldTransform": true,
+      "customerData": { "name": "john doe" }
+    },
+    "stepOutputs": {
+      "previous-step": { "result": "success" }
+    }
+  },
+  "outputs": {
+    "transformedName": "JOHN DOE",
+    "duration": 120,
+    "metadata": {
+      "executionMode": "direct"
+    }
+  },
+  "error": null,
+  "createdAt": "2024-01-15T10:30:00.000Z",
+  "updatedAt": "2024-01-15T10:30:00.120Z"
+}
+```
+
+### Prometheus Metrics Integration
+Execution logs are designed to support Prometheus metrics collection:
+
+- **Step execution duration**: Time from started to completed/failed
+- **Success/failure rates**: Aggregated by flow, step type, organization
+- **Error classification**: Grouped by error codes and types
+- **Throughput metrics**: Steps executed per time period
+- **Flow completion rates**: End-to-end flow success metrics
+
+### Statistics Response Format
+```json
+{
+  "totalExecutions": 1543,
+  "completedSteps": 1420,
+  "failedSteps": 89,
+  "skippedSteps": 34,
+  "avgExecutionTime": 0,
+  "successRate": 92.0,
+  "timeRange": {
+    "from": "2024-01-01T00:00:00.000Z",
+    "to": "2024-01-31T23:59:59.999Z"
+  }
+}
+```
+
+### Observability Features
+- **Multi-tenant isolation**: All logs are scoped to organization
+- **Performance tracking**: Execution duration and timing metrics
+- **Error correlation**: Link related errors across step executions
+- **Audit trail**: Complete history of all step executions
+- **Context preservation**: Full execution context saved with each log
+- **Index optimization**: Efficient querying by execution ID and step key
+
 ## 🛠️ Development Scripts
 
 ```bash

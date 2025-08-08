@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { Flow } from '@prisma/client';
+import { Flow, Prisma } from '@prisma/client';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { PrismaService } from '../prisma.service';
 import { CreateFlowDto } from './dto/create-flow.dto';
@@ -20,7 +20,8 @@ export class FlowsService {
   async create(createFlowDto: CreateFlowDto, tenant: TenantContext): Promise<Flow> {
     const flow = await this.prisma.flow.create({
       data: {
-        ...createFlowDto,
+        version: createFlowDto.version,
+        steps: createFlowDto.steps as unknown as Prisma.InputJsonValue,
         orgId: tenant.orgId,
       },
     });
@@ -105,7 +106,7 @@ export class FlowsService {
         executionLogs: {
           select: {
             id: true,
-            stepId: true,
+            stepKey: true,
             status: true,
             createdAt: true,
             user: {
@@ -148,7 +149,10 @@ export class FlowsService {
     try {
       const updatedFlow = await this.prisma.flow.update({
         where: { id },
-        data: updateFlowDto,
+        data: {
+          version: updateFlowDto.version,
+          steps: updateFlowDto.steps as unknown as Prisma.InputJsonValue,
+        },
       });
 
       // Invalidate caches for this flow
