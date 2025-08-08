@@ -1,0 +1,334 @@
+---
+title: User Authentication
+sidebar_position: 3
+---
+
+# User Authentication
+
+Perform OAuth2 login flows for users to authorize access to their accounts on external services.
+
+## Overview
+
+The `auth login` command initiates OAuth2 authorization flows for users, allowing them to grant permission for workflows to access their accounts on external services like GitHub, Google, Slack, etc.
+
+## Basic Usage
+
+```bash
+tolstoy auth login [OPTIONS]
+```
+
+## Required Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `-t, --tool <toolKey>` | Tool identifier | `-t github` |
+| `-u, --user <userId>` | User ID to associate with tokens | `-u user-123` |
+
+## Optional Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `-o, --org <orgId>` | Organization ID | Uses `ORG_ID` env var |
+| `--no-open` | Display URL instead of opening browser | Opens browser |
+
+## Prerequisites
+
+Before users can log in, you must configure OAuth2 client credentials for the tool:
+
+```bash
+tolstoy tool auth oauth2 \
+  --org my-org \
+  --tool github \
+  --client-id Iv1.xxxxxxxxxxxx \
+  --client-secret xxxxxxxxxxxxxxxx \
+  --callback-url "https://myapp.com/auth/callback" \
+  --scope "repo user"
+```
+
+## Examples
+
+### GitHub Login (Browser)
+```bash
+tolstoy auth login \
+  --tool github \
+  --user user-123 \
+  --org my-org
+```
+
+Output:
+```
+🚀 Initiating OAuth login for tool "github"
+User ID: user-123
+Organization: my-org
+Tool: github
+
+📱 Opening browser for OAuth authorization...
+Login URL: https://api.tolstoy.com/auth/github/login?userId=user-123
+
+✅ Browser opened successfully
+Please complete the authorization in your browser.
+After approval, the callback will complete and tokens will be stored automatically.
+
+The authorization window will show a success/error page when complete.
+
+Headers that will be sent:
+  X-Org-ID: my-org
+  Authorization: Bearer [REDACTED]
+```
+
+### Google Login (Manual URL)
+```bash
+tolstoy auth login \
+  --tool google \
+  --user user-456 \
+  --org my-org \
+  --no-open
+```
+
+Output:
+```
+🚀 Initiating OAuth login for tool "google"
+User ID: user-456
+Organization: my-org
+Tool: google
+
+🔗 OAuth Login URL:
+https://api.tolstoy.com/auth/google/login?userId=user-456
+
+Open this URL in your browser to complete the OAuth authorization.
+After approval, tokens will be stored automatically.
+
+Headers that will be sent:
+  X-Org-ID: my-org
+  Authorization: Bearer [REDACTED]
+```
+
+## OAuth Flow Process
+
+### 1. User Initiates Login
+User runs the `tolstoy auth login` command:
+
+```bash
+tolstoy auth login --tool github --user user-123
+```
+
+### 2. Browser Opens (or URL Displayed)
+- **Default**: Browser automatically opens to authorization URL
+- **`--no-open`**: URL is displayed for manual opening
+
+### 3. User Authorizes
+User sees the OAuth authorization page from the external service (GitHub, Google, etc.) and grants permissions.
+
+### 4. Callback Processing
+After authorization:
+- External service redirects to your configured callback URL
+- Your application processes the callback and exchanges code for tokens
+- Tokens are stored securely and associated with the user ID
+
+### 5. Confirmation
+User sees a success/error page indicating the authorization result.
+
+## Environment Variables
+
+The command uses these environment variables:
+
+```bash
+export TOLSTOY_API_URL="https://api.tolstoy.com"  # Required
+export TOLSTOY_API_KEY="your-api-key"             # Required  
+export ORG_ID="your-default-org"                  # Optional
+```
+
+## Integration Patterns
+
+### Web Application Integration
+
+In a web application, you might trigger OAuth login from your backend:
+
+```javascript
+// Node.js/Express example
+app.post('/auth/start/:service', async (req, res) => {
+  const { service } = req.params;
+  const { userId } = req.body;
+  
+  // Trigger OAuth login via CLI (or SDK)
+  const { spawn } = require('child_process');
+  
+  const cli = spawn('tolstoy', [
+    'auth', 'login',
+    '--tool', service,
+    '--user', userId,
+    '--org', process.env.ORG_ID,
+    '--no-open'  // Get URL instead of opening browser
+  ]);
+  
+  cli.stdout.on('data', (data) => {
+    const output = data.toString();
+    if (output.includes('OAuth Login URL:')) {
+      const url = extractUrlFromOutput(output);
+      res.json({ authUrl: url });
+    }
+  });
+});
+```
+
+### CLI Script Automation
+
+For automated scripts where user interaction is needed:
+
+```bash
+#!/bin/bash
+
+USER_ID="user-123"
+TOOL="github"
+
+echo "Starting OAuth login for $USER_ID on $TOOL"
+
+# Start OAuth flow and capture URL
+AUTH_OUTPUT=$(tolstoy auth login --tool $TOOL --user $USER_ID --no-open 2>&1)
+AUTH_URL=$(echo "$AUTH_OUTPUT" | grep -oP 'https://[^\s]+')
+
+echo "Please visit: $AUTH_URL"
+echo "Press Enter after completing authorization..."
+read
+
+echo "OAuth login completed for $USER_ID"
+```
+
+## Common Use Cases
+
+### 1. User Onboarding
+New users connect their accounts during onboarding:
+
+```bash
+# Step 1: User registers
+# Step 2: Connect GitHub
+tolstoy auth login --tool github --user new-user-456
+
+# Step 3: Connect Google Drive  
+tolstoy auth login --tool google --user new-user-456
+
+# Step 4: Connect Slack
+tolstoy auth login --tool slack --user new-user-456
+```
+
+### 2. Re-authorization
+Users need to re-authorize when tokens expire:
+
+```bash
+# Trigger re-auth for specific user and service
+tolstoy auth login --tool github --user existing-user-789
+```
+
+### 3. Multiple Organizations
+Users can authorize the same service for different organizations:
+
+```bash
+# Authorize for org A
+tolstoy auth login --tool github --user user-123 --org org-a
+
+# Authorize for org B  
+tolstoy auth login --tool github --user user-123 --org org-b
+```
+
+## Token Management
+
+### Token Storage
+- Tokens are stored securely on the Tolstoy backend
+- Associated with the specific user ID and organization
+- Automatically refreshed when possible
+
+### Token Scope
+Tokens inherit the scope configured during OAuth2 client setup:
+
+```bash
+# Configure client with specific scope
+tolstoy tool auth oauth2 \
+  --org my-org \
+  --tool github \
+  --scope "repo user:email"
+  
+# User login will request the same scope
+tolstoy auth login --tool github --user user-123
+```
+
+## Error Handling
+
+### Common Errors
+
+#### Missing OAuth2 Configuration
+```
+Error: Tool "github" not configured for OAuth2
+```
+**Solution**: First configure OAuth2 client credentials using `tool auth oauth2`.
+
+#### Invalid User ID
+```
+Error: User ID must be provided via --user option
+```  
+**Solution**: Always provide a valid user ID with `--user`.
+
+#### Browser Issues
+```
+Error: Failed to open browser
+```
+**Solution**: Use `--no-open` and manually open the displayed URL.
+
+#### Network/API Issues
+```
+Error initiating OAuth login: ECONNREFUSED
+```
+**Solution**: Check API connectivity and credentials.
+
+## Security Considerations
+
+### 1. User ID Privacy
+- User IDs should be non-guessable (UUIDs recommended)
+- Don't expose internal user IDs in URLs or logs
+
+### 2. Callback URL Security
+- Always use HTTPS for production callback URLs
+- Validate callback requests to prevent CSRF attacks
+- Implement proper state parameter validation
+
+### 3. Token Scope
+- Request minimal required permissions
+- Regularly audit and update OAuth2 scopes
+- Inform users about what permissions are requested
+
+### 4. Error Handling
+- Don't expose sensitive error details to users
+- Log security events for monitoring
+- Implement rate limiting on OAuth flows
+
+## Troubleshooting
+
+### Browser Doesn't Open
+```bash
+# Use manual URL approach
+tolstoy auth login --tool github --user user-123 --no-open
+```
+
+### Wrong Organization
+```bash
+# Explicitly specify org (overrides ORG_ID env var)
+tolstoy auth login --tool github --user user-123 --org correct-org
+```
+
+### Token Refresh Issues
+Tokens are automatically refreshed, but if issues persist:
+1. Check OAuth2 client configuration
+2. Verify callback URL is accessible  
+3. Re-authorize the user
+
+## Next Steps
+
+After successful user authentication:
+
+1. **Execute user-scoped actions**: Use `tolstoy actions:execute --user <userId>`
+2. **Monitor token status**: Check token validity and refresh status
+3. **Handle token expiration**: Implement re-authorization flows
+
+## Related Commands
+
+- [`tool auth oauth2`](./tool-auth.mdx) - Configure OAuth2 client credentials
+- [`actions:execute`](./actions.mdx) - Execute actions with user authentication

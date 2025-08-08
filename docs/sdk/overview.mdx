@@ -107,12 +107,42 @@ await clientA.runFlow('flow_id', inputs); // Isolated to org_a
 await clientB.runFlow('flow_id', inputs); // Isolated to org_b
 ```
 
+## CLI Tool
+
+In addition to the TypeScript SDK, Tolstoy provides a powerful command-line interface for managing authentication, executing actions, and automating workflows.
+
+### 🖥️ Command-Line Interface
+Perfect for scripts, CI/CD pipelines, and system administration:
+
+```bash
+# Configure tool authentication
+tolstoy tool auth api-key --org my-org --tool github --key ghp_xxxxxxxxxxxx
+
+# Execute actions directly
+tolstoy actions:execute --org my-org --key send-email '{"to": "user@example.com", "subject": "Hello"}'
+
+# Manage OAuth2 flows
+tolstoy auth login --tool github --user user-123
+```
+
+**Key CLI Features:**
+- 🔧 **Tool Configuration**: Set up API keys and OAuth2 credentials
+- ⚡ **Action Execution**: Run individual actions with JSON inputs
+- 🔐 **User Authentication**: Handle OAuth2 login flows
+- 📝 **Template Management**: Import and manage workflow templates
+- 🚀 **CI/CD Ready**: Perfect for automation and scripting
+
+**[→ Learn more about the CLI](/sdk/cli)**
+
 ## Getting Started
 
 Ready to start building? Choose your path:
 
 ### 🚀 New to Tolstoy?
 Start with the **[Installation Guide](/sdk/installation)** and **[Quick Start](/sdk/quickstart)** to get up and running in minutes.
+
+### 🖥️ Prefer Command Line?
+Use the **[CLI Tool](/sdk/cli)** for scripts, automation, and quick testing.
 
 ### 🔐 Setting Up Access?
 Learn about **[Authentication](/sdk/authentication)** and multi-tenant configuration.
@@ -157,6 +187,12 @@ Connect external services, manage API credentials, and monitor integration healt
     <h3 className="text-lg font-semibold mb-2">🚀 Get Started</h3>
     <p className="text-sm text-gray-600 mb-3">Install the SDK and run your first workflow in 2 minutes.</p>
     <a href="/sdk/installation" className="text-blue-600 font-medium">Installation Guide →</a>
+  </div>
+  
+  <div className="border rounded-lg p-4">
+    <h3 className="text-lg font-semibold mb-2">🖥️ Use CLI</h3>
+    <p className="text-sm text-gray-600 mb-3">Command-line tools for authentication, actions, and automation.</p>
+    <a href="/sdk/cli" className="text-blue-600 font-medium">CLI Documentation →</a>
   </div>
   
   <div className="border rounded-lg p-4">

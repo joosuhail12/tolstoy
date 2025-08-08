@@ -28,6 +28,7 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { ToolSecretsModule } from './tool-secrets/tool-secrets.module';
 import { SandboxModule } from './sandbox/sandbox.module';
 import { InngestModule } from './flows/inngest/inngest.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -107,6 +108,7 @@ import { InngestModule } from './flows/inngest/inngest.module';
     ToolSecretsModule,
     SandboxModule,
     InngestModule,
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [

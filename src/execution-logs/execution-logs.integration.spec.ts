@@ -12,6 +12,8 @@ import { OAuthTokenService } from '../oauth/oauth-token.service';
 import { InputValidatorService } from '../common/services/input-validator.service';
 import { ConditionEvaluatorService } from '../common/services/condition-evaluator.service';
 import { SandboxService } from '../sandbox/sandbox.service';
+import { MetricsService } from '../metrics/metrics.service';
+import { InngestService } from 'nestjs-inngest';
 import { ExecutionLog } from '@prisma/client';
 
 /**
@@ -104,6 +106,23 @@ describe('ExecutionLogsService - Step Execution Integration', () => {
       debug: jest.fn(),
     };
 
+    const mockMetricsService = {
+      incrementStepExecutions: jest.fn(),
+      incrementStepRetries: jest.fn(),
+      incrementStepErrors: jest.fn(),
+      recordStepDuration: jest.fn(),
+      recordFlowDuration: jest.fn(),
+      incrementFlowExecutions: jest.fn(),
+      incrementFlowCompletions: jest.fn(),
+      incrementFlowFailures: jest.fn(),
+      incrementWebhookDispatches: jest.fn(),
+      startStepTimer: jest.fn().mockReturnValue(() => {}), // Returns a function that can be called as endTimer
+    };
+
+    const mockInngestService = {
+      send: jest.fn().mockResolvedValue(void 0),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         FlowExecutorService,
@@ -115,6 +134,8 @@ describe('ExecutionLogsService - Step Execution Integration', () => {
         { provide: OAuthTokenService, useValue: mockOAuthTokenService },
         { provide: InputValidatorService, useValue: mockInputValidatorService },
         { provide: ConditionEvaluatorService, useValue: mockConditionEvaluatorService },
+        { provide: MetricsService, useValue: mockMetricsService },
+        { provide: InngestService, useValue: mockInngestService },
         { provide: `PinoLogger:${FlowExecutorService.name}`, useValue: mockLogger },
         { provide: `PinoLogger:${ExecutionLogsService.name}`, useValue: mockLogger },
       ],
@@ -164,8 +185,8 @@ describe('ExecutionLogsService - Step Execution Integration', () => {
             stepOutputs: mockContext.stepOutputs,
           },
           status: 'started',
-          outputs: null,
-          error: null,
+          outputs: undefined,
+          error: undefined,
         },
       });
 

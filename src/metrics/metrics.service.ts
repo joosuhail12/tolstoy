@@ -41,6 +41,30 @@ export interface AuthInjectionMetricLabels {
   readonly authType: string; // 'apiKey' | 'oauth2' | 'none'
 }
 
+export interface ValidationMetricLabels {
+  readonly orgId: string;
+  readonly actionKey?: string;
+  readonly context: string; // 'action-execution' | 'flow-execution' | 'api-endpoint'
+  readonly errorType: string; // 'required-field' | 'type-validation' | 'format-validation' | 'enum-validation'
+}
+
+export interface ToolAuthConfigMetricLabels {
+  readonly orgId: string;
+  readonly toolKey: string;
+  readonly action: string; // 'upsert' | 'get' | 'delete'
+}
+
+export interface OAuthRedirectMetricLabels {
+  readonly orgId: string;
+  readonly toolKey: string;
+}
+
+export interface OAuthCallbackMetricLabels {
+  readonly orgId: string;
+  readonly toolKey: string;
+  readonly success: string; // 'true' | 'false'
+}
+
 @Injectable()
 export class MetricsService {
   public readonly stepExecutionHistogram: Histogram<keyof StepMetricLabels>;
@@ -51,6 +75,10 @@ export class MetricsService {
   public readonly actionExecutionCounter: Counter<keyof ActionCounterLabels>;
   public readonly actionExecutionDuration: Histogram<keyof ActionMetricLabels>;
   public readonly authInjectionCounter: Counter<keyof AuthInjectionMetricLabels>;
+  public readonly validationErrorsCounter: Counter<keyof ValidationMetricLabels>;
+  public readonly toolAuthConfigCounter: Counter<keyof ToolAuthConfigMetricLabels>;
+  public readonly oauthRedirectCounter: Counter<keyof OAuthRedirectMetricLabels>;
+  public readonly oauthCallbackCounter: Counter<keyof OAuthCallbackMetricLabels>;
 
   constructor() {
     this.stepExecutionHistogram = new Histogram({
@@ -131,6 +159,50 @@ export class MetricsService {
       )[],
       registers: [register],
     });
+
+    this.validationErrorsCounter = new Counter({
+      name: 'validation_errors_total',
+      help: 'Total number of input validation errors',
+      labelNames: ['orgId', 'actionKey', 'context', 'errorType'] as readonly (
+        | 'orgId'
+        | 'actionKey'
+        | 'context'
+        | 'errorType'
+      )[],
+      registers: [register],
+    });
+
+    this.toolAuthConfigCounter = new Counter({
+      name: 'tool_auth_config_requests_total',
+      help: 'Total number of tool auth config requests',
+      labelNames: ['orgId', 'toolKey', 'action'] as readonly (
+        | 'orgId'
+        | 'toolKey'
+        | 'action'
+      )[],
+      registers: [register],
+    });
+
+    this.oauthRedirectCounter = new Counter({
+      name: 'oauth_redirects_total',
+      help: 'Number of OAuth2 redirect requests initiated',
+      labelNames: ['orgId', 'toolKey'] as readonly (
+        | 'orgId'
+        | 'toolKey'
+      )[],
+      registers: [register],
+    });
+
+    this.oauthCallbackCounter = new Counter({
+      name: 'oauth_callbacks_total',
+      help: 'Number of OAuth2 callback attempts',
+      labelNames: ['orgId', 'toolKey', 'success'] as readonly (
+        | 'orgId'
+        | 'toolKey'
+        | 'success'
+      )[],
+      registers: [register],
+    });
   }
 
   recordStepDuration(labels: StepMetricLabels, duration: number): void {
@@ -163,5 +235,21 @@ export class MetricsService {
 
   incrementAuthInjection(labels: AuthInjectionMetricLabels): void {
     this.authInjectionCounter.labels(labels).inc();
+  }
+
+  incrementValidationErrors(labels: ValidationMetricLabels): void {
+    this.validationErrorsCounter.labels(labels).inc();
+  }
+
+  incrementToolAuthConfig(labels: ToolAuthConfigMetricLabels): void {
+    this.toolAuthConfigCounter.labels(labels).inc();
+  }
+
+  incrementOAuthRedirect(labels: OAuthRedirectMetricLabels): void {
+    this.oauthRedirectCounter.labels(labels).inc();
+  }
+
+  incrementOAuthCallback(labels: OAuthCallbackMetricLabels): void {
+    this.oauthCallbackCounter.labels(labels).inc();
   }
 }

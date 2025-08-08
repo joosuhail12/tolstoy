@@ -55,9 +55,9 @@ export class AuthConfigService {
    */
   async getOrgAuthConfig(orgId: string, toolKey: string): Promise<any> {
     const cacheKey = this.orgConfigKey(orgId, toolKey);
-    
+
     this.logger.debug(`Loading org auth config for ${orgId}:${toolKey}`);
-    
+
     // Check cache first
     const cached = await this.cache.get(cacheKey);
     if (cached) {
@@ -67,13 +67,13 @@ export class AuthConfigService {
 
     // Load from database with tool relation
     const record = await this.prisma.toolAuthConfig.findFirst({
-      where: { 
-        orgId, 
-        tool: { name: toolKey } // Assuming tool identifier is 'name' field
+      where: {
+        orgId,
+        tool: { name: toolKey }, // Assuming tool identifier is 'name' field
       },
       include: {
-        tool: true
-      }
+        tool: true,
+      },
     });
 
     if (!record) {
@@ -82,7 +82,7 @@ export class AuthConfigService {
     }
 
     const config = record.config;
-    
+
     // Persist in AWS Secrets Manager as well for backup/sync
     try {
       await this.syncToSecretsManager(`tolstoy/${orgId}/tools/${toolKey}/config`, config);
@@ -94,7 +94,7 @@ export class AuthConfigService {
 
     // Cache for 10 minutes
     await this.cache.set(cacheKey, config, { ttl: 600 });
-    
+
     this.logger.debug(`Loaded and cached auth config for ${orgId}:${toolKey}`);
     return config;
   }
@@ -105,25 +105,27 @@ export class AuthConfigService {
   async getUserCredentials(
     orgId: string,
     userId: string,
-    toolKey: string
+    toolKey: string,
   ): Promise<UserCredential> {
     this.logger.debug(`Loading user credentials for ${orgId}:${userId}:${toolKey}`);
 
     const cred = await this.prisma.userCredential.findFirst({
-      where: { 
-        orgId, 
-        userId, 
-        tool: { name: toolKey } // Assuming tool identifier is 'name' field
+      where: {
+        orgId,
+        userId,
+        tool: { name: toolKey }, // Assuming tool identifier is 'name' field
       },
       include: {
-        tool: true
-      }
+        tool: true,
+      },
     });
 
     if (!cred) {
-      this.logger.warn(`No user credentials found for user ${userId} and tool ${toolKey} in org ${orgId}`);
+      this.logger.warn(
+        `No user credentials found for user ${userId} and tool ${toolKey} in org ${orgId}`,
+      );
       throw new NotFoundException(
-        `No user credentials for user ${userId} & tool ${toolKey} in organization ${orgId}`
+        `No user credentials for user ${userId} & tool ${toolKey} in organization ${orgId}`,
       );
     }
 
@@ -145,28 +147,31 @@ export class AuthConfigService {
     const expirationBuffer = 5 * 60 * 1000; // 5 minutes in milliseconds
     const now = new Date();
     const expiresAt = new Date(cred.expiresAt);
-    
+
     if (expiresAt.getTime() > now.getTime() + expirationBuffer) {
       this.logger.debug(`Access token still valid for credential ${cred.id}`);
       return cred.accessToken;
     }
 
-    this.logger.debug(`Access token expired or expiring soon for credential ${cred.id}, refreshing...`);
+    this.logger.debug(
+      `Access token expired or expiring soon for credential ${cred.id}, refreshing...`,
+    );
 
     // TODO: Implement OAuth2 refresh using your OAuth client
     // For now, this is a placeholder that would need to be implemented
     // based on the specific OAuth provider (Google, Microsoft, etc.)
-    
+
     try {
       // Placeholder for OAuth refresh logic
       // const refreshed = await this.oauthClient.refresh(cred.refreshToken);
-      
+
       // For demo purposes, we'll throw an error indicating this needs implementation
-      throw new Error('OAuth refresh not yet implemented. Please implement based on your OAuth provider.');
-      
+      throw new Error(
+        'OAuth refresh not yet implemented. Please implement based on your OAuth provider.',
+
       /* Implementation would look like this:
       const refreshed: RefreshedTokens = await this.refreshTokenWithProvider(cred.refreshToken);
-      
+
       // Update both DB and potentially Secrets Manager
       const updatedCred = await this.prisma.userCredential.update({
         where: { id: cred.id },
@@ -178,13 +183,13 @@ export class AuthConfigService {
       });
 
       this.logger.debug(`Successfully refreshed token for credential ${cred.id}`);
-      
+
       // Optionally cache the new token briefly
       // await this.cache.set(`token:${cred.id}`, refreshed.accessToken, 300);
-      
+
       return refreshed.accessToken;
       */
-      
+
     } catch (error) {
       this.logger.error(`Failed to refresh token for credential ${cred.id}: ${error.message}`);
       throw error;
@@ -198,13 +203,13 @@ export class AuthConfigService {
     orgId: string,
     toolId: string,
     type: string, // 'apiKey' | 'oauth2'
-    config: any
+    config: any,
   ): Promise<OrgAuthConfig> {
     this.logger.debug(`Setting org auth config for ${orgId}:${toolId}`);
 
     const authConfig = await this.prisma.toolAuthConfig.upsert({
       where: {
-        orgId_toolId: { orgId, toolId }
+        orgId_toolId: { orgId, toolId },
       },
       create: {
         orgId,
@@ -218,8 +223,8 @@ export class AuthConfigService {
         updatedAt: new Date(),
       },
       include: {
-        tool: true
-      }
+        tool: true,
+      },
     });
 
     // Invalidate cache
@@ -239,13 +244,13 @@ export class AuthConfigService {
     toolId: string,
     accessToken: string,
     refreshToken: string,
-    expiresAt: Date
+    expiresAt: Date,
   ): Promise<UserCredential> {
     this.logger.debug(`Setting user credentials for ${orgId}:${userId}:${toolId}`);
 
     const credential = await this.prisma.userCredential.upsert({
       where: {
-        orgId_userId_toolId: { orgId, userId, toolId }
+        orgId_userId_toolId: { orgId, userId, toolId },
       },
       create: {
         orgId,
@@ -274,7 +279,7 @@ export class AuthConfigService {
     this.logger.debug(`Deleting org auth config for ${orgId}:${toolId}`);
 
     const deleted = await this.prisma.toolAuthConfig.deleteMany({
-      where: { orgId, toolId }
+      where: { orgId, toolId },
     });
 
     if (deleted.count === 0) {
@@ -298,11 +303,13 @@ export class AuthConfigService {
     this.logger.debug(`Deleting user credentials for ${orgId}:${userId}:${toolId}`);
 
     const deleted = await this.prisma.userCredential.deleteMany({
-      where: { orgId, userId, toolId }
+      where: { orgId, userId, toolId },
     });
 
     if (deleted.count === 0) {
-      throw new NotFoundException(`No credentials found for user ${userId} and tool ${toolId} in org ${orgId}`);
+      throw new NotFoundException(
+        `No credentials found for user ${userId} and tool ${toolId} in org ${orgId}`,
+      );
     }
 
     this.logger.debug(`Successfully deleted credentials for ${orgId}:${userId}:${toolId}`);
@@ -313,11 +320,11 @@ export class AuthConfigService {
    */
   private async syncToSecretsManager(secretName: string, value: any): Promise<void> {
     const secretValue = typeof value === 'string' ? value : JSON.stringify(value);
-    
+
     try {
       // Check if secret exists
       const exists = await this.awsSecrets.secretExists(secretName);
-      
+
       if (exists) {
         await this.awsSecrets.updateSecret(secretName, secretValue);
       } else {

@@ -166,17 +166,17 @@ export class ActionsService {
     orgId: string,
     userId: string | undefined,
     actionKey: string,
-    inputs: Record<string, any>
+    inputs: Record<string, any>,
   ) {
     const startTime = Date.now();
-    
+
     try {
       // 1. Load Action + Tool
       const action = await this.prisma.action.findFirst({
         where: { orgId, key: actionKey },
-        include: { tool: true }
+        include: { tool: true },
       });
-      
+
       if (!action) {
         throw new NotFoundException(`Action "${actionKey}" not found`);
       }
@@ -184,28 +184,33 @@ export class ActionsService {
       const toolName = action.tool.name;
 
       // Increment counter metric
-      this.metrics.actionExecutionCounter.inc({ 
-        orgId, 
+      this.metrics.actionExecutionCounter.inc({
+        orgId,
         toolKey: toolName,
         actionKey,
-        status: 'started'
+        status: 'started',
       });
 
       // 2. Validate inputs against enhanced schema
-      const validInputs = await this.inputValidator.validate(
+      const validInputs = await this.inputValidator.validateEnhanced(
         action.inputSchema as any,
-        inputs
+        inputs,
+        {
+          orgId,
+          actionKey,
+          contextType: 'action-execution',
+        },
       );
 
       // 3. Resolve auth headers
-      let headers: Record<string, string> = {
+      const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        ...(action.headers as Record<string, string> || {})
+        ...((action.headers as Record<string, string>) || {}),
       };
-      
+
       try {
         const orgAuth = await this.authConfig.getOrgAuthConfig(orgId, toolName);
-        
+
         if (orgAuth?.type === 'apiKey') {
           const headerName = orgAuth.config.headerName || 'Authorization';
           const headerValue = orgAuth.config.headerValue || orgAuth.config.apiKey;
@@ -226,7 +231,7 @@ export class ActionsService {
 
       // 4. Execute HTTP request
       this.logger.log(`Executing single action: ${actionKey} for org: ${orgId}`);
-      
+
       // Construct URL - handle both absolute and relative endpoints
       let url = action.endpoint;
       if (!url.startsWith('http')) {
@@ -235,7 +240,7 @@ export class ActionsService {
 
       // Replace template variables in URL with validated inputs
       url = this.replaceTemplateVariables(url, validInputs);
-      
+
       // Prepare request options
       const requestOptions: RequestInit = {
         method: action.method,
@@ -250,7 +255,7 @@ export class ActionsService {
       // Make HTTP request
       const response = await fetch(url, requestOptions);
       const responseText = await response.text();
-      
+
       let responseData;
       try {
         responseData = JSON.parse(responseText);
@@ -262,16 +267,16 @@ export class ActionsService {
 
       if (response.ok) {
         // Update metrics with success
-        this.metrics.actionExecutionCounter.inc({ 
-          orgId, 
+        this.metrics.actionExecutionCounter.inc({
+          orgId,
           toolKey: toolName,
-          actionKey, 
-          status: 'success' 
+          actionKey,
+          status: 'success',
         });
-        
+
         this.metrics.actionExecutionDuration.observe(
           { orgId, toolKey: toolName, actionKey },
-          duration / 1000
+          duration / 1000,
         );
 
         // 5. Return result
@@ -286,27 +291,26 @@ export class ActionsService {
             toolKey: toolName,
             timestamp: new Date().toISOString(),
             statusCode: response.status,
-            url
-          }
+            url,
+          },
         };
       } else {
         throw new Error(`HTTP ${response.status}: ${responseText}`);
       }
-
     } catch (error) {
       const duration = Date.now() - startTime;
-      
+
       // Update metrics with error
-      this.metrics.actionExecutionCounter.inc({ 
-        orgId, 
+      this.metrics.actionExecutionCounter.inc({
+        orgId,
         toolKey: actionKey, // fallback if tool not found
         actionKey,
-        status: 'error' 
+        status: 'error',
       });
 
       this.metrics.actionExecutionDuration.observe(
         { orgId, toolKey: actionKey, actionKey },
-        duration / 1000
+        duration / 1000,
       );
 
       this.logger.error(`Action execution failed: ${actionKey}`, error);

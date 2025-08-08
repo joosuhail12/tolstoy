@@ -398,26 +398,27 @@ export class ActionsController {
 
   @Post(':key/execute')
   @ApiBearerAuth()
-  @ApiOperation({ 
+  @ApiOperation({
     summary: 'Execute a single Action by key',
-    description: 'Execute a standalone action with provided inputs. This endpoint allows you to run individual actions outside of workflow contexts.'
+    description:
+      'Execute a standalone action with provided inputs. This endpoint allows you to run individual actions outside of workflow contexts.',
   })
   @ApiParam({
     name: 'key',
     description: 'Unique action key identifier',
-    example: 'slack_send_message'
+    example: 'slack_send_message',
   })
   @ApiHeader({
     name: 'X-Org-ID',
     description: 'Organization ID',
     required: true,
-    example: 'org_123456'
+    example: 'org_123456',
   })
   @ApiHeader({
     name: 'X-User-ID',
     description: 'User ID for user-scoped authentication (optional)',
     required: false,
-    example: 'user_789'
+    example: 'user_789',
   })
   @ApiBody({
     description: 'Action execution inputs',
@@ -427,16 +428,16 @@ export class ActionsController {
       properties: {
         inputs: {
           type: 'object',
-          description: 'Input parameters matching the action\'s inputSchema',
+          description: "Input parameters matching the action's inputSchema",
           example: {
             channel: '#general',
             text: 'Hello from Tolstoy!',
-            user_id: 'U123456'
-          }
-        }
+            user_id: 'U123456',
+          },
+        },
       },
-      required: ['inputs']
-    }
+      required: ['inputs'],
+    },
   })
   @ApiResponse({
     status: 200,
@@ -447,18 +448,18 @@ export class ActionsController {
         success: { type: 'boolean', example: true },
         executionId: { type: 'string', example: 'exec_abc123' },
         duration: { type: 'number', example: 1250 },
-        data: { 
-          type: 'object', 
+        data: {
+          type: 'object',
           description: 'Action execution result',
-          example: { messageId: 'msg_456', status: 'sent' }
+          example: { messageId: 'msg_456', status: 'sent' },
         },
         outputs: {
           type: 'object',
           description: 'Additional output data from action',
-          example: { channel: '#general', timestamp: '2024-01-15T10:30:00Z' }
-        }
-      }
-    }
+          example: { channel: '#general', timestamp: '2024-01-15T10:30:00Z' },
+        },
+      },
+    },
   })
   @ApiResponse({
     status: 400,
@@ -468,9 +469,9 @@ export class ActionsController {
       properties: {
         statusCode: { type: 'number', example: 400 },
         message: { type: 'string', example: 'X-Org-ID header required' },
-        error: { type: 'string', example: 'Bad Request' }
-      }
-    }
+        error: { type: 'string', example: 'Bad Request' },
+      },
+    },
   })
   @ApiResponse({
     status: 404,
@@ -480,17 +481,17 @@ export class ActionsController {
       properties: {
         statusCode: { type: 'number', example: 404 },
         message: { type: 'string', example: 'Action "invalid_key" not found' },
-        error: { type: 'string', example: 'Not Found' }
-      }
-    }
+        error: { type: 'string', example: 'Not Found' },
+      },
+    },
   })
   @ApiResponse({
     status: 401,
-    description: 'Unauthorized - invalid or missing authentication'
+    description: 'Unauthorized - invalid or missing authentication',
   })
   @ApiResponse({
     status: 500,
-    description: 'Internal server error during action execution'
+    description: 'Internal server error during action execution',
   })
   async execute(
     @Headers('X-Org-ID') orgId: string,
@@ -498,7 +499,9 @@ export class ActionsController {
     @Param('key') actionKey: string,
     @Body(ValidationPipe) dto: ExecuteActionDto,
   ) {
-    if (!orgId) throw new BadRequestException('X-Org-ID header required');
+    if (!orgId) {
+      throw new BadRequestException('X-Org-ID header required');
+    }
     return this.actionsService.executeAction(orgId, userId, actionKey, dto.inputs);
   }
 }

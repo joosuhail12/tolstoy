@@ -12,7 +12,11 @@ import {
 import { PrismaService } from '../../prisma.service';
 import { Prisma } from '@prisma/client';
 import { ExecutionLogsService } from '../../execution-logs/execution-logs.service';
-import { MetricsService, StepMetricLabels, AuthInjectionMetricLabels } from '../../metrics/metrics.service';
+import {
+  MetricsService,
+  StepMetricLabels,
+  AuthInjectionMetricLabels,
+} from '../../metrics/metrics.service';
 import { AuthConfigService } from '../../auth/auth-config.service';
 
 // Step Configuration Interfaces
@@ -548,7 +552,7 @@ export class ExecuteFlowHandler {
       // Extract tool name from step config or context
       // For http_request steps, we need to determine the tool from the URL or step metadata
       let toolName: string | undefined;
-      
+
       // Check if step config has tool information
       const stepConfig = step.config as any;
       if (stepConfig.toolName) {
@@ -558,7 +562,7 @@ export class ExecuteFlowHandler {
         try {
           const url = new URL(stepConfig.url);
           const domain = url.hostname.toLowerCase();
-          
+
           // Map common domains to tool names
           const domainToolMap: Record<string, string> = {
             'api.slack.com': 'Slack',
@@ -569,7 +573,7 @@ export class ExecuteFlowHandler {
             'discord.com': 'Discord',
             'api.discord.com': 'Discord',
           };
-          
+
           toolName = domainToolMap[domain];
         } catch (error) {
           this.logger.debug(
@@ -596,7 +600,7 @@ export class ExecuteFlowHandler {
 
       // Get organization auth configuration for the tool
       const orgAuth = await this.authConfig.getOrgAuthConfig(context.orgId, toolName);
-      let authHeaders: Record<string, string> = {};
+      const authHeaders: Record<string, string> = {};
 
       if (orgAuth) {
         // Handle API Key authentication
@@ -609,7 +613,7 @@ export class ExecuteFlowHandler {
             authHeaders['Authorization'] = `Bearer ${config.apiKey}`;
           }
         }
-        
+
         // Handle OAuth2 authentication (requires user context)
         else if (orgAuth.type === 'oauth2' && context.userId) {
           try {
@@ -618,7 +622,7 @@ export class ExecuteFlowHandler {
               context.userId,
               toolName,
             );
-            
+
             if (userCredentials?.accessToken) {
               authHeaders['Authorization'] = `Bearer ${userCredentials.accessToken}`;
             }
@@ -697,7 +701,7 @@ export class ExecuteFlowHandler {
 
     // Build authentication headers for this step
     const authHeaders = await this.buildAuthHeaders(step, context);
-    
+
     // Add auth headers to context for this step execution
     const contextWithAuth: ExecutionContext = {
       ...context,

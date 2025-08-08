@@ -24,6 +24,7 @@ import {
 import { AuthConfigService } from './auth-config.service';
 import { CreateAuthConfigDto } from './dto/create-auth-config.dto';
 import { AuthConfigResponseDto, DeleteAuthConfigResponseDto } from './dto/auth-config-response.dto';
+import { MetricsService } from '../metrics/metrics.service';
 
 @ApiTags('Tool Authentication')
 @Controller('tools/:toolId/auth')
@@ -31,7 +32,10 @@ import { AuthConfigResponseDto, DeleteAuthConfigResponseDto } from './dto/auth-c
 export class ToolAuthController {
   private readonly logger = new Logger(ToolAuthController.name);
 
-  constructor(private readonly authConfig: AuthConfigService) {}
+  constructor(
+    private readonly authConfig: AuthConfigService,
+    private readonly metricsService: MetricsService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.OK)
@@ -73,6 +77,13 @@ export class ToolAuthController {
 
     this.logger.log(`Creating/updating auth config for tool ${toolId} in org ${orgId}`);
 
+    // Record metrics
+    this.metricsService.incrementToolAuthConfig({
+      orgId,
+      toolKey: toolId,
+      action: 'upsert',
+    });
+
     const result = await this.authConfig.setOrgAuthConfig(orgId, toolId, dto.type, dto.config);
 
     this.logger.log(`Successfully upserted auth config ${result.id} for tool ${toolId}`);
@@ -111,6 +122,13 @@ export class ToolAuthController {
     }
 
     this.logger.log(`Fetching auth config for tool ${toolId} in org ${orgId}`);
+
+    // Record metrics
+    this.metricsService.incrementToolAuthConfig({
+      orgId,
+      toolKey: toolId,
+      action: 'get',
+    });
 
     // For the GET endpoint, we need to find by tool name/key since getOrgAuthConfig expects toolKey
     // We'll need to modify this to work with toolId - for now, treating toolId as toolKey
@@ -157,6 +175,13 @@ export class ToolAuthController {
     }
 
     this.logger.log(`Deleting auth config for tool ${toolId} in org ${orgId}`);
+
+    // Record metrics
+    this.metricsService.incrementToolAuthConfig({
+      orgId,
+      toolKey: toolId,
+      action: 'delete',
+    });
 
     await this.authConfig.deleteOrgAuthConfig(orgId, toolId);
 

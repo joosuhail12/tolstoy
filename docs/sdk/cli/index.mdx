@@ -1,0 +1,277 @@
+---
+title: CLI Overview
+sidebar_position: 1
+---
+
+# Tolstoy CLI
+
+The official command-line interface for the Tolstoy workflow automation platform. Manage tools, authentication, and execute actions directly from your terminal.
+
+## Why Use the Tolstoy CLI?
+
+- **🚀 Quick Setup**: Configure tool authentication and execute actions instantly
+- **🔧 Developer-Friendly**: Perfect for scripts, automation, and CI/CD pipelines
+- **⚡ Zero Dependencies**: Self-contained binary with everything you need
+- **🔒 Secure**: Environment variable support for credentials
+- **📝 Well-Documented**: Comprehensive help system and examples
+
+## Installation
+
+### npm (Recommended)
+```bash
+npm install -g @tolstoy/cli
+```
+
+### yarn
+```bash
+yarn global add @tolstoy/cli
+```
+
+### Direct Download
+Download the latest binary from our [releases page](https://github.com/tolstoy/cli/releases).
+
+## Quick Start
+
+1. **Set up environment variables:**
+```bash
+export TOLSTOY_API_URL="https://your-tolstoy-instance.com"
+export TOLSTOY_API_KEY="your-api-key"
+export ORG_ID="your-organization-id"
+```
+
+2. **Test your connection:**
+```bash
+tolstoy auth
+```
+
+3. **Configure a tool:**
+```bash
+tolstoy tool auth api-key -o my-org -t github -k ghp_xxxxxxxxxxxx
+```
+
+4. **Execute an action:**
+```bash
+tolstoy actions:execute -o my-org -k create-issue '{"title": "Bug report", "body": "Found an issue"}'
+```
+
+## Core Commands
+
+### Tool Authentication
+Configure authentication for external services:
+
+- [`tool auth api-key`](#tool-auth-api-key) - Configure API key authentication
+- [`tool auth oauth2`](#tool-auth-oauth2) - Configure OAuth2 client credentials
+
+### User Authentication  
+Perform OAuth login flows:
+
+- [`auth login`](#auth-login) - Initiate user OAuth2 login
+
+### Action Execution
+Execute workflow actions:
+
+- [`actions:execute`](#actionsexecute) - Execute single actions
+
+### Existing Commands
+Template and organization management:
+
+- `templates list` - List available templates
+- `templates show <name>` - Show template details  
+- `templates import <name>` - Import templates
+- `orgs` - List organizations
+- `auth` - Test API connection
+
+## Environment Variables
+
+The CLI uses these environment variables:
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `TOLSTOY_API_URL` | Tolstoy API base URL | Yes |
+| `TOLSTOY_API_KEY` | API key for authentication | Yes |
+| `ORG_ID` | Default organization ID | No* |
+
+*Required for some commands if not provided via `--org` flag.
+
+## Authentication Patterns
+
+### 1. API Key Authentication
+For services that use API key authentication:
+
+```bash
+# GitHub example
+tolstoy tool auth api-key \
+  --org my-org \
+  --tool github \
+  --key ghp_xxxxxxxxxxxx \
+  --header "Authorization"
+```
+
+### 2. OAuth2 Client Credentials
+For services requiring OAuth2 setup:
+
+```bash
+# Google OAuth example  
+tolstoy tool auth oauth2 \
+  --org my-org \
+  --tool google \
+  --client-id your-client-id \
+  --client-secret your-client-secret \
+  --callback-url "https://app.example.com/callback" \
+  --scope "https://www.googleapis.com/auth/drive"
+```
+
+### 3. User OAuth Login
+For user-scoped OAuth tokens:
+
+```bash
+# User login for GitHub
+tolstoy auth login \
+  --tool github \
+  --user user-123 \
+  --org my-org
+```
+
+## Output Formats
+
+### Default (Human-Readable)
+```bash
+tolstoy actions:execute -o my-org -k test-action '{"name": "test"}'
+```
+```
+🚀 Executing action "test-action"...
+✅ Action executed successfully
+Success: true
+Execution ID: exec-789
+Duration: 1234ms
+```
+
+### JSON Output
+```bash
+tolstoy actions:execute -o my-org -k test-action --json '{"name": "test"}'
+```
+```json
+{
+  "success": true,
+  "executionId": "exec-789", 
+  "duration": 1234,
+  "data": { "result": "completed" }
+}
+```
+
+## Error Handling
+
+The CLI provides helpful error messages and suggestions:
+
+```bash
+# Missing environment variable
+Error: API_BASE_URL or TOLSTOY_API_URL environment variable not set
+
+# Invalid JSON
+Error: Invalid JSON inputs provided
+Example: '{"key": "value", "number": 123}'
+
+# Connection issues
+Error executing action: ECONNREFUSED
+Hint: Make sure the Tolstoy API is running and accessible
+
+# Timeout errors  
+Error executing action: Request timeout
+Hint: Action execution timed out after 30 seconds. Use --timeout to increase.
+```
+
+## Advanced Usage
+
+### Scripting & Automation
+
+The CLI is designed for automation scenarios:
+
+```bash
+#!/bin/bash
+
+# Set up environment
+export TOLSTOY_API_URL="https://api.tolstoy.com"
+export TOLSTOY_API_KEY="$PRODUCTION_API_KEY" 
+export ORG_ID="prod-org-123"
+
+# Configure tools
+tolstoy tool auth api-key -o "$ORG_ID" -t github -k "$GITHUB_TOKEN"
+tolstoy tool auth api-key -o "$ORG_ID" -t slack -k "$SLACK_BOT_TOKEN"
+
+# Execute workflow actions
+RESULT=$(tolstoy actions:execute -o "$ORG_ID" -k deploy-app --json '{"version": "v1.2.0"}')
+echo "Deployment result: $RESULT"
+```
+
+### CI/CD Integration
+
+Perfect for GitHub Actions, GitLab CI, and other automation:
+
+```yaml
+# GitHub Actions example
+- name: Configure Tolstoy Tools
+  run: |
+    tolstoy tool auth api-key -o $ORG_ID -t github -k ${{ secrets.GITHUB_TOKEN }}
+    
+- name: Execute Deployment
+  run: |
+    tolstoy actions:execute -o $ORG_ID -k deploy-production --json '{
+      "version": "${{ github.ref_name }}",
+      "commit": "${{ github.sha }}"
+    }'
+```
+
+## Getting Help
+
+### Built-in Help
+```bash
+# Main help
+tolstoy --help
+
+# Command-specific help  
+tolstoy tool auth --help
+tolstoy actions:execute --help
+```
+
+### Common Issues
+
+**Q: Getting "command not found" error?**
+A: Make sure the CLI is installed globally and in your PATH.
+
+**Q: Authentication errors?** 
+A: Verify your `TOLSTOY_API_KEY` and `TOLSTOY_API_URL` environment variables.
+
+**Q: JSON parsing errors?**
+A: Ensure your JSON is properly quoted and escaped for your shell.
+
+## Next Steps
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+  <div className="border rounded-lg p-4">
+    <h3 className="text-lg font-semibold mb-2">🔧 Tool Configuration</h3>
+    <p className="text-sm text-gray-600 mb-3">Learn how to configure authentication for different services.</p>
+    <a href="/sdk/cli/tool-auth" className="text-blue-600 font-medium">Configure Tools →</a>
+  </div>
+  
+  <div className="border rounded-lg p-4">
+    <h3 className="text-lg font-semibold mb-2">⚡ Action Execution</h3>
+    <p className="text-sm text-gray-600 mb-3">Execute workflow actions and handle results.</p>
+    <a href="/sdk/cli/actions" className="text-blue-600 font-medium">Execute Actions →</a>
+  </div>
+  
+  <div className="border rounded-lg p-4">
+    <h3 className="text-lg font-semibent mb-2">🔐 Authentication</h3>
+    <p className="text-sm text-gray-600 mb-3">Set up user OAuth flows and manage credentials.</p>
+    <a href="/sdk/cli/authentication" className="text-blue-600 font-medium">Authentication Guide →</a>
+  </div>
+  
+  <div className="border rounded-lg p-4">
+    <h3 className="text-lg font-semibold mb-2">📚 Command Reference</h3>
+    <p className="text-sm text-gray-600 mb-3">Complete reference for all CLI commands and options.</p>
+    <a href="/sdk/cli/reference" className="text-blue-600 font-medium">Browse Commands →</a>
+  </div>
+</div>
+
+---
+
+*The Tolstoy CLI is updated regularly with new features and improvements. Use `tolstoy --version` to check your current version.*

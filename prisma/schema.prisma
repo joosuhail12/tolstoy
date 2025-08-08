@@ -66,7 +66,7 @@ model Action {
   method         String
   endpoint       String
   headers        Json
-  inputSchema    Json
+  inputSchema    Json // ActionInputParam[] - Enhanced input schema with rich UI/validation metadata
   executeIf      Json?
   version        Int      @default(1)
   createdAt      DateTime @default(now())

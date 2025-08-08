@@ -1,0 +1,373 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import axios from 'axios';
+import { OAuthService } from './oauth.service';
+import { AuthConfigService } from './auth-config.service';
+import { RedisCacheService } from '../cache/redis-cache.service';
+
+jest.mock('axios');
+const mockedAxios = axios as jest.Mocked<typeof axios>;
+
+describe('OAuthService', () => {
+  let service: OAuthService;
+  let authConfigService: jest.Mocked<AuthConfigService>;
+  let redisCacheService: jest.Mocked<RedisCacheService>;
+
+  const mockOrgId = 'org_123';
+  const mockUserId = 'user_456';
+  const mockToolKey = 'github';
+  const mockToolId = 'tool_789';
+  const mockState = 'state_abc123';
+  const mockCode = 'auth_code_xyz';
+
+  const mockOAuthConfig = {
+    type: 'oauth2',
+    config: {
+      clientId: 'test_client_id',
+      clientSecret: 'test_client_secret',
+      redirectUri: 'https://example.com/callback',
+      scope: 'read:user',
+    },
+    tool: { id: mockToolId },
+    toolId: mockToolId,
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        OAuthService,
+        {
+          provide: AuthConfigService,
+          useValue: {
+            getOrgAuthConfig: jest.fn(),
+            setUserCredentials: jest.fn(),
+          },
+        },
+        {
+          provide: RedisCacheService,
+          useValue: {
+            set: jest.fn(),
+            get: jest.fn(),
+            del: jest.fn(),
+          },
+        },
+      ],
+    }).compile();
+
+    service = module.get<OAuthService>(OAuthService);
+    authConfigService = module.get(AuthConfigService);
+    redisCacheService = module.get(RedisCacheService);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('getAuthorizeUrl', () => {
+    it('should generate OAuth authorization URL successfully', async () => {
+      authConfigService.getOrgAuthConfig.mockResolvedValue(mockOAuthConfig);
+      redisCacheService.set.mockResolvedValue(undefined);
+
+      const result = await service.getAuthorizeUrl(mockToolKey, mockOrgId, mockUserId);
+
+      expect(result.url).toContain('https://github.com/login/oauth/authorize');
+      expect(result.url).toContain('client_id=test_client_id');
+      expect(result.url).toContain('redirect_uri=https%3A%2F%2Fexample.com%2Fcallback');
+      expect(result.url).toContain('scope=read%3Auser');
+      expect(result.url).toContain('response_type=code');
+      expect(result.url).toContain(`state=${result.state}`);
+      expect(result.state).toBeDefined();
+
+      expect(authConfigService.getOrgAuthConfig).toHaveBeenCalledWith(mockOrgId, mockToolKey);
+      expect(redisCacheService.set).toHaveBeenCalledWith(
+        `oauth:state:${result.state}`,
+        expect.stringContaining(mockOrgId),
+        { ttl: 300 },
+      );
+    });
+
+    it('should throw BadRequestException for non-OAuth2 tools', async () => {
+      const nonOAuthConfig = { ...mockOAuthConfig, type: 'apiKey' };
+      authConfigService.getOrgAuthConfig.mockResolvedValue(nonOAuthConfig);
+
+      await expect(service.getAuthorizeUrl(mockToolKey, mockOrgId, mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw BadRequestException for missing clientId', async () => {
+      const incompleteConfig = {
+        ...mockOAuthConfig,
+        config: { ...mockOAuthConfig.config, clientId: undefined },
+      };
+      authConfigService.getOrgAuthConfig.mockResolvedValue(incompleteConfig);
+
+      await expect(service.getAuthorizeUrl(mockToolKey, mockOrgId, mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw BadRequestException for missing clientSecret', async () => {
+      const incompleteConfig = {
+        ...mockOAuthConfig,
+        config: { ...mockOAuthConfig.config, clientSecret: undefined },
+      };
+      authConfigService.getOrgAuthConfig.mockResolvedValue(incompleteConfig);
+
+      await expect(service.getAuthorizeUrl(mockToolKey, mockOrgId, mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should throw BadRequestException for missing redirectUri', async () => {
+      const incompleteConfig = {
+        ...mockOAuthConfig,
+        config: { ...mockOAuthConfig.config, redirectUri: undefined },
+      };
+      authConfigService.getOrgAuthConfig.mockResolvedValue(incompleteConfig);
+
+      await expect(service.getAuthorizeUrl(mockToolKey, mockOrgId, mockUserId)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('should use custom authorize URL if provided', async () => {
+      const customConfig = {
+        ...mockOAuthConfig,
+        config: {
+          ...mockOAuthConfig.config,
+          authorizeUrl: 'https://custom-provider.com/oauth/authorize',
+        },
+      };
+      authConfigService.getOrgAuthConfig.mockResolvedValue(customConfig);
+      redisCacheService.set.mockResolvedValue(undefined);
+
+      const result = await service.getAuthorizeUrl(mockToolKey, mockOrgId, mockUserId);
+
+      expect(result.url).toContain('https://custom-provider.com/oauth/authorize');
+    });
+
+    it('should throw error for unknown tool without default URL', async () => {
+      authConfigService.getOrgAuthConfig.mockResolvedValue({
+        ...mockOAuthConfig,
+        config: { ...mockOAuthConfig.config },
+      });
+
+      await expect(
+        service.getAuthorizeUrl('unknown-provider', mockOrgId, mockUserId),
+      ).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('handleCallback', () => {
+    const mockStateData = {
+      orgId: mockOrgId,
+      userId: mockUserId,
+      toolKey: mockToolKey,
+      timestamp: Date.now(),
+    };
+
+    const mockTokenResponse = {
+      access_token: 'access_token_123',
+      refresh_token: 'refresh_token_456',
+      expires_in: 3600,
+      scope: 'read:user',
+      token_type: 'Bearer',
+    };
+
+    const mockCredential = {
+      id: 'credential_123',
+      orgId: mockOrgId,
+      userId: mockUserId,
+      toolId: mockToolId,
+      accessToken: mockTokenResponse.access_token,
+      refreshToken: mockTokenResponse.refresh_token,
+      expiresAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    beforeEach(() => {
+      redisCacheService.get.mockResolvedValue(JSON.stringify(mockStateData));
+      redisCacheService.del.mockResolvedValue(undefined);
+      authConfigService.getOrgAuthConfig.mockResolvedValue(mockOAuthConfig);
+      authConfigService.setUserCredentials.mockResolvedValue(mockCredential);
+    });
+
+    it('should handle OAuth callback successfully', async () => {
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: mockTokenResponse,
+      });
+
+      const result = await service.handleCallback(mockCode, mockState);
+
+      expect(result.credentialId).toBe(mockCredential.id);
+      expect(result.toolKey).toBe(mockToolKey);
+
+      expect(redisCacheService.get).toHaveBeenCalledWith(`oauth:state:${mockState}`);
+      expect(redisCacheService.del).toHaveBeenCalledWith(`oauth:state:${mockState}`);
+      expect(authConfigService.getOrgAuthConfig).toHaveBeenCalledWith(mockOrgId, mockToolKey);
+      expect(authConfigService.setUserCredentials).toHaveBeenCalledWith(
+        mockOrgId,
+        mockUserId,
+        mockToolId,
+        mockTokenResponse.access_token,
+        mockTokenResponse.refresh_token,
+        expect.any(Date),
+      );
+    });
+
+    it('should throw UnauthorizedException for invalid state', async () => {
+      redisCacheService.get.mockResolvedValue(null);
+
+      await expect(service.handleCallback(mockCode, 'invalid_state')).rejects.toThrow(
+        UnauthorizedException,
+      );
+
+      expect(redisCacheService.del).not.toHaveBeenCalled();
+    });
+
+    it('should throw UnauthorizedException for expired state', async () => {
+      const expiredStateData = {
+        ...mockStateData,
+        timestamp: Date.now() - 400000, // More than 5 minutes ago
+      };
+      redisCacheService.get.mockResolvedValue(JSON.stringify(expiredStateData));
+
+      await expect(service.handleCallback(mockCode, mockState)).rejects.toThrow(
+        UnauthorizedException,
+      );
+    });
+
+    it('should handle token exchange failure', async () => {
+      mockedAxios.post.mockRejectedValue(new Error('Token exchange failed'));
+
+      await expect(service.handleCallback(mockCode, mockState)).rejects.toThrow(
+        'Token exchange failed',
+      );
+    });
+
+    it('should handle HTTP error in token exchange', async () => {
+      const errorResponse = {
+        response: {
+          status: 400,
+          data: { error: 'invalid_grant', error_description: 'Invalid authorization code' },
+        },
+      };
+      mockedAxios.post.mockRejectedValue({
+        ...errorResponse,
+        isAxiosError: true,
+        message: 'Request failed with status code 400',
+      });
+
+      await expect(service.handleCallback(mockCode, mockState)).rejects.toThrow(
+        'Failed to exchange authorization code: invalid_grant',
+      );
+    });
+
+    it('should handle missing access token in response', async () => {
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: { refresh_token: 'refresh_token_456' }, // Missing access_token
+      });
+
+      await expect(service.handleCallback(mockCode, mockState)).rejects.toThrow(
+        'No access token received from OAuth provider',
+      );
+    });
+
+    it('should use custom token URL if provided', async () => {
+      const customConfig = {
+        ...mockOAuthConfig,
+        config: {
+          ...mockOAuthConfig.config,
+          tokenUrl: 'https://custom-provider.com/oauth/token',
+        },
+      };
+      authConfigService.getOrgAuthConfig.mockResolvedValue(customConfig);
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: mockTokenResponse,
+      });
+
+      await service.handleCallback(mockCode, mockState);
+
+      expect(mockedAxios.post).toHaveBeenCalledWith(
+        'https://custom-provider.com/oauth/token',
+        expect.any(URLSearchParams),
+        expect.any(Object),
+      );
+    });
+
+    it('should handle missing toolId', async () => {
+      const configWithoutToolId = {
+        ...mockOAuthConfig,
+        tool: undefined,
+        toolId: undefined,
+      };
+      authConfigService.getOrgAuthConfig.mockResolvedValue(configWithoutToolId);
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: mockTokenResponse,
+      });
+
+      await expect(service.handleCallback(mockCode, mockState)).rejects.toThrow(
+        'Could not determine toolId for github',
+      );
+    });
+
+    it('should use default expiration time when expires_in is not provided', async () => {
+      const tokenResponseWithoutExpiry = {
+        ...mockTokenResponse,
+        expires_in: undefined,
+      };
+      mockedAxios.post.mockResolvedValue({
+        status: 200,
+        data: tokenResponseWithoutExpiry,
+      });
+
+      await service.handleCallback(mockCode, mockState);
+
+      expect(authConfigService.setUserCredentials).toHaveBeenCalledWith(
+        mockOrgId,
+        mockUserId,
+        mockToolId,
+        mockTokenResponse.access_token,
+        mockTokenResponse.refresh_token,
+        expect.any(Date),
+      );
+
+      // Check that the expiration date is approximately 1 hour from now
+      const call = authConfigService.setUserCredentials.mock.calls[0];
+      const expiresAt = call[5] as Date;
+      const now = new Date();
+      const oneHourFromNow = new Date(now.getTime() + 3600000);
+      expect(expiresAt.getTime()).toBeCloseTo(oneHourFromNow.getTime(), -3); // Within 1000ms
+    });
+  });
+
+  describe('default URLs', () => {
+    const testCases = [
+      { toolKey: 'google', expectedAuthUrl: 'https://accounts.google.com/o/oauth2/v2/auth' },
+      {
+        toolKey: 'microsoft',
+        expectedAuthUrl: 'https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
+      },
+      { toolKey: 'slack', expectedAuthUrl: 'https://slack.com/oauth/v2/authorize' },
+      { toolKey: 'discord', expectedAuthUrl: 'https://discord.com/api/oauth2/authorize' },
+    ];
+
+    testCases.forEach(({ toolKey, expectedAuthUrl }) => {
+      it(`should use correct default authorization URL for ${toolKey}`, async () => {
+        const configForTool = { ...mockOAuthConfig };
+        authConfigService.getOrgAuthConfig.mockResolvedValue(configForTool);
+        redisCacheService.set.mockResolvedValue(undefined);
+
+        const result = await service.getAuthorizeUrl(toolKey, mockOrgId, mockUserId);
+
+        expect(result.url).toContain(expectedAuthUrl);
+      });
+    });
+  });
+});

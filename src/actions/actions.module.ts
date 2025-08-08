@@ -8,9 +8,7 @@ import { MetricsModule } from '../metrics/metrics.module';
 @Module({
   imports: [CommonModule, AuthModule, MetricsModule],
   controllers: [ActionsController],
-  providers: [
-    ActionsService,
-  ],
+  providers: [ActionsService],
   exports: [ActionsService],
 })
 export class ActionsModule {}

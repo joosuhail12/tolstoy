@@ -7,7 +7,7 @@ import { AblyService } from '../ably/ably.service';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { SecretsResolver } from '../secrets/secrets-resolver.service';
 import { OAuthTokenService } from '../oauth/oauth-token.service';
-import { InputValidatorService, InputParameter } from '../common/services/input-validator.service';
+import { InputValidatorService } from '../common/services/input-validator.service';
 import {
   ConditionEvaluatorService,
   ConditionContext,
@@ -864,9 +864,14 @@ export class FlowExecutorService {
 
       if (action.inputSchema && Array.isArray(action.inputSchema)) {
         try {
-          validatedInputs = this.inputValidator.validate(
-            action.inputSchema as unknown as InputParameter[],
+          validatedInputs = this.inputValidator.validateEnhanced(
+            action.inputSchema as unknown as any[],
             inputs,
+            {
+              orgId: context.orgId,
+              actionKey: action.key,
+              contextType: 'flow-execution',
+            },
           );
         } catch (validationError) {
           return {

@@ -120,17 +120,17 @@ describe('AuthConfigService', () => {
         include: { tool: true },
       });
       expect(awsSecretsService.secretExists).toHaveBeenCalledWith(
-        'tolstoy/org-456/tools/testTool/config'
+        'tolstoy/org-456/tools/testTool/config',
       );
       expect(awsSecretsService.createSecret).toHaveBeenCalledWith(
         'tolstoy/org-456/tools/testTool/config',
         JSON.stringify(mockOrgAuthConfig.config),
-        'Tolstoy auth configuration'
+        'Tolstoy auth configuration',
       );
       expect(cacheService.set).toHaveBeenCalledWith(
         'auth:org:org-456:tool:testTool',
         mockOrgAuthConfig.config,
-        { ttl: 600 }
+        { ttl: 600 },
       );
     });
 
@@ -139,7 +139,7 @@ describe('AuthConfigService', () => {
       prismaService.toolAuthConfig.findFirst.mockResolvedValue(null);
 
       await expect(service.getOrgAuthConfig('org-456', 'nonexistentTool')).rejects.toThrow(
-        new NotFoundException('No auth config for tool nonexistentTool in organization org-456')
+        new NotFoundException('No auth config for tool nonexistentTool in organization org-456'),
       );
     });
 
@@ -181,7 +181,9 @@ describe('AuthConfigService', () => {
       prismaService.userCredential.findFirst.mockResolvedValue(null);
 
       await expect(service.getUserCredentials('org-456', 'user-789', 'testTool')).rejects.toThrow(
-        new NotFoundException('No user credentials for user user-789 & tool testTool in organization org-456')
+        new NotFoundException(
+          'No user credentials for user user-789 & tool testTool in organization org-456',
+        ),
       );
     });
   });
@@ -206,7 +208,7 @@ describe('AuthConfigService', () => {
       };
 
       await expect(service.refreshUserToken(expiredCred)).rejects.toThrow(
-        'OAuth refresh not yet implemented. Please implement based on your OAuth provider.'
+        'OAuth refresh not yet implemented. Please implement based on your OAuth provider.',
       );
     });
   });
@@ -261,7 +263,7 @@ describe('AuthConfigService', () => {
         'tool-789',
         'new-access-token',
         'new-refresh-token',
-        expiresAt
+        expiresAt,
       );
 
       expect(result).toEqual({
@@ -270,7 +272,9 @@ describe('AuthConfigService', () => {
         expiresAt,
       });
       expect(prismaService.userCredential.upsert).toHaveBeenCalledWith({
-        where: { orgId_userId_toolId: { orgId: 'org-456', userId: 'user-789', toolId: 'tool-789' } },
+        where: {
+          orgId_userId_toolId: { orgId: 'org-456', userId: 'user-789', toolId: 'tool-789' },
+        },
         create: {
           orgId: 'org-456',
           userId: 'user-789',
@@ -306,7 +310,7 @@ describe('AuthConfigService', () => {
       prismaService.toolAuthConfig.deleteMany.mockResolvedValue({ count: 0 });
 
       await expect(service.deleteOrgAuthConfig('org-456', 'tool-789')).rejects.toThrow(
-        new NotFoundException('No auth config found for org org-456 and tool tool-789')
+        new NotFoundException('No auth config found for org org-456 and tool tool-789'),
       );
     });
   });
@@ -325,8 +329,12 @@ describe('AuthConfigService', () => {
     it('should throw NotFoundException when no credentials to delete', async () => {
       prismaService.userCredential.deleteMany.mockResolvedValue({ count: 0 });
 
-      await expect(service.deleteUserCredentials('org-456', 'user-789', 'tool-789')).rejects.toThrow(
-        new NotFoundException('No credentials found for user user-789 and tool tool-789 in org org-456')
+      await expect(
+        service.deleteUserCredentials('org-456', 'user-789', 'tool-789'),
+      ).rejects.toThrow(
+        new NotFoundException(
+          'No credentials found for user user-789 and tool tool-789 in org org-456',
+        ),
       );
     });
   });
