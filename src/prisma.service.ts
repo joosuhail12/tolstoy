@@ -209,6 +209,14 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.prismaClient?.webhookDispatchLog;
   }
 
+  get toolAuthConfig() {
+    return this.prismaClient?.toolAuthConfig;
+  }
+
+  get userCredential() {
+    return this.prismaClient?.userCredential;
+  }
+
   // Health check method
   async isHealthy(): Promise<boolean> {
     try {
