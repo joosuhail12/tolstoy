@@ -31,11 +31,10 @@
     }
   },
   "navigation": {
-    "dropdowns": [
+    "tabs": [
       {
-        "dropdown": "Documentation",
+        "tab": "Documentation",
         "icon": "book",
-        "description": "Complete guide to Tolstoy workflow automation",
         "groups": [
           {
             "group": "Getting Started",
@@ -60,15 +59,111 @@
             ]
           },
           {
-            "group": "API Documentation", 
+            "group": "API Overview",
             "pages": [
-              "docs/api-reference/index",
-              "docs/api/index"
+              "docs/api-reference/index"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "icon": "code",
+        "groups": [
+          {
+            "group": "Health",
+            "pages": [
+              "docs/api/health/get-status",
+              "docs/api/health/get-statusdetailed"
             ]
           },
           {
-            "group": "Interactive API Reference",
-            "openapi": "docs/openapi.json"
+            "group": "Organizations",
+            "pages": [
+              "docs/api/organizations/get-organizations",
+              "docs/api/organizations/post-organizations",
+              "docs/api/organizations/get-organizations-1",
+              "docs/api/organizations/put-organizations",
+              "docs/api/organizations/delete-organizations"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "docs/api/users/get-users",
+              "docs/api/users/post-users",
+              "docs/api/users/get-users-1",
+              "docs/api/users/put-users",
+              "docs/api/users/delete-users"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "docs/api/tools/get-tools",
+              "docs/api/tools/post-tools",
+              "docs/api/tools/get-tools-1",
+              "docs/api/tools/put-tools",
+              "docs/api/tools/delete-tools"
+            ]
+          },
+          {
+            "group": "Actions",
+            "pages": [
+              "docs/api/actions/get-actions",
+              "docs/api/actions/post-actions",
+              "docs/api/actions/get-actions-1",
+              "docs/api/actions/put-actions",
+              "docs/api/actions/delete-actions"
+            ]
+          },
+          {
+            "group": "Flows",
+            "pages": [
+              "docs/api/flows/get-flows",
+              "docs/api/flows/post-flows",
+              "docs/api/flows/get-flows-1",
+              "docs/api/flows/put-flows",
+              "docs/api/flows/delete-flows",
+              "docs/api/flows/post-flows-execute",
+              "docs/api/flows/get-flows-executions",
+              "docs/api/flows/get-flows-executions-1",
+              "docs/api/flows/post-flows-executions-cancel",
+              "docs/api/flows/post-flows-executions-retry",
+              "docs/api/flows/get-flows-metrics"
+            ]
+          },
+          {
+            "group": "Execution Logs",
+            "pages": [
+              "docs/api/executionlogs/get-execution-logs",
+              "docs/api/executionlogs/post-execution-logs",
+              "docs/api/executionlogs/get-execution-logs-1",
+              "docs/api/executionlogs/put-execution-logs",
+              "docs/api/executionlogs/delete-execution-logs"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "docs/api/webhooks/get-webhooks",
+              "docs/api/webhooks/post-webhooks",
+              "docs/api/webhooks/get-webhooksevent-types",
+              "docs/api/webhooks/get-webhooks-1",
+              "docs/api/webhooks/put-webhooks",
+              "docs/api/webhooks/delete-webhooks",
+              "docs/api/webhooks/patch-webhooks-toggle",
+              "docs/api/webhooks/post-webhooks-test"
+            ]
+          },
+          {
+            "group": "Tool Secrets",
+            "pages": [
+              "docs/api/toolsecrets/get-tools-secrets",
+              "docs/api/toolsecrets/post-tools-secrets",
+              "docs/api/toolsecrets/delete-tools-secrets",
+              "docs/api/toolsecretslist/get-toolssecrets"
+            ]
           }
         ]
       }
