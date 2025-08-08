@@ -33,6 +33,12 @@ variable "hcp_client_secret" {
 }
 
 # HCP Service Configuration
+variable "create_hcp_project" {
+  description = "Create HCP project (requires organization admin permissions)"
+  type        = bool
+  default     = false
+}
+
 variable "create_hcp_vault" {
   description = "Create HCP Vault cluster"
   type        = bool
@@ -399,7 +405,7 @@ variable "backup_schedule" {
 variable "backup_retention_days" {
   description = "Number of days to retain database backups in S3"
   type        = number
-  default     = 30
+  default     = 90
   
   validation {
     condition     = var.backup_retention_days >= 7 && var.backup_retention_days <= 365

@@ -1,0 +1,309 @@
+---
+title: Flow Templates
+description: Ready-made workflow templates to jumpstart your automation
+sidebar_position: 6
+---
+
+# Flow Templates
+
+Tolstoy ships with a curated library of ready-made workflow templates that you can import into your organization with a single command. These templates cover common automation patterns and serve as excellent starting points for building your own custom workflows.
+
+## Quick Start
+
+### List Available Templates
+
+View all available templates:
+
+```bash
+tolstoy templates list
+```
+
+Get detailed information about a specific template:
+
+```bash
+tolstoy templates show "Hello World"
+```
+
+### Import a Template
+
+Import a template into your organization:
+
+```bash
+tolstoy templates import "Hello World" --org org-123
+```
+
+## CLI Installation
+
+First, install the Tolstoy CLI:
+
+```bash
+npm install -g @tolstoy/cli
+```
+
+Set your API credentials:
+
+```bash
+export TOLSTOY_API_KEY="your-api-key"
+export TOLSTOY_API_URL="https://api.tolstoy.dev"  # Optional
+```
+
+## Available Templates
+
+### Getting Started
+
+#### Hello World
+- **Description**: Simple flow that echoes a message
+- **Tags**: `example`, `simple`, `echo`
+- **Use Case**: Learning Tolstoy basics, testing your setup
+
+```bash
+tolstoy templates import "Hello World" --org your-org-id
+```
+
+### Notifications
+
+#### Jira to Slack
+- **Description**: Create a Slack message when a Jira issue is created
+- **Tags**: `jira`, `slack`, `notification`, `integration`
+- **Inputs**: 
+  - `slack_channel` (required): Slack channel to post notifications
+  - `jira_project` (required): Jira project key to monitor
+- **Trigger**: Webhook from Jira
+
+```bash
+tolstoy templates import "Jira to Slack" --org your-org-id
+```
+
+### Developer Tools
+
+#### GitHub Webhook Notifier
+- **Description**: Send notifications for GitHub push events with commit details
+- **Tags**: `github`, `webhook`, `git`, `notification`, `ci-cd`
+- **Inputs**:
+  - `notification_channel` (required): Channel or endpoint for notifications
+  - `repository_filter` (optional): Filter by repository name
+- **Trigger**: GitHub webhook
+
+```bash
+tolstoy templates import "GitHub Webhook Notifier" --org your-org-id
+```
+
+### Data Processing
+
+#### Data Pipeline ETL
+- **Description**: Extract data from API, transform it, and load into database
+- **Tags**: `etl`, `data`, `pipeline`, `database`, `api`
+- **Inputs**:
+  - `source_api_url` (required): Source API URL for data extraction
+  - `database_connection` (required): Database connection string
+  - `target_table` (required): Target table name
+- **Schedule**: Daily at 2 AM UTC
+
+```bash
+tolstoy templates import "Data Pipeline ETL" --org your-org-id
+```
+
+### CRM Integration
+
+#### Email to CRM Sync
+- **Description**: Parse incoming emails and create contacts in CRM system
+- **Tags**: `email`, `crm`, `contact`, `sync`, `automation`
+- **Inputs**:
+  - `crm_system` (required): CRM system (salesforce, hubspot, pipedrive)
+  - `lead_source` (optional): Source to tag new contacts with (default: "Email Inquiry")
+- **Trigger**: Email received webhook
+
+```bash
+tolstoy templates import "Email to CRM Sync" --org your-org-id
+```
+
+## CLI Commands Reference
+
+### `tolstoy templates list`
+
+List all available flow templates.
+
+**Options:**
+- `-c, --category <category>` - Filter by category
+- `-t, --tag <tag>` - Filter by tag
+- `--verbose` - Show detailed template information
+- `--json` - Output in JSON format
+
+**Examples:**
+```bash
+# List all templates
+tolstoy templates list
+
+# List templates by category
+tolstoy templates list --category "Getting Started"
+
+# List templates by tag
+tolstoy templates list --tag "slack"
+
+# Show detailed information
+tolstoy templates list --verbose
+
+# Get JSON output for scripting
+tolstoy templates list --json
+```
+
+### `tolstoy templates show <name>`
+
+Show detailed information about a specific template.
+
+**Examples:**
+```bash
+# Show template details
+tolstoy templates show "Hello World"
+
+# Get JSON output
+tolstoy templates show "Jira to Slack" --json
+```
+
+### `tolstoy templates import <name>`
+
+Import a flow template into your organization.
+
+**Options:**
+- `-o, --org <orgId>` - Organization ID (optional if you have only one org)
+- `--flow-name <name>` - Custom name for the imported flow
+- `--dry-run` - Show what would be imported without creating
+- `-y, --yes` - Skip confirmation prompts
+
+**Examples:**
+```bash
+# Basic import
+tolstoy templates import "Hello World" --org org-123
+
+# Import with custom name
+tolstoy templates import "Hello World" --org org-123 --flow-name "My Hello Flow"
+
+# Dry run (preview only)
+tolstoy templates import "Hello World" --org org-123 --dry-run
+
+# Skip confirmation
+tolstoy templates import "Hello World" --org org-123 --yes
+```
+
+## Template Structure
+
+Templates are defined in YAML format with front matter containing metadata:
+
+```yaml
+---
+name: My Template
+description: Description of what this template does
+version: 1
+category: Category Name
+author: Author Name
+tags: [tag1, tag2, tag3]
+inputs:
+  - name: input_name
+    type: string
+    required: true
+    description: Input description
+---
+trigger:
+  type: webhook
+  source: github
+  event: push
+
+steps:
+  - key: step1
+    action: echo
+    inputs:
+      message: "Hello from template!"
+```
+
+### Template Fields
+
+- **name** (required): Human-readable name for the template
+- **description** (required): Brief description of what the template does
+- **version** (required): Template version number
+- **category** (optional): Category for grouping templates
+- **author** (optional): Template author
+- **tags** (optional): Array of tags for filtering and search
+- **inputs** (optional): Array of input parameters the template accepts
+- **trigger** (optional): Event trigger configuration
+- **schedule** (optional): Scheduled execution configuration
+- **steps** (required): Array of workflow steps
+
+## Authentication
+
+The CLI requires authentication to interact with the Tolstoy API. You can provide credentials in several ways:
+
+### Environment Variables (Recommended)
+```bash
+export TOLSTOY_API_KEY="your-api-key"
+export TOLSTOY_API_URL="https://api.tolstoy.dev"
+export TOLSTOY_ORG_ID="your-default-org-id"  # Optional
+```
+
+### Command Line Options
+```bash
+tolstoy templates import "Hello World" \
+  --api-key "your-api-key" \
+  --api-url "https://api.tolstoy.dev" \
+  --org "org-123"
+```
+
+### Test Connection
+Verify your authentication is working:
+
+```bash
+tolstoy auth
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### "API key is required"
+Make sure you've set the `TOLSTOY_API_KEY` environment variable or provided it via `--api-key`.
+
+#### "Template not found"
+List available templates to see exact names:
+```bash
+tolstoy templates list
+```
+
+#### "No organizations found"
+Create an organization first through the Tolstoy web interface or API.
+
+#### "Connection failed"
+Check your API URL and network connectivity:
+```bash
+tolstoy auth
+```
+
+### Getting Help
+
+- View CLI help: `tolstoy --help`
+- View command help: `tolstoy templates --help`
+- View subcommand help: `tolstoy templates import --help`
+
+## Contributing Templates
+
+Want to contribute a template to the library? Templates are stored in the [`templates/`](https://github.com/tolstoy-dev/tolstoy/tree/main/templates) directory of the Tolstoy repository. 
+
+### Template Guidelines
+
+1. **Clear naming**: Use descriptive names that indicate the template's purpose
+2. **Complete metadata**: Include all relevant metadata fields (description, category, tags, etc.)
+3. **Input documentation**: Document all required inputs with descriptions
+4. **Error handling**: Include appropriate error handling and conditions
+5. **Real-world usefulness**: Ensure the template solves a real automation problem
+
+### Submission Process
+
+1. Fork the Tolstoy repository
+2. Add your template YAML file to the `templates/` directory
+3. Test the template thoroughly
+4. Submit a pull request with your template and a description of its use case
+
+## Next Steps
+
+- [Create your first workflow](/docs/guides/first-workflow) using an imported template
+- [Learn about flow execution](/docs/execution/) to monitor your automated workflows
+- [Explore integrations](/docs/integrations/) to connect with external services
+- [Check out the SDK](/docs/sdk/) for programmatic template management

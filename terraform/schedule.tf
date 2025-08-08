@@ -24,7 +24,6 @@ resource "aws_lambda_function" "backup" {
   environment {
     variables = {
       BACKUP_BUCKET = aws_s3_bucket.tolstoy_backups.bucket
-      AWS_REGION    = var.aws_region
       ENVIRONMENT   = var.environment
     }
   }
@@ -322,7 +321,6 @@ resource "aws_lambda_function" "manual_backup" {
   environment {
     variables = {
       BACKUP_BUCKET = aws_s3_bucket.tolstoy_backups.bucket
-      AWS_REGION    = var.aws_region
       ENVIRONMENT   = var.environment
     }
   }

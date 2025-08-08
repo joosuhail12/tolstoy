@@ -324,7 +324,7 @@ resource "aws_cloudwatch_event_target" "state_backup_target" {
 # Lambda Permission for State Backup EventBridge
 resource "aws_lambda_permission" "allow_eventbridge_state_backup" {
   count         = var.enable_state_backup ? 1 : 0
-  statement_id  = "AllowExecutionFromCloudWatchStateBa ckup"
+  statement_id  = "AllowExecutionFromCloudWatchStateBackup"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.state_backup[0].function_name
   principal     = "events.amazonaws.com"

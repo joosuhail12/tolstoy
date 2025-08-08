@@ -57,6 +57,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups_lifecycle" {
     id     = "backup_retention"
     status = "Enabled"
 
+    filter {
+      prefix = "backups/"
+    }
+
     # Delete current version after 30 days
     expiration {
       days = var.backup_retention_days
@@ -73,9 +77,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "backups_lifecycle" {
       storage_class = "STANDARD_IA"
     }
 
-    # Transition to Glacier after 90 days
+    # Transition to Glacier after 60 days
     transition {
-      days          = 90
+      days          = 60
       storage_class = "GLACIER"
     }
   }

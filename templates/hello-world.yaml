@@ -1,0 +1,17 @@
+---
+name: Hello World
+description: Simple flow that echoes a message
+version: 1
+category: Getting Started
+author: Tolstoy Team
+tags: [example, simple, echo]
+---
+steps:
+  - key: hello
+    action: echo
+    inputs:
+      message: "Hello from Tolstoy!"
+  - key: welcome
+    action: echo
+    inputs:
+      message: "Welcome to workflow automation!"

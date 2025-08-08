@@ -179,12 +179,12 @@ output "route53_zone_name" {
 # HCP Resource Outputs
 output "hcp_project_id" {
   description = "HCP Project ID"
-  value       = hcp_project.tolstoy.resource_id
+  value       = var.create_hcp_project ? hcp_project.tolstoy[0].resource_id : null
 }
 
 output "hcp_project_name" {
   description = "HCP Project name"
-  value       = hcp_project.tolstoy.name
+  value       = var.create_hcp_project ? hcp_project.tolstoy[0].name : null
 }
 
 output "hcp_organization_id" {
@@ -241,7 +241,7 @@ output "hcp_boundary_cluster_id" {
 output "hcp_console_urls" {
   description = "HCP Console URLs for monitoring"
   value = {
-    project     = "https://portal.cloud.hashicorp.com/project/${hcp_project.tolstoy.resource_id}"
+    project     = var.create_hcp_project ? "https://portal.cloud.hashicorp.com/project/${hcp_project.tolstoy[0].resource_id}" : null
     vault       = var.create_hcp_vault ? "https://portal.cloud.hashicorp.com/vault/clusters/${hcp_vault_cluster.tolstoy[0].cluster_id}" : null
     boundary    = var.create_hcp_boundary ? "https://portal.cloud.hashicorp.com/boundary/clusters/${hcp_boundary_cluster.tolstoy[0].cluster_id}" : null
     hvn         = var.create_hcp_hvn ? "https://portal.cloud.hashicorp.com/network/${hcp_hvn.main[0].hvn_id}" : null

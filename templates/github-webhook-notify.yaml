@@ -1,0 +1,95 @@
+---
+name: GitHub Webhook Notifier
+description: Send notifications for GitHub push events with commit details
+version: 1
+category: Developer Tools
+author: Tolstoy Team
+tags: [github, webhook, git, notification, ci-cd]
+inputs:
+  - name: notification_channel
+    type: string
+    required: true
+    description: Channel or endpoint for notifications
+  - name: repository_filter
+    type: string
+    required: false
+    description: Filter by repository name (optional)
+---
+trigger:
+  type: webhook
+  source: github
+  event: push
+
+steps:
+  - key: validate_push_event
+    action: validate
+    inputs:
+      schema:
+        type: object
+        required: [ref, commits, repository]
+        properties:
+          ref:
+            type: string
+          commits:
+            type: array
+          repository:
+            type: object
+            properties:
+              name:
+                type: string
+              full_name:
+                type: string
+    condition:
+      field: "{{trigger.payload.ref}}"
+      operator: "startsWith"
+      value: "refs/heads/"
+
+  - key: filter_repository
+    action: conditional
+    condition:
+      any:
+        - field: "{{inputs.repository_filter}}"
+          operator: "isEmpty"
+        - field: "{{trigger.payload.repository.name}}"
+          operator: "equals"
+          value: "{{inputs.repository_filter}}"
+
+  - key: extract_commit_info
+    action: transform
+    inputs:
+      data: "{{trigger.payload.commits}}"
+      transform: |
+        commits.map(commit => ({
+          id: commit.id.substring(0, 7),
+          message: commit.message.split('\n')[0],
+          author: commit.author.name,
+          url: commit.url
+        }))
+
+  - key: format_notification
+    action: template
+    inputs:
+      template: |
+        🚀 New Push to {{trigger.payload.repository.full_name}}
+        
+        *Branch:* {{trigger.payload.ref.replace('refs/heads/', '')}}
+        *Pusher:* {{trigger.payload.pusher.name}}
+        *Commits:* {{trigger.payload.commits.length}}
+        
+        {{#each extract_commit_info.outputs}}
+        • `{{id}}` {{message}} - {{author}}
+        {{/each}}
+        
+        [View Changes]({{trigger.payload.compare}})
+
+  - key: send_notification
+    action: http.post
+    inputs:
+      url: "{{inputs.notification_channel}}"
+      headers:
+        Content-Type: application/json
+      body:
+        text: "{{format_notification.outputs.result}}"
+        timestamp: "{{trigger.timestamp}}"
+        repository: "{{trigger.payload.repository.full_name}}"
+        branch: "{{trigger.payload.ref.replace('refs/heads/', '')}}"

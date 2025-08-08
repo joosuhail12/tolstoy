@@ -4,8 +4,9 @@
 # Data source for current HCP organization
 data "hcp_organization" "main" {}
 
-# HCP Project for organizing resources
+# HCP Project for organizing resources (conditional)
 resource "hcp_project" "tolstoy" {
+  count       = var.create_hcp_project ? 1 : 0
   name        = var.hcp_project_name
   description = "Tolstoy workflow automation platform infrastructure and services"
 }
