@@ -67,21 +67,15 @@
         ]
       },
       {
-        "tab": "API Documentation",
-        "icon": "api",
+        "tab": "API Reference",
+        "icon": "code",
         "groups": [
           {
             "group": "API Overview",
             "pages": [
               "docs/api-reference/index"
             ]
-          }
-        ]
-      },
-      {
-        "tab": "API Reference",
-        "icon": "code",
-        "groups": [
+          },
           {
             "group": "Health",
             "pages": [
