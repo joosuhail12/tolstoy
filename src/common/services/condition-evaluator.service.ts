@@ -219,7 +219,7 @@ export class ConditionEvaluatorService {
 
       // Handle JSONLogic format
       if (this.isJSONLogicRule(rule)) {
-        return Boolean(jsonLogic.apply(rule as any, context));
+        return Boolean(jsonLogic.apply(rule as Record<string, unknown>, context));
       }
 
       // Handle simple comparison format
@@ -233,7 +233,7 @@ export class ConditionEvaluatorService {
       }
 
       // Default: treat as JSONLogic
-      return Boolean(jsonLogic.apply(rule as any, context));
+      return Boolean(jsonLogic.apply(rule as Record<string, unknown>, context));
     } finally {
       // Clear current context
       this.currentContext = null;
@@ -243,7 +243,7 @@ export class ConditionEvaluatorService {
   /**
    * Check if rule is in JSONLogic format
    */
-  private isJSONLogicRule(rule: any): boolean {
+  private isJSONLogicRule(rule: unknown): boolean {
     if (!rule || typeof rule !== 'object') {
       return false;
     }
@@ -296,7 +296,7 @@ export class ConditionEvaluatorService {
   /**
    * Check if rule is a simple comparison
    */
-  private isSimpleComparisonRule(rule: any): boolean {
+  private isSimpleComparisonRule(rule: unknown): boolean {
     return (
       rule && typeof rule === 'object' && 'field' in rule && 'operator' in rule && 'value' in rule
     );
@@ -305,7 +305,7 @@ export class ConditionEvaluatorService {
   /**
    * Check if rule is custom DSL format
    */
-  private isCustomDSLRule(rule: any): boolean {
+  private isCustomDSLRule(rule: unknown): boolean {
     return rule && typeof rule === 'object' && 'type' in rule && rule.type === 'custom';
   }
 
@@ -365,7 +365,7 @@ export class ConditionEvaluatorService {
   /**
    * Evaluate custom DSL rules (extensible for future custom logic)
    */
-  private evaluateCustomDSL(rule: any, context: ConditionContext): boolean {
+  private evaluateCustomDSL(rule: Record<string, unknown>, context: ConditionContext): boolean {
     const { type, ...config } = rule;
 
     switch (type) {
@@ -383,9 +383,9 @@ export class ConditionEvaluatorService {
   /**
    * Get field value from context using dot notation
    */
-  private getFieldValue(field: string, context: ConditionContext): any {
+  private getFieldValue(field: string, context: ConditionContext): unknown {
     const parts = field.split('.');
-    let value: any = context;
+    let value: unknown = context;
 
     for (const part of parts) {
       if (value && typeof value === 'object' && part in value) {
@@ -448,7 +448,7 @@ export class ConditionEvaluatorService {
   /**
    * Custom DSL: Time window evaluation
    */
-  private evaluateTimeWindow(_config: any, _context: ConditionContext): boolean {
+  private evaluateTimeWindow(_config: Record<string, unknown>, _context: ConditionContext): boolean {
     // Implementation would depend on specific time window logic
     // This is a placeholder for custom time-based conditions
     return true;
@@ -457,7 +457,7 @@ export class ConditionEvaluatorService {
   /**
    * Custom DSL: User role evaluation
    */
-  private evaluateUserRole(_config: any, _context: ConditionContext): boolean {
+  private evaluateUserRole(_config: Record<string, unknown>, _context: ConditionContext): boolean {
     // This would integrate with your user role system
     // Placeholder implementation
     return true;

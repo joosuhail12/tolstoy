@@ -19,7 +19,7 @@ export class AuthConfigResponseDto {
   @ApiProperty({
     description: 'Authentication configuration (sensitive values may be masked)',
   })
-  config: Record<string, any>;
+  config: Record<string, unknown>;
 
   @ApiProperty({ description: 'Creation timestamp' })
   createdAt: Date;

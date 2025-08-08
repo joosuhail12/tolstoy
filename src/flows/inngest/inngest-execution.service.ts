@@ -129,7 +129,7 @@ export class InngestExecutionService {
   /**
    * Get execution status and details
    */
-  async getExecutionStatus(executionId: string, tenant: TenantContext): Promise<any> {
+  async getExecutionStatus(executionId: string, tenant: TenantContext): Promise<Record<string, unknown>> {
     const executionLog = await this.prisma.executionLog.findUnique({
       where: {
         id: executionId,
@@ -272,7 +272,7 @@ export class InngestExecutionService {
     return this.executeFlow(
       originalExecution.flowId,
       tenant,
-      (originalExecution.inputs as any) || {},
+      (originalExecution.inputs as Record<string, unknown>) || {},
     );
   }
 
@@ -286,7 +286,7 @@ export class InngestExecutionService {
       startDate?: Date;
       endDate?: Date;
     } = {},
-  ): Promise<any> {
+  ): Promise<Record<string, unknown>> {
     const { startDate, endDate } = timeRange;
 
     interface MetricsWhereClause {
@@ -328,7 +328,7 @@ export class InngestExecutionService {
     const statusCounts = executions.reduce((acc, item) => {
       acc[item.status] = item._count.status;
       return acc;
-    }, {} as any);
+    }, {} as Record<string, unknown>);
 
     return {
       totalExecutions: totalCount,

@@ -1,0 +1,421 @@
+---
+title: "CLI Installation"
+description: "Install the Tolstoy CLI on macOS, Linux, and Windows to manage workflows from your command line."
+---
+
+# CLI Installation
+
+The Tolstoy CLI provides powerful command-line tools for managing workflows, integrations, and deployments. Install it on your local machine to get started with command-line workflow automation.
+
+## Quick Install
+
+### macOS & Linux (Recommended)
+
+<CodeGroup>
+```bash curl
+curl -fsSL https://get.tolstoy.dev | bash
+```
+
+```bash Homebrew (macOS)
+# Add the Tolstoy tap
+brew tap tolstoy-dev/tap
+
+# Install the CLI
+brew install tolstoy
+```
+
+```bash npm (Cross-platform)
+npm install -g @tolstoy/cli
+```
+</CodeGroup>
+
+### Windows
+
+<CodeGroup>
+```powershell PowerShell
+# Using npm (requires Node.js)
+npm install -g @tolstoy/cli
+```
+
+```bash Windows Subsystem for Linux
+curl -fsSL https://get.tolstoy.dev | bash
+```
+</CodeGroup>
+
+## Manual Installation
+
+### Download Binary
+
+Download the appropriate binary for your platform from our [GitHub releases page](https://github.com/tolstoy-dev/cli/releases/latest):
+
+<CardGroup cols={2}>
+  <Card title="macOS" icon="apple">
+    **Intel**: `tolstoy-cli-macos-x64.tar.gz`  
+    **Apple Silicon**: `tolstoy-cli-macos-arm64.tar.gz`
+  </Card>
+  <Card title="Linux" icon="linux">
+    **x86_64**: `tolstoy-cli-linux-x64.tar.gz`  
+    **ARM64**: `tolstoy-cli-linux-arm64.tar.gz`
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Windows" icon="windows">
+    **x64**: `tolstoy-cli-windows-x64.zip`  
+    **ARM64**: `tolstoy-cli-windows-arm64.zip`
+  </Card>
+  <Card title="Alpine Linux" icon="mountain">
+    **x86_64**: `tolstoy-cli-alpine-x64.tar.gz`  
+    **ARM64**: `tolstoy-cli-alpine-arm64.tar.gz`
+  </Card>
+</CardGroup>
+
+### Extract and Install
+
+<CodeGroup>
+```bash macOS/Linux
+# Extract the archive
+tar -xzf tolstoy-cli-*-*.tar.gz
+
+# Move to your PATH
+sudo mv tolstoy /usr/local/bin/
+
+# Make executable
+sudo chmod +x /usr/local/bin/tolstoy
+
+# Verify installation
+tolstoy --version
+```
+
+```powershell Windows
+# Extract the ZIP file
+Expand-Archive tolstoy-cli-windows-*.zip
+
+# Move to a directory in your PATH
+Move-Item tolstoy.exe C:\Windows\System32\
+
+# Verify installation
+tolstoy --version
+```
+</CodeGroup>
+
+## Verify Installation
+
+Check that the CLI is properly installed:
+
+```bash
+tolstoy --version
+# Output: tolstoy version 1.2.3
+
+tolstoy --help
+# Output: Shows available commands and options
+```
+
+## Shell Completion (Optional)
+
+Enable shell auto-completion for a better command-line experience:
+
+<CodeGroup>
+```bash Bash
+# Add to ~/.bashrc or ~/.bash_profile
+eval "$(tolstoy completion bash)"
+
+# Or install to completion directory
+tolstoy completion bash > /etc/bash_completion.d/tolstoy
+```
+
+```bash Zsh
+# Add to ~/.zshrc
+eval "$(tolstoy completion zsh)"
+
+# Or install to completion directory
+tolstoy completion zsh > /usr/local/share/zsh/site-functions/_tolstoy
+```
+
+```bash Fish
+# Install completion
+tolstoy completion fish > ~/.config/fish/completions/tolstoy.fish
+```
+</CodeGroup>
+
+## Configuration
+
+### Initial Setup
+
+After installation, configure your CLI with your Tolstoy credentials:
+
+```bash
+# Interactive configuration
+tolstoy config add
+
+# You'll be prompted for:
+# - Profile name (default: "default")
+# - API URL (default: https://tolstoy.getpullse.com)
+# - Organization ID
+# - User ID
+```
+
+### Environment Variables
+
+Alternatively, set up environment variables for automatic configuration:
+
+<CodeGroup>
+```bash .env
+TOLSTOY_API_URL=https://tolstoy.getpullse.com
+TOLSTOY_ORG_ID=org_1234567890abcdef
+TOLSTOY_USER_ID=user_abcdef1234567890
+```
+
+```bash Export
+export TOLSTOY_API_URL="https://tolstoy.getpullse.com"
+export TOLSTOY_ORG_ID="org_1234567890abcdef"
+export TOLSTOY_USER_ID="user_abcdef1234567890"
+```
+</CodeGroup>
+
+### Multiple Profiles
+
+The CLI supports multiple profiles for different environments:
+
+```bash
+# Add production profile
+tolstoy config add production --api-url https://api.tolstoy.com
+
+# Add staging profile  
+tolstoy config add staging --api-url https://staging-api.tolstoy.com
+
+# List all profiles
+tolstoy config list
+
+# Switch profiles
+tolstoy config use production
+
+# Test current profile
+tolstoy config test
+```
+
+## Docker Installation
+
+Use the official Docker image for containerized environments:
+
+<CodeGroup>
+```bash Docker Run
+docker run --rm -it \
+  -e TOLSTOY_ORG_ID="org_1234567890abcdef" \
+  -e TOLSTOY_USER_ID="user_abcdef1234567890" \
+  tolstoydev/cli:latest \
+  flows list
+```
+
+```yaml docker-compose.yml
+version: '3.8'
+services:
+  tolstoy-cli:
+    image: tolstoydev/cli:latest
+    environment:
+      - TOLSTOY_ORG_ID=org_1234567890abcdef
+      - TOLSTOY_USER_ID=user_abcdef1234567890
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+```
+
+```dockerfile Dockerfile
+FROM tolstoydev/cli:latest
+
+# Set credentials
+ENV TOLSTOY_ORG_ID=org_1234567890abcdef
+ENV TOLSTOY_USER_ID=user_abcdef1234567890
+
+# Your app code
+COPY . /app
+WORKDIR /app
+
+# Run CLI commands
+RUN tolstoy flows validate ./workflows/
+```
+</CodeGroup>
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml .github/workflows/deploy.yml
+name: Deploy Workflows
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Tolstoy CLI
+        run: |
+          curl -fsSL https://get.tolstoy.dev | bash
+          echo "$HOME/.tolstoy/bin" >> $GITHUB_PATH
+          
+      - name: Configure CLI
+        env:
+          TOLSTOY_ORG_ID: ${{ secrets.TOLSTOY_ORG_ID }}
+          TOLSTOY_USER_ID: ${{ secrets.TOLSTOY_USER_ID }}
+        run: tolstoy config test
+        
+      - name: Deploy Workflows
+        run: tolstoy flows deploy ./workflows/
+```
+
+### GitLab CI
+
+```yaml .gitlab-ci.yml
+stages:
+  - deploy
+
+deploy_workflows:
+  stage: deploy
+  image: tolstoydev/cli:latest
+  variables:
+    TOLSTOY_ORG_ID: $ORG_ID
+    TOLSTOY_USER_ID: $USER_ID
+  script:
+    - tolstoy flows validate ./workflows/
+    - tolstoy flows deploy ./workflows/
+  only:
+    - main
+```
+
+## Troubleshooting
+
+### Permission Issues
+
+If you encounter permission errors during installation:
+
+<CodeGroup>
+```bash macOS/Linux
+# Use sudo for system-wide installation
+sudo curl -fsSL https://get.tolstoy.dev | bash
+
+# Or install to user directory
+curl -fsSL https://get.tolstoy.dev | bash -s -- --user
+```
+
+```powershell Windows
+# Run PowerShell as Administrator
+# Then run the installation command
+npm install -g @tolstoy/cli
+```
+</CodeGroup>
+
+### Path Issues
+
+If the CLI isn't found after installation:
+
+<CodeGroup>
+```bash Bash/Zsh
+# Add to ~/.bashrc or ~/.zshrc
+export PATH="$HOME/.tolstoy/bin:$PATH"
+
+# Reload shell configuration
+source ~/.bashrc  # or ~/.zshrc
+```
+
+```bash Fish
+# Add to ~/.config/fish/config.fish
+set -gx PATH $HOME/.tolstoy/bin $PATH
+```
+</CodeGroup>
+
+### Network Issues
+
+If installation fails due to network issues:
+
+```bash
+# Use alternative mirror
+TOLSTOY_MIRROR=https://github.com/tolstoy-dev/cli/releases/download \
+  curl -fsSL https://get.tolstoy.dev | bash
+
+# Or download manually
+wget https://github.com/tolstoy-dev/cli/releases/latest/download/tolstoy-cli-linux-x64.tar.gz
+```
+
+## Updating the CLI
+
+### Automatic Updates
+
+```bash
+# Check for updates
+tolstoy update check
+
+# Update to latest version
+tolstoy update install
+
+# Update to specific version
+tolstoy update install --version 1.2.3
+```
+
+### Manual Updates
+
+<CodeGroup>
+```bash Homebrew
+brew upgrade tolstoy
+```
+
+```bash npm
+npm update -g @tolstoy/cli
+```
+
+```bash Script
+curl -fsSL https://get.tolstoy.dev | bash
+```
+</CodeGroup>
+
+## Uninstalling
+
+### Remove the CLI
+
+<CodeGroup>
+```bash Homebrew
+brew uninstall tolstoy
+brew untap tolstoy-dev/tap
+```
+
+```bash npm
+npm uninstall -g @tolstoy/cli
+```
+
+```bash Manual
+# Remove binary
+sudo rm /usr/local/bin/tolstoy
+
+# Remove configuration
+rm -rf ~/.tolstoy
+```
+</CodeGroup>
+
+## Next Steps
+
+Now that you have the CLI installed:
+
+<CardGroup cols={2}>
+  <Card title="Configuration Guide" icon="gear" href="/cli/getting-started/configuration">
+    Set up your CLI configuration and credentials
+  </Card>
+  <Card title="First Command" icon="terminal" href="/cli/getting-started/first-command">
+    Run your first CLI command and explore the interface
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Command Reference" icon="book" href="/cli/commands/flows/overview">
+    Explore all available CLI commands
+  </Card>
+  <Card title="CI/CD Integration" icon="infinity" href="/cli/guides/ci-cd-integration">
+    Integrate the CLI into your deployment pipelines
+  </Card>
+</CardGroup>
+
+---
+
+*The Tolstoy CLI is now installed and ready to help you manage workflows from the command line. Configure your credentials and start automating!*

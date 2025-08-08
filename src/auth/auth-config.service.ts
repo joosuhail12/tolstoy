@@ -8,7 +8,7 @@ export interface OrgAuthConfig {
   orgId: string;
   toolId: string;
   type: string; // "apiKey" | "oauth2" - kept as string to match Prisma generated type
-  config: any;
+  config: Record<string, unknown>;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -53,7 +53,7 @@ export class AuthConfigService {
    * Load org-level auth config (apiKey or oauth2)
    * First checks cache, then database, then syncs to AWS Secrets Manager
    */
-  async getOrgAuthConfig(orgId: string, toolKey: string): Promise<any> {
+  async getOrgAuthConfig(orgId: string, toolKey: string): Promise<ToolAuthConfig> {
     const cacheKey = this.orgConfigKey(orgId, toolKey);
 
     this.logger.debug(`Loading org auth config for ${orgId}:${toolKey}`);
@@ -168,6 +168,7 @@ export class AuthConfigService {
       // For demo purposes, we'll throw an error indicating this needs implementation
       throw new Error(
         'OAuth refresh not yet implemented. Please implement based on your OAuth provider.',
+      );
 
       /* Implementation would look like this:
       const refreshed: RefreshedTokens = await this.refreshTokenWithProvider(cred.refreshToken);
@@ -203,7 +204,7 @@ export class AuthConfigService {
     orgId: string,
     toolId: string,
     type: string, // 'apiKey' | 'oauth2'
-    config: any,
+    config: Record<string, unknown>,
   ): Promise<OrgAuthConfig> {
     this.logger.debug(`Setting org auth config for ${orgId}:${toolId}`);
 
@@ -318,7 +319,7 @@ export class AuthConfigService {
   /**
    * Helper method to create or update a secret in AWS Secrets Manager
    */
-  private async syncToSecretsManager(secretName: string, value: any): Promise<void> {
+  private async syncToSecretsManager(secretName: string, value: Record<string, unknown>): Promise<void> {
     const secretValue = typeof value === 'string' ? value : JSON.stringify(value);
 
     try {

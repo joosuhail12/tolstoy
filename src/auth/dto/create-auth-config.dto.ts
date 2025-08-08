@@ -35,5 +35,5 @@ export class CreateAuthConfigDto {
   })
   @IsObject()
   @IsNotEmpty()
-  config: Record<string, any>;
+  config: Record<string, unknown>;
 }

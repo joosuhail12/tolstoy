@@ -8,6 +8,7 @@ import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { SecretsResolver } from '../secrets/secrets-resolver.service';
 import { OAuthTokenService } from '../oauth/oauth-token.service';
 import { InputValidatorService } from '../common/services/input-validator.service';
+import { InputParam } from '../actions/types';
 import {
   ConditionEvaluatorService,
   ConditionContext,
@@ -865,7 +866,7 @@ export class FlowExecutorService {
       if (action.inputSchema && Array.isArray(action.inputSchema)) {
         try {
           validatedInputs = this.inputValidator.validateEnhanced(
-            action.inputSchema as unknown as any[],
+            action.inputSchema as InputParam[],
             inputs,
             {
               orgId: context.orgId,

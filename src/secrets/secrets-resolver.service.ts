@@ -12,7 +12,7 @@ export interface ToolCredentials {
   clientId?: string;
   clientSecret?: string;
   webhookSecret?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export interface OAuthTokens {

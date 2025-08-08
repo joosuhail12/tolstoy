@@ -109,7 +109,7 @@ export class RedisCacheService {
    * @param key Cache key
    * @returns Cached value or null if not found/error
    */
-  async get(key: string): Promise<any> {
+  async get(key: string): Promise<unknown> {
     if (!this.isRedisAvailable()) {
       return null;
     }
@@ -123,7 +123,7 @@ export class RedisCacheService {
         this.metrics.hits++;
         this.updateHitRate();
         this.logger.debug({ key, cached: true }, 'Cache hit');
-        return value as any;
+        return value;
       } else {
         this.metrics.misses++;
         this.updateHitRate();

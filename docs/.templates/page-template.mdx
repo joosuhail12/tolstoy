@@ -1,0 +1,272 @@
+---
+title: "Page Title"
+description: "Brief description of what this page covers - keep under 160 characters for SEO"
+---
+
+# Page Title
+
+Brief introduction paragraph that explains what the reader will learn from this page. Keep it concise but informative.
+
+## Overview
+
+Use this section to provide context and set expectations. Explain:
+- What problem this solves
+- Who should read this page
+- What prerequisites are needed
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/link">
+    Brief description of quick start option
+  </Card>
+  <Card title="Detailed Guide" icon="book" href="/link">
+    Brief description of comprehensive guide
+  </Card>
+</CardGroup>
+
+## Main Content Section
+
+### Subsection 1
+
+Detailed explanation with examples:
+
+<CodeGroup>
+```typescript TypeScript
+// Example code with proper syntax highlighting
+interface ExampleInterface {
+  property: string;
+  method(): Promise<void>;
+}
+```
+
+```bash CLI
+# Command line examples
+command --option value
+```
+
+```json JSON
+{
+  "example": "configuration",
+  "nested": {
+    "property": "value"
+  }
+}
+```
+</CodeGroup>
+
+### Subsection 2
+
+More detailed content. Use clear headings and break up text with:
+
+- **Bold text** for emphasis
+- `inline code` for technical terms
+- Lists for multiple related items
+- Tables for structured data
+
+| Column 1 | Column 2 | Description |
+|----------|----------|-------------|
+| Value 1  | Value 2  | What this means |
+| Value 3  | Value 4  | Additional context |
+
+## Common Patterns
+
+### Best Practices
+
+Use this section to highlight:
+1. **Recommended approaches**
+2. **Common pitfalls to avoid**  
+3. **Performance considerations**
+4. **Security implications**
+
+### Examples
+
+Provide practical examples that readers can copy and adapt:
+
+```typescript
+// Real-world example with comments
+export class ExampleClass {
+  private readonly service: ExampleService;
+  
+  constructor(service: ExampleService) {
+    this.service = service;
+  }
+  
+  async performAction(input: ExampleInput): Promise<ExampleOutput> {
+    // Validate input
+    this.validateInput(input);
+    
+    // Process request
+    const result = await this.service.process(input);
+    
+    // Return formatted response
+    return this.formatResponse(result);
+  }
+  
+  private validateInput(input: ExampleInput): void {
+    if (!input.requiredField) {
+      throw new Error('Required field is missing');
+    }
+  }
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+<details>
+<summary>**Issue**: Descriptive problem statement</summary>
+
+**Symptoms**: What the user sees
+**Cause**: Why this happens  
+**Solution**: Step-by-step fix
+
+```bash
+# Example commands to resolve
+fix-command --option
+```
+</details>
+
+<details>
+<summary>**Issue**: Another common problem</summary>
+
+**Symptoms**: Observable behavior
+**Cause**: Root cause explanation
+**Solution**: Resolution steps with examples
+</details>
+
+## Advanced Topics
+
+For complex pages, include advanced sections:
+
+### Performance Optimization
+
+Tips and techniques for improving performance.
+
+### Integration Patterns  
+
+How this integrates with other systems.
+
+### Customization Options
+
+How to extend or modify default behavior.
+
+## API Reference
+
+If applicable, include quick reference for relevant API endpoints:
+
+### `POST /api/endpoint`
+
+Brief description of what this endpoint does.
+
+**Request:**
+```json
+{
+  "parameter": "value",
+  "optional_parameter": "value"
+}
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "result": "value"
+  }
+}
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Related Page 1" icon="link" href="/link">
+    Brief description of how this relates
+  </Card>
+  <Card title="Related Page 2" icon="link" href="/link">
+    Brief description of the connection
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="External Resource" icon="external-link" href="https://external.com">
+    Reference to external documentation
+  </Card>
+  <Card title="Tutorial" icon="play" href="/tutorial">
+    Hands-on learning opportunity
+  </Card>
+</CardGroup>
+
+## Alerts and Callouts
+
+Use these sparingly for important information:
+
+<Info>
+**Information**: Helpful context or tips that enhance understanding.
+</Info>
+
+<Warning>
+**Warning**: Important considerations or potential issues to be aware of.
+</Warning>
+
+<Tip>
+**Pro Tip**: Advanced techniques or optimizations for experienced users.
+</Tip>
+
+<Note>
+**Note**: Additional context or clarification that doesn't fit in the main flow.
+</Note>
+
+## Next Steps
+
+Always provide clear next steps:
+
+1. **Immediate next action**: What should the reader do right now?
+2. **Follow-up learning**: What should they learn next?
+3. **Advanced topics**: Where to go for deeper knowledge?
+
+<CardGroup cols={2}>
+  <Card title="Next Logical Step" icon="arrow-right" href="/next-page">
+    Natural progression from this content
+  </Card>
+  <Card title="Alternative Path" icon="fork" href="/alternative">
+    Different approach or use case
+  </Card>
+</CardGroup>
+
+---
+
+## Style Guide Notes
+
+### Writing Style
+- **Tone**: Professional but approachable
+- **Voice**: Active voice preferred
+- **Person**: Use "you" to address the reader directly
+- **Tense**: Present tense for instructions, past tense for examples
+
+### Formatting Guidelines
+- **Headings**: Use sentence case (capitalize only first word and proper nouns)
+- **Code**: Always use syntax highlighting with appropriate language tags
+- **Links**: Use descriptive text, avoid "click here" or "read more"
+- **Lists**: Use parallel structure and consistent formatting
+
+### Content Requirements
+- **Examples**: Every concept should have a practical example
+- **Context**: Always explain why, not just how
+- **Completeness**: Include error handling and edge cases
+- **Testing**: Show how to verify implementations work
+
+### SEO Considerations
+- **Title**: Include primary keyword, keep under 60 characters
+- **Description**: Meta description under 160 characters
+- **Headings**: Use H2 and H3 tags with relevant keywords
+- **Internal Links**: Link to related pages within the documentation
+
+### Accessibility
+- **Alt text**: Provide meaningful descriptions for images
+- **Contrast**: Ensure text meets WCAG contrast requirements
+- **Structure**: Use semantic HTML and proper heading hierarchy
+- **Navigation**: Ensure all content is keyboard accessible
+
+---
+
+*This template ensures consistency across all Tolstoy documentation while maintaining high quality and excellent user experience.*

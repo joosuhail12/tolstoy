@@ -27,10 +27,10 @@ export interface ActionInputParam {
   options?: string[];
 
   /** Default value if not provided */
-  default?: any;
+  default?: string | number | boolean | string[];
 
   /** JSONLogic predicate determining field visibility */
-  visibleIf?: any;
+  visibleIf?: Record<string, unknown>;
 
   /** Additional validation constraints */
   validation?: {
@@ -71,13 +71,14 @@ export interface LegacyInputParam {
   type: string;
   required: boolean;
   description?: string;
+  options?: string[];
   validation?: {
     pattern?: string;
     enum?: string[];
     minimum?: number;
     maximum?: number;
   };
-  default?: any;
+  default?: string | number | boolean | string[];
 }
 
 /**
@@ -113,11 +114,15 @@ export function migrateToEnhancedParam(legacy: LegacyInputParam): ActionInputPar
     default: legacy.default,
   };
 
+  // Handle options field (for enum types)
+  if (legacy.options) {
+    enhanced.options = legacy.options;
+  }
+
   // Map legacy validation to new format
   if (legacy.validation) {
     enhanced.validation = {
       pattern: legacy.validation.pattern,
-      enum: legacy.validation.enum,
       min: legacy.validation.minimum,
       max: legacy.validation.maximum,
     };

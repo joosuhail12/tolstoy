@@ -156,6 +156,7 @@ describe('OAuthController', () => {
       oauthService.handleCallback.mockResolvedValue({
         credentialId: mockCredentialId,
         toolKey: mockToolKey,
+        orgId: mockOrgId,
       });
 
       await controller.handleCallback(mockParams, mockQuery, mockResponse);
@@ -250,6 +251,7 @@ describe('OAuthController', () => {
       oauthService.handleCallback.mockResolvedValue({
         credentialId: mockCredentialId,
         toolKey: mockToolKey,
+        orgId: mockOrgId,
       });
 
       await controller.handleCallback(mockParams, mockQuery, mockResponse);
@@ -297,6 +299,7 @@ describe('OAuthController', () => {
       oauthService.handleCallback.mockResolvedValue({
         credentialId: mockCredentialId,
         toolKey: mockToolKey,
+        orgId: mockOrgId,
       });
 
       await controller.handleCallback(
@@ -334,6 +337,7 @@ describe('OAuthController', () => {
       oauthService.handleCallback.mockResolvedValue({
         credentialId: mockCredentialId,
         toolKey: mockToolKey,
+        orgId: mockOrgId,
       });
 
       await controller.handleCallback(

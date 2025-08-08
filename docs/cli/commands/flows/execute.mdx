@@ -1,0 +1,641 @@
+---
+title: "tolstoy flows execute"
+description: "Execute workflows from the command line with input validation, real-time monitoring, and comprehensive result tracking."
+---
+
+# tolstoy flows execute
+
+Execute a workflow from the command line with support for input validation, real-time progress monitoring, and detailed execution tracking.
+
+## Synopsis
+
+```bash
+tolstoy flows execute <FLOW_ID> [flags]
+```
+
+## Description
+
+The `execute` command allows you to run workflows directly from the command line, making it perfect for automation, testing, and integration with CI/CD pipelines. It supports both synchronous and asynchronous execution modes with comprehensive monitoring and result reporting.
+
+## Arguments
+
+| Argument | Description |
+|----------|-------------|
+| `FLOW_ID` | **Required.** The unique identifier or name of the flow to execute |
+
+## Flags
+
+### Input Options
+
+| Flag | Short | Type | Description |
+|------|-------|------|-------------|
+| `--input` | `-i` | string | JSON string containing input parameters |
+| `--input-file` | | path | Path to JSON file containing input parameters |
+| `--stdin` | | boolean | Read input parameters from stdin |
+| `--env-vars` | | boolean | Include environment variables as inputs |
+
+### Execution Mode
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--sync` | `-s` | boolean | false | Execute synchronously (wait for completion) |
+| `--async` | `-a` | boolean | true | Execute asynchronously (return immediately) |
+| `--timeout` | `-t` | duration | 5m | Maximum execution time (sync mode only) |
+| `--poll` | | boolean | false | Poll for completion in async mode |
+| `--poll-interval` | | duration | 2s | Polling interval for status checks |
+
+### Output Options
+
+| Flag | Short | Type | Default | Description |
+|------|-------|------|---------|-------------|
+| `--output` | `-o` | string | table | Output format: table, json, yaml, csv |
+| `--quiet` | `-q` | boolean | false | Suppress progress output |
+| `--verbose` | `-v` | boolean | false | Show detailed execution information |
+| `--show-steps` | | boolean | true | Display step-by-step progress |
+| `--show-inputs` | | boolean | false | Display input parameters |
+| `--show-outputs` | | boolean | true | Display execution outputs |
+
+### Advanced Options
+
+| Flag | Short | Type | Description |
+|------|-------|------|-------------|
+| `--priority` | | string | Execution priority: low, normal, high, critical |
+| `--tags` | | strings | Add tags to the execution |
+| `--dry-run` | | boolean | Validate inputs without executing |
+| `--profile` | | boolean | Enable performance profiling |
+| `--trace` | | string | Set trace ID for debugging |
+| `--save-results` | | path | Save execution results to file |
+
+## Examples
+
+### Basic Execution
+
+<CodeGroup>
+```bash Simple Execution
+# Execute a flow with basic inputs
+tolstoy flows execute user-onboarding \
+  --input '{"email": "user@example.com", "name": "John Doe"}'
+```
+
+```bash Using Input File
+# Create input file
+cat > inputs.json << EOF
+{
+  "email": "user@example.com",
+  "name": "John Doe",
+  "company": "Acme Corp",
+  "source": "cli-execution"
+}
+EOF
+
+# Execute with input file
+tolstoy flows execute user-onboarding --input-file inputs.json
+```
+
+```bash Environment Variables as Inputs
+# Set environment variables
+export USER_EMAIL="user@example.com"
+export USER_NAME="John Doe"
+export COMPANY_NAME="Acme Corp"
+
+# Execute using environment variables
+tolstoy flows execute user-onboarding \
+  --env-vars \
+  --input '{"email": "${USER_EMAIL}", "name": "${USER_NAME}", "company": "${COMPANY_NAME}"}'
+```
+</CodeGroup>
+
+### Execution Modes
+
+<CodeGroup>
+```bash Synchronous Execution
+# Wait for completion (up to 10 minutes)
+tolstoy flows execute data-processing \
+  --sync \
+  --timeout 10m \
+  --input-file batch-data.json \
+  --verbose
+```
+
+```bash Asynchronous with Polling
+# Start async and monitor progress
+tolstoy flows execute long-running-process \
+  --async \
+  --poll \
+  --poll-interval 5s \
+  --input '{"dataset": "large-dataset.csv"}'
+```
+
+```bash Background Execution
+# Execute in background (fire-and-forget)
+tolstoy flows execute notification-sender \
+  --async \
+  --quiet \
+  --input '{"recipients": ["team@company.com"], "message": "Deployment complete"}'
+```
+</CodeGroup>
+
+### Output Formats
+
+<CodeGroup>
+```bash JSON Output
+tolstoy flows execute user-onboarding \
+  --input '{"email": "user@example.com"}' \
+  --output json \
+  --save-results results.json
+```
+
+```bash Table Output (Default)
+tolstoy flows execute user-onboarding \
+  --input '{"email": "user@example.com"}' \
+  --output table \
+  --show-steps \
+  --show-outputs
+```
+
+```bash CSV Output for Automation
+tolstoy flows execute batch-processor \
+  --input-file batch-inputs.json \
+  --output csv \
+  --quiet > execution-results.csv
+```
+</CodeGroup>
+
+### Advanced Usage
+
+<CodeGroup>
+```bash High-Priority Execution
+tolstoy flows execute critical-alert \
+  --input '{"alert_level": "high", "message": "System down"}' \
+  --priority critical \
+  --sync \
+  --timeout 30s \
+  --tags emergency,production
+```
+
+```bash Dry Run Validation
+# Validate inputs without executing
+tolstoy flows execute complex-workflow \
+  --input-file complex-inputs.json \
+  --dry-run \
+  --verbose
+```
+
+```bash Performance Profiling
+tolstoy flows execute performance-test \
+  --input '{"iterations": 1000}' \
+  --profile \
+  --trace perf-test-001 \
+  --save-results performance-results.json
+```
+</CodeGroup>
+
+## Output Examples
+
+### Table Output (Default)
+
+```
+🚀 Executing Flow: User Onboarding Flow (flow_abc123def456)
+
+📋 Execution Details:
+┌─────────────────────┬──────────────────────────────────┐
+│ Field               │ Value                            │
+├─────────────────────┼──────────────────────────────────┤
+│ Execution ID        │ exec_xyz789abc123                │
+│ Flow Version        │ 3                                │
+│ Mode               │ Synchronous                      │
+│ Priority           │ Normal                           │
+│ Started At         │ 2024-01-20 10:30:00 UTC         │
+└─────────────────────┴──────────────────────────────────┘
+
+📝 Input Parameters:
+┌─────────────┬────────────────────────────────┐
+│ Parameter   │ Value                          │
+├─────────────┼────────────────────────────────┤
+│ email       │ user@example.com               │
+│ name        │ John Doe                       │
+│ company     │ Acme Corp                      │
+└─────────────┴────────────────────────────────┘
+
+⏳ Execution Progress:
+┌────┬─────────────────────────────┬──────────┬──────────┬──────────────┐
+│ #  │ Step Name                   │ Status   │ Duration │ Details      │
+├────┼─────────────────────────────┼──────────┼──────────┼──────────────┤
+│ 1  │ Validate Email Address      │ ✅ Done  │ 4.2s     │ Valid email  │
+│ 2  │ Create CRM Contact          │ 🏃 Run   │ -        │ In progress  │
+│ 3  │ Send Welcome Email          │ ⏳ Wait  │ -        │ Waiting      │
+│ 4  │ Notify Sales Team           │ ⏳ Wait  │ -        │ Waiting      │
+└────┴─────────────────────────────┴──────────┴──────────┴──────────────┘
+
+✅ Execution Completed Successfully!
+
+📤 Outputs:
+┌─────────────────────┬──────────────────────────────────┐
+│ Output              │ Value                            │
+├─────────────────────┼──────────────────────────────────┤
+│ crm_contact_id      │ contact_sf_abc123                │
+│ email_sent          │ true                             │
+│ welcome_email_id    │ email_sg_def456                  │
+│ onboarding_complete │ true                             │
+└─────────────────────┴──────────────────────────────────┘
+
+⚡ Performance Summary:
+┌─────────────────────┬──────────────────────────────────┐
+│ Metric              │ Value                            │
+├─────────────────────┼──────────────────────────────────┤
+│ Total Duration      │ 42.15s                           │
+│ Network Time        │ 39.8s (94.4%)                   │
+│ Processing Time     │ 2.15s (5.1%)                    │
+│ Steps Completed     │ 4/4                              │
+│ Success Rate        │ 100%                             │
+└─────────────────────┴──────────────────────────────────┘
+```
+
+### JSON Output
+
+```json
+{
+  "execution_id": "exec_xyz789abc123",
+  "flow_id": "flow_abc123def456",
+  "flow_name": "User Onboarding Flow",
+  "status": "completed",
+  "mode": "sync",
+  "started_at": "2024-01-20T10:30:00Z",
+  "completed_at": "2024-01-20T10:30:42Z",
+  "duration_ms": 42150,
+  "inputs": {
+    "email": "user@example.com",
+    "name": "John Doe",
+    "company": "Acme Corp"
+  },
+  "outputs": {
+    "crm_contact_id": "contact_sf_abc123",
+    "email_sent": true,
+    "welcome_email_id": "email_sg_def456",
+    "onboarding_complete": true
+  },
+  "steps": [
+    {
+      "key": "validate-email",
+      "name": "Validate Email Address",
+      "status": "completed",
+      "duration_ms": 4200,
+      "outputs": {
+        "valid": true,
+        "domain": "example.com"
+      }
+    },
+    {
+      "key": "create-crm-contact",
+      "name": "Create CRM Contact",
+      "status": "completed", 
+      "duration_ms": 13100,
+      "outputs": {
+        "id": "contact_sf_abc123",
+        "success": true
+      }
+    }
+  ],
+  "performance": {
+    "total_duration_ms": 42150,
+    "network_time_ms": 39800,
+    "processing_time_ms": 2150,
+    "success_rate": 1.0
+  }
+}
+```
+
+### Error Output
+
+```
+❌ Execution Failed: User Onboarding Flow (exec_def789ghi012)
+
+📋 Execution Details:
+┌─────────────────────┬──────────────────────────────────┐
+│ Field               │ Value                            │
+├─────────────────────┼──────────────────────────────────┤
+│ Execution ID        │ exec_def789ghi012                │
+│ Started At         │ 2024-01-20 11:00:00 UTC         │
+│ Failed At          │ 2024-01-20 11:00:15 UTC         │
+│ Duration           │ 15.3s                            │
+│ Failed Step        │ Send Welcome Email               │
+└─────────────────────┴──────────────────────────────────┘
+
+💥 Error Details:
+Step 'send-welcome-email' failed after 3 retry attempts
+→ EMAIL_DELIVERY_FAILED: Email delivery failed: Invalid recipient domain
+→ Provider Error: Domain 'nonexistent.com' does not have valid MX records
+
+📋 Step Results:
+┌────┬─────────────────────────────┬──────────┬──────────┬──────────────────┐
+│ #  │ Step Name                   │ Status   │ Duration │ Error            │
+├────┼─────────────────────────────┼──────────┼──────────┼──────────────────┤
+│ 1  │ Validate Email Address      │ ✅ Done  │ 4.1s     │ -                │
+│ 2  │ Create CRM Contact          │ ⏭️ Skip  │ -        │ Condition failed │
+│ 3  │ Send Welcome Email          │ ❌ Fail  │ 10.2s    │ Invalid domain   │
+│ 4  │ Notify Sales Team           │ ⏭️ Skip  │ -        │ Previous failed  │
+└────┴─────────────────────────────┴──────────┴──────────┴──────────────────┘
+
+💡 Suggestions:
+• Validate email domain before attempting to send emails
+• Consider using a different email provider for better deliverability
+• Add email validation step earlier in the workflow
+• Check your email provider configuration
+
+Exit Code: 1
+```
+
+## Integration Examples
+
+### CI/CD Pipeline Integration
+
+<CodeGroup>
+```yaml GitHub Actions
+name: Deploy and Test Workflow
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Install Tolstoy CLI
+        run: |
+          curl -sSL https://get.tolstoy.dev | bash
+          echo "$HOME/.tolstoy/bin" >> $GITHUB_PATH
+      
+      - name: Configure Tolstoy
+        run: |
+          tolstoy config set org-id ${{ secrets.TOLSTOY_ORG_ID }}
+          tolstoy config set user-id ${{ secrets.TOLSTOY_USER_ID }}
+          tolstoy config set api-key ${{ secrets.TOLSTOY_API_KEY }}
+      
+      - name: Run Integration Tests
+        run: |
+          # Test user onboarding flow
+          tolstoy flows execute integration-test \
+            --input '{"test_type": "user_onboarding", "environment": "staging"}' \
+            --sync \
+            --timeout 10m \
+            --output json \
+            --save-results test-results.json
+          
+          # Check if test passed
+          if [ $? -eq 0 ]; then
+            echo "✅ Integration tests passed"
+          else
+            echo "❌ Integration tests failed"
+            exit 1
+          fi
+      
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: test-results
+          path: test-results.json
+```
+
+```dockerfile Docker Container
+FROM alpine:latest
+
+# Install Tolstoy CLI
+RUN apk add --no-cache curl bash \
+    && curl -sSL https://get.tolstoy.dev | bash \
+    && mv /root/.tolstoy/bin/tolstoy /usr/local/bin/
+
+# Copy workflow execution script
+COPY execute-workflow.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/execute-workflow.sh
+
+# Default command
+CMD ["execute-workflow.sh"]
+```
+
+```bash Shell Script (execute-workflow.sh)
+#!/bin/bash
+
+set -e
+
+# Configuration
+FLOW_ID=${FLOW_ID:-"default-workflow"}
+INPUT_FILE=${INPUT_FILE:-"/data/input.json"}
+OUTPUT_DIR=${OUTPUT_DIR:-"/data/output"}
+
+echo "🚀 Starting workflow execution..."
+echo "Flow ID: $FLOW_ID"
+echo "Input File: $INPUT_FILE"
+echo "Output Directory: $OUTPUT_DIR"
+
+# Create output directory
+mkdir -p "$OUTPUT_DIR"
+
+# Execute workflow
+tolstoy flows execute "$FLOW_ID" \
+  --input-file "$INPUT_FILE" \
+  --sync \
+  --timeout 30m \
+  --output json \
+  --save-results "$OUTPUT_DIR/execution-result.json" \
+  --verbose
+
+# Check execution result
+EXECUTION_STATUS=$(jq -r '.status' "$OUTPUT_DIR/execution-result.json")
+
+if [ "$EXECUTION_STATUS" = "completed" ]; then
+  echo "✅ Workflow completed successfully"
+  
+  # Extract outputs to separate file
+  jq '.outputs' "$OUTPUT_DIR/execution-result.json" > "$OUTPUT_DIR/outputs.json"
+  
+  echo "📤 Outputs saved to: $OUTPUT_DIR/outputs.json"
+  exit 0
+else
+  echo "❌ Workflow failed with status: $EXECUTION_STATUS"
+  
+  # Extract error details
+  jq '.error' "$OUTPUT_DIR/execution-result.json" > "$OUTPUT_DIR/error.json"
+  
+  echo "💥 Error details saved to: $OUTPUT_DIR/error.json"
+  exit 1
+fi
+```
+</CodeGroup>
+
+### Automation Scripts
+
+<CodeGroup>
+```bash Daily Report Generation
+#!/bin/bash
+
+# Daily report generation script
+# Usage: ./generate-daily-report.sh [date]
+
+REPORT_DATE=${1:-$(date +%Y-%m-%d)}
+OUTPUT_DIR="/reports/daily"
+
+echo "📊 Generating daily report for: $REPORT_DATE"
+
+# Prepare input data
+cat > /tmp/report-input.json << EOF
+{
+  "date": "$REPORT_DATE",
+  "report_type": "daily_summary",
+  "include_charts": true,
+  "email_recipients": [
+    "management@company.com",
+    "analytics@company.com"
+  ],
+  "formats": ["pdf", "excel"]
+}
+EOF
+
+# Execute report generation workflow
+tolstoy flows execute daily-report-generator \
+  --input-file /tmp/report-input.json \
+  --sync \
+  --timeout 15m \
+  --priority high \
+  --tags "reporting,daily,automated" \
+  --output json \
+  --save-results "$OUTPUT_DIR/report-$REPORT_DATE.json"
+
+if [ $? -eq 0 ]; then
+  echo "✅ Daily report generated successfully"
+  
+  # Extract report URLs
+  REPORT_URLS=$(jq -r '.outputs.report_urls[]' "$OUTPUT_DIR/report-$REPORT_DATE.json")
+  
+  echo "📊 Report URLs:"
+  echo "$REPORT_URLS"
+else
+  echo "❌ Failed to generate daily report"
+  exit 1
+fi
+
+# Cleanup
+rm -f /tmp/report-input.json
+```
+
+```python Python Integration
+#!/usr/bin/env python3
+import subprocess
+import json
+import sys
+from datetime import datetime
+
+def execute_workflow(flow_id, inputs, timeout='5m'):
+    """Execute a Tolstoy workflow from Python"""
+    
+    # Prepare command
+    cmd = [
+        'tolstoy', 'flows', 'execute', flow_id,
+        '--input', json.dumps(inputs),
+        '--sync',
+        '--timeout', timeout,
+        '--output', 'json',
+        '--quiet'
+    ]
+    
+    try:
+        # Execute workflow
+        result = subprocess.run(
+            cmd, 
+            capture_output=True, 
+            text=True, 
+            check=True
+        )
+        
+        # Parse result
+        execution_data = json.loads(result.stdout)
+        
+        return {
+            'success': True,
+            'execution_id': execution_data['execution_id'],
+            'outputs': execution_data.get('outputs', {}),
+            'duration_ms': execution_data.get('duration_ms', 0)
+        }
+        
+    except subprocess.CalledProcessError as e:
+        # Parse error details
+        try:
+            error_data = json.loads(e.stderr)
+            error_message = error_data.get('error', {}).get('message', str(e))
+        except json.JSONDecodeError:
+            error_message = e.stderr or str(e)
+        
+        return {
+            'success': False,
+            'error': error_message,
+            'exit_code': e.returncode
+        }
+
+# Example usage
+if __name__ == '__main__':
+    # Execute user onboarding workflow
+    result = execute_workflow('user-onboarding', {
+        'email': 'new-user@example.com',
+        'name': 'New User',
+        'source': 'python-script'
+    })
+    
+    if result['success']:
+        print(f"✅ Workflow completed in {result['duration_ms']}ms")
+        print(f"CRM Contact ID: {result['outputs'].get('crm_contact_id')}")
+        print(f"Email Sent: {result['outputs'].get('email_sent')}")
+    else:
+        print(f"❌ Workflow failed: {result['error']}")
+        sys.exit(result.get('exit_code', 1))
+```
+</CodeGroup>
+
+## Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TOLSTOY_ORG_ID` | Default organization ID | From config |
+| `TOLSTOY_USER_ID` | Default user ID | From config |
+| `TOLSTOY_API_KEY` | API authentication key | From config |
+| `TOLSTOY_API_URL` | API base URL | https://api.tolstoy.com |
+| `TOLSTOY_TIMEOUT` | Default execution timeout | 5m |
+| `TOLSTOY_OUTPUT_FORMAT` | Default output format | table |
+
+## Exit Codes
+
+| Code | Description |
+|------|-------------|
+| 0 | Success - execution completed |
+| 1 | Execution failed |
+| 2 | Input validation failed |
+| 3 | Flow not found |
+| 4 | Timeout exceeded |
+| 5 | Authentication failed |
+| 6 | Network error |
+| 125 | CLI error |
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="tolstoy flows list" icon="list" href="/cli/commands/flows/list">
+    List all available flows
+  </Card>
+  <Card title="tolstoy flows get" icon="search" href="/cli/commands/flows/get">
+    Get detailed flow information
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="tolstoy executions list" icon="history" href="/cli/commands/executions/list">
+    View execution history
+  </Card>
+  <Card title="tolstoy executions logs" icon="file-text" href="/cli/commands/executions/logs">
+    View execution logs
+  </Card>
+</CardGroup>
+
+---
+
+*Use `tolstoy flows execute` to run workflows from the command line with comprehensive monitoring and integration capabilities. Perfect for automation, testing, and CI/CD pipelines.*

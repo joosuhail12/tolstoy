@@ -1,0 +1,516 @@
+---
+title: "SDK Installation"
+description: "Install the Tolstoy TypeScript SDK and start building workflow automation into your applications with type safety and excellent developer experience."
+---
+
+# SDK Installation
+
+The Tolstoy TypeScript SDK provides a type-safe, easy-to-use interface for integrating workflow automation into your Node.js and browser applications.
+
+## Quick Start
+
+### Node.js Installation
+
+<CodeGroup>
+```bash npm
+npm install @joosuhail/tolstoy-sdk
+```
+
+```bash yarn
+yarn add @joosuhail/tolstoy-sdk
+```
+
+```bash pnpm
+pnpm add @joosuhail/tolstoy-sdk
+```
+</CodeGroup>
+
+### Browser Installation
+
+<CodeGroup>
+```bash ESM
+npm install @joosuhail/tolstoy-sdk
+```
+
+```html Script Tag
+<script src="https://cdn.skypack.dev/@joosuhail/tolstoy-sdk"></script>
+```
+
+```html ES Modules
+<script type="module">
+  import { TolstoyClient } from 'https://cdn.skypack.dev/@joosuhail/tolstoy-sdk';
+</script>
+```
+</CodeGroup>
+
+## Basic Setup
+
+### Initialize the Client
+
+<CodeGroup>
+```typescript TypeScript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient({
+  orgId: process.env.TOLSTOY_ORG_ID!,
+  userId: process.env.TOLSTOY_USER_ID!,
+  apiUrl: 'https://tolstoy.getpullse.com' // optional, defaults to this
+});
+```
+
+```javascript JavaScript
+const { TolstoyClient } = require('@joosuhail/tolstoy-sdk');
+
+const client = new TolstoyClient({
+  orgId: process.env.TOLSTOY_ORG_ID,
+  userId: process.env.TOLSTOY_USER_ID,
+  apiUrl: 'https://tolstoy.getpullse.com'
+});
+```
+</CodeGroup>
+
+### Environment Variables
+
+Create a `.env` file in your project root:
+
+```env
+TOLSTOY_ORG_ID=org_1234567890abcdef
+TOLSTOY_USER_ID=user_abcdef1234567890
+TOLSTOY_API_URL=https://tolstoy.getpullse.com
+```
+
+## Configuration Options
+
+### Client Configuration
+
+```typescript
+interface TolstoyClientOptions {
+  orgId: string;           // Your organization ID
+  userId: string;          // Your user ID
+  apiUrl?: string;         // API base URL (optional)
+  timeout?: number;        // Request timeout in milliseconds
+  retries?: number;        // Number of retry attempts
+  retryDelay?: number;     // Delay between retries in milliseconds
+  debug?: boolean;         // Enable debug logging
+}
+
+const client = new TolstoyClient({
+  orgId: 'org_1234567890abcdef',
+  userId: 'user_abcdef1234567890',
+  timeout: 30000,          // 30 seconds
+  retries: 3,              // Retry failed requests 3 times
+  retryDelay: 1000,        // Wait 1 second between retries
+  debug: process.env.NODE_ENV === 'development'
+});
+```
+
+### Advanced Configuration
+
+```typescript
+import { TolstoyClient, RetryStrategy } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient({
+  orgId: process.env.TOLSTOY_ORG_ID!,
+  userId: process.env.TOLSTOY_USER_ID!,
+  
+  // Custom retry strategy
+  retryStrategy: new RetryStrategy({
+    maxAttempts: 5,
+    baseDelay: 1000,
+    maxDelay: 10000,
+    exponentialBackoff: true,
+    jitter: true
+  }),
+  
+  // Custom HTTP client options
+  httpOptions: {
+    headers: {
+      'User-Agent': 'MyApp/1.0.0'
+    },
+    timeout: 60000
+  }
+});
+```
+
+## TypeScript Support
+
+The SDK is built with TypeScript and provides excellent type safety:
+
+### Type Definitions
+
+```typescript
+import { 
+  Flow, 
+  FlowExecution, 
+  Action,
+  Tool,
+  ExecutionStatus 
+} from '@joosuhail/tolstoy-sdk';
+
+// All API responses are properly typed
+const flows: Flow[] = await client.flows.list();
+const execution: FlowExecution = await client.flows.execute('flow_123', {
+  input: { message: 'Hello World' }
+});
+
+// Status is typed as a union of possible values
+const status: ExecutionStatus = execution.status; // 'pending' | 'running' | 'completed' | 'failed'
+```
+
+### Generic Types
+
+```typescript
+// Create type-safe workflow inputs and outputs
+interface WelcomeEmailInputs {
+  customerEmail: string;
+  customerName: string;
+  templateId: string;
+}
+
+interface WelcomeEmailOutputs {
+  emailId: string;
+  deliveryStatus: 'sent' | 'failed';
+  sentAt: string;
+}
+
+const execution = await client.flows.execute<WelcomeEmailInputs, WelcomeEmailOutputs>(
+  'welcome-email-flow',
+  {
+    customerEmail: 'user@example.com',
+    customerName: 'John Doe',
+    templateId: 'welcome-template'
+  }
+);
+
+// Result is properly typed
+const emailId: string = execution.result.emailId;
+```
+
+## Error Handling
+
+The SDK provides comprehensive error handling with typed error classes:
+
+### Error Types
+
+```typescript
+import { 
+  TolstoyApiError,
+  ValidationError,
+  NotFoundError,
+  RateLimitError,
+  AuthenticationError
+} from '@joosuhail/tolstoy-sdk';
+
+try {
+  const flow = await client.flows.get('nonexistent-flow');
+} catch (error) {
+  if (error instanceof NotFoundError) {
+    console.log('Flow not found:', error.message);
+  } else if (error instanceof ValidationError) {
+    console.log('Validation failed:', error.details);
+  } else if (error instanceof RateLimitError) {
+    console.log('Rate limited. Retry after:', error.retryAfter);
+  } else if (error instanceof TolstoyApiError) {
+    console.log('API error:', error.code, error.message);
+  } else {
+    console.log('Unexpected error:', error);
+  }
+}
+```
+
+### Async/Await with Error Handling
+
+```typescript
+async function createAndExecuteFlow() {
+  try {
+    // Create a new flow
+    const flow = await client.flows.create({
+      name: 'My Workflow',
+      steps: [
+        {
+          key: 'step1',
+          action: 'send-email',
+          inputs: {
+            to: 'user@example.com',
+            subject: 'Hello!'
+          }
+        }
+      ]
+    });
+    
+    // Execute the flow
+    const execution = await client.flows.execute(flow.id, {
+      mode: 'async'
+    });
+    
+    // Poll for completion
+    const result = await client.executions.waitForCompletion(execution.id, {
+      timeout: 60000, // 1 minute
+      interval: 1000  // Check every second
+    });
+    
+    console.log('Flow completed:', result);
+    
+  } catch (error) {
+    if (error instanceof RateLimitError) {
+      // Implement backoff strategy
+      console.log(`Rate limited. Waiting ${error.retryAfter} seconds...`);
+      await new Promise(resolve => setTimeout(resolve, error.retryAfter * 1000));
+      return createAndExecuteFlow(); // Retry
+    } else {
+      console.error('Flow execution failed:', error);
+      throw error;
+    }
+  }
+}
+```
+
+## Framework Integrations
+
+### Express.js
+
+```typescript
+import express from 'express';
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const app = express();
+const tolstoy = new TolstoyClient({
+  orgId: process.env.TOLSTOY_ORG_ID!,
+  userId: process.env.TOLSTOY_USER_ID!
+});
+
+app.post('/api/workflows/:id/execute', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const execution = await tolstoy.flows.execute(id, req.body);
+    
+    res.json({
+      success: true,
+      executionId: execution.id,
+      status: execution.status
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+```
+
+### Next.js API Routes
+
+```typescript
+// pages/api/workflows/[id]/execute.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: process.env.TOLSTOY_ORG_ID!,
+  userId: process.env.TOLSTOY_USER_ID!
+});
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  
+  try {
+    const { id } = req.query;
+    const execution = await tolstoy.flows.execute(id as string, req.body);
+    
+    res.json({
+      success: true,
+      execution
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
+```
+
+### React Hook
+
+```typescript
+import { useState, useCallback } from 'react';
+import { TolstoyClient, Flow, FlowExecution } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient({
+  orgId: process.env.REACT_APP_TOLSTOY_ORG_ID!,
+  userId: process.env.REACT_APP_TOLSTOY_USER_ID!
+});
+
+export function useTolstoyFlow(flowId: string) {
+  const [loading, setLoading] = useState(false);
+  const [execution, setExecution] = useState<FlowExecution | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+  
+  const executeFlow = useCallback(async (inputs: any) => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const result = await client.flows.execute(flowId, inputs);
+      setExecution(result);
+      return result;
+    } catch (err) {
+      setError(err as Error);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, [flowId]);
+  
+  return {
+    executeFlow,
+    execution,
+    loading,
+    error
+  };
+}
+
+// Usage in component
+function WorkflowButton() {
+  const { executeFlow, loading, execution, error } = useTolstoyFlow('flow_123');
+  
+  const handleClick = async () => {
+    try {
+      await executeFlow({ message: 'Hello from React!' });
+    } catch (error) {
+      console.error('Execution failed:', error);
+    }
+  };
+  
+  return (
+    <button onClick={handleClick} disabled={loading}>
+      {loading ? 'Executing...' : 'Run Workflow'}
+      {execution && <p>Status: {execution.status}</p>}
+      {error && <p>Error: {error.message}</p>}
+    </button>
+  );
+}
+```
+
+## Testing
+
+### Unit Testing with Jest
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+import { jest } from '@jest/globals';
+
+// Mock the SDK for testing
+jest.mock('@joosuhail/tolstoy-sdk');
+
+const mockTolstoyClient = TolstoyClient as jest.MockedClass<typeof TolstoyClient>;
+
+describe('Workflow Service', () => {
+  let client: jest.Mocked<TolstoyClient>;
+  
+  beforeEach(() => {
+    client = new mockTolstoyClient() as jest.Mocked<TolstoyClient>;
+    client.flows = {
+      execute: jest.fn(),
+      get: jest.fn(),
+      list: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn()
+    } as any;
+  });
+  
+  it('should execute a workflow successfully', async () => {
+    const mockExecution = {
+      id: 'exec_123',
+      status: 'completed',
+      result: { success: true }
+    };
+    
+    client.flows.execute.mockResolvedValue(mockExecution);
+    
+    const result = await client.flows.execute('flow_123', { input: 'test' });
+    
+    expect(result).toEqual(mockExecution);
+    expect(client.flows.execute).toHaveBeenCalledWith('flow_123', { input: 'test' });
+  });
+});
+```
+
+### Integration Testing
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+describe('Tolstoy Integration Tests', () => {
+  let client: TolstoyClient;
+  
+  beforeAll(() => {
+    client = new TolstoyClient({
+      orgId: process.env.TEST_TOLSTOY_ORG_ID!,
+      userId: process.env.TEST_TOLSTOY_USER_ID!,
+      apiUrl: process.env.TEST_TOLSTOY_API_URL || 'http://localhost:3000'
+    });
+  });
+  
+  it('should list flows', async () => {
+    const flows = await client.flows.list();
+    expect(Array.isArray(flows)).toBe(true);
+  });
+  
+  it('should create and execute a simple workflow', async () => {
+    const flow = await client.flows.create({
+      name: 'Test Workflow',
+      steps: [
+        {
+          key: 'log-step',
+          action: 'log-message',
+          inputs: {
+            message: 'Hello from test!'
+          }
+        }
+      ]
+    });
+    
+    const execution = await client.flows.execute(flow.id, {
+      mode: 'sync'
+    });
+    
+    expect(execution.status).toBe('completed');
+    
+    // Clean up
+    await client.flows.delete(flow.id);
+  });
+});
+```
+
+## Next Steps
+
+Now that you have the SDK installed:
+
+<CardGroup cols={2}>
+  <Card title="Authentication Guide" icon="key" href="/sdk/getting-started/authentication">
+    Learn how to properly authenticate with the Tolstoy API
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/sdk/getting-started/quick-start">
+    Create and execute your first workflow with the SDK
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/sdk/resources/flows/overview">
+    Explore all available SDK methods and types
+  </Card>
+  <Card title="Examples" icon="code" href="/sdk/examples/basic-workflow">
+    See practical examples and common patterns
+  </Card>
+</CardGroup>
+
+---
+
+*The Tolstoy TypeScript SDK is now installed and ready to power your workflow automation. Start with authentication and explore the possibilities.*

@@ -1,0 +1,1062 @@
+---
+title: "System Architecture Diagrams"
+description: "Comprehensive visual documentation of Tolstoy's system architecture, data flows, and component interactions with detailed technical diagrams."
+---
+
+# System Architecture Diagrams
+
+This document provides detailed visual representations of Tolstoy's system architecture, including high-level overviews, component interactions, data flows, and deployment architectures.
+
+## High-Level System Architecture
+
+### Overall System Overview
+
+```mermaid
+graph TB
+    subgraph "Client Tier"
+        WEB[Web Dashboard<br/>React SPA]
+        CLI[CLI Tool<br/>Node.js]
+        SDK[TypeScript SDK<br/>npm package]
+        API_CLIENT[External APIs<br/>REST/GraphQL]
+    end
+    
+    subgraph "Edge Tier"
+        CDN[CloudFront CDN<br/>Static Assets]
+        WAF[Web Application Firewall<br/>DDoS Protection]
+        ALB[Application Load Balancer<br/>SSL Termination]
+    end
+    
+    subgraph "API Gateway Tier"
+        GATEWAY[API Gateway Service<br/>NestJS]
+        AUTH_SVC[Authentication Service<br/>JWT + RBAC]
+        RATE_LIMIT[Rate Limiting Service<br/>Redis-based]
+        METRICS[Metrics Collection<br/>Prometheus]
+    end
+    
+    subgraph "Application Tier"
+        FLOW_ENGINE[Flow Engine<br/>Orchestration Logic]
+        ACTION_REGISTRY[Action Registry<br/>Plugin System]
+        TOOL_MGR[Tool Manager<br/>Integration Hub]
+        EXECUTION_SVC[Execution Service<br/>Async Processing]
+        WEBHOOK_SVC[Webhook Service<br/>Event Handling]
+        NOTIFICATION_SVC[Notification Service<br/>Multi-channel]
+    end
+    
+    subgraph "Data Tier"
+        PRIMARY_DB[(Primary Database<br/>PostgreSQL)]
+        READ_REPLICAS[(Read Replicas<br/>PostgreSQL)]
+        CACHE_CLUSTER[Cache Cluster<br/>Redis]
+        QUEUE_SYSTEM[Message Queue<br/>Inngest)]
+        SEARCH_ENGINE[Search Engine<br/>Elasticsearch]
+        BLOB_STORAGE[Blob Storage<br/>AWS S3]
+    end
+    
+    subgraph "External Services"
+        SECRETS_MGR[AWS Secrets Manager]
+        MONITORING[CloudWatch + DataDog]
+        EMAIL_PROVIDER[SendGrid/SES]
+        SMS_PROVIDER[Twilio]
+        SLACK_API[Slack API]
+        CRM_APIS[CRM APIs<br/>Salesforce, HubSpot]
+    end
+    
+    %% Client connections
+    WEB --> CDN
+    CLI --> ALB
+    SDK --> ALB
+    API_CLIENT --> ALB
+    
+    %% Edge tier flow
+    CDN --> ALB
+    ALB --> WAF
+    WAF --> GATEWAY
+    
+    %% API Gateway connections
+    GATEWAY --> AUTH_SVC
+    GATEWAY --> RATE_LIMIT
+    GATEWAY --> METRICS
+    GATEWAY --> FLOW_ENGINE
+    GATEWAY --> ACTION_REGISTRY
+    GATEWAY --> TOOL_MGR
+    
+    %% Application tier connections
+    FLOW_ENGINE --> EXECUTION_SVC
+    FLOW_ENGINE --> ACTION_REGISTRY
+    EXECUTION_SVC --> QUEUE_SYSTEM
+    EXECUTION_SVC --> WEBHOOK_SVC
+    EXECUTION_SVC --> NOTIFICATION_SVC
+    ACTION_REGISTRY --> TOOL_MGR
+    
+    %% Data connections
+    FLOW_ENGINE --> PRIMARY_DB
+    ACTION_REGISTRY --> PRIMARY_DB
+    TOOL_MGR --> PRIMARY_DB
+    EXECUTION_SVC --> PRIMARY_DB
+    
+    GATEWAY --> READ_REPLICAS
+    FLOW_ENGINE --> CACHE_CLUSTER
+    RATE_LIMIT --> CACHE_CLUSTER
+    
+    EXECUTION_SVC --> SEARCH_ENGINE
+    FLOW_ENGINE --> BLOB_STORAGE
+    
+    %% External service connections
+    TOOL_MGR --> SECRETS_MGR
+    NOTIFICATION_SVC --> EMAIL_PROVIDER
+    NOTIFICATION_SVC --> SMS_PROVIDER
+    TOOL_MGR --> SLACK_API
+    TOOL_MGR --> CRM_APIS
+    
+    METRICS --> MONITORING
+    
+    %% Styling
+    classDef client fill:#e1f5fe
+    classDef edge fill:#f3e5f5
+    classDef gateway fill:#e8f5e8
+    classDef app fill:#fff3e0
+    classDef data fill:#fce4ec
+    classDef external fill:#f5f5f5
+    
+    class WEB,CLI,SDK,API_CLIENT client
+    class CDN,WAF,ALB edge
+    class GATEWAY,AUTH_SVC,RATE_LIMIT,METRICS gateway
+    class FLOW_ENGINE,ACTION_REGISTRY,TOOL_MGR,EXECUTION_SVC,WEBHOOK_SVC,NOTIFICATION_SVC app
+    class PRIMARY_DB,READ_REPLICAS,CACHE_CLUSTER,QUEUE_SYSTEM,SEARCH_ENGINE,BLOB_STORAGE data
+    class SECRETS_MGR,MONITORING,EMAIL_PROVIDER,SMS_PROVIDER,SLACK_API,CRM_APIS external
+```
+
+### Microservices Architecture
+
+```mermaid
+graph TB
+    subgraph "API Gateway Layer"
+        GW[API Gateway<br/>Port 3000]
+    end
+    
+    subgraph "Core Services"
+        FLOW[Flow Service<br/>Port 3001]
+        ACTION[Action Service<br/>Port 3002]
+        TOOL[Tool Service<br/>Port 3003]
+        EXEC[Execution Service<br/>Port 3004]
+        USER[User Service<br/>Port 3005]
+        ORG[Organization Service<br/>Port 3006]
+    end
+    
+    subgraph "Supporting Services"
+        AUTH[Auth Service<br/>Port 3010]
+        WEBHOOK[Webhook Service<br/>Port 3011]
+        NOTIFICATION[Notification Service<br/>Port 3012]
+        METRICS[Metrics Service<br/>Port 3013]
+        SEARCH[Search Service<br/>Port 3014]
+    end
+    
+    subgraph "Infrastructure Services"
+        CACHE[Cache Service<br/>Redis Adapter]
+        QUEUE[Queue Service<br/>Inngest Adapter]
+        SECRET[Secret Service<br/>AWS Adapter]
+        STORAGE[Storage Service<br/>S3 Adapter]
+    end
+    
+    subgraph "Data Layer"
+        DB_FLOW[(Flow DB<br/>flows schema)]
+        DB_USER[(User DB<br/>users schema)]
+        DB_EXEC[(Execution DB<br/>executions schema)]
+        DB_LOGS[(Logs DB<br/>logs schema)]
+    end
+    
+    %% Gateway routing
+    GW --> FLOW
+    GW --> ACTION
+    GW --> TOOL
+    GW --> EXEC
+    GW --> USER
+    GW --> ORG
+    
+    %% Service dependencies
+    FLOW --> ACTION
+    FLOW --> TOOL
+    EXEC --> FLOW
+    EXEC --> ACTION
+    EXEC --> TOOL
+    
+    %% Supporting service connections
+    GW --> AUTH
+    EXEC --> WEBHOOK
+    EXEC --> NOTIFICATION
+    FLOW --> METRICS
+    EXEC --> METRICS
+    USER --> SEARCH
+    FLOW --> SEARCH
+    
+    %% Infrastructure connections
+    FLOW --> CACHE
+    EXEC --> QUEUE
+    TOOL --> SECRET
+    FLOW --> STORAGE
+    
+    %% Database connections
+    FLOW --> DB_FLOW
+    USER --> DB_USER
+    ORG --> DB_USER
+    EXEC --> DB_EXEC
+    WEBHOOK --> DB_LOGS
+    NOTIFICATION --> DB_LOGS
+    
+    %% Styling
+    classDef gateway fill:#e3f2fd
+    classDef core fill:#e8f5e8
+    classDef support fill:#fff3e0
+    classDef infra fill:#f3e5f5
+    classDef data fill:#fce4ec
+    
+    class GW gateway
+    class FLOW,ACTION,TOOL,EXEC,USER,ORG core
+    class AUTH,WEBHOOK,NOTIFICATION,METRICS,SEARCH support
+    class CACHE,QUEUE,SECRET,STORAGE infra
+    class DB_FLOW,DB_USER,DB_EXEC,DB_LOGS data
+```
+
+## Data Flow Diagrams
+
+### Flow Execution Data Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gateway
+    participant FlowEngine
+    participant ActionRegistry
+    participant ToolManager
+    participant ExecutionService
+    participant Queue
+    participant Database
+    participant ExternalAPI
+    
+    Note over Client,ExternalAPI: Flow Execution Request
+    Client->>Gateway: POST /flows/{id}/execute
+    Gateway->>Gateway: Authenticate & Authorize
+    Gateway->>FlowEngine: Execute Flow Request
+    
+    Note over FlowEngine,Database: Flow Definition Retrieval
+    FlowEngine->>Database: Get Flow Definition
+    Database-->>FlowEngine: Flow Definition + Metadata
+    
+    Note over FlowEngine,ExecutionService: Execution Initialization
+    FlowEngine->>ExecutionService: Create Execution Record
+    ExecutionService->>Database: INSERT execution
+    Database-->>ExecutionService: Execution ID
+    ExecutionService-->>FlowEngine: Execution Context
+    
+    Note over FlowEngine,Queue: Async Processing Setup
+    FlowEngine->>Queue: Enqueue Execution Job
+    Queue-->>FlowEngine: Job Queued
+    FlowEngine-->>Gateway: Execution Started
+    Gateway-->>Client: 202 Accepted + Execution ID
+    
+    Note over Queue,ExternalAPI: Async Execution Processing
+    Queue->>ExecutionService: Process Execution Job
+    
+    loop For Each Step
+        ExecutionService->>FlowEngine: Execute Step
+        FlowEngine->>ActionRegistry: Get Action Definition
+        ActionRegistry-->>FlowEngine: Action Schema + Handler
+        
+        FlowEngine->>ToolManager: Get Tool Connection
+        ToolManager->>Database: Get Tool Credentials
+        Database-->>ToolManager: Encrypted Credentials
+        ToolManager-->>FlowEngine: Tool Connection
+        
+        FlowEngine->>ExternalAPI: Execute Action
+        ExternalAPI-->>FlowEngine: Action Result
+        
+        FlowEngine->>Database: Update Step Status
+        Database-->>FlowEngine: Status Updated
+    end
+    
+    Note over ExecutionService,Database: Execution Completion
+    ExecutionService->>Database: Update Execution Status
+    ExecutionService->>Queue: Publish Completion Event
+    Database-->>ExecutionService: Execution Complete
+```
+
+### Authentication & Authorization Flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gateway
+    participant AuthService
+    participant Database
+    participant Cache
+    participant JWTService
+    
+    Note over Client,JWTService: Authentication Request
+    Client->>Gateway: Request with API Key
+    Gateway->>AuthService: Validate API Key
+    
+    Note over AuthService,Cache: Cache Check
+    AuthService->>Cache: Check Cached Session
+    
+    alt Cache Hit
+        Cache-->>AuthService: Cached User Session
+    else Cache Miss
+        AuthService->>Database: Validate API Key
+        Database-->>AuthService: User + Organization Data
+        AuthService->>Cache: Cache Session Data
+    end
+    
+    Note over AuthService,JWTService: Authorization Check
+    AuthService->>Database: Get User Permissions
+    Database-->>AuthService: Role + Permissions
+    
+    AuthService->>JWTService: Generate Access Token
+    JWTService-->>AuthService: Signed JWT
+    
+    AuthService-->>Gateway: Authentication Context
+    Gateway->>Gateway: Set Request Context
+    Gateway->>Gateway: Check Resource Permissions
+    
+    alt Authorized
+        Gateway-->>Client: Continue to Requested Resource
+    else Unauthorized
+        Gateway-->>Client: 403 Forbidden
+    end
+```
+
+### Multi-Tenant Data Isolation
+
+```mermaid
+graph TB
+    subgraph "Request Processing"
+        REQ[Incoming Request<br/>x-org-id: org_123]
+        GATEWAY[API Gateway]
+        TENANT_CTX[Tenant Context<br/>Middleware]
+    end
+    
+    subgraph "Application Layer"
+        SERVICE[Business Service]
+        TENANT_GUARD[Tenant Guard<br/>Decorator]
+        QUERY_BUILDER[Query Builder]
+    end
+    
+    subgraph "Data Access Layer"
+        REPO[Repository Layer]
+        RLS_FILTER[Row Level Security<br/>Filter]
+        CONN_POOL[Connection Pool<br/>per Tenant]
+    end
+    
+    subgraph "Database Layer"
+        POSTGRES[(PostgreSQL<br/>with RLS)]
+        TENANT_POLICY[Tenant Isolation<br/>Policies]
+    end
+    
+    REQ --> GATEWAY
+    GATEWAY --> TENANT_CTX
+    TENANT_CTX --> SERVICE
+    SERVICE --> TENANT_GUARD
+    TENANT_GUARD --> QUERY_BUILDER
+    QUERY_BUILDER --> REPO
+    REPO --> RLS_FILTER
+    RLS_FILTER --> CONN_POOL
+    CONN_POOL --> POSTGRES
+    POSTGRES --> TENANT_POLICY
+    
+    %% Data flow annotations
+    REQ -.->|org_123| TENANT_CTX
+    TENANT_CTX -.->|Set Context| SERVICE
+    TENANT_GUARD -.->|Validate Access| QUERY_BUILDER
+    RLS_FILTER -.->|WHERE org_id = 'org_123'| POSTGRES
+    TENANT_POLICY -.->|Enforce Isolation| POSTGRES
+```
+
+## Component Interaction Diagrams
+
+### Flow Engine Internal Architecture
+
+```mermaid
+graph TB
+    subgraph "Flow Engine Core"
+        PARSER[Definition Parser<br/>JSON Schema Validation]
+        VALIDATOR[Flow Validator<br/>Dependency Checking]
+        EXECUTOR[Step Executor<br/>Orchestration Logic]
+        STATE_MGR[State Manager<br/>Execution Context]
+    end
+    
+    subgraph "Execution Components"
+        CONDITION_EVAL[Condition Evaluator<br/>Expression Engine]
+        VARIABLE_RESOLVER[Variable Resolver<br/>Template System]
+        ERROR_HANDLER[Error Handler<br/>Retry Logic]
+        PARALLEL_EXEC[Parallel Executor<br/>Concurrent Steps]
+    end
+    
+    subgraph "Integration Layer"
+        ACTION_PROXY[Action Proxy<br/>Plugin Interface]
+        TOOL_CONNECTOR[Tool Connector<br/>External APIs]
+        CACHE_MGR[Cache Manager<br/>Performance Optimization]
+        METRICS_COL[Metrics Collector<br/>Performance Tracking]
+    end
+    
+    subgraph "Storage Layer"
+        EXEC_STORE[Execution Store<br/>PostgreSQL]
+        STATE_CACHE[State Cache<br/>Redis]
+        RESULT_STORE[Result Store<br/>S3 + PostgreSQL]
+    end
+    
+    %% Core component interactions
+    PARSER --> VALIDATOR
+    VALIDATOR --> EXECUTOR
+    EXECUTOR --> STATE_MGR
+    
+    %% Execution component interactions
+    EXECUTOR --> CONDITION_EVAL
+    EXECUTOR --> VARIABLE_RESOLVER
+    EXECUTOR --> ERROR_HANDLER
+    EXECUTOR --> PARALLEL_EXEC
+    
+    %% Integration interactions
+    EXECUTOR --> ACTION_PROXY
+    ACTION_PROXY --> TOOL_CONNECTOR
+    EXECUTOR --> CACHE_MGR
+    EXECUTOR --> METRICS_COL
+    
+    %% Storage interactions
+    STATE_MGR --> EXEC_STORE
+    STATE_MGR --> STATE_CACHE
+    EXECUTOR --> RESULT_STORE
+    CACHE_MGR --> STATE_CACHE
+    
+    %% Data flow annotations
+    CONDITION_EVAL -.->|Boolean Results| EXECUTOR
+    VARIABLE_RESOLVER -.->|Resolved Values| EXECUTOR
+    ERROR_HANDLER -.->|Retry Decisions| EXECUTOR
+    PARALLEL_EXEC -.->|Concurrent Results| EXECUTOR
+```
+
+### Action Registry System
+
+```mermaid
+graph TB
+    subgraph "Action Definition Layer"
+        SCHEMA_DEF[Action Schema<br/>Input/Output Definition]
+        CODE_DEF[Action Code<br/>Implementation Logic]
+        META_DEF[Metadata<br/>Documentation + Config]
+    end
+    
+    subgraph "Registry Core"
+        REGISTRY[Action Registry<br/>Central Repository]
+        VERSION_MGR[Version Manager<br/>Semantic Versioning]
+        DEPENDENCY_RESOLVER[Dependency Resolver<br/>Action Dependencies]
+    end
+    
+    subgraph "Runtime Components"
+        LOADER[Dynamic Loader<br/>Code Loading]
+        SANDBOX[Execution Sandbox<br/>Isolated Environment]
+        VALIDATOR[Input Validator<br/>Schema Validation]
+        EXECUTOR[Action Executor<br/>Runtime Engine]
+    end
+    
+    subgraph "Plugin System"
+        BUILTIN_ACTIONS[Built-in Actions<br/>Core Library]
+        CUSTOM_ACTIONS[Custom Actions<br/>User Code]
+        INTEGRATION_ACTIONS[Integration Actions<br/>3rd Party APIs]
+    end
+    
+    subgraph "Storage & Cache"
+        ACTION_DB[(Action Database<br/>PostgreSQL)]
+        CODE_CACHE[Code Cache<br/>Redis]
+        RESULT_CACHE[Result Cache<br/>Redis)]
+    end
+    
+    %% Definition to registry
+    SCHEMA_DEF --> REGISTRY
+    CODE_DEF --> REGISTRY
+    META_DEF --> REGISTRY
+    
+    %% Registry core interactions
+    REGISTRY --> VERSION_MGR
+    REGISTRY --> DEPENDENCY_RESOLVER
+    VERSION_MGR --> DEPENDENCY_RESOLVER
+    
+    %% Runtime interactions
+    REGISTRY --> LOADER
+    LOADER --> SANDBOX
+    SANDBOX --> VALIDATOR
+    VALIDATOR --> EXECUTOR
+    
+    %% Plugin system
+    BUILTIN_ACTIONS --> REGISTRY
+    CUSTOM_ACTIONS --> REGISTRY
+    INTEGRATION_ACTIONS --> REGISTRY
+    
+    %% Storage interactions
+    REGISTRY --> ACTION_DB
+    LOADER --> CODE_CACHE
+    EXECUTOR --> RESULT_CACHE
+    
+    %% Execution flow
+    EXECUTOR -.->|Results| RESULT_CACHE
+    CODE_CACHE -.->|Cached Code| SANDBOX
+    DEPENDENCY_RESOLVER -.->|Resolved Deps| LOADER
+```
+
+## Deployment Architecture
+
+### AWS Infrastructure Diagram
+
+```mermaid
+graph TB
+    subgraph "Route 53"
+        DNS[DNS Management<br/>api.tolstoy.com]
+    end
+    
+    subgraph "CloudFront"
+        CDN[Global CDN<br/>Static Assets + API Cache]
+    end
+    
+    subgraph "Application Load Balancer"
+        ALB[ALB<br/>SSL Termination<br/>Health Checks]
+    end
+    
+    subgraph "VPC: Production (10.0.0.0/16)"
+        subgraph "Public Subnets"
+            NAT_GW[NAT Gateway<br/>10.0.1.0/24]
+            BASTION[Bastion Host<br/>10.0.1.10]
+        end
+        
+        subgraph "Private Subnets - Application Tier"
+            ECS_CLUSTER[ECS Fargate Cluster<br/>10.0.10.0/24]
+            subgraph "ECS Services"
+                API_SVC[API Service<br/>3 tasks]
+                FLOW_SVC[Flow Service<br/>2 tasks]
+                EXEC_SVC[Execution Service<br/>5 tasks]
+                WORKER_SVC[Worker Service<br/>10 tasks]
+            end
+        end
+        
+        subgraph "Private Subnets - Data Tier"
+            RDS_CLUSTER[RDS PostgreSQL<br/>Multi-AZ<br/>10.0.20.0/24]
+            REDIS_CLUSTER[ElastiCache Redis<br/>Cluster Mode<br/>10.0.21.0/24]
+            ES_CLUSTER[OpenSearch<br/>3 nodes<br/>10.0.22.0/24]
+        end
+    end
+    
+    subgraph "AWS Services"
+        S3[S3 Buckets<br/>Static Assets<br/>Execution Results]
+        SECRETS[Secrets Manager<br/>DB Credentials<br/>API Keys]
+        CLOUDWATCH[CloudWatch<br/>Logs + Metrics]
+        SQS[SQS/SNS<br/>Event Processing]
+        LAMBDA[Lambda Functions<br/>Background Tasks]
+    end
+    
+    subgraph "External Integrations"
+        DATADOG[DataDog<br/>APM + Monitoring]
+        INNGEST[Inngest<br/>Job Queue]
+        SENDGRID[SendGrid<br/>Email Delivery]
+        TWILIO[Twilio<br/>SMS Delivery]
+    end
+    
+    %% Traffic flow
+    DNS --> CDN
+    CDN --> ALB
+    ALB --> ECS_CLUSTER
+    
+    %% ECS service interactions
+    ECS_CLUSTER --> API_SVC
+    ECS_CLUSTER --> FLOW_SVC
+    ECS_CLUSTER --> EXEC_SVC
+    ECS_CLUSTER --> WORKER_SVC
+    
+    %% Data connections
+    API_SVC --> RDS_CLUSTER
+    FLOW_SVC --> RDS_CLUSTER
+    EXEC_SVC --> RDS_CLUSTER
+    
+    API_SVC --> REDIS_CLUSTER
+    FLOW_SVC --> REDIS_CLUSTER
+    EXEC_SVC --> REDIS_CLUSTER
+    
+    EXEC_SVC --> ES_CLUSTER
+    
+    %% AWS service connections
+    ECS_CLUSTER --> S3
+    ECS_CLUSTER --> SECRETS
+    ECS_CLUSTER --> CLOUDWATCH
+    WORKER_SVC --> SQS
+    WORKER_SVC --> LAMBDA
+    
+    %% External integrations
+    ECS_CLUSTER --> DATADOG
+    WORKER_SVC --> INNGEST
+    ECS_CLUSTER --> SENDGRID
+    ECS_CLUSTER --> TWILIO
+    
+    %% Network routing
+    ECS_CLUSTER --> NAT_GW
+    
+    %% Styling
+    classDef aws fill:#ff9900,color:#000
+    classDef vpc fill:#232f3e,color:#fff
+    classDef public fill:#4caf50,color:#fff
+    classDef private fill:#2196f3,color:#fff
+    classDef data fill:#9c27b0,color:#fff
+    classDef external fill:#607d8b,color:#fff
+    
+    class DNS,CDN,ALB,S3,SECRETS,CLOUDWATCH,SQS,LAMBDA aws
+    class NAT_GW,BASTION public
+    class ECS_CLUSTER,API_SVC,FLOW_SVC,EXEC_SVC,WORKER_SVC private
+    class RDS_CLUSTER,REDIS_CLUSTER,ES_CLUSTER data
+    class DATADOG,INNGEST,SENDGRID,TWILIO external
+```
+
+### Container Architecture
+
+```mermaid
+graph TB
+    subgraph "ECS Fargate Cluster"
+        subgraph "API Service Tasks"
+            API_1[API Task 1<br/>2 vCPU, 4GB RAM]
+            API_2[API Task 2<br/>2 vCPU, 4GB RAM]
+            API_3[API Task 3<br/>2 vCPU, 4GB RAM]
+        end
+        
+        subgraph "Flow Engine Tasks"
+            FLOW_1[Flow Task 1<br/>1 vCPU, 2GB RAM]
+            FLOW_2[Flow Task 2<br/>1 vCPU, 2GB RAM]
+        end
+        
+        subgraph "Execution Worker Tasks"
+            EXEC_1[Worker Task 1<br/>0.5 vCPU, 1GB RAM]
+            EXEC_2[Worker Task 2<br/>0.5 vCPU, 1GB RAM]
+            EXEC_3[Worker Task 3<br/>0.5 vCPU, 1GB RAM]
+            EXEC_N[Worker Task N<br/>Auto-scaling]
+        end
+    end
+    
+    subgraph "Service Discovery"
+        SERVICE_DISCOVERY[AWS Cloud Map<br/>Service Registry]
+    end
+    
+    subgraph "Load Balancing"
+        TARGET_GROUP_API[API Target Group<br/>Health Checks]
+        TARGET_GROUP_FLOW[Flow Target Group<br/>Health Checks]
+    end
+    
+    subgraph "Auto Scaling"
+        ASG_API[API Auto Scaling<br/>CPU + Memory based]
+        ASG_FLOW[Flow Auto Scaling<br/>Queue depth based]
+        ASG_EXEC[Worker Auto Scaling<br/>Queue depth based]
+    end
+    
+    %% Service connections
+    API_1 --> SERVICE_DISCOVERY
+    API_2 --> SERVICE_DISCOVERY
+    API_3 --> SERVICE_DISCOVERY
+    
+    FLOW_1 --> SERVICE_DISCOVERY
+    FLOW_2 --> SERVICE_DISCOVERY
+    
+    %% Load balancer connections
+    TARGET_GROUP_API --> API_1
+    TARGET_GROUP_API --> API_2
+    TARGET_GROUP_API --> API_3
+    
+    TARGET_GROUP_FLOW --> FLOW_1
+    TARGET_GROUP_FLOW --> FLOW_2
+    
+    %% Auto scaling connections
+    ASG_API --> API_1
+    ASG_API --> API_2
+    ASG_API --> API_3
+    
+    ASG_FLOW --> FLOW_1
+    ASG_FLOW --> FLOW_2
+    
+    ASG_EXEC --> EXEC_1
+    ASG_EXEC --> EXEC_2
+    ASG_EXEC --> EXEC_3
+    ASG_EXEC --> EXEC_N
+    
+    %% Inter-service communication
+    API_1 -.-> FLOW_1
+    API_2 -.-> FLOW_2
+    
+    FLOW_1 -.-> EXEC_1
+    FLOW_2 -.-> EXEC_2
+    
+    %% Styling
+    classDef api fill:#e3f2fd
+    classDef flow fill:#e8f5e8
+    classDef worker fill:#fff3e0
+    classDef infra fill:#f5f5f5
+    
+    class API_1,API_2,API_3 api
+    class FLOW_1,FLOW_2 flow
+    class EXEC_1,EXEC_2,EXEC_3,EXEC_N worker
+    class SERVICE_DISCOVERY,TARGET_GROUP_API,TARGET_GROUP_FLOW,ASG_API,ASG_FLOW,ASG_EXEC infra
+```
+
+## Database Schema Diagrams
+
+### Core Entity Relationships
+
+```mermaid
+erDiagram
+    ORGANIZATIONS {
+        uuid id PK
+        string name
+        string slug UK
+        jsonb settings
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    USERS {
+        uuid id PK
+        uuid org_id FK
+        string email UK
+        string name
+        string role
+        jsonb settings
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    FLOWS {
+        uuid id PK
+        uuid org_id FK
+        string name
+        text description
+        jsonb definition
+        integer version
+        string status
+        text_array tags
+        uuid created_by FK
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    ACTIONS {
+        uuid id PK
+        uuid org_id FK
+        string key UK
+        string name
+        text description
+        string category
+        string type
+        jsonb schema
+        jsonb configuration
+        text_array tags
+        uuid created_by FK
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    TOOLS {
+        uuid id PK
+        uuid org_id FK
+        string name
+        string provider
+        jsonb configuration
+        string credentials_id
+        string status
+        timestamp last_health_check
+        uuid created_by FK
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    EXECUTIONS {
+        uuid id PK
+        uuid flow_id FK
+        string status
+        string mode
+        jsonb inputs
+        jsonb outputs
+        timestamp started_at
+        timestamp completed_at
+        integer duration_ms
+        jsonb error
+        jsonb metadata
+    }
+    
+    STEP_EXECUTIONS {
+        uuid id PK
+        uuid execution_id FK
+        string step_key
+        string status
+        jsonb inputs
+        jsonb outputs
+        timestamp started_at
+        timestamp completed_at
+        integer duration_ms
+        jsonb error
+    }
+    
+    EXECUTION_LOGS {
+        uuid id PK
+        uuid execution_id FK
+        uuid step_execution_id FK
+        string level
+        text message
+        jsonb context
+        timestamp created_at
+    }
+    
+    API_KEYS {
+        uuid id PK
+        uuid user_id FK
+        uuid org_id FK
+        string name
+        string key_hash
+        text_array permissions
+        timestamp expires_at
+        timestamp last_used_at
+        timestamp created_at
+    }
+    
+    WEBHOOKS {
+        uuid id PK
+        uuid org_id FK
+        string name
+        string url
+        text_array events
+        jsonb headers
+        string status
+        timestamp created_at
+        timestamp updated_at
+    }
+    
+    %% Relationships
+    ORGANIZATIONS ||--o{ USERS : "has many"
+    ORGANIZATIONS ||--o{ FLOWS : "owns"
+    ORGANIZATIONS ||--o{ ACTIONS : "owns"
+    ORGANIZATIONS ||--o{ TOOLS : "owns"
+    ORGANIZATIONS ||--o{ API_KEYS : "has"
+    ORGANIZATIONS ||--o{ WEBHOOKS : "has"
+    
+    USERS ||--o{ FLOWS : "creates"
+    USERS ||--o{ ACTIONS : "creates"
+    USERS ||--o{ TOOLS : "creates"
+    USERS ||--o{ API_KEYS : "owns"
+    
+    FLOWS ||--o{ EXECUTIONS : "executed as"
+    
+    EXECUTIONS ||--o{ STEP_EXECUTIONS : "contains"
+    EXECUTIONS ||--o{ EXECUTION_LOGS : "logs to"
+    STEP_EXECUTIONS ||--o{ EXECUTION_LOGS : "logs to"
+```
+
+### Sharding Strategy
+
+```mermaid
+graph TB
+    subgraph "Application Layer"
+        APP[Application Service]
+        SHARD_ROUTER[Shard Router<br/>org_id based]
+    end
+    
+    subgraph "Database Cluster"
+        subgraph "Shard 1: Organizations A-H"
+            DB1_PRIMARY[(Primary DB 1<br/>Write Operations)]
+            DB1_REPLICA1[(Replica 1-1<br/>Read Operations)]
+            DB1_REPLICA2[(Replica 1-2<br/>Analytics)]
+        end
+        
+        subgraph "Shard 2: Organizations I-P"
+            DB2_PRIMARY[(Primary DB 2<br/>Write Operations)]
+            DB2_REPLICA1[(Replica 2-1<br/>Read Operations)]
+            DB2_REPLICA2[(Replica 2-2<br/>Analytics)]
+        end
+        
+        subgraph "Shard 3: Organizations Q-Z"
+            DB3_PRIMARY[(Primary DB 3<br/>Write Operations)]
+            DB3_REPLICA1[(Replica 3-1<br/>Read Operations)]
+            DB3_REPLICA2[(Replica 3-2<br/>Analytics)]
+        end
+    end
+    
+    subgraph "Cross-Shard Operations"
+        COORDINATOR[Distributed Transaction<br/>Coordinator]
+        GLOBAL_CACHE[Global Cache<br/>Cross-shard queries]
+    end
+    
+    APP --> SHARD_ROUTER
+    
+    SHARD_ROUTER -->|org_id: A-H| DB1_PRIMARY
+    SHARD_ROUTER -->|org_id: I-P| DB2_PRIMARY
+    SHARD_ROUTER -->|org_id: Q-Z| DB3_PRIMARY
+    
+    SHARD_ROUTER -->|Read queries| DB1_REPLICA1
+    SHARD_ROUTER -->|Read queries| DB2_REPLICA1
+    SHARD_ROUTER -->|Read queries| DB3_REPLICA1
+    
+    DB1_PRIMARY --> DB1_REPLICA1
+    DB1_PRIMARY --> DB1_REPLICA2
+    DB2_PRIMARY --> DB2_REPLICA1
+    DB2_PRIMARY --> DB2_REPLICA2
+    DB3_PRIMARY --> DB3_REPLICA1
+    DB3_PRIMARY --> DB3_REPLICA2
+    
+    SHARD_ROUTER --> COORDINATOR
+    COORDINATOR --> GLOBAL_CACHE
+    
+    %% Styling
+    classDef primary fill:#4caf50,color:#fff
+    classDef replica fill:#2196f3,color:#fff
+    classDef infra fill:#ff9800,color:#fff
+    
+    class DB1_PRIMARY,DB2_PRIMARY,DB3_PRIMARY primary
+    class DB1_REPLICA1,DB1_REPLICA2,DB2_REPLICA1,DB2_REPLICA2,DB3_REPLICA1,DB3_REPLICA2 replica
+    class SHARD_ROUTER,COORDINATOR,GLOBAL_CACHE infra
+```
+
+## Security Architecture
+
+### Authentication & Authorization Flow
+
+```mermaid
+graph TB
+    subgraph "Client Authentication"
+        API_KEY[API Key<br/>Header: x-api-key]
+        JWT_TOKEN[JWT Token<br/>Header: Authorization]
+        ORG_CONTEXT[Org Context<br/>Header: x-org-id]
+    end
+    
+    subgraph "Gateway Security Layer"
+        WAF[Web Application Firewall<br/>DDoS Protection]
+        RATE_LIMITER[Rate Limiter<br/>Per API Key/IP]
+        API_GATEWAY[API Gateway<br/>Request Validation]
+    end
+    
+    subgraph "Authentication Service"
+        KEY_VALIDATOR[API Key Validator<br/>Hash Verification]
+        JWT_VALIDATOR[JWT Validator<br/>Signature Verification]
+        SESSION_MGR[Session Manager<br/>Redis Cache]
+    end
+    
+    subgraph "Authorization Service"
+        RBAC_ENGINE[RBAC Engine<br/>Role-Based Access]
+        PERMISSION_CHECKER[Permission Checker<br/>Resource Access]
+        TENANT_GUARD[Tenant Guard<br/>Organization Isolation]
+    end
+    
+    subgraph "Security Storage"
+        API_KEY_STORE[(API Keys<br/>Hashed Storage)]
+        JWT_SECRET_STORE[(JWT Secrets<br/>AWS Secrets Manager)]
+        PERMISSION_STORE[(Permissions<br/>Database)]
+    end
+    
+    %% Authentication flow
+    API_KEY --> WAF
+    JWT_TOKEN --> WAF
+    ORG_CONTEXT --> WAF
+    
+    WAF --> RATE_LIMITER
+    RATE_LIMITER --> API_GATEWAY
+    API_GATEWAY --> KEY_VALIDATOR
+    API_GATEWAY --> JWT_VALIDATOR
+    
+    KEY_VALIDATOR --> API_KEY_STORE
+    JWT_VALIDATOR --> JWT_SECRET_STORE
+    KEY_VALIDATOR --> SESSION_MGR
+    JWT_VALIDATOR --> SESSION_MGR
+    
+    %% Authorization flow
+    SESSION_MGR --> RBAC_ENGINE
+    RBAC_ENGINE --> PERMISSION_CHECKER
+    PERMISSION_CHECKER --> TENANT_GUARD
+    
+    RBAC_ENGINE --> PERMISSION_STORE
+    TENANT_GUARD --> PERMISSION_STORE
+    
+    %% Security validation
+    PERMISSION_CHECKER -.->|Authorized| API_GATEWAY
+    PERMISSION_CHECKER -.->|Forbidden| API_GATEWAY
+    
+    %% Styling
+    classDef client fill:#e1f5fe
+    classDef gateway fill:#f3e5f5
+    classDef auth fill:#e8f5e8
+    classDef authz fill:#fff3e0
+    classDef storage fill:#fce4ec
+    
+    class API_KEY,JWT_TOKEN,ORG_CONTEXT client
+    class WAF,RATE_LIMITER,API_GATEWAY gateway
+    class KEY_VALIDATOR,JWT_VALIDATOR,SESSION_MGR auth
+    class RBAC_ENGINE,PERMISSION_CHECKER,TENANT_GUARD authz
+    class API_KEY_STORE,JWT_SECRET_STORE,PERMISSION_STORE storage
+```
+
+### Data Encryption Architecture
+
+```mermaid
+graph TB
+    subgraph "Encryption in Transit"
+        TLS[TLS 1.3<br/>All External Connections]
+        mTLS[Mutual TLS<br/>Internal Service Communication]
+        VPN[VPC Peering<br/>Encrypted Tunnels]
+    end
+    
+    subgraph "Encryption at Rest"
+        DB_ENCRYPTION[Database Encryption<br/>AES-256 at Rest]
+        S3_ENCRYPTION[S3 Bucket Encryption<br/>KMS Keys]
+        REDIS_ENCRYPTION[Redis Encryption<br/>In-memory & Snapshots]
+    end
+    
+    subgraph "Key Management"
+        AWS_KMS[AWS KMS<br/>Master Key Management]
+        SECRETS_MGR[AWS Secrets Manager<br/>Credential Storage]
+        HSM[CloudHSM<br/>Hardware Security Module]
+    end
+    
+    subgraph "Application-Level Encryption"
+        FIELD_ENCRYPTION[Field-Level Encryption<br/>Sensitive Data]
+        API_KEY_HASHING[API Key Hashing<br/>bcrypt + salt]
+        PASSWORD_HASHING[Password Hashing<br/>Argon2id]
+    end
+    
+    subgraph "Monitoring & Auditing"
+        CRYPTO_AUDIT[Cryptographic Audit<br/>Key Usage Logs]
+        ACCESS_LOGS[Access Logs<br/>Encrypted Data Access]
+        COMPLIANCE[Compliance Reports<br/>SOC2, GDPR]
+    end
+    
+    %% Encryption relationships
+    TLS --> mTLS
+    mTLS --> VPN
+    
+    DB_ENCRYPTION --> AWS_KMS
+    S3_ENCRYPTION --> AWS_KMS
+    REDIS_ENCRYPTION --> AWS_KMS
+    
+    AWS_KMS --> HSM
+    SECRETS_MGR --> AWS_KMS
+    
+    FIELD_ENCRYPTION --> AWS_KMS
+    API_KEY_HASHING --> SECRETS_MGR
+    PASSWORD_HASHING --> SECRETS_MGR
+    
+    %% Monitoring connections
+    AWS_KMS --> CRYPTO_AUDIT
+    FIELD_ENCRYPTION --> ACCESS_LOGS
+    ACCESS_LOGS --> COMPLIANCE
+    
+    %% Styling
+    classDef transit fill:#4caf50,color:#fff
+    classDef rest fill:#2196f3,color:#fff
+    classDef keys fill:#ff9800,color:#fff
+    classDef app fill:#9c27b0,color:#fff
+    classDef monitor fill:#607d8b,color:#fff
+    
+    class TLS,mTLS,VPN transit
+    class DB_ENCRYPTION,S3_ENCRYPTION,REDIS_ENCRYPTION rest
+    class AWS_KMS,SECRETS_MGR,HSM keys
+    class FIELD_ENCRYPTION,API_KEY_HASHING,PASSWORD_HASHING app
+    class CRYPTO_AUDIT,ACCESS_LOGS,COMPLIANCE monitor
+```
+
+This comprehensive system diagrams documentation provides detailed visual representations of Tolstoy's architecture at every level, from high-level system overviews to detailed component interactions, security architecture, and deployment patterns. These diagrams serve as essential references for understanding system design, troubleshooting issues, and planning architectural improvements.
+
+---
+
+*These architectural diagrams provide comprehensive visual documentation of Tolstoy's system design, enabling better understanding of component interactions, data flows, and infrastructure patterns for engineering teams and stakeholders.*

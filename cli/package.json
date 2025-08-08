@@ -17,8 +17,15 @@
     "dev": "ts-node src/cli.ts",
     "prepare": "npm run build",
     "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "lint": "eslint src --ext .ts",
-    "clean": "rm -rf dist"
+    "lint:fix": "eslint src --ext .ts --fix",
+    "clean": "rm -rf dist dist-binaries",
+    "build:binaries": "node scripts/build-binaries.js",
+    "release": "./scripts/release.sh",
+    "prepublishOnly": "npm run clean && npm run build",
+    "postversion": "git push && git push --tags"
   },
   "keywords": [
     "tolstoy",
@@ -63,6 +70,8 @@
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.0.0",
     "jest": "^29.0.0",
+    "license-checker": "^25.0.1",
+    "pkg": "^5.8.1",
     "ts-jest": "^29.0.0",
     "ts-node": "^10.9.0",
     "typescript": "^5.0.0"

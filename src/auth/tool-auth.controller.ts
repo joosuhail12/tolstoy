@@ -116,7 +116,7 @@ export class ToolAuthController {
   @ApiNotFoundResponse({
     description: 'Auth configuration not found for this tool and organization',
   })
-  async get(@Headers('X-Org-ID') orgId: string, @Param('toolId') toolId: string): Promise<any> {
+  async get(@Headers('X-Org-ID') orgId: string, @Param('toolId') toolId: string): Promise<AuthConfigResponseDto> {
     if (!orgId) {
       throw new BadRequestException('X-Org-ID header is required');
     }
@@ -196,7 +196,7 @@ export class ToolAuthController {
   /**
    * Mask sensitive values in auth configuration for security
    */
-  private maskSensitiveValues(config: any): any {
+  private maskSensitiveValues(config: Record<string, unknown>): Record<string, unknown> {
     if (!config || typeof config !== 'object') {
       return config;
     }

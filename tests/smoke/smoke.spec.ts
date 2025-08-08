@@ -89,6 +89,203 @@ describe('Tolstoy Smoke Tests', () => {
       expect(res.status).toBe(200);
       expect(Array.isArray(res.body)).toBe(true);
     });
+
+    it('GET /tools returns tools list', async () => {
+      const res = await apiRequest('/tools');
+      expect(res.status).toBe(200);
+      expect(Array.isArray(res.body)).toBe(true);
+    });
+  });
+
+  describe('New Authentication Features (Sprint 6)', () => {
+    let testToolId: string;
+    let testActionKey: string;
+
+    beforeAll(async () => {
+      // Get the first available tool and action for testing
+      const toolsRes = await apiRequest('/tools');
+      if (toolsRes.body.length > 0) {
+        testToolId = toolsRes.body[0].id;
+      }
+
+      const actionsRes = await apiRequest('/actions');
+      if (actionsRes.body.length > 0) {
+        testActionKey = actionsRes.body[0].key;
+      }
+    });
+
+    describe('Tool Authentication Configuration', () => {
+      it('POST /tools/:toolId/auth configures tool authentication', async () => {
+        if (!testToolId) {
+          console.log('Skipping tool auth test - no tools available');
+          return;
+        }
+
+        const authConfig = {
+          type: 'apiKey',
+          config: {
+            apiKey: 'smoke-test-key',
+            headerName: 'Authorization',
+            headerValue: 'Bearer smoke-test-key',
+          },
+        };
+
+        const res = await apiPost(`/tools/${testToolId}/auth`, authConfig);
+        expect([200, 201]).toContain(res.status);
+        expect(res.body).toHaveProperty('type', 'apiKey');
+      });
+
+      it('GET /tools/:toolId/auth retrieves tool authentication', async () => {
+        if (!testToolId) {
+          console.log('Skipping tool auth test - no tools available');
+          return;
+        }
+
+        const res = await apiRequest(`/tools/${testToolId}/auth`);
+        // Should either return config (200) or not found (404)
+        expect([200, 404]).toContain(res.status);
+        
+        if (res.status === 200) {
+          expect(res.body).toHaveProperty('type');
+          expect(res.body).toHaveProperty('config');
+        }
+      });
+
+      it('DELETE /tools/:toolId/auth removes tool authentication', async () => {
+        if (!testToolId) {
+          console.log('Skipping tool auth test - no tools available');
+          return;
+        }
+
+        const res = await request(API_URL)
+          .delete(`/tools/${testToolId}/auth`)
+          .set('Authorization', `Bearer ${API_KEY}`)
+          .set('X-Org-ID', ORG_ID);
+
+        // Should either delete successfully (200) or not found (404)
+        expect([200, 404]).toContain(res.status);
+      });
+    });
+
+    describe('OAuth Flow Endpoints', () => {
+      it('GET /auth/:toolKey/login redirects to OAuth provider or returns error', async () => {
+        const testToolKey = 'github'; // Common OAuth provider
+        
+        const res = await request(API_URL)
+          .get(`/auth/${testToolKey}/login`)
+          .query({
+            orgId: ORG_ID,
+            userId: 'smoke-test-user',
+            redirectUri: 'https://example.com/callback',
+          });
+
+        // Should either redirect (302) or return not found/bad request
+        expect([302, 400, 404]).toContain(res.status);
+
+        if (res.status === 302) {
+          expect(res.headers.location).toBeDefined();
+        }
+      });
+
+      it('GET /auth/:toolKey/callback handles OAuth callback or returns error', async () => {
+        const testToolKey = 'github';
+        
+        const res = await request(API_URL)
+          .get(`/auth/${testToolKey}/callback`)
+          .query({
+            code: 'smoke-test-code',
+            state: 'smoke-test-state',
+          });
+
+        // Should handle callback (302 redirect) or return error
+        expect([302, 400, 404]).toContain(res.status);
+      });
+    });
+
+    describe('Single Action Execution', () => {
+      it('POST /actions/:key/execute executes standalone action', async () => {
+        if (!testActionKey) {
+          console.log('Skipping action execution test - no actions available');
+          return;
+        }
+
+        // Use minimal test inputs
+        const testInputs = {
+          message: 'Smoke test execution',
+        };
+
+        const res = await request(API_URL)
+          .post(`/actions/${testActionKey}/execute`)
+          .set('Authorization', `Bearer ${API_KEY}`)
+          .set('X-Org-ID', ORG_ID)
+          .set('X-User-ID', 'smoke-test-user')
+          .send(testInputs);
+
+        // Should either execute successfully (200) or return validation error (400) or not found (404)
+        expect([200, 400, 404]).toContain(res.status);
+
+        if (res.status === 200) {
+          expect(res.body).toHaveProperty('success');
+          expect(res.body).toHaveProperty('executionId');
+        }
+      });
+
+      it('validates action execution inputs', async () => {
+        if (!testActionKey) {
+          console.log('Skipping action validation test - no actions available');
+          return;
+        }
+
+        // Send invalid inputs (empty object)
+        const res = await request(API_URL)
+          .post(`/actions/${testActionKey}/execute`)
+          .set('Authorization', `Bearer ${API_KEY}`)
+          .set('X-Org-ID', ORG_ID)
+          .send({});
+
+        // Should return validation error (400) or execute successfully if no required fields
+        expect([200, 400]).toContain(res.status);
+
+        if (res.status === 400) {
+          expect(res.body).toHaveProperty('error');
+          expect(res.body.error).toMatch(/validation|required|input/i);
+        }
+      });
+    });
+
+    describe('Enhanced Input Schema Support', () => {
+      it('action execution supports enhanced validation features', async () => {
+        if (!testActionKey) {
+          console.log('Skipping enhanced validation test - no actions available');
+          return;
+        }
+
+        // Test with complex input data to trigger enhanced validation
+        const complexInputs = {
+          text: 'Test string',
+          number: 42,
+          boolean: true,
+          enum: 'option1',
+          date: '2023-12-25',
+        };
+
+        const res = await request(API_URL)
+          .post(`/actions/${testActionKey}/execute`)
+          .set('Authorization', `Bearer ${API_KEY}`)
+          .set('X-Org-ID', ORG_ID)
+          .set('X-User-ID', 'smoke-test-user')
+          .send(complexInputs);
+
+        // Should handle enhanced validation gracefully
+        expect([200, 400, 404]).toContain(res.status);
+
+        if (res.status === 400) {
+          expect(res.body).toHaveProperty('error');
+          // Enhanced validation should provide detailed error messages
+          expect(typeof res.body.error).toBe('string');
+        }
+      });
+    });
   });
 
   describe('Template Import Workflow', () => {

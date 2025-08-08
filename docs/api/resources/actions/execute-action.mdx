@@ -1,0 +1,905 @@
+---
+title: "Execute Action"
+description: "Execute individual actions directly with input validation, real-time monitoring, and comprehensive error handling."
+---
+
+# Execute Action
+
+Execute individual actions directly for testing, debugging, or standalone automation with comprehensive input validation, execution monitoring, and detailed result tracking.
+
+## Endpoint
+
+<CodeGroup>
+```http HTTP
+POST /actions/{key}/execute
+```
+
+```bash cURL
+curl -X POST "https://tolstoy.getpullse.com/actions/slack-send-message/execute" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputs": {
+      "channel": "#general",
+      "message": "Hello from Tolstoy API!"
+    }
+  }'
+```
+</CodeGroup>
+
+## Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `key` | string | **Required.** The unique key of the action to execute |
+
+## Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `timeout` | number | 30000 | Maximum execution time in milliseconds |
+| `validate_only` | boolean | false | Only validate inputs without executing |
+| `enable_profiling` | boolean | false | Enable detailed performance profiling |
+
+## Request Body
+
+### Basic Execution
+
+```json
+{
+  "inputs": {
+    "channel": "#general",
+    "message": "Hello World!",
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*Important Notice:* This is a test message"
+        }
+      }
+    ]
+  }
+}
+```
+
+### Advanced Execution Options
+
+```json
+{
+  "inputs": {
+    "email": "user@example.com",
+    "template_id": "welcome-email",
+    "variables": {
+      "name": "John Doe",
+      "company": "Acme Corp"
+    }
+  },
+  "execution_options": {
+    "timeout": 60000,
+    "retry_policy": {
+      "max_retries": 3,
+      "retry_delay": 1000,
+      "backoff_multiplier": 2.0
+    },
+    "environment": "production",
+    "enable_profiling": true,
+    "tags": ["test", "direct-execution"],
+    "idempotency_key": "test-email-20240120-001"
+  },
+  "context": {
+    "user_id": "user_abc123",
+    "session_id": "session_xyz789",
+    "source": "api-test",
+    "trace_id": "trace_123456"
+  }
+}
+```
+
+### Execution Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `timeout` | number | Action default | Override action timeout |
+| `retry_policy` | object | Action default | Custom retry configuration |
+| `environment` | string | "production" | Execution environment |
+| `enable_profiling` | boolean | false | Detailed performance metrics |
+| `tags` | array | [] | Tags for tracking this execution |
+| `idempotency_key` | string | Auto-generated | Prevent duplicate executions |
+
+## Response Format
+
+### Successful Execution
+
+```json
+{
+  "success": true,
+  "data": {
+    "execution_id": "exec_action_abc123def456",
+    "action_key": "slack-send-message",
+    "action_name": "Send Slack Message",
+    "status": "completed",
+    "inputs": {
+      "channel": "#general",
+      "message": "Hello from Tolstoy API!",
+      "blocks": [
+        {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": "*Important Notice:* This is a test message"
+          }
+        }
+      ]
+    },
+    "outputs": {
+      "message_id": "1703952000.123456",
+      "timestamp": "1703952000.123456",
+      "channel_id": "C1234567890",
+      "permalink": "https://workspace.slack.com/archives/C1234567890/p1703952000123456",
+      "success": true
+    },
+    "started_at": "2024-01-20T10:30:00Z",
+    "completed_at": "2024-01-20T10:30:02Z",
+    "duration_ms": 2150,
+    "performance": {
+      "network_time_ms": 1850,
+      "processing_time_ms": 300,
+      "auth_time_ms": 450,
+      "validation_time_ms": 25
+    },
+    "metadata": {
+      "provider": "slack",
+      "api_version": "2.1.0",
+      "rate_limit_remaining": 49,
+      "rate_limit_reset": "2024-01-20T10:31:00Z"
+    }
+  },
+  "metadata": {
+    "request_id": "req_xyz789abc123",
+    "timestamp": "2024-01-20T10:30:02Z",
+    "processing_time_ms": 2200
+  }
+}
+```
+
+### Validation-Only Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "validation_result": {
+      "valid": true,
+      "inputs_validated": {
+        "channel": {
+          "valid": true,
+          "type": "string",
+          "value": "#general"
+        },
+        "message": {
+          "valid": true,
+          "type": "string",
+          "value": "Hello from Tolstoy API!",
+          "length": 24
+        },
+        "blocks": {
+          "valid": true,
+          "type": "array",
+          "length": 1
+        }
+      },
+      "warnings": [],
+      "errors": [],
+      "estimated_execution_time": 2000,
+      "auth_requirements_met": true
+    },
+    "action_info": {
+      "key": "slack-send-message",
+      "name": "Send Slack Message",
+      "version": "2.1.0",
+      "provider": "slack"
+    }
+  }
+}
+```
+
+## Execution Examples
+
+### Communication Actions
+
+<CodeGroup>
+```bash cURL - Send Slack Message
+curl -X POST "https://tolstoy.getpullse.com/actions/slack-send-message/execute" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputs": {
+      "channel": "#alerts",
+      "message": "🚨 System Alert: High memory usage detected",
+      "blocks": [
+        {
+          "type": "section",
+          "text": {
+            "type": "mrkdwn",
+            "text": "*Alert Level:* High\n*Service:* API Gateway\n*Memory Usage:* 85%"
+          }
+        },
+        {
+          "type": "actions",
+          "elements": [
+            {
+              "type": "button",
+              "text": {
+                "type": "plain_text",
+                "text": "View Dashboard"
+              },
+              "url": "https://monitoring.company.com/dashboard"
+            }
+          ]
+        }
+      ]
+    },
+    "execution_options": {
+      "tags": ["monitoring", "alert"],
+      "enable_profiling": true
+    }
+  }'
+```
+
+```typescript TypeScript - Send Email
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient({
+  orgId: 'org_1234567890abcdef',
+  userId: 'user_abcdef1234567890'
+});
+
+async function sendWelcomeEmail(userEmail: string, userName: string) {
+  try {
+    const result = await client.actions.execute('sendgrid-send-email', {
+      inputs: {
+        to: userEmail,
+        template_id: 'welcome-template-v2',
+        dynamic_template_data: {
+          name: userName,
+          company: 'Acme Corp',
+          welcome_url: 'https://app.company.com/welcome',
+          support_email: 'support@company.com'
+        }
+      },
+      execution_options: {
+        timeout: 15000,
+        tags: ['welcome', 'onboarding']
+      }
+    });
+    
+    if (result.success) {
+      console.log('Welcome email sent successfully!');
+      console.log(`Message ID: ${result.outputs.message_id}`);
+      console.log(`Send time: ${result.duration_ms}ms`);
+    } else {
+      throw new Error(result.error.message);
+    }
+    
+    return result;
+    
+  } catch (error) {
+    console.error('Failed to send welcome email:', error);
+    throw error;
+  }
+}
+
+// Usage
+sendWelcomeEmail('user@example.com', 'John Doe');
+```
+
+```python Python - Send SMS
+import tolstoy
+
+client = tolstoy.Client(
+    org_id='org_1234567890abcdef',
+    user_id='user_abcdef1234567890'
+)
+
+def send_verification_sms(phone_number: str, verification_code: str):
+    try:
+        result = client.actions.execute('twilio-send-sms', {
+            'inputs': {
+                'to': phone_number,
+                'message': f'Your verification code is: {verification_code}. This code expires in 10 minutes.',
+                'from_number': '+1234567890'
+            },
+            'execution_options': {
+                'timeout': 10000,
+                'tags': ['verification', 'sms']
+            }
+        })
+        
+        if result['success']:
+            print(f"✅ SMS sent to {phone_number}")
+            print(f"Message SID: {result['outputs']['sid']}")
+            print(f"Status: {result['outputs']['status']}")
+        else:
+            print(f"❌ Failed to send SMS: {result['error']['message']}")
+            
+        return result
+        
+    except Exception as error:
+        print(f"SMS sending error: {error}")
+        raise error
+
+# Usage
+send_verification_sms('+1234567890', '123456')
+```
+</CodeGroup>
+
+### Data Processing Actions
+
+<CodeGroup>
+```typescript Data Validation
+async function validateUserData(userData: any) {
+  try {
+    // Validate email
+    const emailValidation = await client.actions.execute('email-validator', {
+      inputs: {
+        email: userData.email,
+        check_mx: true,
+        check_disposable: true
+      }
+    });
+    
+    // Validate phone (if provided)
+    let phoneValidation = null;
+    if (userData.phone) {
+      phoneValidation = await client.actions.execute('phone-validator', {
+        inputs: {
+          phone: userData.phone,
+          country_code: userData.country || 'US'
+        }
+      });
+    }
+    
+    // Combine results
+    const validation = {
+      email: {
+        valid: emailValidation.outputs.valid,
+        domain: emailValidation.outputs.domain,
+        disposable: emailValidation.outputs.is_disposable
+      },
+      phone: phoneValidation ? {
+        valid: phoneValidation.outputs.valid,
+        formatted: phoneValidation.outputs.formatted,
+        country: phoneValidation.outputs.country
+      } : null
+    };
+    
+    const isValid = validation.email.valid && 
+                   !validation.email.disposable &&
+                   (!validation.phone || validation.phone.valid);
+    
+    return {
+      valid: isValid,
+      details: validation,
+      recommendations: generateValidationRecommendations(validation)
+    };
+    
+  } catch (error) {
+    console.error('Validation failed:', error);
+    throw error;
+  }
+}
+
+function generateValidationRecommendations(validation: any): string[] {
+  const recommendations = [];
+  
+  if (!validation.email.valid) {
+    recommendations.push('Please provide a valid email address');
+  }
+  
+  if (validation.email.disposable) {
+    recommendations.push('Disposable email addresses are not allowed');
+  }
+  
+  if (validation.phone && !validation.phone.valid) {
+    recommendations.push('Please provide a valid phone number');
+  }
+  
+  return recommendations;
+}
+```
+
+```typescript Data Transformation
+async function transformCustomerData(rawData: any) {
+  try {
+    const transformedData = await client.actions.execute('data-transformer', {
+      inputs: {
+        data: rawData,
+        transformations: [
+          {
+            field: 'name',
+            operation: 'capitalize',
+            target: 'display_name'
+          },
+          {
+            field: 'email',
+            operation: 'lowercase',
+            target: 'email'
+          },
+          {
+            field: 'created_at',
+            operation: 'format_date',
+            format: 'YYYY-MM-DD HH:mm:ss',
+            target: 'created_date'
+          },
+          {
+            field: 'tags',
+            operation: 'array_join',
+            separator: ',',
+            target: 'tags_string'
+          }
+        ]
+      }
+    });
+    
+    console.log('Data transformation completed:');
+    console.log('Original:', rawData);
+    console.log('Transformed:', transformedData.outputs.result);
+    
+    return transformedData.outputs.result;
+    
+  } catch (error) {
+    console.error('Data transformation failed:', error);
+    throw error;
+  }
+}
+```
+</CodeGroup>
+
+### HTTP and API Actions
+
+<CodeGroup>
+```typescript REST API Call
+async function fetchUserProfile(userId: string) {
+  try {
+    const apiResponse = await client.actions.execute('http-request', {
+      inputs: {
+        method: 'GET',
+        url: `https://api.example.com/users/${userId}`,
+        headers: {
+          'Authorization': 'Bearer {{secrets.api_token}}',
+          'Content-Type': 'application/json',
+          'User-Agent': 'Tolstoy-Workflow/1.0'
+        },
+        timeout: 10000
+      },
+      execution_options: {
+        tags: ['api', 'user-profile'],
+        enable_profiling: true
+      }
+    });
+    
+    if (apiResponse.outputs.status_code === 200) {
+      const userData = JSON.parse(apiResponse.outputs.body);
+      console.log('User profile fetched:', userData);
+      return userData;
+    } else {
+      throw new Error(`API request failed: ${apiResponse.outputs.status_code}`);
+    }
+    
+  } catch (error) {
+    console.error('Failed to fetch user profile:', error);
+    throw error;
+  }
+}
+
+async function createCRMContact(contactData: any) {
+  try {
+    const crmResponse = await client.actions.execute('salesforce-create-contact', {
+      inputs: {
+        email: contactData.email,
+        first_name: contactData.firstName,
+        last_name: contactData.lastName,
+        company: contactData.company,
+        phone: contactData.phone,
+        lead_source: 'Website',
+        custom_fields: {
+          industry: contactData.industry,
+          annual_revenue: contactData.revenue
+        }
+      },
+      execution_options: {
+        timeout: 20000,
+        retry_policy: {
+          max_retries: 3,
+          retry_delay: 2000
+        }
+      }
+    });
+    
+    if (crmResponse.outputs.success) {
+      console.log(`CRM contact created: ${crmResponse.outputs.id}`);
+      return {
+        crmId: crmResponse.outputs.id,
+        url: crmResponse.outputs.url
+      };
+    } else {
+      throw new Error(crmResponse.outputs.error);
+    }
+    
+  } catch (error) {
+    console.error('Failed to create CRM contact:', error);
+    throw error;
+  }
+}
+```
+
+```python Python - Database Query
+def execute_database_query(query: str, params: dict = None):
+    try:
+        result = client.actions.execute('database-query', {
+            'inputs': {
+                'query': query,
+                'parameters': params or {},
+                'database': 'analytics',
+                'timeout': 30000
+            },
+            'execution_options': {
+                'tags': ['database', 'analytics'],
+                'enable_profiling': True
+            }
+        })
+        
+        if result['success']:
+            rows = result['outputs']['rows']
+            columns = result['outputs']['columns']
+            row_count = result['outputs']['row_count']
+            
+            print(f"Query executed successfully: {row_count} rows returned")
+            print(f"Execution time: {result['duration_ms']}ms")
+            
+            return {
+                'columns': columns,
+                'rows': rows,
+                'count': row_count
+            }
+        else:
+            print(f"Query failed: {result['error']['message']}")
+            raise Exception(result['error']['message'])
+            
+    except Exception as error:
+        print(f"Database query error: {error}")
+        raise error
+
+# Usage examples
+user_stats = execute_database_query(
+    "SELECT count(*) as total_users, avg(age) as avg_age FROM users WHERE created_at > ?",
+    {"created_after": "2024-01-01"}
+)
+
+monthly_revenue = execute_database_query(
+    """
+    SELECT 
+        DATE_TRUNC('month', created_at) as month,
+        SUM(amount) as total_revenue,
+        COUNT(*) as transaction_count
+    FROM transactions 
+    WHERE created_at >= NOW() - INTERVAL '12 months'
+    GROUP BY month
+    ORDER BY month DESC
+    """
+)
+```
+</CodeGroup>
+
+### Testing and Debugging Actions
+
+```typescript
+class ActionTester {
+  constructor(private client: TolstoyClient) {}
+  
+  async testAction(actionKey: string, testCases: any[]) {
+    console.log(`🧪 Testing action: ${actionKey}`);
+    const results = [];
+    
+    for (let i = 0; i < testCases.length; i++) {
+      const testCase = testCases[i];
+      console.log(`\nTest Case ${i + 1}: ${testCase.name || 'Unnamed'}`);
+      
+      try {
+        // First validate inputs
+        const validation = await this.client.actions.execute(actionKey, {
+          ...testCase.inputs,
+          validate_only: true
+        });
+        
+        if (!validation.data.validation_result.valid) {
+          console.log('❌ Validation failed:');
+          validation.data.validation_result.errors.forEach((error: string) => {
+            console.log(`   ${error}`);
+          });
+          continue;
+        }
+        
+        console.log('✅ Validation passed');
+        
+        // Execute the action
+        const startTime = Date.now();
+        const result = await this.client.actions.execute(actionKey, testCase.inputs);
+        const endTime = Date.now();
+        
+        const testResult = {
+          testCase: testCase.name,
+          success: result.success,
+          duration: endTime - startTime,
+          outputs: result.outputs,
+          error: result.error || null
+        };
+        
+        if (result.success) {
+          console.log(`✅ Execution successful (${testResult.duration}ms)`);
+          
+          // Validate expected outputs if provided
+          if (testCase.expectedOutputs) {
+            const outputValidation = this.validateOutputs(
+              result.outputs, 
+              testCase.expectedOutputs
+            );
+            
+            if (outputValidation.valid) {
+              console.log('✅ Outputs match expectations');
+            } else {
+              console.log('⚠️  Output validation issues:');
+              outputValidation.issues.forEach((issue: string) => {
+                console.log(`   ${issue}`);
+              });
+            }
+          }
+          
+        } else {
+          console.log(`❌ Execution failed: ${result.error?.message}`);
+        }
+        
+        results.push(testResult);
+        
+      } catch (error) {
+        console.log(`💥 Test failed with exception: ${error.message}`);
+        results.push({
+          testCase: testCase.name,
+          success: false,
+          error: error.message,
+          exception: true
+        });
+      }
+      
+      // Add delay between tests
+      if (i < testCases.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    }
+    
+    // Summary
+    const successful = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    
+    console.log(`\n📊 Test Summary:`);
+    console.log(`  Total: ${results.length}`);
+    console.log(`  Successful: ${successful}`);
+    console.log(`  Failed: ${failed}`);
+    console.log(`  Success Rate: ${(successful / results.length * 100).toFixed(1)}%`);
+    
+    return results;
+  }
+  
+  private validateOutputs(actual: any, expected: any): { valid: boolean; issues: string[] } {
+    const issues = [];
+    
+    for (const [key, expectedValue] of Object.entries(expected)) {
+      if (!(key in actual)) {
+        issues.push(`Missing output: ${key}`);
+      } else if (actual[key] !== expectedValue) {
+        issues.push(`Output ${key}: expected ${expectedValue}, got ${actual[key]}`);
+      }
+    }
+    
+    return {
+      valid: issues.length === 0,
+      issues
+    };
+  }
+}
+
+// Usage example
+const tester = new ActionTester(client);
+
+const emailTestCases = [
+  {
+    name: 'Valid email',
+    inputs: {
+      inputs: {
+        email: 'user@example.com'
+      }
+    },
+    expectedOutputs: {
+      valid: true
+    }
+  },
+  {
+    name: 'Invalid email',
+    inputs: {
+      inputs: {
+        email: 'not-an-email'
+      }
+    },
+    expectedOutputs: {
+      valid: false
+    }
+  },
+  {
+    name: 'Disposable email',
+    inputs: {
+      inputs: {
+        email: 'test@tempmail.com',
+        check_disposable: true
+      }
+    },
+    expectedOutputs: {
+      valid: true,
+      is_disposable: true
+    }
+  }
+];
+
+tester.testAction('email-validator', emailTestCases);
+```
+
+## Error Handling
+
+### Common Error Responses
+
+<CodeGroup>
+```json 400 - Invalid Input
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_INPUT",
+    "message": "Action input validation failed",
+    "details": {
+      "action_key": "slack-send-message",
+      "field_errors": [
+        {
+          "field": "channel",
+          "error": "Channel must start with # or @",
+          "received": "general",
+          "expected": "#general or @username"
+        },
+        {
+          "field": "message",
+          "error": "Message cannot be empty",
+          "received": "",
+          "expected": "Non-empty string"
+        }
+      ],
+      "missing_required_fields": ["message"]
+    }
+  }
+}
+```
+
+```json 404 - Action Not Found
+{
+  "success": false,
+  "error": {
+    "code": "ACTION_NOT_FOUND",
+    "message": "Action with key 'invalid-action' not found",
+    "details": {
+      "action_key": "invalid-action",
+      "available_actions": [
+        "slack-send-message",
+        "email-validator",
+        "http-request"
+      ],
+      "suggestions": [
+        "Check the action key spelling",
+        "Ensure the action is available in your organization",
+        "Use GET /actions to see all available actions"
+      ]
+    }
+  }
+}
+```
+
+```json 408 - Execution Timeout
+{
+  "success": false,
+  "error": {
+    "code": "EXECUTION_TIMEOUT",
+    "message": "Action execution exceeded timeout limit",
+    "details": {
+      "action_key": "slow-database-query",
+      "timeout_ms": 30000,
+      "elapsed_ms": 30010,
+      "suggestion": "Consider increasing timeout or optimizing the action"
+    }
+  }
+}
+```
+
+```json 503 - Action Unavailable
+{
+  "success": false,
+  "error": {
+    "code": "ACTION_UNAVAILABLE", 
+    "message": "Action temporarily unavailable due to provider issues",
+    "details": {
+      "action_key": "salesforce-create-contact",
+      "provider": "salesforce",
+      "reason": "API rate limit exceeded",
+      "retry_after": 300,
+      "alternative_actions": [
+        "hubspot-create-contact",
+        "generic-crm-create"
+      ]
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Best Practices
+
+### Input Validation
+
+1. **Validate Before Execute**: Use `validate_only=true` for input checking
+2. **Handle Required Fields**: Ensure all required inputs are provided
+3. **Type Checking**: Verify input types match action schema
+4. **Range Validation**: Check numeric and string length limits
+
+### Performance Optimization
+
+1. **Appropriate Timeouts**: Set realistic timeout values based on action type
+2. **Enable Profiling**: Use profiling for performance analysis
+3. **Batch Operations**: Group related action executions
+4. **Connection Reuse**: Use singleton client instances
+
+### Error Handling
+
+1. **Retry Logic**: Implement exponential backoff for transient failures
+2. **Graceful Degradation**: Have fallback actions for critical paths
+3. **Error Classification**: Distinguish between retriable and permanent errors
+4. **Monitoring**: Track execution success rates and performance
+
+## Rate Limits
+
+| Action Type | Limit | Window | Notes |
+|-------------|-------|---------|-------|
+| Communication | 500 | 1 hour | Slack, email, SMS actions |
+| Data Processing | 1000 | 1 hour | Validation, transformation actions |
+| HTTP Requests | 2000 | 1 hour | External API calls |
+| Custom Actions | 200 | 1 hour | User-created actions |
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="List Actions" icon="list" href="/api/resources/actions/list-actions">
+    Browse all available actions
+  </Card>
+  <Card title="Get Action" icon="search" href="/api/resources/actions/get-action">
+    Get detailed action information and schema
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Create Action" icon="plus" href="/api/resources/actions/create-action">
+    Create custom actions for your organization
+  </Card>
+  <Card title="Action Logs" icon="file-text" href="/api/resources/actions/get-logs">
+    View execution logs and debugging information
+  </Card>
+</CardGroup>
+
+---
+
+*Use the Execute Action endpoint for testing, debugging, and standalone automation. This endpoint provides direct access to individual actions with comprehensive validation and monitoring capabilities.*

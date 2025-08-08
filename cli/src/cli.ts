@@ -15,6 +15,15 @@ import { ToolAuthOauth2Command } from './commands/tool-auth-oauth2';
 import { AuthLoginCommand } from './commands/auth-login';
 import { ExecuteActionCommand } from './commands/execute-action';
 
+// Import comprehensive command modules
+import { FlowsCommand } from './commands/flows';
+import { ToolsCommand } from './commands/tools';
+import { UsersCommand } from './commands/users';
+import { WebhooksCommand } from './commands/webhooks';
+import { LogsCommand } from './commands/logs';
+import { ConfigCommand } from './commands/config';
+import { InitCommand } from './commands/init';
+
 // Load environment variables
 dotenv.config();
 
@@ -766,6 +775,17 @@ program
       process.exit(1);
     }
   });
+
+/**
+ * Register comprehensive command modules
+ */
+FlowsCommand.register(program);
+ToolsCommand.register(program);
+UsersCommand.register(program);
+WebhooksCommand.register(program);
+LogsCommand.register(program);
+ConfigCommand.register(program);
+InitCommand.register(program);
 
 // Error handling
 program.configureHelp({

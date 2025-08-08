@@ -1,0 +1,784 @@
+---
+title: "Create Flow"
+description: "Create a new workflow from a definition with comprehensive validation and immediate availability for execution."
+---
+
+# Create Flow
+
+Create a new workflow by submitting a complete flow definition. The API validates the definition, creates the workflow, and makes it immediately available for execution.
+
+## Endpoint
+
+<CodeGroup>
+```http HTTP
+POST /flows
+```
+
+```bash cURL
+curl -X POST "https://tolstoy.getpullse.com/flows" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json" \
+  -d @flow-definition.json
+```
+</CodeGroup>
+
+## Request Body
+
+The request body must contain a complete flow definition:
+
+```json
+{
+  "name": "string",
+  "description": "string",
+  "version": 1,
+  "inputs": [
+    {
+      "name": "string",
+      "type": "string|number|boolean|object|array",
+      "required": true,
+      "description": "string",
+      "default": "any",
+      "validation": {}
+    }
+  ],
+  "steps": [
+    {
+      "key": "string",
+      "name": "string", 
+      "action": "string",
+      "inputs": {},
+      "executeIf": "string",
+      "onError": {},
+      "retryPolicy": {}
+    }
+  ],
+  "outputs": [
+    {
+      "name": "string",
+      "type": "string",
+      "source": "string",
+      "description": "string"
+    }
+  ],
+  "settings": {
+    "timeout": 300000,
+    "retryPolicy": {
+      "maxRetries": 3,
+      "retryDelay": 1000,
+      "backoffMultiplier": 2
+    },
+    "errorHandling": "stop|continue",
+    "enableLogging": true,
+    "enableMetrics": true
+  },
+  "tags": ["string"],
+  "status": "draft|active|inactive"
+}
+```
+
+### Required Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Unique workflow name within organization |
+| `steps` | array | At least one step is required |
+
+### Optional Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `description` | string | null | Human-readable workflow description |
+| `version` | integer | 1 | Workflow version number |
+| `inputs` | array | [] | Input parameter definitions |
+| `outputs` | array | [] | Output parameter definitions |
+| `settings` | object | defaults | Execution configuration |
+| `tags` | array | [] | Categorization tags |
+| `status` | string | "draft" | Initial workflow status |
+
+## Examples
+
+### Basic Workflow
+
+<CodeGroup>
+```json Simple Notification Flow
+{
+  "name": "Simple Notification",
+  "description": "Send a basic notification via Slack",
+  "steps": [
+    {
+      "key": "send-notification",
+      "name": "Send Slack Message",
+      "action": "slack-send-message",
+      "inputs": {
+        "channel": "#general",
+        "message": "Hello from Tolstoy!"
+      }
+    }
+  ],
+  "tags": ["notifications", "slack"]
+}
+```
+
+```json Multi-Step User Onboarding
+{
+  "name": "User Onboarding Flow",
+  "description": "Complete user onboarding process with email and CRM integration",
+  "inputs": [
+    {
+      "name": "email",
+      "type": "string",
+      "required": true,
+      "description": "User's email address",
+      "validation": {
+        "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"
+      }
+    },
+    {
+      "name": "name",
+      "type": "string", 
+      "required": true,
+      "description": "User's full name"
+    },
+    {
+      "name": "company",
+      "type": "string",
+      "required": false,
+      "description": "User's company name"
+    }
+  ],
+  "steps": [
+    {
+      "key": "validate-email",
+      "name": "Validate Email Address",
+      "action": "email-validator",
+      "inputs": {
+        "email": "{{inputs.email}}"
+      }
+    },
+    {
+      "key": "create-crm-contact",
+      "name": "Create CRM Contact",
+      "action": "salesforce-create-contact",
+      "inputs": {
+        "email": "{{inputs.email}}",
+        "firstName": "{{inputs.name | split(' ') | first}}",
+        "lastName": "{{inputs.name | split(' ') | last}}",
+        "company": "{{inputs.company}}"
+      },
+      "executeIf": "{{steps.validate-email.outputs.valid}} == true"
+    },
+    {
+      "key": "send-welcome-email",
+      "name": "Send Welcome Email",
+      "action": "sendgrid-send-email",
+      "inputs": {
+        "to": "{{inputs.email}}",
+        "template": "welcome-template",
+        "variables": {
+          "name": "{{inputs.name}}",
+          "company": "{{inputs.company}}"
+        }
+      },
+      "executeIf": "{{steps.validate-email.outputs.valid}} == true",
+      "onError": {
+        "action": "log-error",
+        "inputs": {
+          "message": "Failed to send welcome email to {{inputs.email}}",
+          "error": "{{error.message}}"
+        }
+      }
+    },
+    {
+      "key": "notify-team",
+      "name": "Notify Sales Team",
+      "action": "slack-send-message",
+      "inputs": {
+        "channel": "#sales",
+        "message": "🎉 New user onboarded: {{inputs.name}} ({{inputs.email}}) from {{inputs.company}}"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "name": "crmContactId",
+      "type": "string",
+      "source": "{{steps.create-crm-contact.outputs.id}}",
+      "description": "Salesforce contact ID"
+    },
+    {
+      "name": "emailSent",
+      "type": "boolean",
+      "source": "{{steps.send-welcome-email.outputs.success}}",
+      "description": "Whether welcome email was sent successfully"
+    }
+  ],
+  "settings": {
+    "timeout": 300000,
+    "retryPolicy": {
+      "maxRetries": 2,
+      "retryDelay": 5000
+    },
+    "errorHandling": "continue"
+  },
+  "tags": ["onboarding", "crm", "email"]
+}
+```
+</CodeGroup>
+
+### Advanced Workflow with Conditional Logic
+
+<CodeGroup>
+```json Complex Business Process
+{
+  "name": "Lead Qualification Process",
+  "description": "Multi-stage lead qualification with scoring and routing",
+  "inputs": [
+    {
+      "name": "leadData",
+      "type": "object",
+      "required": true,
+      "description": "Complete lead information",
+      "validation": {
+        "required": ["email", "company", "jobTitle"]
+      }
+    }
+  ],
+  "steps": [
+    {
+      "key": "enrich-lead",
+      "name": "Enrich Lead Data",
+      "action": "clearbit-enrich",
+      "inputs": {
+        "email": "{{inputs.leadData.email}}"
+      }
+    },
+    {
+      "key": "calculate-score",
+      "name": "Calculate Lead Score",
+      "action": "lead-scoring-algorithm",
+      "inputs": {
+        "leadData": "{{inputs.leadData}}",
+        "enrichedData": "{{steps.enrich-lead.outputs}}"
+      }
+    },
+    {
+      "key": "high-value-routing",
+      "name": "Route High-Value Lead",
+      "action": "salesforce-assign-lead",
+      "inputs": {
+        "leadId": "{{steps.enrich-lead.outputs.leadId}}",
+        "assignTo": "senior-sales-rep",
+        "priority": "high"
+      },
+      "executeIf": "{{steps.calculate-score.outputs.score}} >= 80"
+    },
+    {
+      "key": "medium-value-routing",
+      "name": "Route Medium-Value Lead", 
+      "action": "salesforce-assign-lead",
+      "inputs": {
+        "leadId": "{{steps.enrich-lead.outputs.leadId}}",
+        "assignTo": "sales-rep",
+        "priority": "medium"
+      },
+      "executeIf": "{{steps.calculate-score.outputs.score}} >= 50 && {{steps.calculate-score.outputs.score}} < 80"
+    },
+    {
+      "key": "nurture-campaign",
+      "name": "Add to Nurture Campaign",
+      "action": "marketo-add-to-campaign",
+      "inputs": {
+        "email": "{{inputs.leadData.email}}",
+        "campaignId": "nurture-campaign-2024"
+      },
+      "executeIf": "{{steps.calculate-score.outputs.score}} < 50"
+    },
+    {
+      "key": "send-notification",
+      "name": "Notify Sales Manager",
+      "action": "slack-send-message",
+      "inputs": {
+        "channel": "#sales-alerts",
+        "message": "🎯 New {{steps.calculate-score.outputs.score >= 80 ? 'high-value' : 'qualified'}} lead: {{inputs.leadData.email}} (Score: {{steps.calculate-score.outputs.score}})"
+      },
+      "executeIf": "{{steps.calculate-score.outputs.score}} >= 50"
+    }
+  ],
+  "settings": {
+    "timeout": 600000,
+    "retryPolicy": {
+      "maxRetries": 3,
+      "retryDelay": 2000,
+      "backoffMultiplier": 2
+    },
+    "errorHandling": "continue",
+    "enableLogging": true,
+    "enableMetrics": true
+  },
+  "tags": ["leads", "qualification", "crm", "scoring"]
+}
+```
+</CodeGroup>
+
+## Request Examples
+
+<CodeGroup>
+```bash cURL - Complete Example
+curl -X POST "https://tolstoy.getpullse.com/flows" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Daily Report Generator",
+    "description": "Generate and distribute daily performance reports",
+    "inputs": [
+      {
+        "name": "reportDate",
+        "type": "string",
+        "required": false,
+        "description": "Date for the report (defaults to yesterday)",
+        "default": "{{yesterday}}"
+      }
+    ],
+    "steps": [
+      {
+        "key": "fetch-data",
+        "name": "Fetch Performance Data",
+        "action": "database-query",
+        "inputs": {
+          "query": "SELECT * FROM daily_metrics WHERE date = {{inputs.reportDate}}",
+          "database": "analytics"
+        }
+      },
+      {
+        "key": "generate-report",
+        "name": "Generate Report",
+        "action": "report-generator",
+        "inputs": {
+          "data": "{{steps.fetch-data.outputs.results}}",
+          "template": "daily-performance"
+        }
+      },
+      {
+        "key": "send-report",
+        "name": "Email Report",
+        "action": "send-email",
+        "inputs": {
+          "to": ["management@company.com", "analytics@company.com"],
+          "subject": "Daily Performance Report - {{inputs.reportDate}}",
+          "attachment": "{{steps.generate-report.outputs.reportFile}}"
+        }
+      }
+    ],
+    "settings": {
+      "timeout": 180000
+    },
+    "tags": ["reporting", "daily", "analytics"]
+  }'
+```
+
+```typescript TypeScript/Node.js
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient({
+  orgId: 'org_1234567890abcdef',
+  userId: 'user_abcdef1234567890'
+});
+
+const flowDefinition = {
+  name: 'Customer Support Automation',
+  description: 'Automated customer support ticket processing and routing',
+  inputs: [
+    {
+      name: 'ticketData',
+      type: 'object' as const,
+      required: true,
+      description: 'Support ticket information'
+    }
+  ],
+  steps: [
+    {
+      key: 'analyze-ticket',
+      name: 'Analyze Ticket Content',
+      action: 'nlp-categorization',
+      inputs: {
+        text: '{{inputs.ticketData.description}}',
+        categories: ['technical', 'billing', 'general']
+      }
+    },
+    {
+      key: 'route-ticket',
+      name: 'Route to Appropriate Team',
+      action: 'zendesk-assign-ticket',
+      inputs: {
+        ticketId: '{{inputs.ticketData.id}}',
+        team: '{{steps.analyze-ticket.outputs.category}}-team',
+        priority: '{{inputs.ticketData.priority}}'
+      }
+    },
+    {
+      key: 'auto-response',
+      name: 'Send Auto-Response',
+      action: 'send-email',
+      inputs: {
+        to: '{{inputs.ticketData.customerEmail}}',
+        template: 'support-acknowledgment',
+        variables: {
+          ticketId: '{{inputs.ticketData.id}}',
+          category: '{{steps.analyze-ticket.outputs.category}}'
+        }
+      }
+    }
+  ],
+  settings: {
+    timeout: 60000,
+    retryPolicy: {
+      maxRetries: 3,
+      retryDelay: 1000
+    }
+  },
+  tags: ['support', 'automation', 'routing']
+};
+
+try {
+  const flow = await client.flows.create(flowDefinition);
+  console.log('Created flow:', flow.id);
+  console.log('Flow status:', flow.status);
+} catch (error) {
+  console.error('Failed to create flow:', error);
+}
+```
+
+```python Python
+import tolstoy
+import json
+
+client = tolstoy.Client(
+    org_id='org_1234567890abcdef',
+    user_id='user_abcdef1234567890'
+)
+
+flow_definition = {
+    "name": "Invoice Processing Workflow",
+    "description": "Automated invoice processing and approval routing",
+    "inputs": [
+        {
+            "name": "invoiceData",
+            "type": "object",
+            "required": True,
+            "description": "Invoice information and metadata"
+        }
+    ],
+    "steps": [
+        {
+            "key": "extract-data",
+            "name": "Extract Invoice Data",
+            "action": "ocr-invoice-extraction",
+            "inputs": {
+                "invoiceFile": "{{inputs.invoiceData.filePath}}",
+                "extractFields": ["amount", "vendor", "date", "description"]
+            }
+        },
+        {
+            "key": "validate-data",
+            "name": "Validate Extracted Data",
+            "action": "invoice-validator",
+            "inputs": {
+                "extractedData": "{{steps.extract-data.outputs}}",
+                "validationRules": "standard-invoice-rules"
+            }
+        },
+        {
+            "key": "route-approval",
+            "name": "Route for Approval",
+            "action": "approval-routing",
+            "inputs": {
+                "amount": "{{steps.extract-data.outputs.amount}}",
+                "department": "{{inputs.invoiceData.department}}",
+                "approvalMatrix": "company-approval-matrix"
+            },
+            "executeIf": "{{steps.validate-data.outputs.isValid}} == true"
+        },
+        {
+            "key": "create-expense-record",
+            "name": "Create Expense Record",
+            "action": "erp-create-expense",
+            "inputs": {
+                "invoiceData": "{{steps.extract-data.outputs}}",
+                "approver": "{{steps.route-approval.outputs.assignedApprover}}"
+            }
+        }
+    ],
+    "outputs": [
+        {
+            "name": "expenseRecordId",
+            "type": "string", 
+            "source": "{{steps.create-expense-record.outputs.id}}",
+            "description": "Created expense record ID"
+        }
+    ],
+    "settings": {
+        "timeout": 300000,
+        "retryPolicy": {
+            "maxRetries": 2,
+            "retryDelay": 3000
+        }
+    },
+    "tags": ["finance", "invoices", "automation", "approval"]
+}
+
+try:
+    flow = client.flows.create(flow_definition)
+    print(f"Created flow: {flow['id']}")
+    print(f"Flow status: {flow['status']}")
+except Exception as error:
+    print(f"Failed to create flow: {error}")
+```
+</CodeGroup>
+
+## Response Format
+
+### Success Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "flow_abc123def456",
+    "name": "User Onboarding Flow",
+    "description": "Complete user onboarding process with email and CRM integration",
+    "version": 1,
+    "status": "draft",
+    "definition": {
+      "inputs": [...],
+      "steps": [...],
+      "outputs": [...],
+      "settings": {...}
+    },
+    "tags": ["onboarding", "crm", "email"],
+    "created_at": "2024-01-20T10:30:00Z",
+    "updated_at": "2024-01-20T10:30:00Z",
+    "created_by": {
+      "id": "user_abcdef1234567890",
+      "name": "John Doe",
+      "email": "john@company.com"
+    },
+    "validation": {
+      "valid": true,
+      "warnings": [
+        "Step 'send-welcome-email' has no retry policy configured"
+      ],
+      "errors": []
+    },
+    "stats": {
+      "total_executions": 0,
+      "successful_executions": 0,
+      "failed_executions": 0,
+      "success_rate": 0,
+      "avg_duration_ms": 0,
+      "last_execution_at": null
+    }
+  },
+  "metadata": {
+    "request_id": "req_xyz789abc123",
+    "timestamp": "2024-01-20T10:30:00Z",
+    "processing_time_ms": 145
+  }
+}
+```
+
+### Response Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique flow identifier |
+| `name` | string | Flow name as provided |
+| `description` | string | Flow description |
+| `version` | integer | Flow version number |
+| `status` | string | Current flow status |
+| `definition` | object | Complete flow definition |
+| `tags` | array | Associated tags |
+| `created_at` | string | ISO 8601 creation timestamp |
+| `updated_at` | string | ISO 8601 last update timestamp |
+| `created_by` | object | User who created the flow |
+| `validation` | object | Validation results and warnings |
+| `stats` | object | Initial statistics (all zeros for new flows) |
+
+## Validation Rules
+
+The API performs comprehensive validation on flow definitions:
+
+### Structure Validation
+
+- **Required fields** must be present and non-empty
+- **Data types** must match schema requirements
+- **Array fields** must contain valid elements
+- **Object fields** must have proper structure
+
+### Business Logic Validation
+
+- **Step references** must point to existing steps
+- **Action references** must point to available actions
+- **Variable references** must be properly formatted
+- **Conditional expressions** must have valid syntax
+
+### Security Validation
+
+- **Input sanitization** to prevent injection attacks
+- **Resource limits** to prevent abuse
+- **Permission checks** for referenced actions and tools
+- **Quota enforcement** for organization limits
+
+## Error Handling
+
+### Common Error Responses
+
+<CodeGroup>
+```json 422 - Validation Error
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Flow definition validation failed",
+    "details": {
+      "field_errors": [
+        {
+          "field": "steps[1].action",
+          "error": "Action 'non-existent-action' not found"
+        },
+        {
+          "field": "inputs[0].validation.pattern",
+          "error": "Invalid regular expression pattern"
+        }
+      ],
+      "structural_errors": [
+        "Step 'send-notification' references undefined step 'validate-input'"
+      ]
+    }
+  }
+}
+```
+
+```json 409 - Conflict Error
+{
+  "success": false,
+  "error": {
+    "code": "FLOW_ALREADY_EXISTS",
+    "message": "A flow with this name already exists in your organization",
+    "details": {
+      "existing_flow_id": "flow_existing123",
+      "existing_flow_name": "User Onboarding Flow",
+      "suggestion": "Use a different name or update the existing flow"
+    }
+  }
+}
+```
+
+```json 400 - Bad Request
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_REQUEST_BODY",
+    "message": "Request body is not valid JSON",
+    "details": {
+      "parse_error": "Unexpected token '}' at position 145",
+      "line": 8,
+      "column": 12
+    }
+  }
+}
+```
+</CodeGroup>
+
+### Error Resolution Guide
+
+<details>
+<summary>**Validation Error**: Action not found</summary>
+
+**Problem**: Referenced action doesn't exist in your organization
+**Solution**: 
+1. Check available actions: `GET /actions`
+2. Create the missing action: `POST /actions`
+3. Update flow definition with correct action key
+</details>
+
+<details>
+<summary>**Conflict Error**: Flow name already exists</summary>
+
+**Problem**: Flow name must be unique within organization
+**Solution**:
+1. Choose a different name
+2. Or update existing flow: `PUT /flows/{existing-flow-id}`
+3. Or append version/date suffix: "Flow Name v2"
+</details>
+
+<details>
+<summary>**Security Error**: Insufficient permissions</summary>
+
+**Problem**: Referenced action requires permissions you don't have
+**Solution**:
+1. Request access from organization admin
+2. Use alternative action with similar functionality
+3. Remove restricted step from workflow
+</details>
+
+## Best Practices
+
+### Flow Design
+
+1. **Clear Naming**: Use descriptive, unique names that explain the workflow purpose
+2. **Modular Steps**: Break complex operations into smaller, focused steps
+3. **Error Handling**: Include error handling for critical steps
+4. **Documentation**: Provide clear descriptions for flows and steps
+5. **Testing**: Create flows in draft status for testing before activation
+
+### Performance Optimization
+
+1. **Parallel Execution**: Use parallel steps where possible to reduce execution time
+2. **Conditional Logic**: Use executeIf to skip unnecessary steps
+3. **Resource Management**: Set appropriate timeouts and retry policies
+4. **Caching**: Leverage caching actions for expensive operations
+5. **Monitoring**: Enable logging and metrics for performance tracking
+
+### Security Considerations
+
+1. **Input Validation**: Always validate inputs, especially from external sources
+2. **Secret Management**: Use secure storage for credentials and sensitive data
+3. **Least Privilege**: Only grant necessary permissions to workflows
+4. **Audit Trail**: Enable logging for compliance and debugging
+5. **Data Protection**: Handle PII and sensitive data according to regulations
+
+## Rate Limits
+
+The Create Flow endpoint has the following rate limits:
+
+| Limit Type | Requests | Window | Notes |
+|------------|----------|---------|--------|
+| Per User | 100 | 1 hour | Individual user creation limit |
+| Per Organization | 500 | 1 hour | Organization-wide creation limit |
+| Burst Limit | 10 | 1 minute | Short-term burst protection |
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="List Flows" icon="list" href="/api/resources/flows/list-flows">
+    Retrieve all flows in your organization
+  </Card>
+  <Card title="Update Flow" icon="edit" href="/api/resources/flows/update-flow">
+    Modify an existing flow definition
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Execute Flow" icon="play" href="/api/resources/flows/execute-flow">
+    Execute the created flow with input parameters
+  </Card>
+  <Card title="Validate Flow" icon="check" href="/api/resources/flows/validate-flow">
+    Validate a flow definition without creating it
+  </Card>
+</CardGroup>
+
+---
+
+*Use the Create Flow endpoint to build sophisticated workflow automation. Start with simple flows and gradually add complexity as you become familiar with the platform capabilities.*

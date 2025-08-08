@@ -77,11 +77,13 @@ export class InputValidatorService {
     );
 
     try {
-      const schema = this.buildEnhancedZodSchema(enhancedParams);
+      // Pre-filter parameters based on visibility conditions
+      const visibleParams = this.filterVisibleParams(enhancedParams, inputData || {});
+      
+      const schema = this.buildEnhancedZodSchema(visibleParams);
       const validated = schema.parse(inputData || {}) as ValidatedInputData;
 
-      // Apply visibility filters
-      return this.applyVisibility(enhancedParams, validated);
+      return validated;
     } catch (err: unknown) {
       // Record validation error metrics if context is provided
       if (context && this.metricsService) {
@@ -89,6 +91,28 @@ export class InputValidatorService {
       }
       return this.handleValidationError(err, enhancedParams, inputData);
     }
+  }
+
+  /**
+   * Filter parameters based on visibility conditions
+   */
+  private filterVisibleParams(
+    params: ActionInputParam[],
+    inputData: Record<string, unknown>,
+  ): ActionInputParam[] {
+    return params.filter((param) => {
+      if (!param.visibleIf) {
+        return true; // Always visible if no condition
+      }
+
+      try {
+        return jsonLogic.apply(param.visibleIf, inputData);
+      } catch (error) {
+        // Log visibility evaluation error but include field by default
+        console.warn(`Failed to evaluate visibility condition for ${param.name}:`, error);
+        return true;
+      }
+    });
   }
 
   /**
@@ -233,40 +257,6 @@ export class InputValidatorService {
     return numberSchema;
   }
 
-  /**
-   * Apply visibility conditions using JSONLogic
-   */
-  private applyVisibility(
-    params: ActionInputParam[],
-    data: ValidatedInputData,
-  ): ValidatedInputData {
-    const result = { ...data };
-
-    for (const param of params) {
-      if (param.visibleIf && param.name in result) {
-        try {
-          const isVisible = jsonLogic.apply(param.visibleIf, { inputs: result });
-          if (!isVisible) {
-            delete result[param.name];
-          }
-        } catch (error) {
-          // Log visibility evaluation error but don't fail validation
-          Sentry.addBreadcrumb({
-            message: 'Failed to evaluate visibility condition',
-            category: 'validation',
-            level: 'warning',
-            data: {
-              paramName: param.name,
-              visibleIf: param.visibleIf,
-              error: error instanceof Error ? error.message : 'Unknown error',
-            },
-          });
-        }
-      }
-    }
-
-    return result;
-  }
 
   /**
    * Handle validation errors with enhanced error reporting

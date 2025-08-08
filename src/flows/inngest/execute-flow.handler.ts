@@ -554,7 +554,7 @@ export class ExecuteFlowHandler {
       let toolName: string | undefined;
 
       // Check if step config has tool information
-      const stepConfig = step.config as any;
+      const stepConfig = step.config as Record<string, unknown>;
       if (stepConfig.toolName) {
         toolName = stepConfig.toolName;
       } else if (stepConfig.url) {
@@ -605,7 +605,7 @@ export class ExecuteFlowHandler {
       if (orgAuth) {
         // Handle API Key authentication
         if (orgAuth.type === 'apiKey' && orgAuth.config) {
-          const config = orgAuth.config as any;
+          const config = orgAuth.config as Record<string, unknown>;
           if (config.headerName && config.headerValue) {
             authHeaders[config.headerName] = config.headerValue;
           } else if (config.apiKey) {

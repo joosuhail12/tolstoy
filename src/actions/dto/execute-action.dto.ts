@@ -68,5 +68,5 @@ export class ExecuteActionDto {
     },
   })
   @IsObject()
-  inputs: Record<string, any>;
+  inputs: Record<string, unknown>;
 }

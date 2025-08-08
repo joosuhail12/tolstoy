@@ -77,6 +77,11 @@ resources:
           retrieve: get /tools/{toolId}/secrets
           delete: delete /tools/{toolId}/secrets
           list: get /tools/secrets
+      auth:
+        methods:
+          upsert: post /tools/{toolId}/auth
+          retrieve: get /tools/{toolId}/auth
+          delete: delete /tools/{toolId}/auth
 
   actions:
     methods:
@@ -85,6 +90,7 @@ resources:
       retrieve: get /actions/{id}
       update: put /actions/{id}
       delete: delete /actions/{id}
+      execute: post /actions/{key}/execute
 
   flows:
     methods:
@@ -122,6 +128,11 @@ resources:
       toggle: patch /webhooks/{id}/toggle
       test: post /webhooks/{id}/test
 
+  auth:
+    methods:
+      oauth_login: get /auth/{toolKey}/login
+      oauth_callback: get /auth/{toolKey}/callback
+
   $client:
     methods:
       get_welcome_message: get /
@@ -138,6 +149,9 @@ settings:
   # [prism mock http server]: https://stoplight.io/open-source/prism
   disable_mock_tests: true
   license: Apache-2.0
+
+openapi:
+  code_samples: 'mintlify'
 
 # `client_settings` define settings for the API client, such as extra constructor
 # arguments (used for authentication), retry behavior, idempotency, etc.

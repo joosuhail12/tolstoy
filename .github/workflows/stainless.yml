@@ -1,0 +1,81 @@
+name: Stainless SDK Generation
+
+on:
+  pull_request:
+    paths:
+      - 'docs/openapi.json'
+      - 'stainless.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/openapi.json'
+      - 'stainless.yml'
+
+env:
+  STAINLESS_ORG: pullse-inc
+  STAINLESS_PROJECT: tolstoy-api
+  OAS_PATH: docs/openapi.json
+
+jobs:
+  preview:
+    # Run preview builds on PRs (but not when PR is closed)
+    if: github.event_name == 'pull_request' && github.event.action != 'closed'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Run preview builds
+        uses: stainless-api/upload-openapi-spec-action/preview@v1
+        with:
+          stainless_api_key: ${{ secrets.STAINLESS_TOKEN }}
+          org: ${{ env.STAINLESS_ORG }}
+          project: ${{ env.STAINLESS_PROJECT }}
+          oas_path: ${{ env.OAS_PATH }}
+
+  merge:
+    # Run builds when PRs that modify OpenAPI spec are merged to main
+    if: github.event_name == 'pull_request' && github.event.action == 'closed' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Run merge build
+        uses: stainless-api/upload-openapi-spec-action/merge@v1
+        with:
+          stainless_api_key: ${{ secrets.STAINLESS_TOKEN }}
+          org: ${{ env.STAINLESS_ORG }}
+          project: ${{ env.STAINLESS_PROJECT }}
+          oas_path: ${{ env.OAS_PATH }}
+
+  push:
+    # Run builds when changes are pushed directly to main
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Run push build
+        uses: stainless-api/upload-openapi-spec-action/push@v1
+        with:
+          stainless_api_key: ${{ secrets.STAINLESS_TOKEN }}
+          org: ${{ env.STAINLESS_ORG }}
+          project: ${{ env.STAINLESS_PROJECT }}
+          oas_path: ${{ env.OAS_PATH }}

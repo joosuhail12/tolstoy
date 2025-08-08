@@ -1,0 +1,830 @@
+---
+title: "Get Execution"
+description: "Retrieve detailed information about a specific workflow execution including status, results, step-by-step progress, and performance metrics."
+---
+
+# Get Execution
+
+Retrieve comprehensive information about a specific workflow execution, including current status, detailed results, step-by-step progress, performance metrics, and error details.
+
+## Endpoint
+
+<CodeGroup>
+```http HTTP
+GET /executions/{id}
+```
+
+```bash cURL
+curl -X GET "https://tolstoy.getpullse.com/executions/exec_abc123def456" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890"
+```
+</CodeGroup>
+
+## Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | string | **Required.** The unique identifier of the execution to retrieve |
+
+## Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `include_steps` | boolean | true | Include detailed step execution information |
+| `include_logs` | boolean | false | Include execution logs in response |
+| `include_profiling` | boolean | false | Include performance profiling data |
+| `step_limit` | number | 50 | Maximum number of steps to return |
+
+## Response Format
+
+### Completed Execution
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "exec_abc123def456",
+    "flow_id": "flow_xyz789abc123",
+    "flow_name": "User Onboarding Flow",
+    "flow_version": 3,
+    "status": "completed",
+    "mode": "async",
+    "priority": "normal",
+    "inputs": {
+      "email": "user@example.com",
+      "name": "John Doe",
+      "company": "Acme Corp",
+      "source": "website-signup"
+    },
+    "outputs": {
+      "crm_contact_id": "contact_sf_abc123",
+      "email_sent": true,
+      "welcome_email_id": "email_sg_def456",
+      "onboarding_complete": true,
+      "next_steps": [
+        "Schedule product demo",
+        "Send feature guide email",
+        "Add to monthly newsletter"
+      ]
+    },
+    "started_at": "2024-01-20T10:30:00Z",
+    "completed_at": "2024-01-20T10:30:42Z",
+    "duration_ms": 42150,
+    "triggered_by": {
+      "type": "webhook",
+      "source": "website-form",
+      "ip_address": "192.168.1.100",
+      "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    },
+    "execution_context": {
+      "org_id": "org_1234567890abcdef",
+      "user_id": "user_abcdef1234567890",
+      "environment": "production",
+      "tags": ["onboarding", "high-priority"],
+      "trace_id": "trace_xyz123abc456"
+    },
+    "steps": [
+      {
+        "key": "validate-email",
+        "name": "Validate Email Address",
+        "action": "email-validator",
+        "status": "completed",
+        "started_at": "2024-01-20T10:30:01Z",
+        "completed_at": "2024-01-20T10:30:05Z",
+        "duration_ms": 4200,
+        "inputs": {
+          "email": "user@example.com",
+          "check_mx": true,
+          "check_disposable": true
+        },
+        "outputs": {
+          "valid": true,
+          "domain": "example.com",
+          "mx_valid": true,
+          "is_disposable": false,
+          "confidence_score": 0.98
+        },
+        "execution_details": {
+          "attempts": 1,
+          "network_time_ms": 3800,
+          "processing_time_ms": 400
+        }
+      },
+      {
+        "key": "create-crm-contact",
+        "name": "Create CRM Contact",
+        "action": "salesforce-create-contact",
+        "status": "completed",
+        "started_at": "2024-01-20T10:30:05Z",
+        "completed_at": "2024-01-20T10:30:18Z",
+        "duration_ms": 13100,
+        "inputs": {
+          "email": "user@example.com",
+          "first_name": "John",
+          "last_name": "Doe",
+          "company": "Acme Corp",
+          "lead_source": "Website"
+        },
+        "outputs": {
+          "id": "contact_sf_abc123",
+          "success": true,
+          "url": "https://company.salesforce.com/contact/contact_sf_abc123",
+          "created": true
+        },
+        "execution_details": {
+          "attempts": 1,
+          "network_time_ms": 12600,
+          "processing_time_ms": 500,
+          "rate_limit_wait_ms": 0
+        },
+        "condition_evaluation": {
+          "executeIf": "{{steps.validate-email.outputs.valid}} == true",
+          "result": true,
+          "evaluation_time_ms": 2
+        }
+      },
+      {
+        "key": "send-welcome-email",
+        "name": "Send Welcome Email",
+        "action": "sendgrid-send-email",
+        "status": "completed",
+        "started_at": "2024-01-20T10:30:18Z",
+        "completed_at": "2024-01-20T10:30:25Z",
+        "duration_ms": 7200,
+        "inputs": {
+          "to": "user@example.com",
+          "template_id": "welcome-template-v2",
+          "dynamic_template_data": {
+            "name": "John",
+            "company": "Acme Corp",
+            "crm_url": "https://company.salesforce.com/contact/contact_sf_abc123"
+          }
+        },
+        "outputs": {
+          "message_id": "email_sg_def456",
+          "success": true,
+          "status": "queued",
+          "timestamp": "2024-01-20T10:30:25Z"
+        },
+        "execution_details": {
+          "attempts": 1,
+          "network_time_ms": 6800,
+          "processing_time_ms": 400
+        },
+        "condition_evaluation": {
+          "executeIf": "{{steps.validate-email.outputs.valid}} == true",
+          "result": true,
+          "evaluation_time_ms": 1
+        }
+      },
+      {
+        "key": "notify-sales-team",
+        "name": "Notify Sales Team",
+        "action": "slack-send-message",
+        "status": "completed",
+        "started_at": "2024-01-20T10:30:25Z",
+        "completed_at": "2024-01-20T10:30:42Z",
+        "duration_ms": 17650,
+        "inputs": {
+          "channel": "#new-leads",
+          "message": "🎉 New lead: John Doe from Acme Corp",
+          "blocks": [
+            {
+              "type": "section",
+              "text": {
+                "type": "mrkdwn",
+                "text": "*New Lead Alert*\n\n*Name:* John Doe\n*Company:* Acme Corp\n*Email:* user@example.com\n*Source:* Website signup"
+              }
+            },
+            {
+              "type": "actions",
+              "elements": [
+                {
+                  "type": "button",
+                  "text": {
+                    "type": "plain_text",
+                    "text": "View in Salesforce"
+                  },
+                  "url": "https://company.salesforce.com/contact/contact_sf_abc123"
+                }
+              ]
+            }
+          ]
+        },
+        "outputs": {
+          "message_id": "1703952000.123456",
+          "timestamp": "1703952000.123456",
+          "channel_id": "C1234567890",
+          "success": true
+        },
+        "execution_details": {
+          "attempts": 2,
+          "network_time_ms": 16800,
+          "processing_time_ms": 850,
+          "retry_reason": "Rate limit - retried after 5000ms",
+          "total_retry_delay_ms": 5000
+        }
+      }
+    ],
+    "performance": {
+      "total_duration_ms": 42150,
+      "steps_duration_ms": 42150,
+      "overhead_ms": 0,
+      "network_time_ms": 39800,
+      "processing_time_ms": 2150,
+      "condition_evaluation_ms": 3,
+      "parallel_steps": 0,
+      "sequential_steps": 4,
+      "retries_total": 1,
+      "cache_hits": 2,
+      "cache_misses": 6
+    },
+    "resource_usage": {
+      "memory_peak_mb": 67.5,
+      "memory_avg_mb": 45.2,
+      "cpu_time_ms": 150,
+      "network_bytes_sent": 15420,
+      "network_bytes_received": 8930
+    },
+    "error": null,
+    "warnings": [
+      "Step 'notify-sales-team' experienced a rate limit and was retried"
+    ],
+    "metadata": {
+      "execution_environment": "production",
+      "worker_id": "worker_abc123",
+      "region": "us-east-1",
+      "flow_definition_hash": "sha256:abc123...",
+      "created_backup": false
+    }
+  },
+  "metadata": {
+    "request_id": "req_xyz789abc123",
+    "timestamp": "2024-01-20T10:35:00Z",
+    "processing_time_ms": 25
+  }
+}
+```
+
+### Failed Execution
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "exec_def789ghi012",
+    "flow_id": "flow_xyz789abc123",
+    "flow_name": "User Onboarding Flow",
+    "flow_version": 3,
+    "status": "failed",
+    "mode": "async",
+    "priority": "normal",
+    "inputs": {
+      "email": "invalid-user@nonexistent.com",
+      "name": "Test User",
+      "company": "Test Company"
+    },
+    "outputs": null,
+    "started_at": "2024-01-20T11:00:00Z",
+    "completed_at": "2024-01-20T11:00:15Z",
+    "duration_ms": 15300,
+    "steps": [
+      {
+        "key": "validate-email",
+        "name": "Validate Email Address",
+        "action": "email-validator",
+        "status": "completed",
+        "started_at": "2024-01-20T11:00:01Z",
+        "completed_at": "2024-01-20T11:00:05Z",
+        "duration_ms": 4100,
+        "inputs": {
+          "email": "invalid-user@nonexistent.com",
+          "check_mx": true
+        },
+        "outputs": {
+          "valid": false,
+          "domain": "nonexistent.com",
+          "mx_valid": false,
+          "is_disposable": false,
+          "error": "Domain does not exist"
+        }
+      },
+      {
+        "key": "create-crm-contact",
+        "name": "Create CRM Contact",
+        "action": "salesforce-create-contact",
+        "status": "skipped",
+        "skipped_reason": "Condition not met: email validation failed",
+        "condition_evaluation": {
+          "executeIf": "{{steps.validate-email.outputs.valid}} == true",
+          "result": false,
+          "evaluation_time_ms": 1
+        }
+      },
+      {
+        "key": "send-welcome-email",
+        "name": "Send Welcome Email",
+        "action": "sendgrid-send-email",
+        "status": "failed",
+        "started_at": "2024-01-20T11:00:05Z",
+        "completed_at": "2024-01-20T11:00:15Z",
+        "duration_ms": 10200,
+        "inputs": {
+          "to": "invalid-user@nonexistent.com",
+          "template_id": "welcome-template-v2"
+        },
+        "outputs": null,
+        "error": {
+          "code": "EMAIL_DELIVERY_FAILED",
+          "message": "Email delivery failed: Invalid recipient domain",
+          "details": {
+            "provider_error": "Domain 'nonexistent.com' does not have valid MX records",
+            "provider_code": "550",
+            "retry_possible": false
+          }
+        },
+        "execution_details": {
+          "attempts": 3,
+          "max_retries_reached": true,
+          "retry_delays_ms": [1000, 2000, 4000],
+          "total_retry_time_ms": 7000
+        }
+      }
+    ],
+    "error": {
+      "code": "STEP_EXECUTION_FAILED",
+      "message": "Step 'send-welcome-email' failed after 3 retry attempts",
+      "failed_step": "send-welcome-email",
+      "root_cause": "EMAIL_DELIVERY_FAILED",
+      "details": {
+        "step_key": "send-welcome-email",
+        "step_name": "Send Welcome Email",
+        "attempts_made": 3,
+        "last_error": "Email delivery failed: Invalid recipient domain"
+      }
+    },
+    "performance": {
+      "total_duration_ms": 15300,
+      "steps_duration_ms": 14300,
+      "overhead_ms": 1000,
+      "network_time_ms": 13200,
+      "processing_time_ms": 1100,
+      "retries_total": 3
+    }
+  }
+}
+```
+
+### Running Execution
+
+```json
+{
+  "success": true,
+  "data": {
+    "id": "exec_ghi345jkl678",
+    "flow_id": "flow_xyz789abc123",
+    "flow_name": "User Onboarding Flow",
+    "flow_version": 3,
+    "status": "running",
+    "mode": "async",
+    "priority": "high",
+    "inputs": {
+      "email": "current-user@example.com",
+      "name": "Current User",
+      "company": "Current Company"
+    },
+    "outputs": null,
+    "started_at": "2024-01-20T11:10:00Z",
+    "completed_at": null,
+    "duration_ms": null,
+    "current_step": "create-crm-contact",
+    "steps_completed": 1,
+    "total_steps": 4,
+    "progress_percentage": 25,
+    "estimated_completion": "2024-01-20T11:10:45Z",
+    "steps": [
+      {
+        "key": "validate-email",
+        "name": "Validate Email Address",
+        "action": "email-validator", 
+        "status": "completed",
+        "started_at": "2024-01-20T11:10:01Z",
+        "completed_at": "2024-01-20T11:10:04Z",
+        "duration_ms": 3200,
+        "outputs": {
+          "valid": true,
+          "domain": "example.com",
+          "mx_valid": true
+        }
+      },
+      {
+        "key": "create-crm-contact",
+        "name": "Create CRM Contact",
+        "action": "salesforce-create-contact",
+        "status": "running",
+        "started_at": "2024-01-20T11:10:04Z",
+        "completed_at": null,
+        "duration_ms": null,
+        "estimated_completion": "2024-01-20T11:10:20Z",
+        "progress_info": {
+          "phase": "api_request",
+          "description": "Creating contact record in Salesforce"
+        }
+      },
+      {
+        "key": "send-welcome-email",
+        "name": "Send Welcome Email",
+        "action": "sendgrid-send-email",
+        "status": "pending",
+        "condition_evaluation": {
+          "executeIf": "{{steps.validate-email.outputs.valid}} == true",
+          "result": null,
+          "depends_on": ["create-crm-contact"]
+        }
+      },
+      {
+        "key": "notify-sales-team",
+        "name": "Notify Sales Team",
+        "action": "slack-send-message",
+        "status": "pending"
+      }
+    ],
+    "real_time_updates": {
+      "websocket_url": "wss://api.tolstoy.com/executions/exec_ghi345jkl678/stream",
+      "polling_url": "/executions/exec_ghi345jkl678",
+      "recommended_poll_interval_ms": 2000
+    }
+  }
+}
+```
+
+## Request Examples
+
+### Basic Execution Details
+
+<CodeGroup>
+```bash cURL - Basic Request
+curl -X GET "https://tolstoy.getpullse.com/executions/exec_abc123def456" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890"
+```
+
+```typescript TypeScript/Node.js
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient({
+  orgId: 'org_1234567890abcdef',
+  userId: 'user_abcdef1234567890'
+});
+
+async function getExecutionDetails(executionId: string) {
+  try {
+    const execution = await client.executions.get(executionId, {
+      include_steps: true,
+      include_profiling: true
+    });
+    
+    console.log(`Execution: ${execution.id}`);
+    console.log(`Flow: ${execution.flow_name} (v${execution.flow_version})`);
+    console.log(`Status: ${execution.status}`);
+    console.log(`Duration: ${execution.duration_ms || 'In progress'}ms`);
+    
+    if (execution.status === 'running') {
+      console.log(`Progress: ${execution.progress_percentage}% (${execution.steps_completed}/${execution.total_steps} steps)`);
+      console.log(`Current Step: ${execution.current_step}`);
+      console.log(`Estimated Completion: ${execution.estimated_completion}`);
+    }
+    
+    // Display step status
+    console.log('\n📋 Step Status:');
+    execution.steps.forEach((step, i) => {
+      const statusIcon = {
+        completed: '✅',
+        running: '🏃',
+        failed: '❌',
+        skipped: '⏭️',
+        pending: '⏳'
+      }[step.status] || '❓';
+      
+      console.log(`${i + 1}. ${statusIcon} ${step.name} (${step.status})`);
+      if (step.duration_ms) {
+        console.log(`   Duration: ${step.duration_ms}ms`);
+      }
+      if (step.error) {
+        console.log(`   Error: ${step.error.message}`);
+      }
+    });
+    
+    // Performance insights
+    if (execution.performance) {
+      console.log('\n⚡ Performance:');
+      console.log(`  Network Time: ${execution.performance.network_time_ms}ms`);
+      console.log(`  Processing Time: ${execution.performance.processing_time_ms}ms`);
+      console.log(`  Retries: ${execution.performance.retries_total}`);
+      
+      if (execution.resource_usage) {
+        console.log(`  Memory Peak: ${execution.resource_usage.memory_peak_mb}MB`);
+      }
+    }
+    
+    return execution;
+    
+  } catch (error) {
+    console.error('Failed to get execution details:', error);
+    throw error;
+  }
+}
+
+// Usage
+getExecutionDetails('exec_abc123def456');
+```
+
+```python Python
+import tolstoy
+import time
+
+client = tolstoy.Client(
+    org_id='org_1234567890abcdef',
+    user_id='user_abcdef1234567890'
+)
+
+def monitor_execution(execution_id: str):
+    try:
+        print(f"🔍 Monitoring execution: {execution_id}")
+        
+        while True:
+            execution = client.executions.get(execution_id, {
+                'include_steps': True,
+                'include_profiling': True
+            })
+            
+            print(f"\n📊 Status: {execution['status'].upper()}")
+            
+            if execution['status'] == 'running':
+                progress = execution.get('progress_percentage', 0)
+                current_step = execution.get('current_step', 'Unknown')
+                print(f"⏳ Progress: {progress}% - Current step: {current_step}")
+                
+                # Show step details
+                for step in execution['steps']:
+                    status_icon = {
+                        'completed': '✅',
+                        'running': '🏃',
+                        'failed': '❌',
+                        'skipped': '⏭️',
+                        'pending': '⏳'
+                    }.get(step['status'], '❓')
+                    
+                    print(f"  {status_icon} {step['name']}")
+                    
+                    if step['status'] == 'running' and step.get('progress_info'):
+                        print(f"    → {step['progress_info']['description']}")
+                
+            elif execution['status'] == 'completed':
+                duration = execution['duration_ms']
+                print(f"🎉 Completed in {duration:,}ms")
+                
+                # Show outputs
+                if execution.get('outputs'):
+                    print("\n📤 Outputs:")
+                    for key, value in execution['outputs'].items():
+                        print(f"  {key}: {value}")
+                
+                # Performance summary
+                if execution.get('performance'):
+                    perf = execution['performance']
+                    print(f"\n⚡ Performance Summary:")
+                    print(f"  Total Duration: {perf['total_duration_ms']:,}ms")
+                    print(f"  Network Time: {perf['network_time_ms']:,}ms")
+                    print(f"  Processing Time: {perf['processing_time_ms']:,}ms")
+                    print(f"  Retries: {perf['retries_total']}")
+                
+                break
+                
+            elif execution['status'] in ['failed', 'cancelled']:
+                print(f"❌ Execution {execution['status']}")
+                
+                if execution.get('error'):
+                    error = execution['error']
+                    print(f"Error: {error['message']}")
+                    if error.get('failed_step'):
+                        print(f"Failed at step: {error['failed_step']}")
+                
+                # Show failed steps
+                failed_steps = [s for s in execution['steps'] if s['status'] == 'failed']
+                if failed_steps:
+                    print("\n💥 Failed Steps:")
+                    for step in failed_steps:
+                        print(f"  - {step['name']}: {step.get('error', {}).get('message', 'Unknown error')}")
+                
+                break
+            
+            # Wait before next check (for running executions)
+            if execution['status'] == 'running':
+                time.sleep(2)
+            else:
+                break
+        
+        return execution
+        
+    except Exception as error:
+        print(f"Failed to monitor execution: {error}")
+        raise error
+
+# Usage
+monitor_execution('exec_abc123def456')
+```
+</CodeGroup>
+
+### Advanced Analysis
+
+```typescript
+async function analyzeExecutionPerformance(executionId: string) {
+  const execution = await client.executions.get(executionId, {
+    include_steps: true,
+    include_profiling: true
+  });
+  
+  if (execution.status !== 'completed') {
+    throw new Error('Can only analyze completed executions');
+  }
+  
+  const analysis = {
+    overall: {
+      totalDuration: execution.duration_ms,
+      successRate: execution.steps.filter(s => s.status === 'completed').length / execution.steps.length,
+      retryRate: execution.steps.filter(s => s.execution_details?.attempts > 1).length / execution.steps.length
+    },
+    bottlenecks: [],
+    recommendations: []
+  };
+  
+  // Identify bottlenecks
+  const avgDuration = execution.duration_ms / execution.steps.length;
+  execution.steps.forEach(step => {
+    if (step.duration_ms > avgDuration * 2) {
+      analysis.bottlenecks.push({
+        step: step.name,
+        duration: step.duration_ms,
+        impact: ((step.duration_ms / execution.duration_ms) * 100).toFixed(1) + '%'
+      });
+    }
+  });
+  
+  // Generate recommendations
+  if (analysis.overall.retryRate > 0.2) {
+    analysis.recommendations.push('High retry rate detected - consider improving error handling');
+  }
+  
+  if (execution.performance.network_time_ms > execution.performance.processing_time_ms * 5) {
+    analysis.recommendations.push('Network time dominates execution - consider optimizing API calls');
+  }
+  
+  if (analysis.bottlenecks.length > 0) {
+    analysis.recommendations.push(`Optimize ${analysis.bottlenecks.length} bottleneck step(s)`);
+  }
+  
+  return analysis;
+}
+```
+
+## Execution Monitoring Patterns
+
+### Real-time Monitoring
+
+```typescript
+class ExecutionMonitor {
+  constructor(private client: TolstoyClient) {}
+  
+  async monitorWithCallback(
+    executionId: string, 
+    onUpdate: (execution: any) => void,
+    options: { pollInterval?: number; timeout?: number } = {}
+  ) {
+    const { pollInterval = 2000, timeout = 300000 } = options;
+    const startTime = Date.now();
+    
+    while (true) {
+      const execution = await this.client.executions.get(executionId);
+      onUpdate(execution);
+      
+      // Check if execution is complete
+      if (['completed', 'failed', 'cancelled'].includes(execution.status)) {
+        return execution;
+      }
+      
+      // Check timeout
+      if (Date.now() - startTime > timeout) {
+        throw new Error('Monitoring timeout exceeded');
+      }
+      
+      // Wait before next poll
+      await new Promise(resolve => setTimeout(resolve, pollInterval));
+    }
+  }
+  
+  async waitForCompletion(
+    executionId: string, 
+    options: { timeout?: number; pollInterval?: number } = {}
+  ) {
+    return this.monitorWithCallback(executionId, (execution) => {
+      if (execution.status === 'running') {
+        console.log(`Progress: ${execution.progress_percentage}% - ${execution.current_step}`);
+      }
+    }, options);
+  }
+}
+
+// Usage
+const monitor = new ExecutionMonitor(client);
+
+monitor.waitForCompletion('exec_abc123def456', {
+  timeout: 600000, // 10 minutes
+  pollInterval: 3000 // 3 seconds
+}).then(result => {
+  console.log('Execution completed:', result.status);
+}).catch(error => {
+  console.error('Monitoring failed:', error);
+});
+```
+
+## Error Analysis
+
+```typescript
+function analyzeExecutionErrors(execution: any) {
+  if (execution.status !== 'failed') {
+    return { hasErrors: false };
+  }
+  
+  const failedSteps = execution.steps.filter(s => s.status === 'failed');
+  const errorAnalysis = {
+    hasErrors: true,
+    totalErrors: failedSteps.length,
+    errorTypes: {},
+    retriableErrors: 0,
+    permanentErrors: 0,
+    recommendations: []
+  };
+  
+  failedSteps.forEach(step => {
+    const errorCode = step.error?.code || 'UNKNOWN_ERROR';
+    errorAnalysis.errorTypes[errorCode] = (errorAnalysis.errorTypes[errorCode] || 0) + 1;
+    
+    // Classify error type
+    const retriableCodes = ['TIMEOUT', 'RATE_LIMIT', 'NETWORK_ERROR', 'TEMPORARY_FAILURE'];
+    if (retriableCodes.includes(errorCode)) {
+      errorAnalysis.retriableErrors++;
+    } else {
+      errorAnalysis.permanentErrors++;
+    }
+  });
+  
+  // Generate recommendations
+  if (errorAnalysis.retriableErrors > 0) {
+    errorAnalysis.recommendations.push('Consider increasing retry limits for transient failures');
+  }
+  
+  if (errorAnalysis.errorTypes['TIMEOUT'] > 0) {
+    errorAnalysis.recommendations.push('Increase timeout values for slow operations');
+  }
+  
+  if (errorAnalysis.errorTypes['RATE_LIMIT'] > 0) {
+    errorAnalysis.recommendations.push('Implement exponential backoff or rate limiting');
+  }
+  
+  return errorAnalysis;
+}
+```
+
+## Rate Limits
+
+| Request Type | Limit | Window | Notes |
+|--------------|-------|---------|-------|
+| Get Execution | 2000 | 1 hour | Standard retrieval requests |
+| With Profiling | 500 | 1 hour | Resource-intensive requests |
+| Polling | 1000 | 1 hour | Real-time monitoring requests |
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="List Executions" icon="list" href="/api/resources/flows/list-executions">
+    Browse executions for a specific flow
+  </Card>
+  <Card title="Cancel Execution" icon="stop" href="/api/resources/executions/cancel-execution">
+    Cancel a running execution
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Execution Logs" icon="file-text" href="/api/resources/executions/get-logs">
+    View detailed execution logs
+  </Card>
+  <Card title="Retry Execution" icon="refresh" href="/api/resources/executions/retry-execution">
+    Retry a failed execution
+  </Card>
+</CardGroup>
+
+---
+
+*Use the Get Execution endpoint to monitor workflow progress, analyze performance, and debug execution issues with comprehensive step-by-step visibility and detailed error information.*

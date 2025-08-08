@@ -166,7 +166,7 @@ export class ActionsService {
     orgId: string,
     userId: string | undefined,
     actionKey: string,
-    inputs: Record<string, any>,
+    inputs: Record<string, unknown>,
   ) {
     const startTime = Date.now();
 
@@ -193,7 +193,7 @@ export class ActionsService {
 
       // 2. Validate inputs against enhanced schema
       const validInputs = await this.inputValidator.validateEnhanced(
-        action.inputSchema as any,
+        action.inputSchema as InputParam[],
         inputs,
         {
           orgId,
@@ -318,7 +318,7 @@ export class ActionsService {
     }
   }
 
-  private replaceTemplateVariables(template: string, variables: Record<string, any>): string {
+  private replaceTemplateVariables(template: string, variables: Record<string, unknown>): string {
     return template.replace(/\{\{([^}]+)\}\}/g, (match, key) => {
       const value = variables[key.trim()];
       return value !== undefined ? String(value) : match;

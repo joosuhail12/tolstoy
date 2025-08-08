@@ -1,0 +1,747 @@
+---
+title: "Execute Flow"
+description: "Execute workflows synchronously or asynchronously with comprehensive input validation, real-time monitoring, and detailed execution tracking."
+---
+
+# Execute Flow
+
+Execute a workflow with input parameters, supporting both synchronous and asynchronous execution modes with comprehensive monitoring, error handling, and result tracking.
+
+## Endpoint
+
+<CodeGroup>
+```http HTTP - Async (Default)
+POST /flows/{id}/execute
+```
+
+```http HTTP - Sync
+POST /flows/{id}/execute?mode=sync
+```
+
+```bash cURL - Async Execution
+curl -X POST "https://tolstoy.getpullse.com/flows/flow_abc123def456/execute" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputs": {
+      "email": "user@example.com",
+      "name": "John Doe",
+      "company": "Acme Corp"
+    }
+  }'
+```
+</CodeGroup>
+
+## Path Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | string | **Required.** The unique identifier of the flow to execute |
+
+## Query Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `mode` | string | "async" | Execution mode: `async` or `sync` |
+| `timeout` | number | 300000 | Maximum execution time in milliseconds (sync mode only) |
+| `wait_for_completion` | boolean | false | Wait for async execution to complete |
+
+## Request Body
+
+### Basic Execution
+
+```json
+{
+  "inputs": {
+    "email": "user@example.com",
+    "name": "John Doe",
+    "company": "Acme Corp"
+  }
+}
+```
+
+### Advanced Execution Options
+
+```json
+{
+  "inputs": {
+    "email": "user@example.com", 
+    "name": "John Doe",
+    "company": "Acme Corp"
+  },
+  "execution_options": {
+    "priority": "high",
+    "timeout": 600000,
+    "retry_policy": {
+      "max_retries": 3,
+      "retry_delay": 2000,
+      "backoff_multiplier": 2.0
+    },
+    "error_handling": "continue",
+    "enable_profiling": true,
+    "tags": ["production", "high-priority"],
+    "idempotency_key": "user-signup-20240120-001"
+  },
+  "context": {
+    "source": "web-signup",
+    "user_agent": "Mozilla/5.0...",
+    "ip_address": "192.168.1.100",
+    "session_id": "session_xyz123"
+  }
+}
+```
+
+### Execution Options
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `priority` | string | "normal" | Execution priority: `low`, `normal`, `high`, `critical` |
+| `timeout` | number | Flow default | Override flow timeout in milliseconds |
+| `retry_policy` | object | Flow default | Override flow retry policy |
+| `error_handling` | string | Flow default | Override error handling: `stop` or `continue` |
+| `enable_profiling` | boolean | false | Enable detailed performance profiling |
+| `tags` | array | [] | Additional tags for this execution |
+| `idempotency_key` | string | Auto-generated | Prevent duplicate executions |
+
+## Response Format
+
+### Asynchronous Execution Response
+
+```json
+{
+  "success": true,
+  "data": {
+    "execution_id": "exec_xyz123abc456",
+    "flow_id": "flow_abc123def456",
+    "status": "pending",
+    "mode": "async",
+    "inputs": {
+      "email": "user@example.com",
+      "name": "John Doe",
+      "company": "Acme Corp"
+    },
+    "started_at": "2024-01-20T10:30:00Z",
+    "estimated_completion": "2024-01-20T10:30:45Z",
+    "priority": "normal",
+    "current_step": null,
+    "steps_completed": 0,
+    "total_steps": 4,
+    "progress_percentage": 0
+  },
+  "links": {
+    "status": "/executions/exec_xyz123abc456",
+    "logs": "/executions/exec_xyz123abc456/logs",
+    "cancel": "/executions/exec_xyz123abc456/cancel"
+  },
+  "metadata": {
+    "request_id": "req_abc123def456",
+    "timestamp": "2024-01-20T10:30:00Z",
+    "processing_time_ms": 85
+  }
+}
+```
+
+### Synchronous Execution Response
+
+<CodeGroup>
+```json Successful Completion
+{
+  "success": true,
+  "data": {
+    "execution_id": "exec_xyz123abc456",
+    "flow_id": "flow_abc123def456",
+    "status": "completed",
+    "mode": "sync",
+    "inputs": {
+      "email": "user@example.com",
+      "name": "John Doe",
+      "company": "Acme Corp"
+    },
+    "outputs": {
+      "crm_contact_id": "contact_sf_abc123",
+      "email_sent": true,
+      "notification_sent": true,
+      "welcome_email_id": "email_sg_def456"
+    },
+    "started_at": "2024-01-20T10:30:00Z",
+    "completed_at": "2024-01-20T10:30:35Z",
+    "duration_ms": 35250,
+    "steps_executed": [
+      {
+        "key": "validate-email",
+        "name": "Validate Email Address",
+        "status": "completed",
+        "started_at": "2024-01-20T10:30:01Z",
+        "completed_at": "2024-01-20T10:30:05Z",
+        "duration_ms": 4200,
+        "inputs": {
+          "email": "user@example.com"
+        },
+        "outputs": {
+          "valid": true,
+          "domain": "example.com",
+          "mx_valid": true
+        }
+      },
+      {
+        "key": "create-crm-contact",
+        "name": "Create CRM Contact", 
+        "status": "completed",
+        "started_at": "2024-01-20T10:30:05Z",
+        "completed_at": "2024-01-20T10:30:18Z",
+        "duration_ms": 13100,
+        "inputs": {
+          "email": "user@example.com",
+          "name": "John Doe",
+          "company": "Acme Corp"
+        },
+        "outputs": {
+          "id": "contact_sf_abc123",
+          "success": true,
+          "url": "https://salesforce.com/contacts/contact_sf_abc123"
+        }
+      }
+    ],
+    "performance": {
+      "total_duration_ms": 35250,
+      "network_time_ms": 18300,
+      "processing_time_ms": 16950,
+      "steps_parallel": 1,
+      "steps_sequential": 4,
+      "memory_peak_mb": 45.2
+    }
+  }
+}
+```
+
+```json Execution Timeout
+{
+  "success": false,
+  "error": {
+    "code": "EXECUTION_TIMEOUT",
+    "message": "Flow execution exceeded maximum timeout of 30 seconds",
+    "details": {
+      "execution_id": "exec_xyz123abc456",
+      "timeout_ms": 30000,
+      "elapsed_ms": 30010,
+      "current_step": "create-crm-contact",
+      "completed_steps": ["validate-email"],
+      "remaining_steps": ["send-welcome-email", "notify-team"]
+    }
+  },
+  "partial_results": {
+    "steps_completed": 1,
+    "outputs_so_far": {
+      "email_valid": true
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Execution Examples
+
+### Basic Async Execution
+
+<CodeGroup>
+```bash cURL
+curl -X POST "https://tolstoy.getpullse.com/flows/flow_abc123def456/execute" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputs": {
+      "user_email": "john.doe@company.com",
+      "full_name": "John Doe",
+      "department": "Engineering",
+      "start_date": "2024-02-01"
+    }
+  }'
+```
+
+```typescript TypeScript/Node.js
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient({
+  orgId: 'org_1234567890abcdef',
+  userId: 'user_abcdef1234567890'
+});
+
+async function executeUserOnboarding(userData: any) {
+  try {
+    // Start async execution
+    const execution = await client.flows.execute('flow_abc123def456', {
+      inputs: {
+        user_email: userData.email,
+        full_name: userData.name,
+        department: userData.department,
+        start_date: userData.startDate
+      },
+      execution_options: {
+        priority: 'high',
+        enable_profiling: true,
+        tags: ['user-onboarding', 'new-hire']
+      }
+    });
+    
+    console.log(`Execution started: ${execution.execution_id}`);
+    console.log(`Status: ${execution.status}`);
+    console.log(`Estimated completion: ${execution.estimated_completion}`);
+    
+    // Optional: Wait for completion
+    const result = await client.flows.waitForCompletion(execution.execution_id, {
+      timeout: 300000, // 5 minutes
+      pollInterval: 2000 // Check every 2 seconds
+    });
+    
+    if (result.status === 'completed') {
+      console.log('Onboarding completed successfully!');
+      console.log('Results:', result.outputs);
+    } else {
+      console.error('Onboarding failed:', result.error);
+    }
+    
+    return result;
+    
+  } catch (error) {
+    console.error('Failed to execute onboarding flow:', error);
+    throw error;
+  }
+}
+
+// Usage
+executeUserOnboarding({
+  email: 'john.doe@company.com',
+  name: 'John Doe',
+  department: 'Engineering',
+  startDate: '2024-02-01'
+});
+```
+
+```python Python
+import tolstoy
+import asyncio
+
+client = tolstoy.Client(
+    org_id='org_1234567890abcdef',
+    user_id='user_abcdef1234567890'
+)
+
+async def execute_workflow_with_monitoring(flow_id: str, inputs: dict):
+    try:
+        # Execute flow asynchronously
+        execution = client.flows.execute(flow_id, {
+            'inputs': inputs,
+            'execution_options': {
+                'priority': 'high',
+                'enable_profiling': True,
+                'tags': ['automated', 'production']
+            }
+        })
+        
+        print(f"Execution started: {execution['execution_id']}")
+        
+        # Monitor execution progress
+        while True:
+            status = client.flows.get_execution(execution['execution_id'])
+            
+            print(f"Status: {status['status']}")
+            print(f"Progress: {status['progress_percentage']}%")
+            
+            if status['current_step']:
+                print(f"Current step: {status['current_step']}")
+            
+            # Check if execution is complete
+            if status['status'] in ['completed', 'failed', 'cancelled']:
+                break
+                
+            # Wait before checking again
+            await asyncio.sleep(2)
+        
+        if status['status'] == 'completed':
+            print("✅ Execution completed successfully!")
+            print("Outputs:", status['outputs'])
+            return status['outputs']
+        else:
+            print(f"❌ Execution {status['status']}")
+            if status.get('error'):
+                print("Error:", status['error']['message'])
+            raise Exception(f"Execution {status['status']}")
+            
+    except Exception as error:
+        print(f"Execution failed: {error}")
+        raise error
+
+# Usage
+asyncio.run(execute_workflow_with_monitoring('flow_abc123def456', {
+    'email': 'user@example.com',
+    'name': 'Jane Smith',
+    'role': 'Developer'
+}))
+```
+</CodeGroup>
+
+### Synchronous Execution with Timeout
+
+<CodeGroup>
+```bash cURL - Sync Mode
+curl -X POST "https://tolstoy.getpullse.com/flows/flow_abc123def456/execute?mode=sync&timeout=60000" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputs": {
+      "email": "test@example.com",
+      "name": "Test User"
+    },
+    "execution_options": {
+      "timeout": 60000,
+      "retry_policy": {
+        "max_retries": 2,
+        "retry_delay": 1000
+      }
+    }
+  }'
+```
+
+```typescript TypeScript - Quick Sync Execution
+async function quickExecuteFlow(flowId: string, inputs: any) {
+  try {
+    const result = await client.flows.executeSync(flowId, inputs, {
+      timeout: 30000 // 30 seconds max
+    });
+    
+    if (result.status === 'completed') {
+      console.log('Flow completed in', result.duration_ms, 'ms');
+      return result.outputs;
+    } else {
+      throw new Error(`Flow ${result.status}: ${result.error?.message}`);
+    }
+    
+  } catch (error) {
+    if (error.code === 'EXECUTION_TIMEOUT') {
+      console.log('Flow is taking too long, switching to async mode...');
+      // Fall back to async execution
+      return await client.flows.execute(flowId, inputs);
+    }
+    throw error;
+  }
+}
+```
+</CodeGroup>
+
+### Batch Execution
+
+```typescript
+async function executeBatchWorkflows(executions: Array<{flowId: string; inputs: any}>) {
+  const batchSize = 5;
+  const results = [];
+  
+  // Process in batches to avoid overwhelming the system
+  for (let i = 0; i < executions.length; i += batchSize) {
+    const batch = executions.slice(i, i + batchSize);
+    
+    // Execute batch concurrently
+    const batchPromises = batch.map(async ({ flowId, inputs }, index) => {
+      try {
+        const execution = await client.flows.execute(flowId, inputs, {
+          execution_options: {
+            priority: 'normal',
+            tags: [`batch-${Math.floor(i / batchSize) + 1}`, `item-${index + 1}`],
+            idempotency_key: `batch-${Date.now()}-${i + index}`
+          }
+        });
+        
+        return {
+          success: true,
+          executionId: execution.execution_id,
+          flowId,
+          inputs
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error.message,
+          flowId,
+          inputs
+        };
+      }
+    });
+    
+    const batchResults = await Promise.allSettled(batchPromises);
+    results.push(...batchResults.map(r => r.status === 'fulfilled' ? r.value : r.reason));
+    
+    console.log(`Processed batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(executions.length / batchSize)}`);
+    
+    // Small delay between batches
+    if (i + batchSize < executions.length) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+  }
+  
+  const successful = results.filter(r => r.success);
+  const failed = results.filter(r => !r.success);
+  
+  console.log(`Batch execution complete: ${successful.length} successful, ${failed.length} failed`);
+  
+  return {
+    successful,
+    failed,
+    summary: {
+      total: executions.length,
+      successRate: successful.length / executions.length,
+      failureRate: failed.length / executions.length
+    }
+  };
+}
+```
+
+## Real-time Execution Streaming
+
+```typescript
+async function streamFlowExecution(flowId: string, inputs: any) {
+  // Start execution
+  const execution = await client.flows.execute(flowId, inputs);
+  
+  console.log(`🚀 Started execution: ${execution.execution_id}`);
+  
+  // Stream real-time updates
+  for await (const update of client.flows.streamExecution(execution.execution_id)) {
+    switch (update.type) {
+      case 'execution_started':
+        console.log(`▶️  Execution started with ${update.execution.total_steps} steps`);
+        break;
+        
+      case 'step_started':
+        console.log(`🏃 Started: ${update.step.name}`);
+        break;
+        
+      case 'step_completed':
+        const duration = update.step.duration_ms;
+        const progress = Math.round((update.execution.steps_completed / update.execution.total_steps) * 100);
+        console.log(`✅ Completed: ${update.step.name} (${duration}ms) - ${progress}% done`);
+        break;
+        
+      case 'step_failed':
+        console.log(`❌ Failed: ${update.step.name} - ${update.step.error?.message}`);
+        break;
+        
+      case 'execution_completed':
+        console.log(`🎉 Execution completed in ${update.execution.duration_ms}ms`);
+        console.log('Final outputs:', update.execution.outputs);
+        return update.execution;
+        
+      case 'execution_failed':
+        console.log(`💥 Execution failed: ${update.execution.error?.message}`);
+        console.log('Failed at step:', update.execution.current_step);
+        throw new Error(update.execution.error?.message);
+    }
+  }
+}
+```
+
+## Error Handling
+
+### Common Error Responses
+
+<CodeGroup>
+```json 400 - Invalid Input
+{
+  "success": false,
+  "error": {
+    "code": "INVALID_INPUT",
+    "message": "Flow input validation failed",
+    "details": {
+      "field_errors": [
+        {
+          "field": "email",
+          "error": "Invalid email format",
+          "received": "not-an-email",
+          "expected": "Valid email address"
+        },
+        {
+          "field": "age",
+          "error": "Value must be between 18 and 120",
+          "received": 150,
+          "expected": "Number between 18 and 120"
+        }
+      ],
+      "missing_required_fields": ["name"],
+      "extra_fields": ["unknown_field"]
+    }
+  }
+}
+```
+
+```json 409 - Flow Inactive
+{
+  "success": false,
+  "error": {
+    "code": "FLOW_INACTIVE",
+    "message": "Cannot execute inactive flow",
+    "details": {
+      "flow_id": "flow_abc123def456",
+      "current_status": "inactive",
+      "last_active": "2024-01-15T10:30:00Z",
+      "deactivated_by": "user_xyz789",
+      "reason": "Flow has validation errors"
+    }
+  }
+}
+```
+
+```json 429 - Rate Limited
+{
+  "success": false,
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Execution rate limit exceeded",
+    "details": {
+      "limit": 100,
+      "window": "1 hour",
+      "current_usage": 100,
+      "reset_time": "2024-01-20T11:30:00Z",
+      "retry_after": 1200
+    }
+  }
+}
+```
+
+```json 500 - Execution Error
+{
+  "success": false,
+  "error": {
+    "code": "EXECUTION_ERROR", 
+    "message": "Flow execution encountered an internal error",
+    "details": {
+      "execution_id": "exec_xyz123abc456",
+      "failed_at_step": "create-crm-contact",
+      "error_message": "Connection timeout to Salesforce API",
+      "retry_possible": true,
+      "support_reference": "ERR-2024-0120-001"
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Performance Optimization
+
+### Execution Strategies
+
+<CodeGroup>
+```typescript Optimized Execution Pattern
+class FlowExecutionManager {
+  constructor(private client: TolstoyClient) {}
+  
+  async executeWithOptimalStrategy(flowId: string, inputs: any, options: {
+    preferSync?: boolean;
+    maxSyncTimeout?: number;
+    fallbackToAsync?: boolean;
+  } = {}) {
+    const {
+      preferSync = false,
+      maxSyncTimeout = 30000,
+      fallbackToAsync = true
+    } = options;
+    
+    // Try sync first if preferred
+    if (preferSync) {
+      try {
+        return await this.client.flows.executeSync(flowId, inputs, {
+          timeout: maxSyncTimeout
+        });
+      } catch (error) {
+        if (error.code === 'EXECUTION_TIMEOUT' && fallbackToAsync) {
+          console.log('Sync execution timed out, falling back to async...');
+          return await this.client.flows.execute(flowId, inputs);
+        }
+        throw error;
+      }
+    }
+    
+    // Default to async
+    return await this.client.flows.execute(flowId, inputs);
+  }
+  
+  async executeWithRetry(flowId: string, inputs: any, maxRetries = 3) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const execution = await this.client.flows.execute(flowId, inputs, {
+          execution_options: {
+            tags: [`attempt-${attempt}`]
+          }
+        });
+        
+        // Wait for completion
+        const result = await this.client.flows.waitForCompletion(execution.execution_id);
+        
+        if (result.status === 'completed') {
+          return result;
+        } else if (result.status === 'failed') {
+          lastError = new Error(result.error?.message || 'Execution failed');
+          if (attempt < maxRetries && this.isRetriableError(result.error)) {
+            console.log(`Attempt ${attempt} failed, retrying...`);
+            await this.sleep(Math.pow(2, attempt) * 1000); // Exponential backoff
+            continue;
+          }
+        }
+        
+        throw lastError;
+        
+      } catch (error) {
+        lastError = error;
+        if (attempt === maxRetries) {
+          throw error;
+        }
+      }
+    }
+  }
+  
+  private isRetriableError(error: any): boolean {
+    const retriableCodes = ['TIMEOUT', 'RATE_LIMIT', 'TEMPORARY_FAILURE'];
+    return retriableCodes.includes(error?.code);
+  }
+  
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+```
+</CodeGroup>
+
+## Rate Limits
+
+| Execution Type | Limit | Window | Notes |
+|----------------|-------|---------|-------|
+| Async Executions | 1000 | 1 hour | Per organization |
+| Sync Executions | 500 | 1 hour | Higher resource usage |
+| High Priority | 100 | 1 hour | Reserved for critical workflows |
+| Per Flow | 200 | 1 hour | Individual flow execution limit |
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Get Execution" icon="search" href="/api/resources/executions/get-execution">
+    Retrieve execution status and results
+  </Card>
+  <Card title="List Executions" icon="list" href="/api/resources/flows/list-executions">
+    View execution history for a flow
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Cancel Execution" icon="stop" href="/api/resources/executions/cancel-execution">
+    Cancel a running execution
+  </Card>
+  <Card title="Execution Logs" icon="file-text" href="/api/resources/executions/get-logs">
+    View detailed execution logs
+  </Card>
+</CardGroup>
+
+---
+
+*Use the Execute Flow endpoint to run workflows with comprehensive monitoring, error handling, and performance optimization. Choose between sync and async modes based on your application needs and expected execution time.*

@@ -85,6 +85,7 @@ export class OAuthService {
 
       this.logger.log(
         `Generated OAuth URL for ${toolKey}: ${authorizeUrl}?client_id=${oauthConfig.clientId}&...`,
+      );
 
       return { url: fullUrl, state };
     } catch (error) {
@@ -247,6 +248,7 @@ export class OAuthService {
         throw new Error(
           `Failed to exchange authorization code: ${error.response?.data?.error || error.message}`,
         );
+      }
 
       this.logger.error(`Token exchange error for ${toolKey}: ${error.message}`);
       throw error;
@@ -256,7 +258,7 @@ export class OAuthService {
   /**
    * Validate OAuth configuration has required fields
    */
-  private validateOAuthConfig(config: any, toolKey: string): OAuthConfig {
+  private validateOAuthConfig(config: Record<string, unknown>, toolKey: string): OAuthConfig {
     if (!config.clientId) {
       throw new BadRequestException(`Missing clientId for OAuth2 configuration of ${toolKey}`);
     }

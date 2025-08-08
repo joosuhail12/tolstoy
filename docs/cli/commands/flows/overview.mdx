@@ -1,0 +1,530 @@
+---
+title: "Flow Commands Overview"
+description: "Comprehensive guide to managing workflows from the command line using the Tolstoy CLI flow commands."
+---
+
+# Flow Commands Overview
+
+The `tolstoy flows` command group provides complete workflow management from the command line. Use these commands to list, create, execute, and monitor workflows without leaving your terminal.
+
+## Quick Reference
+
+| Command | Description | Usage |
+|---------|-------------|--------|
+| `list` | List all workflows | `tolstoy flows list [options]` |
+| `get` | Get workflow details | `tolstoy flows get <flow-id>` |
+| `create` | Create new workflow | `tolstoy flows create <file>` |
+| `update` | Update existing workflow | `tolstoy flows update <flow-id> <file>` |
+| `delete` | Delete workflow | `tolstoy flows delete <flow-id>` |
+| `execute` | Execute workflow | `tolstoy flows execute <flow-id> [inputs]` |
+| `logs` | View execution logs | `tolstoy flows logs <flow-id>` |
+| `validate` | Validate workflow file | `tolstoy flows validate <file>` |
+
+## Common Usage Patterns
+
+### Development Workflow
+
+```bash
+# Validate workflow definition
+tolstoy flows validate ./workflows/welcome-user.yml
+
+# Create the workflow
+tolstoy flows create ./workflows/welcome-user.yml
+
+# Test execution with sample data
+tolstoy flows execute flow_123 '{"email": "test@example.com"}'
+
+# Check execution logs
+tolstoy flows logs flow_123 --limit 5
+```
+
+### Production Operations
+
+```bash
+# List all active workflows
+tolstoy flows list --status active
+
+# Execute workflow asynchronously 
+tolstoy flows execute flow_123 ./inputs.json --mode async
+
+# Monitor recent executions
+tolstoy flows logs --status failed --since 1h
+
+# Update workflow from CI/CD
+tolstoy flows update flow_123 ./workflows/welcome-user-v2.yml
+```
+
+## Global Options
+
+All flow commands support these global options:
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `--api-url` | Override API base URL | `--api-url https://staging-api.tolstoy.dev` |
+| `--profile` | Use specific configuration profile | `--profile production` |
+| `--json` | Output results in JSON format | `--json` |
+| `--verbose` | Enable verbose logging | `--verbose` |
+| `--help` | Show command help | `--help` |
+
+## Workflow File Format
+
+The CLI supports multiple workflow file formats:
+
+<CodeGroup>
+```yaml YAML (Recommended)
+# welcome-user.yml
+name: Welcome New User
+description: Send welcome email and notifications
+version: 1
+
+inputs:
+  - name: email
+    type: string
+    required: true
+  - name: name
+    type: string
+    required: false
+
+steps:
+  - key: validate-email
+    name: Validate Email Address
+    action: validate-email-format
+    inputs:
+      email: "{{inputs.email}}"
+    
+  - key: send-welcome
+    name: Send Welcome Email
+    action: send-email
+    inputs:
+      to: "{{inputs.email}}"
+      template: welcome-template
+      variables:
+        name: "{{inputs.name}}"
+    executeIf: "{{steps.validate-email.output.valid}} == true"
+    
+  - key: notify-team
+    name: Notify Team
+    action: post-slack-message
+    inputs:
+      channel: "#new-users"
+      message: "New user: {{inputs.email}}"
+
+settings:
+  timeout: 300000
+  retryPolicy:
+    maxRetries: 2
+    retryDelay: 5000
+```
+
+```json JSON
+{
+  "name": "Welcome New User",
+  "description": "Send welcome email and notifications", 
+  "version": 1,
+  "inputs": [
+    {
+      "name": "email",
+      "type": "string", 
+      "required": true
+    }
+  ],
+  "steps": [
+    {
+      "key": "validate-email",
+      "name": "Validate Email Address",
+      "action": "validate-email-format",
+      "inputs": {
+        "email": "{{inputs.email}}"
+      }
+    }
+  ]
+}
+```
+
+```typescript TypeScript Definition
+// workflow.ts
+import { WorkflowDefinition } from '@joosuhail/tolstoy-sdk';
+
+export const welcomeUserFlow: WorkflowDefinition = {
+  name: 'Welcome New User',
+  description: 'Send welcome email and notifications',
+  version: 1,
+  inputs: [
+    { name: 'email', type: 'string', required: true },
+    { name: 'name', type: 'string', required: false }
+  ],
+  steps: [
+    {
+      key: 'validate-email',
+      name: 'Validate Email Address', 
+      action: 'validate-email-format',
+      inputs: { email: '{{inputs.email}}' }
+    }
+    // ... more steps
+  ]
+};
+```
+</CodeGroup>
+
+## Environment Variables
+
+Configure default behavior with environment variables:
+
+```bash
+# Default execution mode (sync/async)
+export TOLSTOY_DEFAULT_EXECUTION_MODE=async
+
+# Default timeout for flow operations (milliseconds)
+export TOLSTOY_FLOW_TIMEOUT=300000
+
+# Default output format (json/table/yaml)  
+export TOLSTOY_OUTPUT_FORMAT=table
+
+# Enable debug logging for flow operations
+export TOLSTOY_FLOWS_DEBUG=true
+```
+
+## Advanced Features
+
+### Batch Operations
+
+Execute multiple workflows in parallel:
+
+```bash
+# Execute multiple flows with same input
+tolstoy flows execute flow_1 flow_2 flow_3 '{"email": "user@example.com"}'
+
+# Execute from input file with multiple records
+tolstoy flows execute flow_123 --batch ./user-inputs.jsonl
+```
+
+Where `user-inputs.jsonl` contains:
+```jsonl
+{"email": "user1@example.com", "name": "User One"}
+{"email": "user2@example.com", "name": "User Two"}  
+{"email": "user3@example.com", "name": "User Three"}
+```
+
+### Template Variables
+
+Use template variables in workflow files for reusability:
+
+```yaml
+# workflow-template.yml
+name: "{{WORKFLOW_NAME}}"
+description: "{{WORKFLOW_DESCRIPTION}}"
+
+steps:
+  - key: notify
+    action: post-slack-message
+    inputs:
+      channel: "{{SLACK_CHANNEL}}"
+      message: "{{MESSAGE_TEMPLATE}}"
+```
+
+Execute with variable substitution:
+```bash
+WORKFLOW_NAME="Production Alert" \
+WORKFLOW_DESCRIPTION="Alert for production issues" \
+SLACK_CHANNEL="#alerts" \
+MESSAGE_TEMPLATE="Production issue detected" \
+tolstoy flows create ./workflow-template.yml
+```
+
+### Conditional Execution
+
+Use complex conditions for sophisticated workflow control:
+
+```yaml
+steps:
+  - key: check-business-hours
+    action: evaluate-condition
+    inputs:
+      condition: |
+        const now = new Date();
+        const hour = now.getHours();
+        return hour >= 9 && hour <= 17;
+        
+  - key: immediate-response
+    action: send-immediate-response
+    executeIf: "{{steps.check-business-hours.output.result}} == true"
+    
+  - key: queue-for-later
+    action: queue-response
+    executeIf: "{{steps.check-business-hours.output.result}} == false"
+```
+
+### Error Handling Patterns
+
+Implement robust error handling:
+
+```yaml
+steps:
+  - key: critical-operation
+    action: process-payment
+    inputs:
+      amount: "{{inputs.amount}}"
+      payment_method: "{{inputs.payment_method}}"
+    onError:
+      - action: log-payment-failure
+        inputs:
+          error: "{{error.message}}"
+          user_id: "{{inputs.user_id}}"
+      - action: send-failure-notification
+        inputs:
+          to: "support@company.com"
+          subject: "Payment Processing Failed"
+    retryPolicy:
+      maxRetries: 3
+      retryDelay: 2000
+      backoffMultiplier: 2
+```
+
+## Integration with CI/CD
+
+### GitHub Actions
+
+```yaml
+# .github/workflows/deploy-workflows.yml
+name: Deploy Workflows
+
+on:
+  push:
+    branches: [main]
+    paths: ['workflows/**']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Tolstoy CLI
+        run: npm install -g @tolstoy/cli
+        
+      - name: Configure CLI
+        env:
+          TOLSTOY_ORG_ID: ${{ secrets.TOLSTOY_ORG_ID }}
+          TOLSTOY_USER_ID: ${{ secrets.TOLSTOY_USER_ID }}
+        run: |
+          tolstoy config add production \
+            --api-url https://api.tolstoy.dev \
+            --org-id $TOLSTOY_ORG_ID \
+            --user-id $TOLSTOY_USER_ID
+          tolstoy config use production
+          
+      - name: Validate Workflows
+        run: |
+          for workflow in workflows/*.yml; do
+            echo "Validating $workflow"
+            tolstoy flows validate "$workflow"
+          done
+          
+      - name: Deploy Workflows
+        run: |
+          for workflow in workflows/*.yml; do
+            workflow_name=$(basename "$workflow" .yml)
+            echo "Deploying $workflow_name"
+            
+            # Check if workflow exists
+            if tolstoy flows get "$workflow_name" --quiet; then
+              echo "Updating existing workflow"
+              tolstoy flows update "$workflow_name" "$workflow"
+            else
+              echo "Creating new workflow"
+              tolstoy flows create "$workflow"
+            fi
+          done
+```
+
+### GitLab CI
+
+```yaml
+# .gitlab-ci.yml
+deploy_workflows:
+  stage: deploy
+  image: node:18-alpine
+  before_script:
+    - npm install -g @tolstoy/cli
+    - tolstoy config add production --org-id $TOLSTOY_ORG_ID --user-id $TOLSTOY_USER_ID
+  script:
+    - tolstoy flows validate workflows/
+    - tolstoy flows deploy workflows/ --environment production
+  only:
+    - main
+  when: manual
+```
+
+## Monitoring and Observability
+
+### Health Checks
+
+Monitor workflow health from the CLI:
+
+```bash
+# Check overall workflow health
+tolstoy flows health
+
+# Get execution statistics
+tolstoy flows stats --since 24h
+
+# Monitor specific workflow
+tolstoy flows monitor flow_123 --interval 30s
+```
+
+### Alerting
+
+Set up CLI-based monitoring with custom alerting:
+
+```bash
+#!/bin/bash
+# monitor-workflows.sh
+
+# Check for failed executions in the last hour
+FAILED_COUNT=$(tolstoy flows logs --status failed --since 1h --json | jq length)
+
+if [ "$FAILED_COUNT" -gt 5 ]; then
+  # Send alert via Slack
+  tolstoy actions execute send-alert '{
+    "message": "High failure rate detected: '$FAILED_COUNT' failed executions in the last hour",
+    "severity": "high"
+  }'
+fi
+```
+
+### Performance Analysis
+
+Analyze workflow performance:
+
+```bash
+# Get performance metrics for specific workflow
+tolstoy flows analyze flow_123 --metrics duration,success_rate,error_rate
+
+# Compare performance between versions
+tolstoy flows compare flow_123 --versions v1,v2 --metric duration
+
+# Export performance data for analysis
+tolstoy flows export flow_123 --format csv --since 7d > performance.csv
+```
+
+## Best Practices
+
+### Workflow Organization
+
+```bash
+# Recommended directory structure
+workflows/
+├── production/
+│   ├── user-onboarding.yml
+│   ├── payment-processing.yml
+│   └── notifications.yml
+├── staging/
+│   └── test-workflows.yml
+├── development/
+│   └── experimental.yml
+└── templates/
+    └── base-template.yml
+
+# Use consistent naming
+tolstoy flows create production/user-onboarding.yml --name prod-user-onboarding
+```
+
+### Version Control
+
+```bash
+# Tag workflows with version information
+tolstoy flows update flow_123 ./workflow.yml --version 2.1.0 --changelog "Added error handling"
+
+# Keep workflow definitions in version control
+git add workflows/
+git commit -m "Update user onboarding workflow v2.1.0"
+```
+
+### Testing
+
+```bash
+# Always validate before deployment
+tolstoy flows validate ./workflow.yml
+
+# Test with sample data
+tolstoy flows execute flow_123 ./test-inputs.json --dry-run
+
+# Run integration tests
+tolstoy flows test ./workflows/ --environment staging
+```
+
+## Troubleshooting
+
+### Common Issues
+
+<details>
+<summary>**Command not found: tolstoy flows**</summary>
+
+**Solution**: Ensure the CLI is properly installed and in your PATH:
+```bash
+# Check installation
+which tolstoy
+
+# Reinstall if needed
+npm install -g @tolstoy/cli
+
+# Check version
+tolstoy --version
+```
+</details>
+
+<details>
+<summary>**Authentication failed**</summary>
+
+**Solution**: Verify your credentials and configuration:
+```bash
+# Check current configuration
+tolstoy config list
+
+# Test connection
+tolstoy config test
+
+# Reconfigure if needed
+tolstoy config add --interactive
+```
+</details>
+
+<details>
+<summary>**Workflow validation errors**</summary>
+
+**Solution**: Common validation issues and fixes:
+```bash
+# Check YAML syntax
+yamllint workflow.yml
+
+# Validate workflow structure
+tolstoy flows validate workflow.yml --verbose
+
+# Check for missing actions
+tolstoy actions list --filter referenced-by-workflow
+```
+</details>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Flow Management" icon="list" href="/cli/commands/flows/list">
+    Learn to list and filter workflows effectively
+  </Card>
+  <Card title="Workflow Execution" icon="play" href="/cli/commands/flows/execute">
+    Master workflow execution with different modes and options
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Log Analysis" icon="document-text" href="/cli/commands/flows/logs">
+    Analyze workflow execution logs and troubleshoot issues
+  </Card>
+  <Card title="Best Practices" icon="star" href="/cli/guides/automation-scripts">
+    Learn CLI automation best practices and patterns
+  </Card>
+</CardGroup>
+
+---
+
+*The flow commands provide powerful workflow management capabilities directly from your terminal. Master these commands to streamline your workflow automation development and operations.*

@@ -12,7 +12,7 @@ export interface FlowStepEvent {
   orgId: string;
   flowId: string;
   stepName?: string;
-  output?: any;
+  output?: unknown;
   error?: {
     message: string;
     code?: string;
@@ -20,9 +20,9 @@ export interface FlowStepEvent {
   };
   duration?: number;
   skipReason?: string; // Reason for skipping the step
-  executeIf?: any; // The condition that caused the skip
+  executeIf?: Record<string, unknown>; // The condition that caused the skip
   metadata?: {
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -37,7 +37,7 @@ export interface FlowExecutionEvent {
   failedSteps?: number;
   skippedSteps?: number;
   duration?: number;
-  output?: any;
+  output?: unknown;
   error?: {
     message: string;
     code?: string;
@@ -219,7 +219,7 @@ export class AblyService implements OnModuleDestroy {
   private async publishWithRetry(
     channelName: string,
     eventName: string,
-    data: any,
+    data: unknown,
     maxRetries: number = 3,
   ): Promise<void> {
     if (!this.client) {
@@ -268,7 +268,7 @@ export class AblyService implements OnModuleDestroy {
     orgId: string,
     executionId: string,
     eventName: string,
-    data: any,
+    data: unknown,
   ): Promise<void> {
     await this.initialize();
 
@@ -307,12 +307,12 @@ export class AblyService implements OnModuleDestroy {
     flowId: string,
     options: {
       stepName?: string;
-      output?: any;
+      output?: unknown;
       error?: { message: string; code?: string; stack?: string };
       duration?: number;
       skipReason?: string;
-      executeIf?: any;
-      metadata?: { [key: string]: any };
+      executeIf?: Record<string, unknown>;
+      metadata?: { [key: string]: unknown };
     } = {},
   ): Promise<FlowStepEvent> {
     return {
@@ -337,7 +337,7 @@ export class AblyService implements OnModuleDestroy {
       failedSteps?: number;
       skippedSteps?: number;
       duration?: number;
-      output?: any;
+      output?: unknown;
       error?: { message: string; code?: string };
     } = {},
   ): Promise<FlowExecutionEvent> {
