@@ -414,6 +414,9 @@ terraform apply
 ### HCP Commands
 
 ```bash
+# Retrieve HCP credentials from AWS (one-time setup)
+./get-hcp-credentials.sh
+
 # View workspace status
 terraform workspace show
 
@@ -425,6 +428,72 @@ terraform apply
 
 # View run history
 # Visit: https://app.terraform.io/app/your-org/workspaces/workspace-name
+```
+
+## 🏗️ HCP Resource Management
+
+This configuration creates and manages HCP resources directly, making them visible in your HashiCorp Cloud dashboard.
+
+### HCP Resources Created
+
+#### **Core Resources (Always Created)**
+- **HCP Project**: Organizes all your Tolstoy infrastructure
+- **HCP Service Principal**: Authentication for Terraform and CI/CD
+- **HCP IAM Workload Identity Provider**: GitHub Actions integration
+
+#### **Optional Services (Configurable)**
+- **HCP Vault**: Secrets management and encryption
+- **HCP Consul**: Service mesh and service discovery  
+- **HCP Boundary**: Secure remote access
+- **HCP Packer Registry**: Container and VM image management
+- **HCP Waypoint**: Application deployment automation
+- **HCP Virtual Network**: Private cloud networking
+
+### Enabling HCP Services
+
+Set these variables in your `terraform.tfvars` to enable services:
+
+```hcl
+# Enable HCP services (start with these for basic setup)
+create_hcp_vault           = true    # Recommended for secrets
+create_hcp_hvn            = true    # Recommended for networking
+create_hcp_consul         = false   # Enable for microservices
+create_hcp_packer_registry = false   # Enable for image management
+create_hcp_boundary       = false   # Enable for secure access
+create_hcp_waypoint       = false   # Enable for deployment automation
+
+# Service configuration
+hcp_vault_tier     = "dev"          # or "starter_small" for production
+hcp_consul_tier    = "development"  # or "standard" for production
+hcp_hvn_cidr      = "172.25.16.0/20"
+```
+
+### HCP Service Principal Setup
+
+Your service principal credentials are stored in AWS Secrets Manager. Use the provided script to retrieve them:
+
+```bash
+# Retrieve HCP credentials from AWS Secrets Manager
+./get-hcp-credentials.sh
+
+# This will:
+# - Get credentials from tolstoy/env secret
+# - Update terraform.tfvars automatically  
+# - Set environment variables for current session
+# - Create .hcp-env for future sessions
+```
+
+### Viewing HCP Resources
+
+After deployment, your resources will be visible at:
+
+- **HCP Console**: https://portal.cloud.hashicorp.com
+- **Project Dashboard**: `https://portal.cloud.hashicorp.com/project/{project-id}`
+- **Service Dashboards**: Available via Terraform outputs
+
+```bash
+# Get HCP console URLs
+terraform output hcp_console_urls
 ```
 
 ## 🚀 Advanced Configuration

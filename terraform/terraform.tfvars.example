@@ -4,6 +4,9 @@
 # HCP Terraform Cloud Configuration
 hcp_organization     = "your-hcp-org"           # Your HCP organization name
 hcp_workspace_name   = "tolstoy-api-gateway-prod"  # Workspace name in HCP
+hcp_project_name     = "tolstoy"                   # HCP project name
+hcp_client_id        = "your-hcp-client-id"       # From service principal (use get-hcp-credentials.sh)
+hcp_client_secret    = "your-hcp-client-secret"   # From service principal (use get-hcp-credentials.sh)
 
 # Project Configuration
 project_name = "tolstoy"
@@ -51,6 +54,20 @@ allowed_countries = []           # Empty list allows all countries
 # Advanced Security Configuration
 enable_waf_logging      = true
 waf_log_retention_days = 7
+
+# HCP Services Configuration (optional - set to true to create)
+create_hcp_vault             = false   # Create HCP Vault cluster for secrets management
+create_hcp_hvn               = false   # Create HCP Virtual Network for private connectivity
+create_hcp_consul            = false   # Create HCP Consul cluster for service mesh
+create_hcp_packer_registry   = false   # Create HCP Packer registry for image management
+create_hcp_boundary          = false   # Create HCP Boundary cluster for secure access
+create_hcp_waypoint          = false   # Create HCP Waypoint application for deployment
+
+# HCP Service Configuration (only needed if creating services above)
+# hcp_vault_tier = "dev"              # Vault tier: dev, starter_small, standard_small, standard_medium, standard_large
+# hcp_consul_tier = "development"     # Consul tier: development, standard, plus
+# hcp_consul_size = "x_small"         # Consul size: x_small, small, medium, large
+# hcp_hvn_cidr = "172.25.16.0/20"     # CIDR block for HCP Virtual Network
 
 # Development/Testing Overrides
 # Uncomment for development environment

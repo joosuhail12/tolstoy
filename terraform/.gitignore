@@ -81,6 +81,10 @@ aws-credentials.json
 .env.local
 .env.production
 .env.staging
+.hcp-env
+
+# HCP credentials
+hcp-credentials.json
 
 # Keep example files
 !*.example

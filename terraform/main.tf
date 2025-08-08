@@ -8,6 +8,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    hcp = {
+      source  = "hashicorp/hcp"
+      version = "~> 0.109.0"
+    }
   }
   
   # HCP Terraform Cloud backend configuration
@@ -32,6 +36,11 @@ provider "aws" {
       Task        = "5.4"
     }
   }
+}
+
+provider "hcp" {
+  client_id     = var.hcp_client_id
+  client_secret = var.hcp_client_secret
 }
 
 # Data sources for existing resources

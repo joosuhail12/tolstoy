@@ -175,3 +175,77 @@ output "route53_zone_name" {
   description = "Route53 hosted zone name"
   value       = var.route53_zone_id != "" ? data.aws_route53_zone.main[0].name : null
 }
+
+# HCP Resource Outputs
+output "hcp_project_id" {
+  description = "HCP Project ID"
+  value       = hcp_project.tolstoy.resource_id
+}
+
+output "hcp_project_name" {
+  description = "HCP Project name"
+  value       = hcp_project.tolstoy.name
+}
+
+output "hcp_organization_id" {
+  description = "HCP Organization ID"
+  value       = data.hcp_organization.main.resource_id
+}
+
+output "hcp_vault_cluster_id" {
+  description = "HCP Vault Cluster ID (if created)"
+  value       = var.create_hcp_vault ? hcp_vault_cluster.tolstoy[0].cluster_id : null
+}
+
+output "hcp_vault_public_endpoint" {
+  description = "HCP Vault public endpoint URL (if created)"
+  value       = var.create_hcp_vault ? hcp_vault_cluster.tolstoy[0].vault_public_endpoint_url : null
+}
+
+output "hcp_consul_cluster_id" {
+  description = "HCP Consul Cluster ID (if created)"
+  value       = var.create_hcp_consul ? hcp_consul_cluster.tolstoy[0].cluster_id : null
+}
+
+output "hcp_consul_public_endpoint" {
+  description = "HCP Consul public endpoint URL (if created)"
+  value       = var.create_hcp_consul ? hcp_consul_cluster.tolstoy[0].consul_public_endpoint_url : null
+}
+
+output "hcp_hvn_id" {
+  description = "HCP HVN ID (if created)"
+  value       = var.create_hcp_hvn ? hcp_hvn.main[0].hvn_id : null
+}
+
+output "hcp_boundary_cluster_id" {
+  description = "HCP Boundary Cluster ID (if created)"
+  value       = var.create_hcp_boundary ? hcp_boundary_cluster.tolstoy[0].cluster_id : null
+}
+
+output "hcp_packer_registry_name" {
+  description = "HCP Packer Registry name (if created)"
+  value       = var.create_hcp_packer_registry ? hcp_packer_registry.tolstoy[0].name : null
+}
+
+output "hcp_waypoint_application_name" {
+  description = "HCP Waypoint Application name (if created)"
+  value       = var.create_hcp_waypoint ? hcp_waypoint_application.tolstoy_api[0].name : null
+}
+
+output "hcp_service_principal" {
+  description = "HCP Service Principal resource name"
+  value       = data.hcp_service_principal.tolstoy.resource_name
+}
+
+# HCP Console URLs
+output "hcp_console_urls" {
+  description = "HCP Console URLs for monitoring"
+  value = {
+    project     = "https://portal.cloud.hashicorp.com/project/${hcp_project.tolstoy.resource_id}"
+    vault       = var.create_hcp_vault ? "https://portal.cloud.hashicorp.com/vault/clusters/${hcp_vault_cluster.tolstoy[0].cluster_id}" : null
+    consul      = var.create_hcp_consul ? "https://portal.cloud.hashicorp.com/consul/clusters/${hcp_consul_cluster.tolstoy[0].cluster_id}" : null
+    boundary    = var.create_hcp_boundary ? "https://portal.cloud.hashicorp.com/boundary/clusters/${hcp_boundary_cluster.tolstoy[0].cluster_id}" : null
+    packer      = var.create_hcp_packer_registry ? "https://portal.cloud.hashicorp.com/packer/registry/${hcp_packer_registry.tolstoy[0].name}" : null
+    waypoint    = var.create_hcp_waypoint ? "https://portal.cloud.hashicorp.com/waypoint/applications/${hcp_waypoint_application.tolstoy_api[0].name}" : null
+  }
+}

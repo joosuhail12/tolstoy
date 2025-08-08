@@ -14,6 +14,150 @@ variable "hcp_workspace_name" {
   default     = "tolstoy-api-gateway-prod"
 }
 
+variable "hcp_project_name" {
+  description = "HCP project name"
+  type        = string
+  default     = "tolstoy"
+}
+
+variable "hcp_client_id" {
+  description = "HCP service principal client ID"
+  type        = string
+  sensitive   = true
+}
+
+variable "hcp_client_secret" {
+  description = "HCP service principal client secret"
+  type        = string
+  sensitive   = true
+}
+
+# HCP Service Configuration
+variable "create_hcp_vault" {
+  description = "Create HCP Vault cluster"
+  type        = bool
+  default     = false
+}
+
+variable "create_hcp_hvn" {
+  description = "Create HCP HashiCorp Virtual Network"
+  type        = bool
+  default     = false
+}
+
+variable "create_hcp_consul" {
+  description = "Create HCP Consul cluster"
+  type        = bool
+  default     = false
+}
+
+variable "create_hcp_packer_registry" {
+  description = "Create HCP Packer registry"
+  type        = bool
+  default     = false
+}
+
+variable "create_hcp_boundary" {
+  description = "Create HCP Boundary cluster"
+  type        = bool
+  default     = false
+}
+
+variable "create_hcp_waypoint" {
+  description = "Create HCP Waypoint application"
+  type        = bool
+  default     = false
+}
+
+variable "hcp_hvn_cidr" {
+  description = "CIDR block for HCP HVN"
+  type        = string
+  default     = "172.25.16.0/20"
+}
+
+variable "hcp_vault_tier" {
+  description = "HCP Vault cluster tier"
+  type        = string
+  default     = "dev"
+}
+
+variable "hcp_consul_tier" {
+  description = "HCP Consul cluster tier"
+  type        = string
+  default     = "development"
+}
+
+variable "hcp_consul_size" {
+  description = "HCP Consul cluster size"
+  type        = string
+  default     = "x_small"
+}
+
+variable "hcp_boundary_tier" {
+  description = "HCP Boundary cluster tier"
+  type        = string
+  default     = "Standard"
+}
+
+variable "hcp_boundary_username" {
+  description = "HCP Boundary admin username"
+  type        = string
+  default     = "admin"
+}
+
+variable "hcp_boundary_password" {
+  description = "HCP Boundary admin password"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+# Monitoring Integration Variables (optional)
+variable "grafana_endpoint" {
+  description = "Grafana endpoint for audit logs"
+  type        = string
+  default     = ""
+}
+
+variable "grafana_user" {
+  description = "Grafana user for audit logs"
+  type        = string
+  default     = ""
+}
+
+variable "grafana_password" {
+  description = "Grafana password for audit logs"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "datadog_api_key" {
+  description = "Datadog API key for audit logs"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
+variable "datadog_region" {
+  description = "Datadog region for audit logs"
+  type        = string
+  default     = "US"
+}
+
+variable "splunk_hecendpoint" {
+  description = "Splunk HEC endpoint for audit logs"
+  type        = string
+  default     = ""
+}
+
+variable "splunk_token" {
+  description = "Splunk HEC token for audit logs"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 # Project Configuration
 variable "project_name" {
   description = "Name of the project"
