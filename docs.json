@@ -9,6 +9,7 @@
     },
     "baseUrl": ["https://tolstoy.getpullse.com", "http://localhost:3000"]
   },
+  "openapi": "docs/openapi.json",
   "logo": {
     "dark": "/logo/dark.svg",
     "light": "/logo/light.svg"

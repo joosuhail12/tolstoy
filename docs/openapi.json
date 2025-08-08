@@ -3,13 +3,40 @@
   "paths": {
     "/status": {
       "get": {
+        "description": "Get basic application health status",
         "operationId": "HealthController_getHealth",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "uptime": {
+                      "type": "number",
+                      "example": 12345.678
+                    },
+                    "version": {
+                      "type": "string",
+                      "example": "1.0.0"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
+        "summary": "Health Check",
         "tags": [
           "Health"
         ]
@@ -17,13 +44,79 @@
     },
     "/status/detailed": {
       "get": {
+        "description": "Get comprehensive health status including database, environment, and system information",
         "operationId": "HealthController_getDetailedHealth",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved detailed health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "application": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "example": "ok"
+                        },
+                        "timestamp": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "uptime": {
+                          "type": "number",
+                          "example": 12345.678
+                        },
+                        "version": {
+                          "type": "string",
+                          "example": "1.0.0"
+                        }
+                      }
+                    },
+                    "database": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "example": "connected"
+                        },
+                        "responseTime": {
+                          "type": "number",
+                          "example": 15.2
+                        },
+                        "connection": {
+                          "type": "string",
+                          "example": "postgresql://..."
+                        }
+                      }
+                    },
+                    "environment": {
+                      "type": "object",
+                      "description": "Environment configuration (sensitive values masked)",
+                      "example": {
+                        "NODE_ENV": "development",
+                        "PORT": 3000
+                      }
+                    },
+                    "system": {
+                      "type": "object",
+                      "description": "System information",
+                      "example": {
+                        "platform": "linux",
+                        "arch": "x64",
+                        "nodeVersion": "18.17.0"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
+        "summary": "Detailed Health Check",
         "tags": [
           "Health"
         ]
@@ -31,35 +124,139 @@
     },
     "/organizations": {
       "post": {
+        "description": "Create a new organization",
         "operationId": "OrganizationsController_create",
         "parameters": [],
         "requestBody": {
           "required": true,
+          "description": "Organization details",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateOrganizationDto"
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Organization name",
+                    "example": "Acme Corp"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Organization description",
+                    "example": "Leading technology company"
+                  },
+                  "settings": {
+                    "type": "object",
+                    "description": "Organization settings",
+                    "example": {
+                      "timezone": "UTC",
+                      "currency": "USD"
+                    }
+                  }
+                },
+                "required": [
+                  "name"
+                ]
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Organization created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "org_abc123"
+                    },
+                    "name": {
+                      "type": "string",
+                      "example": "Acme Corp"
+                    },
+                    "description": {
+                      "type": "string",
+                      "example": "Leading technology company"
+                    },
+                    "settings": {
+                      "type": "object",
+                      "example": {
+                        "timezone": "UTC"
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid organization data"
           }
         },
+        "summary": "Create Organization",
         "tags": [
           "Organizations"
         ]
       },
       "get": {
+        "description": "Get all organizations",
         "operationId": "OrganizationsController_findAll",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved organizations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "example": "org_abc123"
+                      },
+                      "name": {
+                        "type": "string",
+                        "example": "Acme Corp"
+                      },
+                      "description": {
+                        "type": "string",
+                        "example": "Leading technology company"
+                      },
+                      "settings": {
+                        "type": "object",
+                        "example": {
+                          "timezone": "UTC"
+                        }
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
+        "summary": "List Organizations",
         "tags": [
           "Organizations"
         ]
@@ -67,74 +264,151 @@
     },
     "/organizations/{id}": {
       "get": {
+        "description": "Get a specific organization by ID",
         "operationId": "OrganizationsController_findOne",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Organization ID",
             "schema": {
+              "example": "org_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved organization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "org_abc123"
+                    },
+                    "name": {
+                      "type": "string",
+                      "example": "Acme Corp"
+                    },
+                    "description": {
+                      "type": "string",
+                      "example": "Leading technology company"
+                    },
+                    "settings": {
+                      "type": "object",
+                      "example": {
+                        "timezone": "UTC"
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Organization not found"
           }
         },
+        "summary": "Get Organization",
         "tags": [
           "Organizations"
         ]
       },
       "put": {
+        "description": "Update organization details",
         "operationId": "OrganizationsController_update",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Organization ID",
             "schema": {
+              "example": "org_abc123",
               "type": "string"
             }
           }
         ],
         "requestBody": {
           "required": true,
+          "description": "Updated organization details",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateOrganizationDto"
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Organization name",
+                    "example": "Acme Corp"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Organization description",
+                    "example": "Leading technology company"
+                  },
+                  "settings": {
+                    "type": "object",
+                    "description": "Organization settings",
+                    "example": {
+                      "timezone": "UTC",
+                      "currency": "USD"
+                    }
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Organization updated successfully"
+          },
+          "404": {
+            "description": "Organization not found"
           }
         },
+        "summary": "Update Organization",
         "tags": [
           "Organizations"
         ]
       },
       "delete": {
+        "description": "Delete an organization permanently",
         "operationId": "OrganizationsController_remove",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Organization ID",
             "schema": {
+              "example": "org_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": ""
+            "description": "Organization deleted successfully"
+          },
+          "404": {
+            "description": "Organization not found"
           }
         },
+        "summary": "Delete Organization",
         "tags": [
           "Organizations"
         ]
@@ -142,35 +416,178 @@
     },
     "/users": {
       "post": {
+        "description": "Create a new user in the organization",
         "operationId": "UsersController_create",
         "parameters": [],
         "requestBody": {
           "required": true,
+          "description": "User details",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateUserDto"
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "User email address",
+                    "example": "john.doe@example.com"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "User full name",
+                    "example": "John Doe"
+                  },
+                  "role": {
+                    "type": "string",
+                    "description": "User role",
+                    "enum": [
+                      "admin",
+                      "member",
+                      "viewer"
+                    ],
+                    "example": "member"
+                  },
+                  "profile": {
+                    "type": "object",
+                    "description": "User profile information",
+                    "example": {
+                      "department": "Engineering",
+                      "title": "Software Engineer"
+                    }
+                  }
+                },
+                "required": [
+                  "email",
+                  "name"
+                ]
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "User created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "user_abc123"
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "john.doe@example.com"
+                    },
+                    "name": {
+                      "type": "string",
+                      "example": "John Doe"
+                    },
+                    "role": {
+                      "type": "string",
+                      "example": "member"
+                    },
+                    "profile": {
+                      "type": "object",
+                      "example": {
+                        "department": "Engineering"
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid user data"
+          },
+          "409": {
+            "description": "User with this email already exists"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Create User",
         "tags": [
           "Users"
         ]
       },
       "get": {
+        "description": "Get all users in the organization",
         "operationId": "UsersController_findAll",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved users",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "example": "user_abc123"
+                      },
+                      "email": {
+                        "type": "string",
+                        "example": "john.doe@example.com"
+                      },
+                      "name": {
+                        "type": "string",
+                        "example": "John Doe"
+                      },
+                      "role": {
+                        "type": "string",
+                        "example": "member"
+                      },
+                      "profile": {
+                        "type": "object",
+                        "example": {
+                          "department": "Engineering"
+                        }
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "List Users",
         "tags": [
           "Users"
         ]
@@ -178,74 +595,190 @@
     },
     "/users/{id}": {
       "get": {
+        "description": "Get a specific user by ID",
         "operationId": "UsersController_findOne",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "User ID",
             "schema": {
+              "example": "user_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "user_abc123"
+                    },
+                    "email": {
+                      "type": "string",
+                      "example": "john.doe@example.com"
+                    },
+                    "name": {
+                      "type": "string",
+                      "example": "John Doe"
+                    },
+                    "role": {
+                      "type": "string",
+                      "example": "member"
+                    },
+                    "profile": {
+                      "type": "object",
+                      "example": {
+                        "department": "Engineering"
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Get User",
         "tags": [
           "Users"
         ]
       },
       "put": {
+        "description": "Update user details",
         "operationId": "UsersController_update",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "User ID",
             "schema": {
+              "example": "user_abc123",
               "type": "string"
             }
           }
         ],
         "requestBody": {
           "required": true,
+          "description": "Updated user details",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateUserDto"
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "User email address",
+                    "example": "john.doe@example.com"
+                  },
+                  "name": {
+                    "type": "string",
+                    "description": "User full name",
+                    "example": "John Doe"
+                  },
+                  "role": {
+                    "type": "string",
+                    "description": "User role",
+                    "enum": [
+                      "admin",
+                      "member",
+                      "viewer"
+                    ],
+                    "example": "member"
+                  },
+                  "profile": {
+                    "type": "object",
+                    "description": "User profile information",
+                    "example": {
+                      "department": "Engineering",
+                      "title": "Senior Software Engineer"
+                    }
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "User updated successfully"
+          },
+          "404": {
+            "description": "User not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Update User",
         "tags": [
           "Users"
         ]
       },
       "delete": {
+        "description": "Delete a user permanently",
         "operationId": "UsersController_remove",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "User ID",
             "schema": {
+              "example": "user_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": ""
+            "description": "User deleted successfully"
+          },
+          "404": {
+            "description": "User not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Delete User",
         "tags": [
           "Users"
         ]
@@ -253,35 +786,191 @@
     },
     "/tools": {
       "post": {
+        "description": "Register a new external tool for use in workflows",
         "operationId": "ToolsController_create",
         "parameters": [],
         "requestBody": {
           "required": true,
+          "description": "Tool configuration",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateToolDto"
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Tool name",
+                    "example": "Slack Notifier"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Tool type/category",
+                    "enum": [
+                      "notification",
+                      "api",
+                      "database",
+                      "webhook",
+                      "email"
+                    ],
+                    "example": "notification"
+                  },
+                  "configuration": {
+                    "type": "object",
+                    "description": "Tool-specific configuration",
+                    "example": {
+                      "baseUrl": "https://hooks.slack.com",
+                      "timeout": 5000,
+                      "retries": 3
+                    }
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Tool description",
+                    "example": "Send notifications to Slack channels"
+                  },
+                  "version": {
+                    "type": "string",
+                    "description": "Tool version",
+                    "example": "1.0.0"
+                  }
+                },
+                "required": [
+                  "name",
+                  "type",
+                  "configuration"
+                ]
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Tool created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "tool_abc123"
+                    },
+                    "name": {
+                      "type": "string",
+                      "example": "Slack Notifier"
+                    },
+                    "type": {
+                      "type": "string",
+                      "example": "notification"
+                    },
+                    "configuration": {
+                      "type": "object",
+                      "example": {
+                        "baseUrl": "https://hooks.slack.com"
+                      }
+                    },
+                    "description": {
+                      "type": "string",
+                      "example": "Send notifications to Slack channels"
+                    },
+                    "version": {
+                      "type": "string",
+                      "example": "1.0.0"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid tool configuration"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Create Tool",
         "tags": [
           "Tools"
         ]
       },
       "get": {
+        "description": "Get all registered tools for the organization",
         "operationId": "ToolsController_findAll",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved tools",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "example": "tool_abc123"
+                      },
+                      "name": {
+                        "type": "string",
+                        "example": "Slack Notifier"
+                      },
+                      "type": {
+                        "type": "string",
+                        "example": "notification"
+                      },
+                      "configuration": {
+                        "type": "object",
+                        "example": {
+                          "baseUrl": "https://hooks.slack.com"
+                        }
+                      },
+                      "description": {
+                        "type": "string",
+                        "example": "Send notifications to Slack channels"
+                      },
+                      "version": {
+                        "type": "string",
+                        "example": "1.0.0"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "List Tools",
         "tags": [
           "Tools"
         ]
@@ -289,74 +978,204 @@
     },
     "/tools/{id}": {
       "get": {
+        "description": "Get a specific tool by ID",
         "operationId": "ToolsController_findOne",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Tool ID",
             "schema": {
+              "example": "tool_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved tool",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "tool_abc123"
+                    },
+                    "name": {
+                      "type": "string",
+                      "example": "Slack Notifier"
+                    },
+                    "type": {
+                      "type": "string",
+                      "example": "notification"
+                    },
+                    "configuration": {
+                      "type": "object",
+                      "example": {
+                        "baseUrl": "https://hooks.slack.com"
+                      }
+                    },
+                    "description": {
+                      "type": "string",
+                      "example": "Send notifications to Slack channels"
+                    },
+                    "version": {
+                      "type": "string",
+                      "example": "1.0.0"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tool not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Get Tool",
         "tags": [
           "Tools"
         ]
       },
       "put": {
+        "description": "Update tool configuration",
         "operationId": "ToolsController_update",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Tool ID",
             "schema": {
+              "example": "tool_abc123",
               "type": "string"
             }
           }
         ],
         "requestBody": {
           "required": true,
+          "description": "Updated tool configuration",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateToolDto"
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Tool name",
+                    "example": "Slack Notifier"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "Tool type/category",
+                    "enum": [
+                      "notification",
+                      "api",
+                      "database",
+                      "webhook",
+                      "email"
+                    ],
+                    "example": "notification"
+                  },
+                  "configuration": {
+                    "type": "object",
+                    "description": "Tool-specific configuration",
+                    "example": {
+                      "baseUrl": "https://hooks.slack.com",
+                      "timeout": 10000,
+                      "retries": 5
+                    }
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Tool description",
+                    "example": "Enhanced Slack notification tool"
+                  },
+                  "version": {
+                    "type": "string",
+                    "description": "Tool version",
+                    "example": "1.1.0"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Tool updated successfully"
+          },
+          "404": {
+            "description": "Tool not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Update Tool",
         "tags": [
           "Tools"
         ]
       },
       "delete": {
+        "description": "Delete a tool permanently (will affect workflows using this tool)",
         "operationId": "ToolsController_remove",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Tool ID",
             "schema": {
+              "example": "tool_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": ""
+            "description": "Tool deleted successfully"
+          },
+          "404": {
+            "description": "Tool not found"
+          },
+          "409": {
+            "description": "Tool is being used by active workflows and cannot be deleted"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Delete Tool",
         "tags": [
           "Tools"
         ]
@@ -364,35 +1183,289 @@
     },
     "/actions": {
       "post": {
+        "description": "Create a reusable action template for workflows. Actions define API calls that can be executed within workflow steps.",
         "operationId": "ActionsController_create",
         "parameters": [],
         "requestBody": {
           "required": true,
+          "description": "Action template configuration",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateActionDto"
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Human-readable action name",
+                    "example": "Send Slack Message"
+                  },
+                  "key": {
+                    "type": "string",
+                    "description": "Unique identifier for the action",
+                    "example": "slack_send_message"
+                  },
+                  "toolId": {
+                    "type": "string",
+                    "description": "ID of the associated tool",
+                    "example": "tool_slack_123"
+                  },
+                  "method": {
+                    "type": "string",
+                    "description": "HTTP method for the action",
+                    "enum": [
+                      "GET",
+                      "POST",
+                      "PUT",
+                      "DELETE",
+                      "PATCH"
+                    ],
+                    "example": "POST"
+                  },
+                  "endpoint": {
+                    "type": "string",
+                    "description": "API endpoint URL or path",
+                    "example": "/api/chat.postMessage"
+                  },
+                  "headers": {
+                    "type": "object",
+                    "description": "HTTP headers required for the action",
+                    "example": {
+                      "Content-Type": "application/json",
+                      "Authorization": "Bearer {token}"
+                    }
+                  },
+                  "inputSchema": {
+                    "type": "array",
+                    "description": "Schema defining input parameters for the action",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string",
+                          "example": "channel"
+                        },
+                        "type": {
+                          "type": "string",
+                          "example": "string"
+                        },
+                        "required": {
+                          "type": "boolean",
+                          "example": true
+                        },
+                        "description": {
+                          "type": "string",
+                          "example": "Slack channel ID"
+                        }
+                      }
+                    },
+                    "example": [
+                      {
+                        "name": "channel",
+                        "type": "string",
+                        "required": true,
+                        "description": "Slack channel ID"
+                      },
+                      {
+                        "name": "text",
+                        "type": "string",
+                        "required": true,
+                        "description": "Message content"
+                      }
+                    ]
+                  },
+                  "executeIf": {
+                    "type": "object",
+                    "description": "Conditional execution rules (optional)",
+                    "example": {
+                      "user.role": "admin"
+                    }
+                  },
+                  "version": {
+                    "type": "number",
+                    "description": "Action version number",
+                    "example": 1
+                  }
+                },
+                "required": [
+                  "name",
+                  "key",
+                  "toolId",
+                  "method",
+                  "endpoint",
+                  "headers",
+                  "inputSchema"
+                ]
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Action created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "action_abc123"
+                    },
+                    "name": {
+                      "type": "string",
+                      "example": "Send Slack Message"
+                    },
+                    "key": {
+                      "type": "string",
+                      "example": "slack_send_message"
+                    },
+                    "toolId": {
+                      "type": "string",
+                      "example": "tool_slack_123"
+                    },
+                    "method": {
+                      "type": "string",
+                      "example": "POST"
+                    },
+                    "endpoint": {
+                      "type": "string",
+                      "example": "/api/chat.postMessage"
+                    },
+                    "headers": {
+                      "type": "object",
+                      "example": {
+                        "Content-Type": "application/json"
+                      }
+                    },
+                    "inputSchema": {
+                      "type": "array",
+                      "example": []
+                    },
+                    "executeIf": {
+                      "type": "object",
+                      "example": {}
+                    },
+                    "version": {
+                      "type": "number",
+                      "example": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid action configuration"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Create Action",
         "tags": [
           "Actions"
         ]
       },
       "get": {
+        "description": "Get all reusable action templates for the organization",
         "operationId": "ActionsController_findAll",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved actions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "example": "action_abc123"
+                      },
+                      "name": {
+                        "type": "string",
+                        "example": "Send Slack Message"
+                      },
+                      "key": {
+                        "type": "string",
+                        "example": "slack_send_message"
+                      },
+                      "toolId": {
+                        "type": "string",
+                        "example": "tool_slack_123"
+                      },
+                      "method": {
+                        "type": "string",
+                        "example": "POST"
+                      },
+                      "endpoint": {
+                        "type": "string",
+                        "example": "/api/chat.postMessage"
+                      },
+                      "headers": {
+                        "type": "object",
+                        "example": {
+                          "Content-Type": "application/json"
+                        }
+                      },
+                      "inputSchema": {
+                        "type": "array",
+                        "example": [
+                          {
+                            "name": "channel",
+                            "type": "string",
+                            "required": true,
+                            "description": "Slack channel ID"
+                          }
+                        ]
+                      },
+                      "executeIf": {
+                        "type": "object",
+                        "example": {}
+                      },
+                      "version": {
+                        "type": "number",
+                        "example": 1
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "List Actions",
         "tags": [
           "Actions"
         ]
@@ -400,74 +1473,296 @@
     },
     "/actions/{id}": {
       "get": {
+        "description": "Get a specific action template by ID",
         "operationId": "ActionsController_findOne",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Action ID",
             "schema": {
+              "example": "action_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved action",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "action_abc123"
+                    },
+                    "name": {
+                      "type": "string",
+                      "example": "Send Slack Message"
+                    },
+                    "key": {
+                      "type": "string",
+                      "example": "slack_send_message"
+                    },
+                    "toolId": {
+                      "type": "string",
+                      "example": "tool_slack_123"
+                    },
+                    "method": {
+                      "type": "string",
+                      "example": "POST"
+                    },
+                    "endpoint": {
+                      "type": "string",
+                      "example": "/api/chat.postMessage"
+                    },
+                    "headers": {
+                      "type": "object",
+                      "example": {
+                        "Content-Type": "application/json",
+                        "Authorization": "Bearer {token}"
+                      }
+                    },
+                    "inputSchema": {
+                      "type": "array",
+                      "example": [
+                        {
+                          "name": "channel",
+                          "type": "string",
+                          "required": true,
+                          "description": "Slack channel ID"
+                        },
+                        {
+                          "name": "text",
+                          "type": "string",
+                          "required": true,
+                          "description": "Message content"
+                        }
+                      ]
+                    },
+                    "executeIf": {
+                      "type": "object",
+                      "example": {
+                        "user.role": "admin"
+                      }
+                    },
+                    "version": {
+                      "type": "number",
+                      "example": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Action not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Get Action",
         "tags": [
           "Actions"
         ]
       },
       "put": {
+        "description": "Update an action template configuration",
         "operationId": "ActionsController_update",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Action ID",
             "schema": {
+              "example": "action_abc123",
               "type": "string"
             }
           }
         ],
         "requestBody": {
           "required": true,
+          "description": "Updated action configuration",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateActionDto"
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Human-readable action name",
+                    "example": "Send Enhanced Slack Message"
+                  },
+                  "key": {
+                    "type": "string",
+                    "description": "Unique identifier for the action",
+                    "example": "slack_send_enhanced_message"
+                  },
+                  "toolId": {
+                    "type": "string",
+                    "description": "ID of the associated tool",
+                    "example": "tool_slack_123"
+                  },
+                  "method": {
+                    "type": "string",
+                    "description": "HTTP method for the action",
+                    "enum": [
+                      "GET",
+                      "POST",
+                      "PUT",
+                      "DELETE",
+                      "PATCH"
+                    ],
+                    "example": "POST"
+                  },
+                  "endpoint": {
+                    "type": "string",
+                    "description": "API endpoint URL or path",
+                    "example": "/api/chat.postMessage"
+                  },
+                  "headers": {
+                    "type": "object",
+                    "description": "HTTP headers required for the action",
+                    "example": {
+                      "Content-Type": "application/json",
+                      "Authorization": "Bearer {token}"
+                    }
+                  },
+                  "inputSchema": {
+                    "type": "array",
+                    "description": "Schema defining input parameters for the action",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "required": {
+                          "type": "boolean"
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "example": [
+                      {
+                        "name": "channel",
+                        "type": "string",
+                        "required": true,
+                        "description": "Slack channel ID"
+                      },
+                      {
+                        "name": "text",
+                        "type": "string",
+                        "required": true,
+                        "description": "Message content"
+                      },
+                      {
+                        "name": "attachments",
+                        "type": "array",
+                        "required": false,
+                        "description": "Message attachments"
+                      }
+                    ]
+                  },
+                  "executeIf": {
+                    "type": "object",
+                    "description": "Conditional execution rules (optional)",
+                    "example": {
+                      "user.role": "admin"
+                    }
+                  },
+                  "version": {
+                    "type": "number",
+                    "description": "Action version number",
+                    "example": 2
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Action updated successfully"
+          },
+          "400": {
+            "description": "Invalid action configuration"
+          },
+          "404": {
+            "description": "Action not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Update Action",
         "tags": [
           "Actions"
         ]
       },
       "delete": {
+        "description": "Delete an action template permanently. This will affect any workflows that use this action.",
         "operationId": "ActionsController_remove",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Action ID",
             "schema": {
+              "example": "action_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": ""
+            "description": "Action deleted successfully"
+          },
+          "404": {
+            "description": "Action not found"
+          },
+          "409": {
+            "description": "Action is being used by active workflows and cannot be deleted"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Delete Action",
         "tags": [
           "Actions"
         ]
@@ -475,35 +1770,205 @@
     },
     "/flows": {
       "post": {
+        "description": "Create a new workflow with steps and configuration",
         "operationId": "FlowsController_create",
         "parameters": [],
         "requestBody": {
           "required": true,
+          "description": "Flow definition",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateFlowDto"
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Flow name",
+                    "example": "User Onboarding Flow"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Flow description",
+                    "example": "Automated user onboarding process with email and notifications"
+                  },
+                  "version": {
+                    "type": "number",
+                    "description": "Flow version number",
+                    "example": 1
+                  },
+                  "steps": {
+                    "type": "array",
+                    "description": "Workflow steps definition",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "example": "step_1"
+                        },
+                        "type": {
+                          "type": "string",
+                          "example": "action"
+                        },
+                        "actionId": {
+                          "type": "string",
+                          "example": "action_abc123"
+                        },
+                        "config": {
+                          "type": "object",
+                          "example": {
+                            "timeout": 30000
+                          }
+                        }
+                      }
+                    },
+                    "example": [
+                      {
+                        "id": "step_1",
+                        "type": "action",
+                        "actionId": "action_send_email",
+                        "config": {
+                          "to": "{{user.email}}",
+                          "template": "welcome"
+                        }
+                      }
+                    ]
+                  },
+                  "settings": {
+                    "type": "object",
+                    "description": "Flow execution settings",
+                    "example": {
+                      "timeout": 300000,
+                      "retries": 2
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "steps"
+                ]
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Flow created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "flow_abc123"
+                    },
+                    "name": {
+                      "type": "string",
+                      "example": "User Onboarding Flow"
+                    },
+                    "description": {
+                      "type": "string",
+                      "example": "Automated user onboarding process"
+                    },
+                    "version": {
+                      "type": "number",
+                      "example": 1
+                    },
+                    "steps": {
+                      "type": "array",
+                      "example": []
+                    },
+                    "settings": {
+                      "type": "object",
+                      "example": {
+                        "timeout": 300000
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid flow definition"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Create Flow",
         "tags": [
           "Flows"
         ]
       },
       "get": {
+        "description": "Get all workflows for the organization",
         "operationId": "FlowsController_findAll",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved flows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "example": "flow_abc123"
+                      },
+                      "name": {
+                        "type": "string",
+                        "example": "User Onboarding Flow"
+                      },
+                      "version": {
+                        "type": "number",
+                        "example": 1
+                      },
+                      "steps": {
+                        "type": "array",
+                        "example": []
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "List Flows",
         "tags": [
           "Flows"
         ]
@@ -511,74 +1976,163 @@
     },
     "/flows/{id}": {
       "get": {
+        "description": "Get a specific workflow by ID",
         "operationId": "FlowsController_findOne",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Flow ID",
             "schema": {
+              "example": "flow_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved flow"
+          },
+          "404": {
+            "description": "Flow not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Get Flow",
         "tags": [
           "Flows"
         ]
       },
       "put": {
+        "description": "Update workflow definition and configuration",
         "operationId": "FlowsController_update",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Flow ID",
             "schema": {
+              "example": "flow_abc123",
               "type": "string"
             }
           }
         ],
         "requestBody": {
           "required": true,
+          "description": "Updated flow definition",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateFlowDto"
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Flow name",
+                    "example": "Updated User Onboarding Flow"
+                  },
+                  "description": {
+                    "type": "string",
+                    "description": "Flow description",
+                    "example": "Enhanced automated user onboarding process"
+                  },
+                  "version": {
+                    "type": "number",
+                    "description": "Flow version number",
+                    "example": 2
+                  },
+                  "steps": {
+                    "type": "array",
+                    "description": "Updated workflow steps definition",
+                    "example": [
+                      {
+                        "id": "step_1",
+                        "type": "action",
+                        "actionId": "action_send_email",
+                        "config": {
+                          "to": "{{user.email}}",
+                          "template": "welcome_v2"
+                        }
+                      }
+                    ]
+                  },
+                  "settings": {
+                    "type": "object",
+                    "description": "Updated flow execution settings",
+                    "example": {
+                      "timeout": 600000,
+                      "retries": 3
+                    }
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Flow updated successfully"
+          },
+          "404": {
+            "description": "Flow not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Update Flow",
         "tags": [
           "Flows"
         ]
       },
       "delete": {
+        "description": "Delete a workflow permanently",
         "operationId": "FlowsController_remove",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Flow ID",
             "schema": {
+              "example": "flow_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": ""
+            "description": "Flow deleted successfully"
+          },
+          "404": {
+            "description": "Flow not found"
+          },
+          "409": {
+            "description": "Flow has active executions and cannot be deleted"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Delete Flow",
         "tags": [
           "Flows"
         ]
@@ -586,22 +2140,87 @@
     },
     "/flows/{id}/execute": {
       "post": {
+        "description": "Execute a workflow either synchronously or asynchronously with optional input variables",
         "operationId": "FlowsController_executeFlow",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Flow ID to execute",
             "schema": {
+              "example": "flow_abc123",
               "type": "string"
             }
           }
         ],
-        "responses": {
-          "202": {
-            "description": ""
+        "requestBody": {
+          "required": true,
+          "description": "Execution configuration",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "variables": {
+                    "type": "object",
+                    "description": "Input variables for the flow execution",
+                    "example": {
+                      "userId": "user_123",
+                      "email": "user@example.com"
+                    }
+                  },
+                  "useDurable": {
+                    "type": "boolean",
+                    "description": "Whether to use durable (async) execution",
+                    "default": true
+                  }
+                }
+              }
+            }
           }
         },
+        "responses": {
+          "202": {
+            "description": "Flow execution started successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "executionId": {
+                      "type": "string",
+                      "example": "exec_abc123"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "running"
+                    },
+                    "mode": {
+                      "type": "string",
+                      "example": "durable"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid execution parameters"
+          },
+          "404": {
+            "description": "Flow not found"
+          }
+        },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Execute Flow",
         "tags": [
           "Flows"
         ]
@@ -609,22 +2228,71 @@
     },
     "/flows/{id}/executions": {
       "get": {
+        "description": "Get execution history for a specific flow",
         "operationId": "FlowsController_getFlowExecutions",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Flow ID",
             "schema": {
+              "example": "flow_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved flow executions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "executionId": {
+                        "type": "string",
+                        "example": "exec_abc123"
+                      },
+                      "status": {
+                        "type": "string",
+                        "example": "completed"
+                      },
+                      "startedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "completedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "variables": {
+                        "type": "object",
+                        "example": {
+                          "userId": "user_123"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Flow not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Get Flow Executions",
         "tags": [
           "Flows"
         ]
@@ -632,13 +2300,16 @@
     },
     "/flows/{id}/executions/{executionId}": {
       "get": {
+        "description": "Get detailed status of a specific flow execution",
         "operationId": "FlowsController_getExecutionStatus",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Flow ID",
             "schema": {
+              "example": "flow_abc123",
               "type": "string"
             }
           },
@@ -646,16 +2317,71 @@
             "name": "executionId",
             "required": true,
             "in": "path",
+            "description": "Execution ID",
             "schema": {
+              "example": "exec_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved execution status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "executionId": {
+                      "type": "string",
+                      "example": "exec_abc123"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "running"
+                    },
+                    "currentStep": {
+                      "type": "string",
+                      "example": "step_2"
+                    },
+                    "progress": {
+                      "type": "number",
+                      "example": 0.6
+                    },
+                    "startedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "variables": {
+                      "type": "object",
+                      "example": {
+                        "userId": "user_123"
+                      }
+                    },
+                    "output": {
+                      "type": "object",
+                      "example": {
+                        "result": "success"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Execution not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Get Execution Status",
         "tags": [
           "Flows"
         ]
@@ -663,13 +2389,16 @@
     },
     "/flows/{id}/executions/{executionId}/cancel": {
       "post": {
+        "description": "Cancel a running flow execution",
         "operationId": "FlowsController_cancelExecution",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Flow ID",
             "schema": {
+              "example": "flow_abc123",
               "type": "string"
             }
           },
@@ -677,16 +2406,30 @@
             "name": "executionId",
             "required": true,
             "in": "path",
+            "description": "Execution ID",
             "schema": {
+              "example": "exec_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": ""
+            "description": "Execution cancelled successfully"
+          },
+          "404": {
+            "description": "Execution not found or already completed"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Cancel Execution",
         "tags": [
           "Flows"
         ]
@@ -694,13 +2437,16 @@
     },
     "/flows/{id}/executions/{executionId}/retry": {
       "post": {
+        "description": "Retry a failed flow execution",
         "operationId": "FlowsController_retryExecution",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Flow ID",
             "schema": {
+              "example": "flow_abc123",
               "type": "string"
             }
           },
@@ -708,16 +2454,54 @@
             "name": "executionId",
             "required": true,
             "in": "path",
+            "description": "Execution ID to retry",
             "schema": {
+              "example": "exec_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "202": {
-            "description": ""
+            "description": "Execution retry initiated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "newExecutionId": {
+                      "type": "string",
+                      "example": "exec_def456"
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "running"
+                    },
+                    "retryAttempt": {
+                      "type": "number",
+                      "example": 2
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Execution is not in a retryable state"
+          },
+          "404": {
+            "description": "Execution not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Retry Execution",
         "tags": [
           "Flows"
         ]
@@ -725,22 +2509,70 @@
     },
     "/flows/{id}/metrics": {
       "get": {
+        "description": "Get execution metrics and statistics for a flow",
         "operationId": "FlowsController_getExecutionMetrics",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Flow ID",
             "schema": {
+              "example": "flow_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved execution metrics",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "totalExecutions": {
+                      "type": "number",
+                      "example": 152
+                    },
+                    "successfulExecutions": {
+                      "type": "number",
+                      "example": 140
+                    },
+                    "failedExecutions": {
+                      "type": "number",
+                      "example": 12
+                    },
+                    "averageExecutionTime": {
+                      "type": "number",
+                      "example": 4250.5
+                    },
+                    "lastExecutionAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "successRate": {
+                      "type": "number",
+                      "example": 0.921
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Flow not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Get Execution Metrics",
         "tags": [
           "Flows"
         ]
@@ -748,155 +2580,658 @@
     },
     "/execution-logs": {
       "post": {
+        "description": "Create a log entry for workflow step execution. This tracks the execution history, inputs, outputs, and any errors.",
         "operationId": "ExecutionLogsController_create",
         "parameters": [],
         "requestBody": {
           "required": true,
+          "description": "Execution log entry data",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateExecutionLogDto"
+                "type": "object",
+                "properties": {
+                  "flowId": {
+                    "type": "string",
+                    "description": "ID of the workflow being executed",
+                    "example": "flow_abc123"
+                  },
+                  "executionId": {
+                    "type": "string",
+                    "description": "Unique execution instance ID",
+                    "example": "exec_xyz789"
+                  },
+                  "stepKey": {
+                    "type": "string",
+                    "description": "Unique identifier for the step within the workflow",
+                    "example": "send_notification"
+                  },
+                  "inputs": {
+                    "type": "object",
+                    "description": "Input data provided to the step",
+                    "example": {
+                      "stepName": "Send Slack Notification",
+                      "stepType": "action",
+                      "config": {
+                        "actionKey": "slack_send_message",
+                        "parameters": {
+                          "channel": "#general",
+                          "message": "Workflow completed successfully"
+                        }
+                      },
+                      "variables": {
+                        "userId": "user_123",
+                        "timestamp": "2024-01-15T10:30:00Z"
+                      },
+                      "stepOutputs": {}
+                    }
+                  },
+                  "outputs": {
+                    "type": "object",
+                    "description": "Output data produced by the step (optional)",
+                    "example": {
+                      "messageId": "msg_456",
+                      "timestamp": "2024-01-15T10:30:05Z",
+                      "success": true
+                    }
+                  },
+                  "error": {
+                    "type": "object",
+                    "description": "Error information if step failed (optional)",
+                    "example": {
+                      "message": "Channel not found",
+                      "code": "CHANNEL_NOT_FOUND",
+                      "stack": "Error stack trace..."
+                    }
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "Execution status of the step",
+                    "enum": [
+                      "pending",
+                      "running",
+                      "completed",
+                      "failed",
+                      "skipped"
+                    ],
+                    "example": "completed"
+                  }
+                },
+                "required": [
+                  "flowId",
+                  "executionId",
+                  "stepKey",
+                  "inputs",
+                  "status"
+                ]
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Execution log created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "log_def456"
+                    },
+                    "flowId": {
+                      "type": "string",
+                      "example": "flow_abc123"
+                    },
+                    "executionId": {
+                      "type": "string",
+                      "example": "exec_xyz789"
+                    },
+                    "stepKey": {
+                      "type": "string",
+                      "example": "send_notification"
+                    },
+                    "inputs": {
+                      "type": "object",
+                      "example": {}
+                    },
+                    "outputs": {
+                      "type": "object",
+                      "example": {}
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": null
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "completed"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid execution log data"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Create Execution Log",
         "tags": [
-          "ExecutionLogs"
+          "Execution Logs"
         ]
       },
       "get": {
+        "description": "Get all execution logs for the organization. This provides a complete history of workflow step executions.",
         "operationId": "ExecutionLogsController_findAll",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved execution logs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "example": "log_def456"
+                      },
+                      "flowId": {
+                        "type": "string",
+                        "example": "flow_abc123"
+                      },
+                      "executionId": {
+                        "type": "string",
+                        "example": "exec_xyz789"
+                      },
+                      "stepKey": {
+                        "type": "string",
+                        "example": "send_notification"
+                      },
+                      "inputs": {
+                        "type": "object",
+                        "example": {
+                          "stepName": "Send Slack Notification",
+                          "stepType": "action",
+                          "config": {},
+                          "variables": {},
+                          "stepOutputs": {}
+                        }
+                      },
+                      "outputs": {
+                        "type": "object",
+                        "example": {
+                          "messageId": "msg_456",
+                          "success": true
+                        }
+                      },
+                      "error": {
+                        "type": "object",
+                        "example": null
+                      },
+                      "status": {
+                        "type": "string",
+                        "example": "completed"
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "List Execution Logs",
         "tags": [
-          "ExecutionLogs"
+          "Execution Logs"
         ]
       }
     },
     "/execution-logs/{id}": {
       "get": {
+        "description": "Get a specific execution log entry by ID",
         "operationId": "ExecutionLogsController_findOne",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Execution log ID",
             "schema": {
+              "example": "log_def456",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved execution log",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "log_def456"
+                    },
+                    "flowId": {
+                      "type": "string",
+                      "example": "flow_abc123"
+                    },
+                    "executionId": {
+                      "type": "string",
+                      "example": "exec_xyz789"
+                    },
+                    "stepKey": {
+                      "type": "string",
+                      "example": "send_notification"
+                    },
+                    "inputs": {
+                      "type": "object",
+                      "example": {
+                        "stepName": "Send Slack Notification",
+                        "stepType": "action",
+                        "config": {
+                          "actionKey": "slack_send_message",
+                          "parameters": {
+                            "channel": "#general",
+                            "message": "Workflow completed successfully"
+                          }
+                        },
+                        "executeIf": "user.role == \"admin\"",
+                        "variables": {
+                          "userId": "user_123",
+                          "timestamp": "2024-01-15T10:30:00Z"
+                        },
+                        "stepOutputs": {
+                          "previousStepResult": "success"
+                        }
+                      }
+                    },
+                    "outputs": {
+                      "type": "object",
+                      "example": {
+                        "messageId": "msg_456",
+                        "timestamp": "2024-01-15T10:30:05Z",
+                        "success": true,
+                        "responseCode": 200
+                      }
+                    },
+                    "error": {
+                      "type": "object",
+                      "example": null
+                    },
+                    "status": {
+                      "type": "string",
+                      "example": "completed"
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Execution log not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Get Execution Log",
         "tags": [
-          "ExecutionLogs"
+          "Execution Logs"
         ]
       },
       "put": {
+        "description": "Update execution log entry. Typically used to add outputs or update status after step completion.",
         "operationId": "ExecutionLogsController_update",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Execution log ID",
             "schema": {
+              "example": "log_def456",
               "type": "string"
             }
           }
         ],
         "requestBody": {
           "required": true,
+          "description": "Updated execution log data",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateExecutionLogDto"
+                "type": "object",
+                "properties": {
+                  "outputs": {
+                    "type": "object",
+                    "description": "Output data produced by the step",
+                    "example": {
+                      "messageId": "msg_456",
+                      "timestamp": "2024-01-15T10:30:05Z",
+                      "success": true,
+                      "responseCode": 200
+                    }
+                  },
+                  "error": {
+                    "type": "object",
+                    "description": "Error information if step failed",
+                    "example": {
+                      "message": "Channel not found",
+                      "code": "CHANNEL_NOT_FOUND",
+                      "stack": "Error stack trace..."
+                    }
+                  },
+                  "status": {
+                    "type": "string",
+                    "description": "Updated execution status",
+                    "enum": [
+                      "pending",
+                      "running",
+                      "completed",
+                      "failed",
+                      "skipped"
+                    ],
+                    "example": "completed"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Execution log updated successfully"
+          },
+          "400": {
+            "description": "Invalid execution log data"
+          },
+          "404": {
+            "description": "Execution log not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Update Execution Log",
         "tags": [
-          "ExecutionLogs"
+          "Execution Logs"
         ]
       },
       "delete": {
+        "description": "Delete an execution log entry. Use with caution as this removes audit trail information.",
         "operationId": "ExecutionLogsController_remove",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Execution log ID",
             "schema": {
+              "example": "log_def456",
               "type": "string"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": ""
+            "description": "Execution log deleted successfully"
+          },
+          "404": {
+            "description": "Execution log not found"
+          },
+          "409": {
+            "description": "Cannot delete log entry that is part of active execution"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Delete Execution Log",
         "tags": [
-          "ExecutionLogs"
+          "Execution Logs"
         ]
       }
     },
     "/webhooks": {
       "post": {
+        "description": "Create a new webhook to receive event notifications",
         "operationId": "WebhooksController_create",
         "parameters": [],
         "requestBody": {
           "required": true,
+          "description": "Webhook configuration",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateWebhookDto"
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Webhook endpoint URL",
+                    "example": "https://api.example.com/webhook"
+                  },
+                  "eventTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Event types to subscribe to",
+                    "example": [
+                      "flow.execution.completed",
+                      "flow.execution.failed"
+                    ]
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "description": "Whether the webhook is active",
+                    "default": true
+                  },
+                  "secret": {
+                    "type": "string",
+                    "description": "Optional secret for webhook signature verification",
+                    "example": "webhook_secret_123"
+                  }
+                },
+                "required": [
+                  "url",
+                  "eventTypes"
+                ]
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Webhook created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "webhook_abc123"
+                    },
+                    "url": {
+                      "type": "string",
+                      "example": "https://api.example.com/webhook"
+                    },
+                    "eventTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "example": [
+                        "flow.execution.completed"
+                      ]
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid webhook configuration"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Create Webhook",
         "tags": [
           "Webhooks"
         ]
       },
       "get": {
+        "description": "Get all webhooks for the organization, optionally filtered by event type",
         "operationId": "WebhooksController_findAll",
         "parameters": [
           {
             "name": "eventType",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Filter webhooks by event type",
             "schema": {
+              "example": "flow.execution.completed",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved webhooks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "example": "webhook_abc123"
+                      },
+                      "url": {
+                        "type": "string",
+                        "example": "https://api.example.com/webhook"
+                      },
+                      "eventTypes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "example": [
+                          "flow.execution.completed"
+                        ]
+                      },
+                      "enabled": {
+                        "type": "boolean",
+                        "example": true
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "List Webhooks",
         "tags": [
           "Webhooks"
         ]
@@ -904,13 +3239,45 @@
     },
     "/webhooks/event-types": {
       "get": {
+        "description": "Get list of all valid event types that can be subscribed to via webhooks",
         "operationId": "WebhooksController_getValidEventTypes",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved event types",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "eventTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "example": [
+                        "flow.execution.started",
+                        "flow.execution.completed",
+                        "flow.execution.failed",
+                        "user.created",
+                        "organization.updated"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Get Valid Event Types",
         "tags": [
           "Webhooks"
         ]
@@ -918,74 +3285,185 @@
     },
     "/webhooks/{id}": {
       "get": {
+        "description": "Get a specific webhook by ID",
         "operationId": "WebhooksController_findOne",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Webhook ID",
             "schema": {
+              "example": "webhook_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved webhook",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "webhook_abc123"
+                    },
+                    "url": {
+                      "type": "string",
+                      "example": "https://api.example.com/webhook"
+                    },
+                    "eventTypes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "example": [
+                        "flow.execution.completed"
+                      ]
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Get Webhook",
         "tags": [
           "Webhooks"
         ]
       },
       "put": {
+        "description": "Update webhook configuration",
         "operationId": "WebhooksController_update",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Webhook ID",
             "schema": {
+              "example": "webhook_abc123",
               "type": "string"
             }
           }
         ],
         "requestBody": {
           "required": true,
+          "description": "Updated webhook configuration",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/UpdateWebhookDto"
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "description": "Webhook endpoint URL",
+                    "example": "https://api.example.com/webhook"
+                  },
+                  "eventTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Event types to subscribe to",
+                    "example": [
+                      "flow.execution.completed",
+                      "flow.execution.failed"
+                    ]
+                  },
+                  "enabled": {
+                    "type": "boolean",
+                    "description": "Whether the webhook is active"
+                  },
+                  "secret": {
+                    "type": "string",
+                    "description": "Optional secret for webhook signature verification"
+                  }
+                }
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": ""
+            "description": "Webhook updated successfully"
+          },
+          "404": {
+            "description": "Webhook not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Update Webhook",
         "tags": [
           "Webhooks"
         ]
       },
       "delete": {
+        "description": "Delete a webhook permanently",
         "operationId": "WebhooksController_remove",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Webhook ID",
             "schema": {
+              "example": "webhook_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": ""
+            "description": "Webhook deleted successfully"
+          },
+          "404": {
+            "description": "Webhook not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Delete Webhook",
         "tags": [
           "Webhooks"
         ]
@@ -993,22 +3471,58 @@
     },
     "/webhooks/{id}/toggle": {
       "patch": {
+        "description": "Enable or disable a webhook",
         "operationId": "WebhooksController_toggle",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Webhook ID",
             "schema": {
+              "example": "webhook_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Webhook status toggled successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "webhook_abc123"
+                    },
+                    "enabled": {
+                      "type": "boolean",
+                      "example": false
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Toggle Webhook",
         "tags": [
           "Webhooks"
         ]
@@ -1016,22 +3530,58 @@
     },
     "/webhooks/{id}/test": {
       "post": {
+        "description": "Send a test payload to verify webhook endpoint is working",
         "operationId": "WebhooksController_testWebhook",
         "parameters": [
           {
             "name": "id",
             "required": true,
             "in": "path",
+            "description": "Webhook ID",
             "schema": {
+              "example": "webhook_abc123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "202": {
-            "description": ""
+            "description": "Test webhook request sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "statusCode": {
+                      "type": "number",
+                      "example": 200
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Webhook test successful"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhook not found"
           }
         },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Test Webhook",
         "tags": [
           "Webhooks"
         ]
@@ -1039,110 +3589,344 @@
     },
     "/tools/{toolId}/secrets": {
       "post": {
+        "description": "Securely store encrypted credentials for an external tool. These credentials will be used when the tool is executed in workflows.",
         "operationId": "ToolSecretsController_storeCredentials",
         "parameters": [
           {
             "name": "toolId",
             "required": true,
             "in": "path",
+            "description": "Tool ID to store credentials for",
             "schema": {
+              "example": "tool_slack_123",
               "type": "string"
             }
           }
         ],
         "requestBody": {
           "required": true,
+          "description": "Tool credentials to store securely",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/StoreCredentialsDto"
+                "type": "object",
+                "properties": {
+                  "credentials": {
+                    "type": "object",
+                    "description": "Key-value pairs of credentials (will be encrypted)",
+                    "example": {
+                      "apiKey": "your-api-key-here",
+                      "webhookUrl": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+                      "botToken": "your-bot-token-here"
+                    }
+                  }
+                },
+                "required": [
+                  "credentials"
+                ]
               }
             }
           }
         },
         "responses": {
           "201": {
-            "description": ""
+            "description": "Credentials stored successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "toolId": {
+                      "type": "string",
+                      "example": "tool_slack_123"
+                    },
+                    "toolName": {
+                      "type": "string",
+                      "example": "Slack Integration"
+                    },
+                    "maskedCredentials": {
+                      "type": "object",
+                      "example": {
+                        "apiKey": "your-***...***key",
+                        "webhookUrl": "https://***...***XX",
+                        "botToken": "your-***...***token"
+                      }
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid credentials data"
+          },
+          "404": {
+            "description": "Tool not found"
           }
         },
+        "security": [
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Store Tool Credentials",
         "tags": [
-          "ToolSecrets"
+          "Tool Secrets"
         ]
       },
       "get": {
+        "description": "Retrieve stored credentials for a tool. By default returns masked values for security. Use unmask=true to get actual values (use carefully).",
         "operationId": "ToolSecretsController_getCredentials",
         "parameters": [
           {
             "name": "toolId",
             "required": true,
             "in": "path",
+            "description": "Tool ID to retrieve credentials for",
             "schema": {
+              "example": "tool_slack_123",
               "type": "string"
             }
           },
           {
             "name": "unmask",
-            "required": true,
+            "required": false,
             "in": "query",
+            "description": "Whether to return unmasked credential values (use with extreme caution)",
             "schema": {
+              "enum": [
+                "true",
+                "false"
+              ],
               "type": "string"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Credentials retrieved successfully (masked by default)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "title": "Masked Credentials Response",
+                      "type": "object",
+                      "properties": {
+                        "toolId": {
+                          "type": "string",
+                          "example": "tool_slack_123"
+                        },
+                        "toolName": {
+                          "type": "string",
+                          "example": "Slack Integration"
+                        },
+                        "maskedCredentials": {
+                          "type": "object",
+                          "example": {
+                            "apiKey": "your-***...***key",
+                            "webhookUrl": "https://***...***XX",
+                            "botToken": "your-***...***token"
+                          }
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    },
+                    {
+                      "title": "Unmasked Credentials Response (unmask=true)",
+                      "type": "object",
+                      "properties": {
+                        "toolId": {
+                          "type": "string",
+                          "example": "tool_slack_123"
+                        },
+                        "toolName": {
+                          "type": "string",
+                          "example": "Slack Integration"
+                        },
+                        "credentials": {
+                          "type": "object",
+                          "example": {
+                            "apiKey": "your-api-key-here",
+                            "webhookUrl": "https://hooks.slack.com/services/YOUR/WEBHOOK/URL",
+                            "botToken": "your-bot-token-here"
+                          }
+                        },
+                        "maskedCredentials": {
+                          "type": "object",
+                          "example": {
+                            "apiKey": "your-***...***key",
+                            "webhookUrl": "https://***...***XX",
+                            "botToken": "your-***...***token"
+                          }
+                        },
+                        "createdAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "updatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tool credentials not found"
           }
         },
+        "security": [
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Get Tool Credentials",
         "tags": [
-          "ToolSecrets"
+          "Tool Secrets"
         ]
       },
       "delete": {
+        "description": "Permanently delete stored credentials for a tool. This will affect any workflows that use this tool.",
         "operationId": "ToolSecretsController_deleteCredentials",
         "parameters": [
           {
             "name": "toolId",
             "required": true,
             "in": "path",
+            "description": "Tool ID to delete credentials for",
             "schema": {
+              "example": "tool_slack_123",
               "type": "string"
             }
           }
         ],
         "responses": {
           "204": {
-            "description": ""
+            "description": "Credentials deleted successfully"
+          },
+          "404": {
+            "description": "Tool credentials not found"
+          },
+          "409": {
+            "description": "Cannot delete credentials that are being used by active workflows"
           }
         },
+        "security": [
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Delete Tool Credentials",
         "tags": [
-          "ToolSecrets"
+          "Tool Secrets"
         ]
       }
     },
     "/tools/secrets": {
       "get": {
+        "description": "Get all tools in the organization with their credential status. Shows which tools have credentials stored and which ones need setup.",
         "operationId": "ToolSecretsListController_listToolsWithCredentials",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Successfully retrieved tools with credential status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "toolId": {
+                        "type": "string",
+                        "example": "tool_slack_123"
+                      },
+                      "toolName": {
+                        "type": "string",
+                        "example": "Slack Integration"
+                      },
+                      "toolType": {
+                        "type": "string",
+                        "example": "notification"
+                      },
+                      "hasCredentials": {
+                        "type": "boolean",
+                        "example": true,
+                        "description": "Whether credentials are stored for this tool"
+                      },
+                      "credentialKeys": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        },
+                        "example": [
+                          "apiKey",
+                          "webhookUrl",
+                          "botToken"
+                        ],
+                        "description": "List of credential keys (if credentials exist)"
+                      },
+                      "lastUpdated": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "When credentials were last updated (if they exist)"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         },
+        "security": [
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "List Tools with Credentials",
         "tags": [
-          "ToolSecretsList"
+          "Tool Secrets List"
         ]
       }
     },
     "/": {
       "get": {
+        "description": "Get a welcome message from the Tolstoy API",
         "operationId": "AppController_getHello",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Welcome message retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Welcome to Tolstoy - Workflow Automation Platform"
+                }
+              }
+            }
           }
         },
+        "summary": "Welcome Message",
         "tags": [
           "App"
         ]
@@ -1150,13 +3934,32 @@
     },
     "/health": {
       "get": {
+        "description": "Simple health check endpoint (deprecated - use /status instead)",
         "operationId": "AppController_getHealth",
         "parameters": [],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Basic health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2025-08-08T10:30:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
           }
         },
+        "summary": "Basic Health Check",
         "tags": [
           "App"
         ]
@@ -1195,67 +3998,6 @@
         "description": "User ID for request context"
       }
     },
-    "schemas": {
-      "CreateOrganizationDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "UpdateOrganizationDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "CreateUserDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "UpdateUserDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "CreateToolDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "UpdateToolDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "CreateActionDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "UpdateActionDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "CreateFlowDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "UpdateFlowDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "CreateExecutionLogDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "UpdateExecutionLogDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "CreateWebhookDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "UpdateWebhookDto": {
-        "type": "object",
-        "properties": {}
-      },
-      "StoreCredentialsDto": {
-        "type": "object",
-        "properties": {}
-      }
-    }
+    "schemas": {}
   }
 }

@@ -10,7 +10,17 @@ import {
   HttpStatus,
   HttpCode,
   Optional,
+  Query,
 } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBody,
+  ApiQuery,
+  ApiSecurity,
+} from '@nestjs/swagger';
 import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
 import { FlowsService } from './flows.service';
 import { FlowExecutorService } from './flow-executor.service';
@@ -20,6 +30,9 @@ import { UpdateFlowDto } from './dto/update-flow.dto';
 import { Tenant } from '../common/decorators/tenant.decorator';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
 
+@ApiTags('Flows')
+@ApiSecurity('x-org-id')
+@ApiSecurity('x-user-id')
 @Controller('flows')
 export class FlowsController {
   constructor(
@@ -32,6 +45,81 @@ export class FlowsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Create Flow',
+    description: 'Create a new workflow with steps and configuration',
+  })
+  @ApiBody({
+    description: 'Flow definition',
+    schema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Flow name',
+          example: 'User Onboarding Flow',
+        },
+        description: {
+          type: 'string',
+          description: 'Flow description',
+          example: 'Automated user onboarding process with email and notifications',
+        },
+        version: {
+          type: 'number',
+          description: 'Flow version number',
+          example: 1,
+        },
+        steps: {
+          type: 'array',
+          description: 'Workflow steps definition',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string', example: 'step_1' },
+              type: { type: 'string', example: 'action' },
+              actionId: { type: 'string', example: 'action_abc123' },
+              config: { type: 'object', example: { timeout: 30000 } },
+            },
+          },
+          example: [
+            {
+              id: 'step_1',
+              type: 'action',
+              actionId: 'action_send_email',
+              config: { to: '{{user.email}}', template: 'welcome' },
+            },
+          ],
+        },
+        settings: {
+          type: 'object',
+          description: 'Flow execution settings',
+          example: { timeout: 300000, retries: 2 },
+        },
+      },
+      required: ['name', 'steps'],
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Flow created successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        id: { type: 'string', example: 'flow_abc123' },
+        name: { type: 'string', example: 'User Onboarding Flow' },
+        description: { type: 'string', example: 'Automated user onboarding process' },
+        version: { type: 'number', example: 1 },
+        steps: { type: 'array', example: [] },
+        settings: { type: 'object', example: { timeout: 300000 } },
+        createdAt: { type: 'string', format: 'date-time' },
+        updatedAt: { type: 'string', format: 'date-time' },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid flow definition',
+  })
   async create(
     @Body(ValidationPipe) createFlowDto: CreateFlowDto,
     @Tenant() tenant: TenantContext,
@@ -49,16 +137,112 @@ export class FlowsController {
   }
 
   @Get()
+  @ApiOperation({
+    summary: 'List Flows',
+    description: 'Get all workflows for the organization',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved flows',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', example: 'flow_abc123' },
+          name: { type: 'string', example: 'User Onboarding Flow' },
+          version: { type: 'number', example: 1 },
+          steps: { type: 'array', example: [] },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+    },
+  })
   findAll(@Tenant() tenant: TenantContext) {
     return this.flowsService.findAll(tenant);
   }
 
   @Get(':id')
+  @ApiOperation({
+    summary: 'Get Flow',
+    description: 'Get a specific workflow by ID',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Flow ID',
+    example: 'flow_abc123',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved flow',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Flow not found',
+  })
   findOne(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     return this.flowsService.findOne(id, tenant);
   }
 
   @Put(':id')
+  @ApiOperation({
+    summary: 'Update Flow',
+    description: 'Update workflow definition and configuration',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Flow ID',
+    example: 'flow_abc123',
+  })
+  @ApiBody({
+    description: 'Updated flow definition',
+    schema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Flow name',
+          example: 'Updated User Onboarding Flow',
+        },
+        description: {
+          type: 'string',
+          description: 'Flow description',
+          example: 'Enhanced automated user onboarding process',
+        },
+        version: {
+          type: 'number',
+          description: 'Flow version number',
+          example: 2,
+        },
+        steps: {
+          type: 'array',
+          description: 'Updated workflow steps definition',
+          example: [
+            {
+              id: 'step_1',
+              type: 'action',
+              actionId: 'action_send_email',
+              config: { to: '{{user.email}}', template: 'welcome_v2' },
+            },
+          ],
+        },
+        settings: {
+          type: 'object',
+          description: 'Updated flow execution settings',
+          example: { timeout: 600000, retries: 3 },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Flow updated successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Flow not found',
+  })
   update(
     @Param('id') id: string,
     @Body(ValidationPipe) updateFlowDto: UpdateFlowDto,
@@ -69,6 +253,27 @@ export class FlowsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Delete Flow',
+    description: 'Delete a workflow permanently',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Flow ID',
+    example: 'flow_abc123',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Flow deleted successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Flow not found',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Flow has active executions and cannot be deleted',
+  })
   async remove(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     this.logger.warn({ flowId: id, orgId: tenant.orgId }, 'Deleting flow');
 
@@ -79,6 +284,62 @@ export class FlowsController {
 
   @Post(':id/execute')
   @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Execute Flow',
+    description: 'Execute a workflow either synchronously or asynchronously with optional input variables',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Flow ID to execute',
+    example: 'flow_abc123',
+  })
+  @ApiBody({
+    description: 'Execution configuration',
+    schema: {
+      type: 'object',
+      properties: {
+        variables: {
+          type: 'object',
+          description: 'Input variables for the flow execution',
+          example: { userId: 'user_123', email: 'user@example.com' },
+        },
+        useDurable: {
+          type: 'boolean',
+          description: 'Whether to use durable (async) execution',
+          default: true,
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 202,
+    description: 'Flow execution started successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        executionId: {
+          type: 'string',
+          example: 'exec_abc123',
+        },
+        status: {
+          type: 'string',
+          example: 'running',
+        },
+        mode: {
+          type: 'string',
+          example: 'durable',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Flow not found',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid execution parameters',
+  })
   async executeFlow(
     @Param('id') id: string,
     @Body() executionInput: { variables?: any; useDurable?: boolean },
@@ -136,6 +397,36 @@ export class FlowsController {
   }
 
   @Get(':id/executions')
+  @ApiOperation({
+    summary: 'Get Flow Executions',
+    description: 'Get execution history for a specific flow',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Flow ID',
+    example: 'flow_abc123',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved flow executions',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          executionId: { type: 'string', example: 'exec_abc123' },
+          status: { type: 'string', example: 'completed' },
+          startedAt: { type: 'string', format: 'date-time' },
+          completedAt: { type: 'string', format: 'date-time' },
+          variables: { type: 'object', example: { userId: 'user_123' } },
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Flow not found',
+  })
   async getFlowExecutions(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     if (!this.inngestExecutionService) {
       throw new Error(
@@ -146,6 +437,40 @@ export class FlowsController {
   }
 
   @Get(':id/executions/:executionId')
+  @ApiOperation({
+    summary: 'Get Execution Status',
+    description: 'Get detailed status of a specific flow execution',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Flow ID',
+    example: 'flow_abc123',
+  })
+  @ApiParam({
+    name: 'executionId',
+    description: 'Execution ID',
+    example: 'exec_abc123',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved execution status',
+    schema: {
+      type: 'object',
+      properties: {
+        executionId: { type: 'string', example: 'exec_abc123' },
+        status: { type: 'string', example: 'running' },
+        currentStep: { type: 'string', example: 'step_2' },
+        progress: { type: 'number', example: 0.6 },
+        startedAt: { type: 'string', format: 'date-time' },
+        variables: { type: 'object', example: { userId: 'user_123' } },
+        output: { type: 'object', example: { result: 'success' } },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Execution not found',
+  })
   async getExecutionStatus(
     @Param('id') flowId: string,
     @Param('executionId') executionId: string,
@@ -161,6 +486,28 @@ export class FlowsController {
 
   @Post(':id/executions/:executionId/cancel')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Cancel Execution',
+    description: 'Cancel a running flow execution',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Flow ID',
+    example: 'flow_abc123',
+  })
+  @ApiParam({
+    name: 'executionId',
+    description: 'Execution ID',
+    example: 'exec_abc123',
+  })
+  @ApiResponse({
+    status: 204,
+    description: 'Execution cancelled successfully',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Execution not found or already completed',
+  })
   async cancelExecution(
     @Param('id') flowId: string,
     @Param('executionId') executionId: string,
@@ -194,6 +541,40 @@ export class FlowsController {
 
   @Post(':id/executions/:executionId/retry')
   @HttpCode(HttpStatus.ACCEPTED)
+  @ApiOperation({
+    summary: 'Retry Execution',
+    description: 'Retry a failed flow execution',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Flow ID',
+    example: 'flow_abc123',
+  })
+  @ApiParam({
+    name: 'executionId',
+    description: 'Execution ID to retry',
+    example: 'exec_abc123',
+  })
+  @ApiResponse({
+    status: 202,
+    description: 'Execution retry initiated',
+    schema: {
+      type: 'object',
+      properties: {
+        newExecutionId: { type: 'string', example: 'exec_def456' },
+        status: { type: 'string', example: 'running' },
+        retryAttempt: { type: 'number', example: 2 },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Execution not found',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Execution is not in a retryable state',
+  })
   async retryExecution(
     @Param('id') flowId: string,
     @Param('executionId') executionId: string,
@@ -231,6 +612,34 @@ export class FlowsController {
   }
 
   @Get(':id/metrics')
+  @ApiOperation({
+    summary: 'Get Execution Metrics',
+    description: 'Get execution metrics and statistics for a flow',
+  })
+  @ApiParam({
+    name: 'id',
+    description: 'Flow ID',
+    example: 'flow_abc123',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully retrieved execution metrics',
+    schema: {
+      type: 'object',
+      properties: {
+        totalExecutions: { type: 'number', example: 152 },
+        successfulExecutions: { type: 'number', example: 140 },
+        failedExecutions: { type: 'number', example: 12 },
+        averageExecutionTime: { type: 'number', example: 4250.5 },
+        lastExecutionAt: { type: 'string', format: 'date-time' },
+        successRate: { type: 'number', example: 0.921 },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Flow not found',
+  })
   async getExecutionMetrics(@Param('id') id: string, @Tenant() tenant: TenantContext) {
     if (!this.inngestExecutionService) {
       throw new Error(
