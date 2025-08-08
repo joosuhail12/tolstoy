@@ -40,19 +40,34 @@ check_prerequisites() {
     fi
     echo -e "${GREEN}✅ Terraform found: $(terraform version | head -n1)${NC}"
     
-    # Check if AWS CLI is installed
-    if ! command -v aws &> /dev/null; then
-        echo -e "${RED}❌ AWS CLI is not installed. Please install AWS CLI first.${NC}"
-        exit 1
+    # Check if using HCP backend
+    if grep -q "cloud {" "${TERRAFORM_DIR}/main.tf"; then
+        echo -e "${BLUE}ℹ️ Using HCP Terraform Cloud backend${NC}"
+        
+        # Check Terraform Cloud login
+        if ! terraform auth -check &> /dev/null; then
+            echo -e "${YELLOW}⚠️ Not logged in to Terraform Cloud. Attempting login...${NC}"
+            terraform login
+        fi
+        echo -e "${GREEN}✅ Terraform Cloud authentication verified${NC}"
+        
+        echo -e "${YELLOW}⚠️ AWS credentials should be configured in your HCP workspace${NC}"
+        echo -e "${YELLOW}   Visit: https://app.terraform.io to configure environment variables${NC}"
+    else
+        # Check if AWS CLI is installed for local backend
+        if ! command -v aws &> /dev/null; then
+            echo -e "${RED}❌ AWS CLI is not installed. Please install AWS CLI first.${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}✅ AWS CLI found: $(aws --version)${NC}"
+        
+        # Check AWS credentials
+        if ! aws sts get-caller-identity &> /dev/null; then
+            echo -e "${RED}❌ AWS credentials not configured. Please run 'aws configure' first.${NC}"
+            exit 1
+        fi
+        echo -e "${GREEN}✅ AWS credentials configured${NC}"
     fi
-    echo -e "${GREEN}✅ AWS CLI found: $(aws --version)${NC}"
-    
-    # Check AWS credentials
-    if ! aws sts get-caller-identity &> /dev/null; then
-        echo -e "${RED}❌ AWS credentials not configured. Please run 'aws configure' first.${NC}"
-        exit 1
-    fi
-    echo -e "${GREEN}✅ AWS credentials configured${NC}"
     
     # Check if terraform.tfvars exists
     if [[ ! -f "${TERRAFORM_DIR}/terraform.tfvars" ]]; then

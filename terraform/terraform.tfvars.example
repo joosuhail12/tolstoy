@@ -1,6 +1,10 @@
 # Example Terraform Variables Configuration
 # Copy this file to terraform.tfvars and customize for your environment
 
+# HCP Terraform Cloud Configuration
+hcp_organization     = "your-hcp-org"           # Your HCP organization name
+hcp_workspace_name   = "tolstoy-api-gateway-prod"  # Workspace name in HCP
+
 # Project Configuration
 project_name = "tolstoy"
 environment  = "prod"

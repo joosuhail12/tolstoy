@@ -10,12 +10,14 @@ terraform {
     }
   }
   
-  # Optional: Configure remote state backend
-  # backend "s3" {
-  #   bucket = "tolstoy-terraform-state"
-  #   key    = "api-gateway/terraform.tfstate"
-  #   region = "us-east-1"
-  # }
+  # HCP Terraform Cloud backend configuration
+  cloud {
+    organization = var.hcp_organization
+    
+    workspaces {
+      name = var.hcp_workspace_name
+    }
+  }
 }
 
 provider "aws" {

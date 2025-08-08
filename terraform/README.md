@@ -27,11 +27,28 @@ Internet → WAF → API Gateway → EC2 (Nginx) → NestJS App
 ### Prerequisites
 
 - **Terraform** >= 1.0
-- **AWS CLI** configured with appropriate permissions
+- **HCP CLI** installed and logged in (`hcp auth login`)
+- **AWS CLI** configured with appropriate permissions (or AWS credentials in HCP workspace)
 - **Existing EC2 instance** running Tolstoy with Nginx
 - **Route53 hosted zone** (optional, for custom domain)
+- **HCP Terraform Cloud account** with organization access
 
-### 1. Clone and Configure
+### 1. HCP Setup (Recommended)
+
+```bash
+cd tolstoy/terraform
+
+# Set up HCP Terraform Cloud integration
+./setup-hcp.sh
+
+# This will:
+# - Configure Terraform Cloud backend
+# - Login to Terraform Cloud
+# - Initialize remote state
+# - Create workspace setup guide
+```
+
+### 2. Manual Configuration (Alternative)
 
 ```bash
 cd tolstoy/terraform
@@ -43,6 +60,10 @@ cp terraform.tfvars.example terraform.tfvars
 Edit `terraform.tfvars` with your settings:
 
 ```hcl
+# HCP Configuration
+hcp_organization = "your-hcp-org"
+hcp_workspace_name = "tolstoy-api-gateway-prod"
+
 # Required: Your existing EC2 instance
 ec2_instance_id = "i-0ea0ff0e9a8db29d4"
 
@@ -329,6 +350,81 @@ aws apigateway get-rest-api --rest-api-id $(terraform output -raw api_gateway_re
 
 # Test backend connectivity
 curl -v http://$(terraform output -raw backend_private_ip)/status
+```
+
+## 🏗️ HCP Terraform Cloud Integration
+
+This infrastructure is configured to use **HCP Terraform Cloud** for state management, collaboration, and CI/CD integration.
+
+### Benefits of HCP Integration
+
+- **Remote State Management**: Secure, versioned state storage
+- **Team Collaboration**: Shared workspaces with access controls  
+- **CI/CD Integration**: Automated deployments from GitHub
+- **Policy as Code**: Sentinel policies for compliance
+- **Cost Estimation**: Automatic cost analysis for changes
+- **Audit Logging**: Complete audit trail of infrastructure changes
+
+### HCP Workspace Configuration
+
+After running `./setup-hcp.sh`, configure your workspace at:
+`https://app.terraform.io/app/your-org/workspaces/tolstoy-api-gateway-prod`
+
+#### Required Environment Variables
+
+Set these **sensitive** environment variables in your HCP workspace:
+
+```bash
+AWS_ACCESS_KEY_ID         = your-aws-access-key     [Sensitive]
+AWS_SECRET_ACCESS_KEY     = your-aws-secret-key     [Sensitive]  
+AWS_DEFAULT_REGION        = us-east-1
+```
+
+#### VCS Integration
+
+1. Connect your GitHub repository: `joosuhail12/tolstoy`
+2. Set working directory: `terraform/`
+3. Enable automatic triggering on changes
+4. Configure path filtering: `terraform/**/*`
+
+#### Workspace Settings
+
+- **Execution Mode**: Remote
+- **Terraform Version**: Latest or >= 1.0
+- **Auto Apply**: Enable after testing (optional)
+- **Speculative Plans**: Enable for PR reviews
+
+### HCP Deployment Workflow
+
+```bash
+# 1. Make changes to terraform files
+git add terraform/
+git commit -m "Update API Gateway configuration"
+git push
+
+# 2. HCP automatically triggers plan
+# View plan at: https://app.terraform.io
+
+# 3. Review and apply via HCP UI or CLI
+terraform apply
+
+# 4. Monitor deployment in HCP workspace
+```
+
+### HCP Commands
+
+```bash
+# View workspace status
+terraform workspace show
+
+# Run plan in HCP
+terraform plan
+
+# Apply via HCP (runs remotely)
+terraform apply
+
+# View run history
+# Visit: https://app.terraform.io/app/your-org/workspaces/workspace-name
 ```
 
 ## 🚀 Advanced Configuration

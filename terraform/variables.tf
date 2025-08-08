@@ -1,6 +1,19 @@
 # Terraform Variables for Tolstoy API Gateway Infrastructure
 # Sprint 5 Task 5.4: Enterprise-grade API Gateway with WAF, ACM, and caching
 
+# HCP Terraform Cloud Configuration
+variable "hcp_organization" {
+  description = "HCP Terraform Cloud organization name"
+  type        = string
+  default     = "tolstoy-org"
+}
+
+variable "hcp_workspace_name" {
+  description = "HCP Terraform Cloud workspace name"
+  type        = string
+  default     = "tolstoy-api-gateway-prod"
+}
+
 # Project Configuration
 variable "project_name" {
   description = "Name of the project"
