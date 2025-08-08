@@ -40,7 +40,7 @@ async function bootstrap() {
     .setTitle('Tolstoy API')
     .setDescription('Interactive API reference for Tolstoy workflow automation platform')
     .setVersion(process.env.APP_VERSION || '1.0.0')
-    .addServer('https://api.tolstoy.dev', 'Production')
+    .addServer('https://tolstoy.getpullse.com', 'Production')
     .addServer('http://localhost:3000', 'Development')
     .addApiKey(
       {

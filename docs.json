@@ -7,11 +7,7 @@
     "playground": {
       "mode": "show"
     },
-    "baseUrl": ["https://api.tolstoy.dev", "http://localhost:3000"],
-    "auth": {
-      "method": "key",
-      "name": "x-org-id"
-    }
+    "baseUrl": ["https://tolstoy.getpullse.com", "http://localhost:3000"]
   },
   "logo": {
     "dark": "/logo/dark.svg",

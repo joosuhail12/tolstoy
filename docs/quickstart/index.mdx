@@ -42,7 +42,7 @@ x-user-id: your-user-id
 Register an external API service that your workflows will interact with:
 
 ```bash
-curl -X POST https://api.tolstoy.dev/tools \
+curl -X POST https://tolstoy.getpullse.com/tools \
   -H "x-org-id: $TOLSTOY_ORG_ID" \
   -H "x-user-id: $TOLSTOY_USER_ID" \
   -H "Content-Type: application/json" \
@@ -58,7 +58,7 @@ curl -X POST https://api.tolstoy.dev/tools \
 Create a reusable action that defines a specific API operation:
 
 ```bash
-curl -X POST https://api.tolstoy.dev/actions \
+curl -X POST https://tolstoy.getpullse.com/actions \
   -H "x-org-id: $TOLSTOY_ORG_ID" \
   -H "x-user-id: $TOLSTOY_USER_ID" \
   -H "Content-Type: application/json" \
@@ -84,7 +84,7 @@ curl -X POST https://api.tolstoy.dev/actions \
 Now create a workflow that uses your action:
 
 ```bash
-curl -X POST https://api.tolstoy.dev/flows \
+curl -X POST https://tolstoy.getpullse.com/flows \
   -H "x-org-id: $TOLSTOY_ORG_ID" \
   -H "x-user-id: $TOLSTOY_USER_ID" \
   -H "Content-Type: application/json" \
@@ -108,7 +108,7 @@ curl -X POST https://api.tolstoy.dev/flows \
 Run your workflow and see it in action:
 
 ```bash
-curl -X POST https://api.tolstoy.dev/flows/{flow-id}/execute \
+curl -X POST https://tolstoy.getpullse.com/flows/{flow-id}/execute \
   -H "x-org-id: $TOLSTOY_ORG_ID" \
   -H "x-user-id: $TOLSTOY_USER_ID" \
   -H "Content-Type: application/json" \
@@ -123,12 +123,12 @@ Check the execution status and logs:
 
 ```bash
 # Get execution status
-curl https://api.tolstoy.dev/flows/{flow-id}/executions/{execution-id} \
+curl https://tolstoy.getpullse.com/flows/{flow-id}/executions/{execution-id} \
   -H "x-org-id: $TOLSTOY_ORG_ID" \
   -H "x-user-id: $TOLSTOY_USER_ID"
 
 # View execution logs
-curl https://api.tolstoy.dev/execution-logs?executionId={execution-id} \
+curl https://tolstoy.getpullse.com/execution-logs?executionId={execution-id} \
   -H "x-org-id: $TOLSTOY_ORG_ID" \
   -H "x-user-id: $TOLSTOY_USER_ID"
 ```

@@ -36,7 +36,7 @@ Tool (GitHub API)
 ### Basic Tool Creation
 
 ```bash
-curl -X POST https://api.tolstoy.dev/tools \
+curl -X POST https://tolstoy.getpullse.com/tools \
   -H "x-org-id: your-org-id" \
   -H "x-user-id: your-user-id" \
   -H "Content-Type: application/json" \
@@ -138,7 +138,7 @@ For public APIs that don't require authentication.
 After creating a tool, store its authentication credentials securely:
 
 ```bash
-curl -X POST https://api.tolstoy.dev/tools/tool_abc123/secrets \
+curl -X POST https://tolstoy.getpullse.com/tools/tool_abc123/secrets \
   -H "x-org-id: your-org-id" \
   -H "x-user-id: your-user-id" \
   -H "Content-Type: application/json" \
@@ -151,7 +151,7 @@ curl -X POST https://api.tolstoy.dev/tools/tool_abc123/secrets \
 ### Retrieving Credentials (Masked)
 
 ```bash
-curl https://api.tolstoy.dev/tools/tool_abc123/secrets \
+curl https://tolstoy.getpullse.com/tools/tool_abc123/secrets \
   -H "x-org-id: your-org-id" \
   -H "x-user-id: your-user-id"
 ```
@@ -285,21 +285,21 @@ Tolstoy provides pre-configured tool templates for popular services:
 
 ### List Tools
 ```bash
-curl https://api.tolstoy.dev/tools \
+curl https://tolstoy.getpullse.com/tools \
   -H "x-org-id: your-org-id" \
   -H "x-user-id: your-user-id"
 ```
 
 ### Get Tool Details
 ```bash
-curl https://api.tolstoy.dev/tools/tool_abc123 \
+curl https://tolstoy.getpullse.com/tools/tool_abc123 \
   -H "x-org-id: your-org-id" \
   -H "x-user-id: your-user-id"
 ```
 
 ### Update Tool
 ```bash
-curl -X PATCH https://api.tolstoy.dev/tools/tool_abc123 \
+curl -X PATCH https://tolstoy.getpullse.com/tools/tool_abc123 \
   -H "x-org-id: your-org-id" \
   -H "x-user-id: your-user-id" \
   -H "Content-Type: application/json" \
@@ -311,7 +311,7 @@ curl -X PATCH https://api.tolstoy.dev/tools/tool_abc123 \
 
 ### Delete Tool
 ```bash
-curl -X DELETE https://api.tolstoy.dev/tools/tool_abc123 \
+curl -X DELETE https://tolstoy.getpullse.com/tools/tool_abc123 \
   -H "x-org-id: your-org-id" \
   -H "x-user-id: your-user-id"
 ```
@@ -324,7 +324,7 @@ curl -X DELETE https://api.tolstoy.dev/tools/tool_abc123 \
 Verify that a tool's configuration and credentials work correctly:
 
 ```bash
-curl -X POST https://api.tolstoy.dev/tools/tool_abc123/test \
+curl -X POST https://tolstoy.getpullse.com/tools/tool_abc123/test \
   -H "x-org-id: your-org-id" \
   -H "x-user-id: your-user-id" \
   -H "Content-Type: application/json" \
@@ -482,7 +482,7 @@ Use the test connection feature to diagnose problems:
 
 ```bash
 # Test basic connectivity
-curl -X POST https://api.tolstoy.dev/tools/tool_abc123/test \
+curl -X POST https://tolstoy.getpullse.com/tools/tool_abc123/test \
   -H "x-org-id: your-org-id" \
   -H "x-user-id: your-user-id" \
   -H "Content-Type: application/json" \
