@@ -1,0 +1,60 @@
+---
+title: Quickstart
+sidebar_position: 1
+---
+
+
+# Quickstart
+
+Get Tolstoy up and running in under 5 minutes with this step-by-step guide.
+
+## 1. Install the CLI
+
+```bash
+npm install -g @tolstoy/cli
+```
+
+## 2. Scaffold a Project
+
+```bash
+tolstoy init my-project
+cd my-project
+```
+
+## 3. Define a Simple Flow
+
+Create your first workflow with a simple hello-world example:
+
+```yaml
+version: 1
+steps:
+  - key: hello-world
+    action: echo
+    inputs:
+      message: "Hello, world!"
+```
+
+## 4. Run the Flow
+
+Execute your workflow with the Tolstoy CLI:
+
+```bash
+tolstoy run --org=org-123 --flow=my-flow
+```
+
+## Next Steps
+
+🎉 Congratulations! You've created and executed your first Tolstoy workflow. 
+
+Here's what to explore next:
+
+- **Flow Definition Guide** - Learn advanced workflow patterns and conditional logic
+- **Action Reference** - Discover available actions and create custom ones  
+- **Integrations** - Connect with popular tools like Slack, GitHub, and more
+- **API Documentation** - Integrate Tolstoy programmatically
+
+## Need Help?
+
+- Check our [troubleshooting guide](/troubleshooting) for common issues
+- Join our [community Discord](https://discord.gg/tolstoy) for support
+- Browse [example workflows](https://github.com/tolstoy/examples) for inspiration
