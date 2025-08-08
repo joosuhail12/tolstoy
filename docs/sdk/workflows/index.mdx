@@ -1,0 +1,357 @@
+---
+title: Workflows
+sidebar_position: 5
+---
+
+# Workflows
+
+Create, manage, and execute automated workflows in your Tolstoy platform. Workflows are the core of the automation system, combining tools, actions, and logic to create powerful automated processes.
+
+## Overview
+
+Workflow management enables you to:
+- **Create complex automations** with conditional logic and parallel execution
+- **Execute workflows** with custom variables and configuration
+- **Monitor execution status** with real-time logs and metrics
+- **Handle errors gracefully** with retry mechanisms and fallback strategies
+- **Track performance metrics** across all workflow executions
+
+## Workflow Methods
+
+### Management
+- **[listFlows()](list-flows)** - List all workflows in the organization with execution statistics
+- **[createFlow()](create-flow)** - Create new workflows with advanced definition builder
+
+### Execution & Monitoring
+- **[runFlow()](run-flow)** - Execute workflows with custom variables and real-time monitoring
+- **[getFlowExecution()](get-flow-execution)** - Monitor execution status with detailed logs and metrics
+
+## Quick Examples
+
+### List Organization Workflows
+```typescript
+const flows = await client.listFlows();
+
+flows.data.forEach(flow => {
+  console.log(`${flow.name} - ${flow.active ? 'Active' : 'Inactive'}`);
+  console.log(`Executions: ${flow.metrics.totalExecutions}`);
+  console.log(`Success Rate: ${flow.metrics.successRate}%`);
+});
+```
+
+### Create Automated Workflow
+```typescript
+const workflow = await client.createFlow({
+  name: 'Customer Onboarding',
+  description: 'Automated customer onboarding process',
+  definition: {
+    steps: [
+      {
+        id: 'send-welcome-email',
+        type: 'action',
+        actionId: 'email-send',
+        config: {
+          template: 'welcome',
+          to: '{{customer.email}}'
+        }
+      },
+      {
+        id: 'create-user-account',
+        type: 'action',
+        actionId: 'user-create',
+        config: {
+          email: '{{customer.email}}',
+          name: '{{customer.name}}'
+        }
+      }
+    ]
+  },
+  active: true
+});
+
+console.log(`Created workflow: ${workflow.data.name}`);
+```
+
+### Execute with Monitoring
+```typescript
+const execution = await client.runFlow('flow_abc123', {
+  variables: {
+    customer: {
+      email: 'john@company.com',
+      name: 'John Doe',
+      plan: 'pro'
+    }
+  },
+  options: {
+    timeout: 300000, // 5 minutes
+    retries: 3
+  }
+});
+
+console.log(`Execution ID: ${execution.data.id}`);
+console.log(`Status: ${execution.data.status}`);
+
+// Monitor progress
+const status = await client.getFlowExecution(execution.data.id);
+console.log(`Progress: ${status.data.progress}%`);
+```
+
+## Common Use Cases
+
+### Customer Onboarding Pipeline
+Automate the complete customer onboarding process:
+
+```typescript
+async function createOnboardingWorkflow() {
+  const workflow = await client.createFlow({
+    name: 'Customer Onboarding Pipeline',
+    definition: {
+      steps: [
+        {
+          id: 'validate-customer-data',
+          type: 'action',
+          actionId: 'data-validation',
+          config: {
+            schema: 'customer-schema',
+            required: ['email', 'name', 'company']
+          }
+        },
+        {
+          id: 'create-crm-record',
+          type: 'tool',
+          toolId: 'salesforce',
+          config: {
+            operation: 'create-lead',
+            data: '{{customer}}'
+          }
+        },
+        {
+          id: 'send-welcome-sequence',
+          type: 'parallel',
+          branches: [
+            {
+              steps: [{
+                id: 'welcome-email',
+                type: 'action',
+                actionId: 'email-send',
+                config: { template: 'welcome' }
+              }]
+            },
+            {
+              steps: [{
+                id: 'slack-notification',
+                type: 'tool',
+                toolId: 'slack',
+                config: {
+                  channel: '#sales',
+                  message: 'New customer: {{customer.name}}'
+                }
+              }]
+            }
+          ]
+        }
+      ]
+    }
+  });
+  
+  return workflow;
+}
+```
+
+### Data Processing Pipeline
+Handle large-scale data processing workflows:
+
+```typescript
+async function createDataPipeline() {
+  return await client.createFlow({
+    name: 'Daily Data Processing',
+    definition: {
+      triggers: [{
+        type: 'schedule',
+        cron: '0 2 * * *' // 2 AM daily
+      }],
+      steps: [
+        {
+          id: 'extract-data',
+          type: 'tool',
+          toolId: 'database',
+          config: {
+            query: 'SELECT * FROM daily_metrics WHERE date = CURRENT_DATE - 1'
+          }
+        },
+        {
+          id: 'transform-data',
+          type: 'action',
+          actionId: 'data-transform',
+          config: {
+            transformations: [
+              { field: 'revenue', operation: 'currency-format' },
+              { field: 'date', operation: 'iso-format' }
+            ]
+          }
+        },
+        {
+          id: 'load-to-warehouse',
+          type: 'tool',
+          toolId: 'snowflake',
+          config: {
+            table: 'processed_metrics',
+            mode: 'append'
+          }
+        }
+      ]
+    }
+  });
+}
+```
+
+### Error Handling & Retries
+Implement robust error handling:
+
+```typescript
+const resilientWorkflow = await client.createFlow({
+  name: 'API Integration with Retries',
+  definition: {
+    steps: [
+      {
+        id: 'external-api-call',
+        type: 'tool',
+        toolId: 'http-request',
+        config: {
+          url: 'https://api.external.com/data',
+          method: 'GET'
+        },
+        errorHandling: {
+          retries: 3,
+          backoff: 'exponential',
+          retryOn: ['timeout', '5xx'],
+          fallback: {
+            action: 'log-error',
+            config: { level: 'warning' }
+          }
+        }
+      }
+    ]
+  }
+});
+```
+
+## Integration Patterns
+
+### Workflow Builder Component
+```typescript
+function WorkflowBuilder({ onSave }) {
+  const [steps, setSteps] = useState([]);
+  const [variables, setVariables] = useState({});
+  
+  const addStep = (stepType) => {
+    const newStep = {
+      id: generateStepId(),
+      type: stepType,
+      config: {}
+    };
+    setSteps([...steps, newStep]);
+  };
+  
+  const saveWorkflow = async () => {
+    const workflow = await client.createFlow({
+      name: workflowName,
+      definition: { steps, variables },
+      active: false // Save as draft
+    });
+    onSave(workflow);
+  };
+  
+  return (
+    <div>
+      <button onClick={() => addStep('action')}>Add Action</button>
+      <button onClick={() => addStep('tool')}>Add Tool</button>
+      <button onClick={saveWorkflow}>Save Workflow</button>
+      
+      {steps.map(step => (
+        <StepEditor key={step.id} step={step} onChange={updateStep} />
+      ))}
+    </div>
+  );
+}
+```
+
+### Execution Dashboard
+```typescript
+async function createExecutionDashboard() {
+  const flows = await client.listFlows();
+  const recentExecutions = [];
+  
+  for (const flow of flows.data) {
+    const executions = await client.getFlowExecution(flow.id);
+    recentExecutions.push(...executions.data.slice(0, 5));
+  }
+  
+  return {
+    totalFlows: flows.data.length,
+    activeFlows: flows.data.filter(f => f.active).length,
+    recentExecutions: recentExecutions.sort((a, b) => 
+      new Date(b.startedAt) - new Date(a.startedAt)
+    )
+  };
+}
+```
+
+## Advanced Patterns
+
+### Dynamic Workflow Generation
+```typescript
+async function createDynamicWorkflow(template: string, config: any) {
+  const workflowTemplate = await loadTemplate(template);
+  
+  const workflow = await client.createFlow({
+    name: `Generated: ${template}`,
+    definition: interpolateTemplate(workflowTemplate, config),
+    tags: ['auto-generated', template]
+  });
+  
+  return workflow;
+}
+```
+
+### Workflow Composition
+```typescript
+async function composeWorkflows(parentWorkflow: string, childWorkflows: string[]) {
+  const compositeFlow = await client.createFlow({
+    name: 'Composite Workflow',
+    definition: {
+      steps: [
+        {
+          id: 'parent-execution',
+          type: 'subflow',
+          flowId: parentWorkflow
+        },
+        {
+          id: 'child-executions',
+          type: 'parallel',
+          branches: childWorkflows.map(flowId => ({
+            steps: [{
+              id: `child-${flowId}`,
+              type: 'subflow',
+              flowId
+            }]
+          }))
+        }
+      ]
+    }
+  });
+  
+  return compositeFlow;
+}
+```
+
+## Best Practices
+
+- **Design idempotent workflows** - ensure workflows can be safely re-run
+- **Use meaningful variable names** - make workflows self-documenting
+- **Implement proper error handling** - handle failures gracefully with retries
+- **Monitor execution metrics** - track performance and identify bottlenecks
+- **Version control workflow definitions** - maintain history of workflow changes
+- **Test workflows thoroughly** - use staging environments for testing
+- **Implement circuit breakers** - prevent cascade failures in complex workflows
+- **Use parallel execution** - optimize performance with concurrent steps where possible

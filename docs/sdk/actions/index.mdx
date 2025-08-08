@@ -1,0 +1,537 @@
+---
+title: Actions
+sidebar_position: 7
+---
+
+# Actions
+
+Create and manage reusable actions for your Tolstoy workflows. Actions are atomic operations that can be combined to build complex automation workflows.
+
+## Overview
+
+Action management enables you to:
+- **Create reusable operations** that can be shared across multiple workflows
+- **Implement custom business logic** with JavaScript/TypeScript functions
+- **Build action libraries** for common operations in your organization
+- **Version control actions** with rollback and deployment capabilities
+- **Monitor action performance** with detailed execution metrics
+
+## Action Methods
+
+### Discovery & Management
+- **[listActions()](list-actions)** - List all actions with usage statistics and version information
+- **[createAction()](create-action)** - Create new custom actions with code execution and configuration
+
+## Quick Examples
+
+### List Available Actions
+```typescript
+const actions = await client.listActions();
+
+actions.data.forEach(action => {
+  console.log(`${action.name} (v${action.version})`);
+  console.log(`Type: ${action.type}`);
+  console.log(`Usage: ${action.metrics.totalExecutions} executions`);
+});
+```
+
+### Create Data Transformation Action
+```typescript
+const transformAction = await client.createAction({
+  name: 'Transform Customer Data',
+  type: 'javascript',
+  description: 'Standardize customer data format',
+  inputs: {
+    customer: {
+      type: 'object',
+      required: true,
+      properties: {
+        email: { type: 'string' },
+        name: { type: 'string' },
+        phone: { type: 'string' }
+      }
+    }
+  },
+  outputs: {
+    transformedCustomer: {
+      type: 'object',
+      properties: {
+        email: { type: 'string' },
+        fullName: { type: 'string' },
+        phoneNumber: { type: 'string' },
+        createdAt: { type: 'string' }
+      }
+    }
+  },
+  code: `
+    function execute(inputs) {
+      const { customer } = inputs;
+      
+      return {
+        transformedCustomer: {
+          email: customer.email?.toLowerCase() || '',
+          fullName: customer.name?.trim() || '',
+          phoneNumber: customer.phone?.replace(/[^\\d]/g, '') || '',
+          createdAt: new Date().toISOString()
+        }
+      };
+    }
+  `
+});
+
+console.log(`Created action: ${transformAction.data.name}`);
+```
+
+### Create Validation Action
+```typescript
+const validationAction = await client.createAction({
+  name: 'Email Validator',
+  type: 'javascript',
+  description: 'Validate email addresses with comprehensive checks',
+  inputs: {
+    email: {
+      type: 'string',
+      required: true,
+      description: 'Email address to validate'
+    }
+  },
+  outputs: {
+    isValid: { type: 'boolean' },
+    errors: { type: 'array', items: { type: 'string' } },
+    suggestions: { type: 'array', items: { type: 'string' } }
+  },
+  code: `
+    function execute(inputs) {
+      const { email } = inputs;
+      const errors = [];
+      const suggestions = [];
+      
+      // Basic format check
+      const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+      if (!emailRegex.test(email)) {
+        errors.push('Invalid email format');
+      }
+      
+      // Domain validation
+      const domain = email.split('@')[1];
+      const commonDomains = ['gmail.com', 'yahoo.com', 'outlook.com'];
+      
+      if (domain && !commonDomains.includes(domain)) {
+        suggestions.push(\`Did you mean @\${findClosestMatch(domain, commonDomains)}?\`);
+      }
+      
+      return {
+        isValid: errors.length === 0,
+        errors,
+        suggestions
+      };
+    }
+    
+    function findClosestMatch(input, options) {
+      // Simple Levenshtein distance implementation
+      return options[0]; // Simplified for example
+    }
+  `
+});
+```
+
+## Common Use Cases
+
+### Data Processing Pipeline
+Create actions for ETL operations:
+
+```typescript
+async function createDataProcessingActions() {
+  // Extract action
+  const extractAction = await client.createAction({
+    name: 'Data Extractor',
+    type: 'javascript',
+    description: 'Extract data from various sources',
+    inputs: {
+      source: { type: 'string', enum: ['database', 'api', 'file'] },
+      config: { type: 'object' }
+    },
+    outputs: {
+      data: { type: 'array' },
+      metadata: { type: 'object' }
+    },
+    code: `
+      function execute(inputs) {
+        const { source, config } = inputs;
+        
+        switch (source) {
+          case 'database':
+            return extractFromDatabase(config);
+          case 'api':
+            return extractFromAPI(config);
+          case 'file':
+            return extractFromFile(config);
+          default:
+            throw new Error(\`Unsupported source: \${source}\`);
+        }
+      }
+    `
+  });
+  
+  // Transform action
+  const transformAction = await client.createAction({
+    name: 'Data Transformer',
+    type: 'javascript',
+    description: 'Apply transformations to data',
+    inputs: {
+      data: { type: 'array', required: true },
+      transformations: { type: 'array', required: true }
+    },
+    outputs: {
+      transformedData: { type: 'array' },
+      statistics: { type: 'object' }
+    },
+    code: `
+      function execute(inputs) {
+        const { data, transformations } = inputs;
+        let transformedData = data;
+        
+        for (const transform of transformations) {
+          transformedData = applyTransformation(transformedData, transform);
+        }
+        
+        return {
+          transformedData,
+          statistics: {
+            originalCount: data.length,
+            transformedCount: transformedData.length,
+            transformationsApplied: transformations.length
+          }
+        };
+      }
+    `
+  });
+  
+  return { extractAction, transformAction };
+}
+```
+
+### Notification Actions
+Create notification actions for different channels:
+
+```typescript
+async function createNotificationActions() {
+  const emailNotification = await client.createAction({
+    name: 'Send Email Notification',
+    type: 'javascript',
+    inputs: {
+      to: { type: 'string', required: true },
+      subject: { type: 'string', required: true },
+      body: { type: 'string', required: true },
+      template: { type: 'string' }
+    },
+    outputs: {
+      sent: { type: 'boolean' },
+      messageId: { type: 'string' }
+    },
+    code: `
+      async function execute(inputs) {
+        const { to, subject, body, template } = inputs;
+        
+        const emailService = getEmailService();
+        const result = await emailService.send({
+          to,
+          subject,
+          body: template ? renderTemplate(template, { body }) : body
+        });
+        
+        return {
+          sent: result.success,
+          messageId: result.messageId
+        };
+      }
+    `
+  });
+  
+  const slackNotification = await client.createAction({
+    name: 'Send Slack Message',
+    type: 'javascript',
+    inputs: {
+      channel: { type: 'string', required: true },
+      message: { type: 'string', required: true },
+      username: { type: 'string' },
+      emoji: { type: 'string' }
+    },
+    outputs: {
+      sent: { type: 'boolean' },
+      timestamp: { type: 'string' }
+    },
+    code: `
+      async function execute(inputs) {
+        const { channel, message, username, emoji } = inputs;
+        
+        const slack = getSlackClient();
+        const result = await slack.chat.postMessage({
+          channel,
+          text: message,
+          username: username || 'Tolstoy Bot',
+          icon_emoji: emoji || ':robot_face:'
+        });
+        
+        return {
+          sent: result.ok,
+          timestamp: result.ts
+        };
+      }
+    `
+  });
+  
+  return { emailNotification, slackNotification };
+}
+```
+
+### Business Logic Actions
+Implement complex business rules:
+
+```typescript
+async function createBusinessLogicActions() {
+  const priceCalculator = await client.createAction({
+    name: 'Dynamic Price Calculator',
+    type: 'javascript',
+    description: 'Calculate dynamic pricing based on multiple factors',
+    inputs: {
+      product: { type: 'object', required: true },
+      customer: { type: 'object', required: true },
+      market: { type: 'object' }
+    },
+    outputs: {
+      price: { type: 'number' },
+      discount: { type: 'number' },
+      reasoning: { type: string }
+    },
+    code: `
+      function execute(inputs) {
+        const { product, customer, market } = inputs;
+        
+        let basePrice = product.basePrice;
+        let discount = 0;
+        const reasons = [];
+        
+        // Customer tier discount
+        if (customer.tier === 'premium') {
+          discount += 0.15;
+          reasons.push('Premium customer discount');
+        } else if (customer.tier === 'gold') {
+          discount += 0.10;
+          reasons.push('Gold customer discount');
+        }
+        
+        // Volume discount
+        if (customer.volume > 1000) {
+          discount += 0.05;
+          reasons.push('High volume discount');
+        }
+        
+        // Market conditions
+        if (market?.competition === 'high') {
+          discount += 0.03;
+          reasons.push('Competitive market adjustment');
+        }
+        
+        const finalPrice = basePrice * (1 - discount);
+        
+        return {
+          price: Math.round(finalPrice * 100) / 100,
+          discount: Math.round(discount * 100),
+          reasoning: reasons.join('; ')
+        };
+      }
+    `
+  });
+  
+  return priceCalculator;
+}
+```
+
+## Integration Patterns
+
+### Action Library Builder
+```typescript
+class ActionLibrary {
+  async createUtilityActions() {
+    const actions = [];
+    
+    // Date utilities
+    actions.push(await this.createDateAction());
+    
+    // String utilities
+    actions.push(await this.createStringAction());
+    
+    // Math utilities
+    actions.push(await this.createMathAction());
+    
+    return actions;
+  }
+  
+  async createDateAction() {
+    return await client.createAction({
+      name: 'Date Utilities',
+      type: 'javascript',
+      description: 'Common date operations',
+      inputs: {
+        operation: { 
+          type: 'string', 
+          enum: ['format', 'add', 'subtract', 'compare']
+        },
+        date: { type: 'string' },
+        amount: { type: 'number' },
+        unit: { type: 'string' },
+        format: { type: 'string' }
+      },
+      outputs: {
+        result: { type: 'string' }
+      },
+      code: `
+        function execute(inputs) {
+          const { operation, date, amount, unit, format } = inputs;
+          const dateObj = new Date(date);
+          
+          switch (operation) {
+            case 'format':
+              return { result: formatDate(dateObj, format) };
+            case 'add':
+              return { result: addTime(dateObj, amount, unit) };
+            case 'subtract':
+              return { result: subtractTime(dateObj, amount, unit) };
+            case 'compare':
+              return { result: compareDates(dateObj, new Date()) };
+            default:
+              throw new Error(\`Unknown operation: \${operation}\`);
+          }
+        }
+      `
+    });
+  }
+}
+```
+
+### Action Composition
+```typescript
+async function composeActions(actionIds: string[]) {
+  const compositeAction = await client.createAction({
+    name: 'Composite Action',
+    type: 'workflow',
+    description: 'Composed from multiple actions',
+    inputs: {
+      data: { type: 'any' }
+    },
+    outputs: {
+      result: { type: 'any' }
+    },
+    definition: {
+      steps: actionIds.map((actionId, index) => ({
+        id: `step-${index}`,
+        type: 'action',
+        actionId,
+        inputs: index === 0 ? { data: '{{inputs.data}}' } : { data: '{{previous.result}}' }
+      }))
+    }
+  });
+  
+  return compositeAction;
+}
+```
+
+### Action Testing Framework
+```typescript
+class ActionTester {
+  async testAction(actionId: string, testCases: any[]) {
+    const results = [];
+    
+    for (const testCase of testCases) {
+      try {
+        const result = await this.executeAction(actionId, testCase.inputs);
+        const passed = this.validateOutput(result, testCase.expected);
+        
+        results.push({
+          name: testCase.name,
+          passed,
+          input: testCase.inputs,
+          expected: testCase.expected,
+          actual: result
+        });
+      } catch (error) {
+        results.push({
+          name: testCase.name,
+          passed: false,
+          error: error.message
+        });
+      }
+    }
+    
+    return results;
+  }
+  
+  async executeAction(actionId: string, inputs: any) {
+    // Execute action through workflow
+    const execution = await client.runFlow('test-workflow', {
+      variables: { actionId, inputs }
+    });
+    
+    return execution.data.result;
+  }
+}
+```
+
+## Advanced Features
+
+### Version Management
+```typescript
+async function versionAction(actionId: string, changes: any) {
+  // Get current action
+  const currentAction = await client.getAction(actionId);
+  
+  // Create new version
+  const newVersion = await client.createAction({
+    ...currentAction.data,
+    version: currentAction.data.version + 1,
+    ...changes,
+    changelog: `Updated: ${new Date().toISOString()}`
+  });
+  
+  return newVersion;
+}
+```
+
+### Action Monitoring
+```typescript
+async function monitorActionPerformance() {
+  const actions = await client.listActions();
+  const performanceReport = [];
+  
+  for (const action of actions.data) {
+    const metrics = action.metrics;
+    const performance = {
+      name: action.name,
+      totalExecutions: metrics.totalExecutions,
+      averageExecutionTime: metrics.averageExecutionTime,
+      successRate: metrics.successRate,
+      errorRate: metrics.errorRate
+    };
+    
+    if (performance.errorRate > 0.05) {
+      console.warn(`⚠️ High error rate for ${action.name}: ${performance.errorRate}%`);
+    }
+    
+    performanceReport.push(performance);
+  }
+  
+  return performanceReport;
+}
+```
+
+## Best Practices
+
+- **Keep actions focused** - each action should do one thing well
+- **Use clear input/output schemas** - make actions self-documenting
+- **Handle errors gracefully** - provide meaningful error messages
+- **Test actions thoroughly** - create comprehensive test suites
+- **Version actions carefully** - maintain backward compatibility when possible
+- **Monitor action performance** - track execution times and error rates
+- **Document action behavior** - include examples and edge cases
+- **Use TypeScript** - leverage type safety for better reliability

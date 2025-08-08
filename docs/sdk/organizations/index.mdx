@@ -1,0 +1,205 @@
+---
+title: Organizations
+sidebar_position: 3
+---
+
+# Organizations
+
+Manage organizations in your Tolstoy platform. Organizations provide multi-tenant isolation and resource management for your workflow automation platform.
+
+## Overview
+
+Organization management enables you to:
+- **Create and manage** multiple organizations for multi-tenant applications
+- **Monitor usage and billing** across different organizations
+- **Configure organization settings** like timezone, currency, and features
+- **Track subscription status** and plan limitations
+- **Implement organization switching** in your applications
+
+## Organization Methods
+
+### Discovery & Management
+- **[listOrganizations()](list-organizations)** - List all organizations the current user has access to
+- **[createOrganization()](create-organization)** - Create new organizations for multi-tenant setups
+- **[getOrganization()](get-organization)** - Get detailed organization information with usage analytics
+
+## Quick Examples
+
+### List User Organizations
+```typescript
+const organizations = await client.listOrganizations();
+
+organizations.data.forEach(org => {
+  console.log(`${org.name} (${org.subscription.plan})`);
+  console.log(`Users: ${org.usage.users}/${org.limits.users}`);
+});
+```
+
+### Create New Organization
+```typescript
+const organization = await client.createOrganization({
+  name: 'Acme Corporation',
+  slug: 'acme-corp',
+  description: 'Main organization for workflow automation',
+  plan: 'pro'
+});
+
+console.log(`Created: ${organization.data.name}`);
+```
+
+### Monitor Organization Health
+```typescript
+const org = await client.getOrganization('org_abc123');
+const usage = org.data.usage;
+const limits = org.data.limits;
+
+// Check approaching limits
+if (usage.workflows / limits.workflows > 0.8) {
+  console.warn('⚠️ Approaching workflow limit');
+}
+```
+
+## Common Use Cases
+
+### SaaS Platform Onboarding
+Create organizations automatically during customer signup:
+
+```typescript
+async function onboardNewCustomer(customerData: any) {
+  const organization = await client.createOrganization({
+    name: customerData.companyName,
+    slug: generateSlug(customerData.companyName),
+    plan: customerData.selectedPlan,
+    settings: {
+      timezone: customerData.timezone,
+      currency: customerData.currency
+    }
+  });
+  
+  return organization;
+}
+```
+
+### Multi-tenant Application Context
+Switch between organizations for different contexts:
+
+```typescript
+class MultiTenantApp {
+  private clients = new Map<string, TolstoyClient>();
+  
+  async initializeForUser(userId: string) {
+    const orgs = await client.listOrganizations();
+    
+    orgs.data.forEach(org => {
+      const orgClient = new TolstoyClient(baseUrl, org.id, userId);
+      this.clients.set(org.id, orgClient);
+    });
+  }
+  
+  getOrgClient(orgId: string): TolstoyClient {
+    return this.clients.get(orgId)!;
+  }
+}
+```
+
+### Usage Analytics Dashboard
+Monitor organization usage across your platform:
+
+```typescript
+async function generateUsageReport() {
+  const orgs = await client.listOrganizations();
+  
+  const report = orgs.data.map(org => ({
+    name: org.name,
+    plan: org.subscription.plan,
+    workflowUsage: `${org.usage.workflows}/${org.limits.workflows}`,
+    executionUsage: `${org.usage.executions}/${org.limits.executionsPerMonth}`,
+    userUsage: `${org.usage.users}/${org.limits.users}`
+  }));
+  
+  return report;
+}
+```
+
+### Billing Integration
+Track subscription status for billing systems:
+
+```typescript
+async function checkSubscriptionHealth(orgId: string) {
+  const org = await client.getOrganization(orgId);
+  const subscription = org.data.subscription;
+  
+  const daysUntilRenewal = Math.ceil(
+    (new Date(subscription.currentPeriodEnd).getTime() - Date.now()) 
+    / (1000 * 60 * 60 * 24)
+  );
+  
+  if (daysUntilRenewal <= 7) {
+    // Send renewal reminder
+    console.log(`Subscription renews in ${daysUntilRenewal} days`);
+  }
+  
+  if (subscription.status === 'past_due') {
+    // Handle payment issues
+    console.warn('Payment is past due');
+  }
+}
+```
+
+## Integration Patterns
+
+### Organization Selector Component
+```typescript
+function OrganizationSwitcher({ onOrgChange }) {
+  const [organizations, setOrganizations] = useState([]);
+  const [selectedOrg, setSelectedOrg] = useState('');
+  
+  useEffect(() => {
+    client.listOrganizations().then(orgs => {
+      setOrganizations(orgs.data);
+      setSelectedOrg(orgs.data[0]?.id || '');
+    });
+  }, []);
+  
+  return (
+    <select 
+      value={selectedOrg} 
+      onChange={(e) => {
+        setSelectedOrg(e.target.value);
+        onOrgChange(e.target.value);
+      }}
+    >
+      {organizations.map(org => (
+        <option key={org.id} value={org.id}>
+          {org.name} ({org.subscription.plan})
+        </option>
+      ))}
+    </select>
+  );
+}
+```
+
+### Organization Provisioning Pipeline
+```typescript
+async function provisionOrganization(config: any) {
+  // 1. Create organization
+  const org = await client.createOrganization(config.organization);
+  
+  // 2. Switch to organization context
+  const orgClient = new TolstoyClient(baseUrl, org.data.id, 'system');
+  
+  // 3. Set up initial users, tools, webhooks
+  await setupInitialConfiguration(orgClient, config);
+  
+  return org;
+}
+```
+
+## Best Practices
+
+- **Validate organization slugs** to ensure they're URL-safe and unique
+- **Implement proper access control** - users should only see organizations they belong to
+- **Cache organization data** for frequently accessed information
+- **Monitor usage metrics** to proactively manage plan limits
+- **Set up automated alerts** for subscription renewals and usage thresholds
+- **Implement graceful degradation** when organizations are suspended or cancelled

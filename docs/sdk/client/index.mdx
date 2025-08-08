@@ -1,0 +1,75 @@
+---
+title: Client Setup
+sidebar_position: 1
+---
+
+# Client Setup
+
+Learn how to initialize and configure the Tolstoy SDK client for your application.
+
+## Quick Start
+
+The TolstoyClient is the main entry point for all SDK operations. It handles authentication, request routing, and provides access to all Tolstoy API functionality.
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient(
+  'https://tolstoy.getpullse.com',
+  'your-org-id',
+  'your-user-id'
+);
+```
+
+## Client Methods
+
+### Core Setup
+- **[TolstoyClient Constructor](tolstoy-client)** - Initialize the SDK client with authentication
+
+## Configuration Options
+
+The client supports various configuration patterns for different environments and use cases:
+
+### Production Setup
+```typescript
+const client = new TolstoyClient(
+  process.env.TOLSTOY_BASE_URL,
+  process.env.TOLSTOY_ORG_ID,
+  process.env.TOLSTOY_USER_ID
+);
+```
+
+### Multi-tenant Setup
+```typescript
+// Switch between different organizations
+const devClient = new TolstoyClient(baseUrl, 'dev-org-id', userId);
+const prodClient = new TolstoyClient(baseUrl, 'prod-org-id', userId);
+```
+
+### Development Setup
+```typescript
+const client = new TolstoyClient(
+  'http://localhost:3000',
+  'dev-org-123',
+  'dev-user-456'
+);
+```
+
+## Authentication
+
+The client supports multiple authentication methods:
+- **Multi-tenant headers** (recommended)
+- **Bearer tokens**
+- **Custom authentication**
+
+## Next Steps
+
+Once you have your client configured, explore the other SDK categories:
+
+- **[Health & Status](/sdk/health)** - Monitor system health
+- **[Organizations](/sdk/organizations)** - Manage organizations
+- **[Users](/sdk/users)** - User management
+- **[Workflows](/sdk/workflows)** - Workflow automation
+- **[Tools](/sdk/tools)** - API integrations
+- **[Actions](/sdk/actions)** - Reusable operations
+- **[Webhooks](/sdk/webhooks)** - Event-driven integrations

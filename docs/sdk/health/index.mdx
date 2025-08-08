@@ -1,0 +1,92 @@
+---
+title: Health & Status
+sidebar_position: 2
+---
+
+# Health & Status
+
+Monitor the health and performance of your Tolstoy API instance with comprehensive health checking methods.
+
+## Overview
+
+The health monitoring methods help you:
+- **Monitor API availability** and response times
+- **Check system dependencies** (database, redis, queues)
+- **Track performance metrics** (CPU, memory, request rates)
+- **Implement health dashboards** and alerting systems
+- **Ensure production readiness** with automated health checks
+
+## Health Methods
+
+### Basic Monitoring
+- **[getHealth()](get-health)** - Quick API health check for load balancers and uptime monitoring
+
+### Advanced Monitoring  
+- **[getDetailedHealth()](get-detailed-health)** - Comprehensive system health with dependencies and metrics
+
+## Quick Examples
+
+### Basic Health Check
+```typescript
+const health = await client.getHealth();
+console.log(`API Status: ${health.data.status}`);
+```
+
+### Comprehensive Health Monitoring
+```typescript
+const detailedHealth = await client.getDetailedHealth();
+
+console.log('System Status:', detailedHealth.data.status);
+console.log('Dependencies:', detailedHealth.data.dependencies);
+console.log('Performance Metrics:', detailedHealth.data.metrics);
+```
+
+## Common Use Cases
+
+### Load Balancer Health Checks
+Use `getHealth()` for simple up/down status checks that load balancers can consume.
+
+### Monitoring Dashboards
+Use `getDetailedHealth()` to build comprehensive monitoring dashboards with:
+- Dependency status tracking
+- Performance metrics visualization
+- Resource usage monitoring
+- Alert threshold management
+
+### CI/CD Pipeline Validation
+Integrate health checks into your deployment pipeline to ensure API readiness before promoting releases.
+
+### Auto-scaling Triggers
+Monitor system metrics to trigger horizontal scaling based on CPU, memory, or request volume.
+
+## Integration Patterns
+
+### Express.js Health Endpoint
+```typescript
+app.get('/health', async (req, res) => {
+  try {
+    const health = await client.getHealth();
+    res.status(200).json({ status: 'ok', api: health.data.status });
+  } catch (error) {
+    res.status(503).json({ status: 'error', error: error.message });
+  }
+});
+```
+
+### Monitoring Service Integration
+```typescript
+// Prometheus metrics export
+const health = await client.getDetailedHealth();
+const metrics = health.data.metrics;
+
+console.log(`tolstoy_memory_usage ${metrics.memory.percentage}`);
+console.log(`tolstoy_cpu_usage ${metrics.cpu.usage}`);
+```
+
+## Best Practices
+
+- **Cache health data** for high-frequency checks to avoid overwhelming the API
+- **Implement circuit breakers** for resilient health monitoring
+- **Set up automated alerts** for critical health issues
+- **Monitor trends** over time, not just point-in-time status
+- **Test health endpoints** during outages to ensure monitoring works when needed

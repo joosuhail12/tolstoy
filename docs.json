@@ -200,61 +200,69 @@
             ]
           },
           {
-            "group": "Core Methods",
+            "group": "Client Setup",
             "pages": [
-              "docs/sdk/methods/tolstoy-client"
+              "docs/sdk/client/index",
+              "docs/sdk/client/tolstoy-client"
             ]
           },
           {
             "group": "Health & Status",
             "pages": [
-              "docs/sdk/methods/get-health",
-              "docs/sdk/methods/get-detailed-health"
+              "docs/sdk/health/index",
+              "docs/sdk/health/get-health",
+              "docs/sdk/health/get-detailed-health"
             ]
           },
           {
             "group": "Organizations",
             "pages": [
-              "docs/sdk/methods/list-organizations",
-              "docs/sdk/methods/create-organization",
-              "docs/sdk/methods/get-organization"
+              "docs/sdk/organizations/index",
+              "docs/sdk/organizations/list-organizations",
+              "docs/sdk/organizations/create-organization",
+              "docs/sdk/organizations/get-organization"
             ]
           },
           {
             "group": "Users",
             "pages": [
-              "docs/sdk/methods/list-users",
-              "docs/sdk/methods/create-user"
+              "docs/sdk/users/index",
+              "docs/sdk/users/list-users",
+              "docs/sdk/users/create-user"
             ]
           },
           {
             "group": "Workflows",
             "pages": [
-              "docs/sdk/methods/list-flows",
-              "docs/sdk/methods/create-flow",
-              "docs/sdk/methods/run-flow",
-              "docs/sdk/methods/get-flow-execution"
+              "docs/sdk/workflows/index",
+              "docs/sdk/workflows/list-flows",
+              "docs/sdk/workflows/create-flow",
+              "docs/sdk/workflows/run-flow",
+              "docs/sdk/workflows/get-flow-execution"
             ]
           },
           {
             "group": "Tools",
             "pages": [
-              "docs/sdk/methods/list-tools",
-              "docs/sdk/methods/create-tool"
+              "docs/sdk/tools/index",
+              "docs/sdk/tools/list-tools",
+              "docs/sdk/tools/create-tool"
             ]
           },
           {
             "group": "Actions",
             "pages": [
-              "docs/sdk/methods/list-actions",
-              "docs/sdk/methods/create-action"
+              "docs/sdk/actions/index",
+              "docs/sdk/actions/list-actions",
+              "docs/sdk/actions/create-action"
             ]
           },
           {
             "group": "Webhooks",
             "pages": [
-              "docs/sdk/methods/list-webhooks",
-              "docs/sdk/methods/create-webhook"
+              "docs/sdk/webhooks/index",
+              "docs/sdk/webhooks/list-webhooks",
+              "docs/sdk/webhooks/create-webhook"
             ]
           }
         ]
