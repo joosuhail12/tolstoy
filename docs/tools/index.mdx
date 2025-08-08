@@ -1,0 +1,507 @@
+---
+title: Tools & Integrations
+sidebar_position: 6
+---
+
+# Tools & Integrations
+
+Connect external APIs and services to your Tolstoy workflows. Tools represent external systems that your workflows can interact with through defined actions.
+
+## Overview
+
+Tools in Tolstoy are external service integrations that provide the foundation for workflow automation. Each tool represents:
+
+- **API Endpoint**: Base URL and connection details for an external service
+- **Authentication**: How to securely connect and authenticate with the service
+- **Credentials**: Encrypted storage of API keys, tokens, and secrets
+- **Actions**: Specific operations that can be performed with the service
+
+## Tool Concepts
+
+### Tool vs Action Relationship
+
+```
+Tool (GitHub API)
+├── Action: Create Issue
+├── Action: Get Repository  
+├── Action: List Pull Requests
+└── Action: Create Pull Request
+```
+
+- **Tool**: Represents the entire external service (e.g., GitHub API, Slack API)
+- **Action**: Specific operations within that service (e.g., "Create Issue", "Send Message")
+
+## Creating Tools
+
+### Basic Tool Creation
+
+```bash
+curl -X POST https://api.tolstoy.dev/tools \
+  -H "x-org-id: your-org-id" \
+  -H "x-user-id: your-user-id" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "GitHub API",
+    "description": "GitHub REST API integration",
+    "baseUrl": "https://api.github.com",
+    "authType": "bearer",
+    "version": "1.0"
+  }'
+```
+
+### Tool Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | ✅ | Human-readable tool name |
+| `description` | string | ❌ | Tool description and purpose |
+| `baseUrl` | string | ✅ | Base URL for the API |
+| `authType` | string | ✅ | Authentication method (see below) |
+| `version` | string | ❌ | Tool version for tracking changes |
+| `headers` | object | ❌ | Default headers for all requests |
+| `timeout` | number | ❌ | Request timeout in milliseconds |
+
+## Authentication Types
+
+### Bearer Token Authentication
+Most common for REST APIs and OAuth-based services.
+
+```json
+{
+  "name": "GitHub API",
+  "baseUrl": "https://api.github.com", 
+  "authType": "bearer"
+}
+```
+
+**Usage**: Token is sent as `Authorization: Bearer <token>` header.
+
+### API Key Authentication
+For services that use API keys in headers or query parameters.
+
+```json
+{
+  "name": "SendGrid API",
+  "baseUrl": "https://api.sendgrid.com/v3",
+  "authType": "api_key",
+  "headers": {
+    "Content-Type": "application/json"
+  }
+}
+```
+
+**Usage**: API key is sent as `Authorization: Bearer <api_key>` or custom header.
+
+### Basic Authentication
+For services using username/password authentication.
+
+```json
+{
+  "name": "Internal API",
+  "baseUrl": "https://internal-api.company.com",
+  "authType": "basic"
+}
+```
+
+**Usage**: Credentials encoded as `Authorization: Basic <base64(username:password)>`.
+
+### Custom Authentication
+For services with unique authentication schemes.
+
+```json
+{
+  "name": "Custom Service",
+  "baseUrl": "https://custom-api.com",
+  "authType": "custom",
+  "headers": {
+    "X-API-Key": "{{secret.api_key}}",
+    "X-Client-ID": "{{secret.client_id}}"
+  }
+}
+```
+
+### No Authentication
+For public APIs that don't require authentication.
+
+```json
+{
+  "name": "JSONPlaceholder",
+  "baseUrl": "https://jsonplaceholder.typicode.com",
+  "authType": "none"
+}
+```
+
+## Managing Tool Secrets
+
+### Storing Credentials
+
+After creating a tool, store its authentication credentials securely:
+
+```bash
+curl -X POST https://api.tolstoy.dev/tools/tool_abc123/secrets \
+  -H "x-org-id: your-org-id" \
+  -H "x-user-id: your-user-id" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "api_token": "ghp_abc123def456...",
+    "client_id": "oauth_client_123"
+  }'
+```
+
+### Retrieving Credentials (Masked)
+
+```bash
+curl https://api.tolstoy.dev/tools/tool_abc123/secrets \
+  -H "x-org-id: your-org-id" \
+  -H "x-user-id: your-user-id"
+```
+
+Response:
+```json
+{
+  "secrets": {
+    "api_token": "ghp_abc***456",
+    "client_id": "oauth_***_123"
+  }
+}
+```
+
+> **Security**: Secrets are stored encrypted in AWS Secrets Manager and never returned in full.
+
+## Built-in Tool Integrations
+
+### Popular Services
+
+Tolstoy provides pre-configured tool templates for popular services:
+
+#### GitHub
+```json
+{
+  "name": "GitHub",
+  "baseUrl": "https://api.github.com",
+  "authType": "bearer",
+  "headers": {
+    "Accept": "application/vnd.github.v3+json",
+    "User-Agent": "Tolstoy-Workflow"
+  }
+}
+```
+
+#### Slack  
+```json
+{
+  "name": "Slack",
+  "baseUrl": "https://slack.com/api", 
+  "authType": "bearer",
+  "headers": {
+    "Content-Type": "application/json; charset=utf-8"
+  }
+}
+```
+
+#### SendGrid
+```json
+{
+  "name": "SendGrid",
+  "baseUrl": "https://api.sendgrid.com/v3",
+  "authType": "bearer",
+  "headers": {
+    "Content-Type": "application/json"
+  }
+}
+```
+
+#### Stripe
+```json
+{
+  "name": "Stripe", 
+  "baseUrl": "https://api.stripe.com/v1",
+  "authType": "bearer",
+  "headers": {
+    "Stripe-Version": "2022-11-15"
+  }
+}
+```
+
+#### Airtable
+```json
+{
+  "name": "Airtable",
+  "baseUrl": "https://api.airtable.com/v0",
+  "authType": "bearer", 
+  "headers": {
+    "Content-Type": "application/json"
+  }
+}
+```
+
+## Tool Configuration Examples
+
+### OAuth 2.0 Service
+```json
+{
+  "name": "Google Sheets API",
+  "description": "Google Sheets integration with OAuth",
+  "baseUrl": "https://sheets.googleapis.com/v4",
+  "authType": "bearer",
+  "version": "v4",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "timeout": 30000
+}
+```
+
+### REST API with Custom Headers
+```json
+{
+  "name": "Internal CRM",
+  "description": "Company CRM system",
+  "baseUrl": "https://crm.company.com/api/v2", 
+  "authType": "api_key",
+  "headers": {
+    "X-API-Version": "2.0",
+    "X-Client-Type": "tolstoy",
+    "Content-Type": "application/json"
+  }
+}
+```
+
+### GraphQL API
+```json
+{
+  "name": "Shopify GraphQL",
+  "description": "Shopify Admin API via GraphQL", 
+  "baseUrl": "https://your-shop.myshopify.com/admin/api/2023-01",
+  "authType": "custom",
+  "headers": {
+    "X-Shopify-Access-Token": "{{secret.access_token}}",
+    "Content-Type": "application/graphql"
+  }
+}
+```
+
+## Tool Management
+
+### List Tools
+```bash
+curl https://api.tolstoy.dev/tools \
+  -H "x-org-id: your-org-id" \
+  -H "x-user-id: your-user-id"
+```
+
+### Get Tool Details
+```bash
+curl https://api.tolstoy.dev/tools/tool_abc123 \
+  -H "x-org-id: your-org-id" \
+  -H "x-user-id: your-user-id"
+```
+
+### Update Tool
+```bash
+curl -X PATCH https://api.tolstoy.dev/tools/tool_abc123 \
+  -H "x-org-id: your-org-id" \
+  -H "x-user-id: your-user-id" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "description": "Updated tool description",
+    "timeout": 45000
+  }'
+```
+
+### Delete Tool
+```bash
+curl -X DELETE https://api.tolstoy.dev/tools/tool_abc123 \
+  -H "x-org-id: your-org-id" \
+  -H "x-user-id: your-user-id"
+```
+
+> **Warning**: Deleting a tool will prevent workflows using its actions from executing.
+
+## Testing Tool Connections
+
+### Test Connection
+Verify that a tool's configuration and credentials work correctly:
+
+```bash
+curl -X POST https://api.tolstoy.dev/tools/tool_abc123/test \
+  -H "x-org-id: your-org-id" \
+  -H "x-user-id: your-user-id" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "endpoint": "/user",
+    "method": "GET"
+  }'
+```
+
+Response:
+```json
+{
+  "success": true,
+  "statusCode": 200,
+  "responseTime": 245,
+  "response": {
+    "login": "octocat",
+    "id": 583231
+  }
+}
+```
+
+## Advanced Tool Configuration
+
+### Custom Request Processing
+
+For complex APIs that require request preprocessing:
+
+```json
+{
+  "name": "SOAP API",
+  "baseUrl": "https://api.example.com/soap",
+  "authType": "custom",
+  "headers": {
+    "Content-Type": "text/xml; charset=utf-8",
+    "SOAPAction": "{{action.soapAction}}"
+  },
+  "requestProcessor": "soap_envelope"
+}
+```
+
+### Rate Limiting Configuration
+
+Configure rate limiting for API calls:
+
+```json
+{
+  "name": "Rate Limited API",
+  "baseUrl": "https://api.example.com/v1",
+  "authType": "bearer",
+  "rateLimiting": {
+    "requestsPerSecond": 10,
+    "requestsPerMinute": 500,
+    "requestsPerHour": 10000
+  }
+}
+```
+
+### Retry Configuration
+
+Configure retry behavior for failed requests:
+
+```json
+{
+  "name": "Unreliable API",
+  "baseUrl": "https://api.example.com",
+  "authType": "bearer",
+  "retryConfig": {
+    "maxRetries": 3,
+    "backoffStrategy": "exponential",
+    "retryableStatusCodes": [429, 500, 502, 503, 504]
+  }
+}
+```
+
+## Tool Security Best Practices
+
+### Credential Management
+- Store all secrets using the Tool Secrets API
+- Never include credentials in tool definitions
+- Rotate credentials regularly
+- Use environment-specific credentials
+
+### Access Control
+- Limit tool access to necessary team members
+- Use least-privilege authentication (read-only when possible)
+- Monitor tool usage through audit logs
+- Regularly review tool permissions
+
+### API Security
+- Always use HTTPS endpoints
+- Validate SSL certificates
+- Implement request signing where supported
+- Use API versioning to prevent breaking changes
+
+## Common Integration Patterns
+
+### Database Connections
+```json
+{
+  "name": "PostgreSQL",
+  "baseUrl": "postgresql://host:port/database",
+  "authType": "basic",
+  "timeout": 10000
+}
+```
+
+### File Storage Services
+```json
+{
+  "name": "AWS S3",
+  "baseUrl": "https://s3.amazonaws.com",
+  "authType": "custom",
+  "headers": {
+    "x-amz-content-sha256": "{{computed.contentHash}}",
+    "Authorization": "{{computed.awsSignature}}"
+  }
+}
+```
+
+### Message Queues
+```json
+{
+  "name": "RabbitMQ",
+  "baseUrl": "https://rabbitmq.company.com",
+  "authType": "basic",
+  "headers": {
+    "Content-Type": "application/json"
+  }
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Tool Connection Fails**
+- Verify baseUrl is accessible from Tolstoy
+- Check authentication credentials are correct
+- Ensure API endpoints return expected responses
+
+**Authentication Errors**
+- Verify authType matches the API's requirements
+- Check that stored secrets are correct and not expired
+- Test authentication manually with curl/Postman
+
+**Timeout Issues**
+- Increase timeout values for slow APIs
+- Check network connectivity to the service
+- Consider implementing retry strategies
+
+### Debug Tool Issues
+
+Use the test connection feature to diagnose problems:
+
+```bash
+# Test basic connectivity
+curl -X POST https://api.tolstoy.dev/tools/tool_abc123/test \
+  -H "x-org-id: your-org-id" \
+  -H "x-user-id: your-user-id" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "endpoint": "/health",
+    "method": "GET",
+    "debug": true
+  }'
+```
+
+The debug response includes:
+- Request headers sent
+- Response status and headers
+- Response time and size
+- Any errors encountered
+
+## Next Steps
+
+- **[Action Reference](/action-reference)** - Learn how to create actions for your tools
+- **[Flow Definition Guide](/flow-definition)** - Use tools in your workflows  
+- **[Security Guide](/security)** - Best practices for secure integrations
+- **[API Reference](/api)** - Complete tools API documentation

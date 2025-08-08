@@ -23,15 +23,36 @@
   "navigation": {
     "dropdowns": [
       {
-        "dropdown": "Documentation", 
+        "dropdown": "Documentation",
+        "icon": "book",
+        "description": "Complete guide to Tolstoy workflow automation",
         "groups": [
           {
             "group": "Getting Started",
             "pages": [
               "docs/quickstart/index",
-              "docs/flow-definition/index",
-              "docs/action-reference/index", 
               "docs/onboarding/index"
+            ]
+          },
+          {
+            "group": "Core Concepts", 
+            "pages": [
+              "docs/flow-definition/index",
+              "docs/action-reference/index",
+              "docs/tools/index"
+            ]
+          },
+          {
+            "group": "Advanced Features",
+            "pages": [
+              "docs/webhooks/index",
+              "docs/execution/index"
+            ]
+          },
+          {
+            "group": "API Documentation",
+            "pages": [
+              "docs/api/index"
             ]
           }
         ]

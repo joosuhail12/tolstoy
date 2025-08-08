@@ -3,58 +3,174 @@ title: Quickstart
 sidebar_position: 1
 ---
 
-
 # Quickstart
 
-Get Tolstoy up and running in under 5 minutes with this step-by-step guide.
+Get started with Tolstoy, the enterprise workflow automation platform. This guide will walk you through creating your first workflow in under 10 minutes.
 
-## 1. Install the CLI
+## What is Tolstoy?
 
-```bash
-npm install -g @tolstoy/cli
-```
+Tolstoy is a powerful workflow automation platform that enables you to:
+- **Connect APIs**: Integrate with external services and tools
+- **Build Workflows**: Create complex, multi-step business processes
+- **Execute Securely**: Run workflows with monitoring and error handling
+- **Scale Enterprise**: Multi-tenant architecture with comprehensive logging
 
-## 2. Scaffold a Project
+## Prerequisites
 
-```bash
-tolstoy init my-project
-cd my-project
-```
+Before you begin, ensure you have:
+- An active Tolstoy organization account
+- API credentials for any external services you want to integrate
+- Basic understanding of REST APIs and JSON
 
-## 3. Define a Simple Flow
+## Step 1: Set Up Authentication
 
-Create your first workflow with a simple hello-world example:
-
-```yaml
-version: 1
-steps:
-  - key: hello-world
-    action: echo
-    inputs:
-      message: "Hello, world!"
-```
-
-## 4. Run the Flow
-
-Execute your workflow with the Tolstoy CLI:
+First, you'll need to set up API authentication headers for all requests:
 
 ```bash
-tolstoy run --org=org-123 --flow=my-flow
+export TOLSTOY_ORG_ID="your-organization-id"
+export TOLSTOY_USER_ID="your-user-id"
 ```
+
+All API requests require these headers:
+```
+x-org-id: your-organization-id
+x-user-id: your-user-id
+```
+
+## Step 2: Create a Tool Integration
+
+Register an external API service that your workflows will interact with:
+
+```bash
+curl -X POST https://api.tolstoy.dev/tools \
+  -H "x-org-id: $TOLSTOY_ORG_ID" \
+  -H "x-user-id: $TOLSTOY_USER_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "GitHub API",
+    "baseUrl": "https://api.github.com",
+    "authType": "bearer"
+  }'
+```
+
+## Step 3: Define an Action
+
+Create a reusable action that defines a specific API operation:
+
+```bash
+curl -X POST https://api.tolstoy.dev/actions \
+  -H "x-org-id: $TOLSTOY_ORG_ID" \
+  -H "x-user-id: $TOLSTOY_USER_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "github-get-user",
+    "name": "Get GitHub User",
+    "toolId": "<tool-id-from-step-2>",
+    "method": "GET",
+    "endpoint": "/users/{username}",
+    "inputSchema": [
+      {
+        "name": "username",
+        "type": "string",
+        "required": true,
+        "description": "GitHub username"
+      }
+    ]
+  }'
+```
+
+## Step 4: Create Your First Flow
+
+Now create a workflow that uses your action:
+
+```bash
+curl -X POST https://api.tolstoy.dev/flows \
+  -H "x-org-id: $TOLSTOY_ORG_ID" \
+  -H "x-user-id: $TOLSTOY_USER_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My First Workflow",
+    "version": 1,
+    "steps": [
+      {
+        "key": "get-user",
+        "action": "github-get-user",
+        "inputs": {
+          "username": "octocat"
+        }
+      }
+    ]
+  }'
+```
+
+## Step 5: Execute the Flow
+
+Run your workflow and see it in action:
+
+```bash
+curl -X POST https://api.tolstoy.dev/flows/{flow-id}/execute \
+  -H "x-org-id: $TOLSTOY_ORG_ID" \
+  -H "x-user-id: $TOLSTOY_USER_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "mode": "sync"
+  }'
+```
+
+## Step 6: Monitor Execution
+
+Check the execution status and logs:
+
+```bash
+# Get execution status
+curl https://api.tolstoy.dev/flows/{flow-id}/executions/{execution-id} \
+  -H "x-org-id: $TOLSTOY_ORG_ID" \
+  -H "x-user-id: $TOLSTOY_USER_ID"
+
+# View execution logs
+curl https://api.tolstoy.dev/execution-logs?executionId={execution-id} \
+  -H "x-org-id: $TOLSTOY_ORG_ID" \
+  -H "x-user-id: $TOLSTOY_USER_ID"
+```
+
+🎉 **Congratulations!** You've successfully:
+- Created your first Tool integration
+- Defined a reusable Action
+- Built and executed a workflow
+- Monitored execution results
+
+## What You Can Do Next
+
+### Build More Complex Workflows
+- **Multi-Step Flows**: Chain multiple actions together
+- **Conditional Logic**: Use `executeIf` conditions to control flow
+- **Error Handling**: Set up retry policies and failure handling
+- **Webhooks**: Get notified when workflows complete
+
+### Advanced Features
+- **Durable Execution**: Use async mode for long-running workflows
+- **Code Execution**: Run custom JavaScript/Python in secure sandboxes
+- **Real-time Monitoring**: Connect to WebSocket updates for live progress
+- **Metrics & Analytics**: Track performance and success rates
+
+### Integration Examples
+- **GitHub + Slack**: Auto-notify team when PRs are created
+- **CRM + Email**: Send welcome emails for new customers
+- **Database + Analytics**: Generate and send weekly reports
+- **Support + Ticketing**: Auto-create tickets from form submissions
 
 ## Next Steps
 
-🎉 Congratulations! You've created and executed your first Tolstoy workflow. 
-
-Here's what to explore next:
-
-- **Flow Definition Guide** - Learn advanced workflow patterns and conditional logic
-- **Action Reference** - Discover available actions and create custom ones  
-- **Integrations** - Connect with popular tools like Slack, GitHub, and more
-- **API Documentation** - Integrate Tolstoy programmatically
+| Guide | Description |
+|-------|-------------|
+| **[Flow Definition Guide](/flow-definition)** | Learn advanced patterns and conditional logic |
+| **[Action Reference](/action-reference)** | Complete guide to actions and parameters |
+| **[Webhooks Guide](/webhooks)** | Set up event-driven integrations |
+| **[Tools & Integrations](/tools)** | Connect external services and APIs |
+| **[API Reference](/api)** | Complete REST API documentation |
 
 ## Need Help?
 
-- Check our [troubleshooting guide](/troubleshooting) for common issues
-- Join our [community Discord](https://discord.gg/tolstoy) for support
-- Browse [example workflows](https://github.com/tolstoy/examples) for inspiration
+- **[Developer Onboarding](/onboarding)** - Complete development setup guide
+- **[Troubleshooting](/troubleshooting)** - Common issues and solutions
+- **[Examples Repository](https://github.com/tolstoy/examples)** - Real-world workflow examples
