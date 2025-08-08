@@ -1,0 +1,58 @@
+# Example Terraform Variables Configuration
+# Copy this file to terraform.tfvars and customize for your environment
+
+# Project Configuration
+project_name = "tolstoy"
+environment  = "prod"
+aws_region   = "us-east-1"
+
+# EC2 Backend Configuration
+ec2_instance_id = "i-0ea0ff0e9a8db29d4"  # Your existing EC2 instance ID
+backend_port    = 80                      # Port where Nginx is running
+
+# Custom Domain Configuration (Optional)
+# Uncomment and configure if you have a custom domain
+# domain_name      = "api.tolstoy.dev"
+# route53_zone_id  = "Z1234567890123"    # Your Route53 hosted zone ID
+
+# API Gateway Configuration
+stage_name             = "prod"
+integration_timeout_ms = 29000
+
+# Caching Configuration
+enable_caching      = true
+cache_cluster_size  = "0.5"      # 0.5 GB cache cluster (cheapest option)
+cache_ttl_seconds   = 60         # 1 minute cache TTL
+
+# Rate Limiting Configuration
+throttle_rate_limit  = 100       # 100 requests per second
+throttle_burst_limit = 200       # 200 burst capacity
+
+# API Key Authentication (Optional)
+enable_api_key_auth = false      # Set to true to require API keys
+quota_limit         = 10000      # Daily quota limit
+quota_period        = "DAY"      # DAY, WEEK, or MONTH
+
+# Logging Configuration
+api_gateway_log_level = "ERROR"  # OFF, ERROR, or INFO
+log_retention_days    = 14       # CloudWatch logs retention
+enable_data_trace     = false    # Detailed request/response logging
+enable_xray_tracing   = true     # X-Ray distributed tracing
+
+# WAF Configuration
+waf_rate_limit    = 2000         # 2000 requests per 5 minutes per IP
+allowed_countries = []           # Empty list allows all countries
+                                # Example: ["US", "CA", "GB"] for specific countries
+
+# Advanced Security Configuration
+enable_waf_logging      = true
+waf_log_retention_days = 7
+
+# Development/Testing Overrides
+# Uncomment for development environment
+# environment = "dev"
+# enable_caching = false
+# api_gateway_log_level = "INFO"
+# enable_data_trace = true
+# throttle_rate_limit = 1000
+# waf_rate_limit = 10000
