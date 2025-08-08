@@ -30,12 +30,17 @@ Main configuration file that defines:
    - `src/**/*.controller.ts` (NestJS controllers)
    - `stainless.yml` (Stainless configuration)
 
-2. **Publishes to Stainless**:
+2. **Authentication Setup**:
+   - Configures AWS credentials from GitHub secrets
+   - Retrieves `STAINLESS_TOKEN` from AWS Secrets Manager (`tolstoy/env`)
+   - Masks sensitive tokens for security
+
+3. **Publishes to Stainless**:
    - Validates OpenAPI spec format
-   - Uploads to Stainless SDK Studio
+   - Uploads to Stainless SDK Studio using AWS-managed token
    - Generates decorated spec with `x-code-samples`
 
-3. **Deployment verification**:
+4. **Deployment verification**:
    - Confirms Stainless URL is accessible
    - Validates generated code samples
    - Creates deployment summary
@@ -135,9 +140,10 @@ curl -s https://stainless.app/projects/tolstoy/releases/latest/openapi.json | \
 ### Common Issues
 
 1. **Stainless URL not accessible**
-   - Check GitHub Actions logs
-   - Verify `STAINLESS_TOKEN` secret is set
-   - Ensure OpenAPI spec is valid JSON
+   - Check GitHub Actions logs for AWS authentication errors
+   - Verify `STAINLESS_TOKEN` is added to `tolstoy/env` in AWS Secrets Manager
+   - Ensure `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` GitHub secrets are set
+   - Confirm OpenAPI spec is valid JSON
 
 2. **Code samples not appearing**
    - Verify Mintlify `docs.json` points to Stainless URL
@@ -160,6 +166,12 @@ echo "Endpoints: $(jq -r '.paths | keys | length' docs/openapi.json)"
 
 # Test Stainless URL
 curl -I https://stainless.app/projects/tolstoy/releases/latest/openapi.json
+
+# Verify STAINLESS_TOKEN in AWS Secrets Manager (requires AWS CLI configured)
+aws secretsmanager get-secret-value --secret-id "tolstoy/env" --region us-east-1 \
+  --query 'SecretString' --output text | jq -r 'has("STAINLESS_TOKEN")' && \
+  echo "✅ STAINLESS_TOKEN found in AWS Secrets" || \
+  echo "❌ STAINLESS_TOKEN missing from AWS Secrets"
 ```
 
 ## 📈 Benefits

@@ -45,10 +45,45 @@ jobs:
           echo "📊 Spec size: $(wc -l < docs/openapi.json) lines"
           echo "📊 Endpoints: $(jq -r '.paths | keys | length' docs/openapi.json) endpoints"
 
+      - name: 🔑 Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: 🔐 Retrieve Stainless token from AWS Secrets Manager
+        id: get-stainless-token
+        run: |
+          echo "🔍 Retrieving STAINLESS_TOKEN from AWS Secrets Manager..."
+          
+          # Fetch the secret from AWS Secrets Manager
+          SECRET_JSON=$(aws secretsmanager get-secret-value \
+            --secret-id "tolstoy/env" \
+            --region us-east-1 \
+            --query 'SecretString' \
+            --output text)
+          
+          # Extract the STAINLESS_TOKEN from the JSON
+          STAINLESS_TOKEN=$(echo "$SECRET_JSON" | jq -r '.STAINLESS_TOKEN')
+          
+          if [[ "$STAINLESS_TOKEN" == "null" || -z "$STAINLESS_TOKEN" ]]; then
+            echo "❌ STAINLESS_TOKEN not found in AWS Secrets Manager"
+            echo "Please ensure STAINLESS_TOKEN is added to the tolstoy/env secret"
+            exit 1
+          fi
+          
+          echo "✅ Successfully retrieved STAINLESS_TOKEN from AWS"
+          echo "🔒 Token length: ${#STAINLESS_TOKEN} characters"
+          
+          # Set as output for next step (masked for security)
+          echo "::add-mask::$STAINLESS_TOKEN"
+          echo "token=$STAINLESS_TOKEN" >> $GITHUB_OUTPUT
+
       - name: 🎯 Publish to Stainless
         uses: stainless-sdk/cli-action@v1
         with:
-          token: ${{ secrets.STAINLESS_TOKEN }}
+          token: ${{ steps.get-stainless-token.outputs.token }}
           # Use the raw GitHub URL for the OpenAPI spec
           spec_url: https://raw.githubusercontent.com/${{ github.repository }}/main/docs/openapi.json
         continue-on-error: false
