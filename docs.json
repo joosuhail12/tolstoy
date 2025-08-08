@@ -63,7 +63,13 @@
               "docs/webhooks/index",
               "docs/execution/index"
             ]
-          },
+          }
+        ]
+      },
+      {
+        "tab": "API Documentation",
+        "icon": "api",
+        "groups": [
           {
             "group": "API Overview",
             "pages": [
@@ -169,6 +175,18 @@
               "docs/api/toolsecrets/post-tools-secrets",
               "docs/api/toolsecrets/delete-tools-secrets",
               "docs/api/toolsecretslist/get-toolssecrets"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "SDK",
+        "icon": "terminal",
+        "groups": [
+          {
+            "group": "TypeScript SDK",
+            "pages": [
+              "docs/sdk/index"
             ]
           }
         ]

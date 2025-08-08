@@ -85,6 +85,21 @@ async function bootstrap() {
     },
   });
 
+  // Add a dedicated CORS-enabled OpenAPI spec endpoint for Stainless
+  app.register(async (fastify: any) => {
+    await fastify.route({
+      method: 'GET',
+      url: '/openapi.json',
+      handler: async (request: any, reply: any) => {
+        reply.header('Access-Control-Allow-Origin', '*');
+        reply.header('Access-Control-Allow-Methods', 'GET');
+        reply.header('Access-Control-Allow-Headers', 'Content-Type');
+        reply.header('Content-Type', 'application/json');
+        return document;
+      }
+    });
+  });
+
   await app.listen(3000, '0.0.0.0');
 
   const logger = app.get(Logger);
