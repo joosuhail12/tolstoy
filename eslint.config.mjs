@@ -6,16 +6,28 @@ import prettierPlugin from 'eslint-plugin-prettier';
 
 export default [
   {
-    ignores: ['dist/**', 'node_modules/**', '*.js', 'coverage/**', '.next/**', '*.mjs', '**/*.spec.ts', '**/*.test.ts', 'tests/**/*'],
+    ignores: [
+      'dist/**', 
+      'node_modules/**', 
+      '*.js', 
+      'coverage/**', 
+      '.next/**', 
+      '*.mjs', 
+      '**/*.spec.ts', 
+      '**/*.test.ts', 
+      'tests/**/*',
+      '*.d.ts'
+    ],
   },
   {
     files: ['src/**/*.ts'],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
-        project: './tsconfig.json',
-        tsconfigRootDir: '.',
+        project: ['./tsconfig.json'],
+        tsconfigRootDir: import.meta.dirname || process.cwd(),
         sourceType: 'module',
+        ecmaVersion: 'latest',
       },
       globals: {
         console: 'readonly',
@@ -102,9 +114,10 @@ export default [
     languageOptions: {
       parser: tsparser,
       parserOptions: {
-        project: './tsconfig.json',
-        tsconfigRootDir: '.',
+        project: ['./tsconfig.json'],
+        tsconfigRootDir: import.meta.dirname || process.cwd(),
         sourceType: 'module',
+        ecmaVersion: 'latest',
       },
       globals: {
         console: 'readonly',

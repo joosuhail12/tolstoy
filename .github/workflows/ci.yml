@@ -25,6 +25,12 @@ env:
   NODE_VERSION: '20'
   DATABASE_URL: 'postgresql://test:test@localhost:5432/tolstoy_test'
   REDIS_URL: 'redis://localhost:6379'
+  # CI-specific environment variables
+  NODE_ENV: test
+  APP_NAME: Tolstoy
+  USE_AWS_SECRETS: false
+  JWT_SECRET: test_jwt_secret_for_ci
+  ENCRYPTION_KEY: test_encryption_key_for_ci_32_bytes
 
 jobs:
   # Quality checks that run quickly
@@ -36,18 +42,21 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'yarn'
+          cache: 'npm'
 
       - name: 📦 Install dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: 🔍 ESLint check
-        run: yarn lint
+        run: npm run lint
 
       - name: 🔍 TypeScript type check
         run: npx tsc --noEmit
@@ -64,18 +73,21 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'yarn'
+          cache: 'npm'
 
       - name: 📦 Install dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: 🔒 Run npm audit
-        run: yarn audit --audit-level=moderate --groups=dependencies
+        run: npm audit --audit-level=moderate --omit=dev
 
       - name: 🔒 Check for known vulnerabilities
         run: npx audit-ci --config audit-ci.json
@@ -121,32 +133,39 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🔧 Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'yarn'
+          cache: 'npm'
 
       - name: 📦 Install dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: 🔨 Build application
-        run: yarn build
+        run: npm run build
 
       - name: 🗃️ Setup test database
         run: |
-          yarn db:generate
-          yarn db:push
+          npm run db:generate
+          npm run db:push
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
 
       - name: 🧪 Run unit tests
-        run: yarn test --coverage --maxWorkers=2
+        run: npm test -- --coverage --maxWorkers=2
         env:
           DATABASE_URL: ${{ env.DATABASE_URL }}
           REDIS_URL: ${{ env.REDIS_URL }}
           NODE_ENV: test
+          APP_NAME: ${{ env.APP_NAME }}
+          USE_AWS_SECRETS: ${{ env.USE_AWS_SECRETS }}
+          JWT_SECRET: ${{ env.JWT_SECRET }}
+          ENCRYPTION_KEY: ${{ env.ENCRYPTION_KEY }}
 
       - name: 📊 Upload coverage to Codecov
         if: matrix.node-version == 20
@@ -192,23 +211,26 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'yarn'
+          cache: 'npm'
 
       - name: 📦 Install dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: 🔨 Build application
-        run: yarn build
+        run: npm run build
 
       - name: 🗃️ Setup integration database
         run: |
-          yarn db:generate
-          yarn db:push
+          npm run db:generate
+          npm run db:push
           # Seed test data
           node -e "
             const { PrismaClient } = require('@prisma/client');
@@ -226,7 +248,7 @@ jobs:
 
       - name: 🚀 Start application
         run: |
-          yarn start &
+          npm start &
           echo $! > app.pid
           sleep 10
         env:
@@ -234,6 +256,10 @@ jobs:
           REDIS_URL: ${{ env.REDIS_URL }}
           NODE_ENV: test
           PORT: 3001
+          APP_NAME: ${{ env.APP_NAME }}
+          USE_AWS_SECRETS: ${{ env.USE_AWS_SECRETS }}
+          JWT_SECRET: ${{ env.JWT_SECRET }}
+          ENCRYPTION_KEY: ${{ env.ENCRYPTION_KEY }}
 
       - name: 🔍 Wait for application to be ready
         run: |
@@ -251,7 +277,7 @@ jobs:
           done
 
       - name: 🧪 Run integration tests
-        run: yarn test:integration || yarn test tests/integration
+        run: npm run test:integration || npm test tests/integration
         env:
           TEST_API_URL: http://localhost:3001
           DATABASE_URL: 'postgresql://test:test@localhost:5432/tolstoy_integration'
@@ -273,18 +299,21 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'yarn'
+          cache: 'npm'
 
       - name: 📦 Install dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: 🔨 Build for production
-        run: yarn build
+        run: npm run build
 
       - name: 📦 Test package installation
         run: |
@@ -332,26 +361,29 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🔧 Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'yarn'
+          cache: 'npm'
 
       - name: 📦 Install dependencies
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: 🗃️ Test fresh migration
         run: |
-          yarn db:generate
-          yarn db:migrate:deploy
+          npm run db:generate
+          npm run db:migrate:deploy
         env:
           DATABASE_URL: 'postgresql://test:test@localhost:5432/tolstoy_migration_test'
 
       - name: 🔍 Validate database schema
         run: |
-          yarn db:generate
+          npm run db:generate
           # Check that schema is in sync
           npx prisma db pull --schema=prisma/schema.prisma
           if git diff --exit-code prisma/schema.prisma; then
