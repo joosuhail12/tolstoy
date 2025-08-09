@@ -3,11 +3,6 @@
   "theme": "mint",
   "name": "Tolstoy Docs",
   "description": "Workflow automation platform documentation - Learn how to create, manage, and execute workflows with Tolstoy",
-  "logo": {
-    "dark": "/logo/dark.svg",
-    "light": "/logo/light.svg"
-  },
-  "favicon": "/favicon.svg",
   "colors": {
     "primary": "#2563eb",
     "light": "#3b82f6",
