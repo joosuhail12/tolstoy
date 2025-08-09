@@ -1,0 +1,1652 @@
+---
+title: "CLI Overview"
+description: "Complete guide to the Tolstoy Command Line Interface for developers and DevOps teams"
+---
+
+# CLI Overview
+
+The Tolstoy CLI is a powerful command-line interface that enables developers and DevOps teams to manage workflows, deployments, and integrations directly from the terminal. Built with modern development workflows in mind, the CLI provides comprehensive functionality for automating and streamlining your Tolstoy operations.
+
+<img
+  className="block dark:hidden"
+  src="/images/cli-hero-light.png"
+  alt="Tolstoy CLI Overview Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/cli-hero-dark.png"
+  alt="Tolstoy CLI Overview Dark"
+/>
+
+## Why Use the Tolstoy CLI?
+
+<CardGroup cols={2}>
+  <Card title="Developer Productivity" icon="terminal">
+    Manage workflows, execute deployments, and debug issues directly from your terminal without context switching.
+  </Card>
+  <Card title="CI/CD Integration" icon="arrows-rotate">
+    Seamlessly integrate Tolstoy operations into your existing CI/CD pipelines and automation scripts.
+  </Card>
+  <Card title="Powerful Scripting" icon="file-code">
+    Create complex automation scripts using the full power of the Tolstoy platform from the command line.
+  </Card>
+  <Card title="Team Collaboration" icon="users">
+    Share configurations, templates, and best practices across your development team with version-controlled CLI configs.
+  </Card>
+</CardGroup>
+
+## Installation
+
+### **System Requirements**
+
+<Tabs>
+  <Tab title="macOS">
+    **Minimum Requirements:**
+    - macOS 10.14 (Mojave) or later
+    - 64-bit processor
+    - 100MB available disk space
+    
+    **Recommended:**
+    - macOS 12.0 (Monterey) or later
+    - Apple Silicon (M1/M2) or Intel processor
+    - 500MB available disk space
+  </Tab>
+  
+  <Tab title="Linux">
+    **Supported Distributions:**
+    - Ubuntu 18.04 LTS or later
+    - CentOS 7 or later / RHEL 7 or later
+    - Debian 9 or later
+    - Fedora 30 or later
+    - Amazon Linux 2
+    
+    **Requirements:**
+    - 64-bit architecture (x86_64 or arm64)
+    - glibc 2.17 or later
+    - 100MB available disk space
+  </Tab>
+  
+  <Tab title="Windows">
+    **Requirements:**
+    - Windows 10 version 1903 or later
+    - Windows Server 2019 or later
+    - 64-bit architecture
+    - PowerShell 5.1 or later (PowerShell 7+ recommended)
+    - 100MB available disk space
+  </Tab>
+</Tabs>
+
+### **Installation Methods**
+
+<CodeGroup>
+```bash Homebrew (macOS/Linux)
+# Install via Homebrew
+brew tap tolstoy/cli
+brew install tolstoy
+
+# Verify installation
+tolstoy version
+```
+
+```bash Shell Script (Linux/macOS)
+# Download and install with shell script
+curl -fsSL https://get.tolstoy.dev | bash
+
+# Add to PATH (add to ~/.bashrc or ~/.zshrc)
+export PATH="$HOME/.tolstoy/bin:$PATH"
+
+# Verify installation
+tolstoy version
+```
+
+```bash npm/yarn (Cross-platform)
+# Install globally with npm
+npm install -g @tolstoy/cli
+
+# Or with yarn
+yarn global add @tolstoy/cli
+
+# Verify installation
+tolstoy version
+```
+
+```powershell Windows (PowerShell)
+# Install with PowerShell script
+Invoke-RestMethod -Uri https://get.tolstoy.dev/install.ps1 | Invoke-Expression
+
+# Or download manually
+Invoke-WebRequest -Uri https://releases.tolstoy.dev/cli/latest/tolstoy-windows-amd64.exe -OutFile tolstoy.exe
+
+# Verify installation
+.\tolstoy.exe version
+```
+
+```bash Docker
+# Run with Docker (no installation required)
+docker run --rm -v $(pwd):/workspace tolstoy/cli:latest version
+
+# Create alias for convenience
+echo 'alias tolstoy="docker run --rm -v $(pwd):/workspace tolstoy/cli:latest"' >> ~/.bashrc
+
+# Use the alias
+tolstoy version
+```
+
+```bash Manual Download
+# Download binary for your platform
+curl -L -o tolstoy https://releases.tolstoy.dev/cli/latest/tolstoy-$(uname -s)-$(uname -m)
+
+# Make executable and move to PATH
+chmod +x tolstoy
+sudo mv tolstoy /usr/local/bin/
+
+# Verify installation
+tolstoy version
+```
+</CodeGroup>
+
+### **Auto-Completion Setup**
+
+Enable shell auto-completion for enhanced productivity:
+
+<CodeGroup>
+```bash Bash
+# Generate completion script
+tolstoy completion bash > ~/.tolstoy-completion.bash
+
+# Add to ~/.bashrc
+echo 'source ~/.tolstoy-completion.bash' >> ~/.bashrc
+
+# Reload shell
+source ~/.bashrc
+```
+
+```zsh Zsh
+# Generate completion script
+tolstoy completion zsh > ~/.tolstoy-completion.zsh
+
+# Add to ~/.zshrc
+echo 'source ~/.tolstoy-completion.zsh' >> ~/.zshrc
+
+# Reload shell
+source ~/.zshrc
+```
+
+```fish Fish
+# Generate and install completion
+tolstoy completion fish > ~/.config/fish/completions/tolstoy.fish
+
+# Reload shell
+fish -c "source ~/.config/fish/config.fish"
+```
+
+```powershell PowerShell
+# Generate completion script
+tolstoy completion powershell > $PROFILE.CurrentUserCurrentHost.Substring(0, $PROFILE.CurrentUserCurrentHost.LastIndexOf('\')) + '\Microsoft.PowerShell_profile.ps1'
+
+# Reload PowerShell profile
+. $PROFILE
+```
+</CodeGroup>
+
+## Authentication & Configuration
+
+### **Initial Setup**
+
+Configure the CLI with your Tolstoy credentials:
+
+<Steps>
+  <Step title="Login to Tolstoy">
+    Use interactive login or API key authentication
+    ```bash
+    # Interactive login (recommended)
+    tolstoy auth login
+    
+    # Or use API key
+    tolstoy auth login --api-key sk_live_your_api_key_here
+    ```
+  </Step>
+  <Step title="Select Organization">
+    Choose your default organization
+    ```bash
+    # List available organizations
+    tolstoy orgs list
+    
+    # Set default organization
+    tolstoy config set organization org_123abc456def
+    ```
+  </Step>
+  <Step title="Configure Environment">
+    Set up environment-specific configurations
+    ```bash
+    # Set default environment
+    tolstoy config set environment production
+    
+    # Configure API endpoint (for on-premise)
+    tolstoy config set api-url https://your-tolstoy-instance.com
+    ```
+  </Step>
+  <Step title="Verify Setup">
+    Test your configuration
+    ```bash
+    # Check current user and organization
+    tolstoy auth whoami
+    
+    # Test API connectivity
+    tolstoy flows list --limit 5
+    ```
+  </Step>
+</Steps>
+
+### **Configuration Management**
+
+<Tabs>
+  <Tab title="Global Configuration">
+    **Global Settings**
+    
+    Manage global CLI settings that apply across all projects:
+    
+    ```bash
+    # View current configuration
+    tolstoy config list
+    
+    # Set global defaults
+    tolstoy config set --global api-url https://api.tolstoy.dev
+    tolstoy config set --global timeout 30s
+    tolstoy config set --global output-format json
+    tolstoy config set --global log-level info
+    
+    # Remove configuration
+    tolstoy config unset api-url
+    ```
+    
+    **Configuration File Location:**
+    - macOS/Linux: `~/.tolstoy/config.yaml`
+    - Windows: `%APPDATA%\tolstoy\config.yaml`
+    
+    ```yaml
+    # ~/.tolstoy/config.yaml
+    api_url: https://api.tolstoy.dev
+    organization: org_123abc456def
+    environment: production
+    timeout: 30s
+    output_format: json
+    log_level: info
+    auth:
+      api_key: sk_live_your_api_key_here
+      expires_at: "2024-12-31T23:59:59Z"
+    ```
+  </Tab>
+  
+  <Tab title="Project Configuration">
+    **Project-Specific Settings**
+    
+    Override global settings on a per-project basis:
+    
+    ```bash
+    # Initialize project configuration
+    tolstoy init
+    
+    # Set project-specific settings
+    tolstoy config set organization org_dev_456def789ghi
+    tolstoy config set environment development
+    tolstoy config set flows-directory ./workflows
+    ```
+    
+    **Project Configuration File:**
+    ```yaml
+    # .tolstoy.yaml (project root)
+    organization: org_dev_456def789ghi
+    environment: development
+    flows_directory: ./workflows
+    tools_directory: ./tools
+    templates_directory: ./templates
+    
+    # Environment-specific overrides
+    environments:
+      development:
+        api_url: https://api-dev.tolstoy.dev
+        debug: true
+      staging:
+        api_url: https://api-staging.tolstoy.dev
+      production:
+        api_url: https://api.tolstoy.dev
+        log_level: warn
+    
+    # Default values for workflow creation
+    defaults:
+      flow:
+        timeout: "10m"
+        retry_policy:
+          attempts: 3
+          delay: "30s"
+      action:
+        timeout: "5m"
+    ```
+  </Tab>
+  
+  <Tab title="Environment Management">
+    **Multi-Environment Setup**
+    
+    Manage different environments (dev, staging, production):
+    
+    ```bash
+    # List environments
+    tolstoy env list
+    
+    # Switch environment
+    tolstoy env use staging
+    
+    # Create new environment
+    tolstoy env create testing --copy-from development
+    
+    # Environment-specific commands
+    tolstoy flows list --env production
+    tolstoy flows deploy my-flow --env production --approve
+    
+    # Bulk environment operations
+    tolstoy flows sync --from development --to staging
+    ```
+    
+    **Environment Configuration:**
+    ```bash
+    # Set environment-specific variables
+    tolstoy env set-var DATABASE_URL "postgres://..." --env staging
+    tolstoy env set-var API_TIMEOUT "60s" --env production
+    
+    # List environment variables
+    tolstoy env vars --env staging
+    
+    # Import/export environment variables
+    tolstoy env export staging > staging.env
+    tolstoy env import production < production.env
+    ```
+  </Tab>
+</Tabs>
+
+## Core Commands
+
+### **Flow Management**
+
+Comprehensive workflow management from the command line:
+
+<CodeGroup>
+```bash List & Filter Flows
+# List all flows
+tolstoy flows list
+
+# Filter flows
+tolstoy flows list --status active --tag production
+tolstoy flows list --created-after 2024-01-01
+tolstoy flows list --name-contains "user-onboarding"
+
+# Output formatting
+tolstoy flows list --output table
+tolstoy flows list --output json | jq '.flows[].name'
+tolstoy flows list --output yaml
+```
+
+```bash Create & Deploy Flows
+# Create flow from template
+tolstoy flows create --name "user-onboarding" --template email-workflow
+tolstoy flows create --from-file workflow.yaml
+
+# Deploy flows
+tolstoy flows deploy user-onboarding-flow --env production
+tolstoy flows deploy --all --env staging --dry-run
+
+# Bulk operations
+tolstoy flows deploy --tag "release-v1.2" --env production
+tolstoy flows rollback user-onboarding-flow --to-version 1.4.2
+```
+
+```bash Flow Execution & Testing
+# Execute flow manually
+tolstoy flows execute user-onboarding-flow --input '{"email":"test@example.com"}'
+tolstoy flows execute my-flow --input-file test-data.json
+
+# Test flows
+tolstoy flows test user-onboarding-flow --scenario happy-path
+tolstoy flows test --all --parallel 5
+
+# Debug execution
+tolstoy flows debug execution exec_123abc456def
+tolstoy flows logs user-onboarding-flow --tail --since 1h
+```
+
+```bash Flow Versioning & History
+# Version management
+tolstoy flows versions user-onboarding-flow
+tolstoy flows publish user-onboarding-flow --version 1.5.0
+tolstoy flows rollback user-onboarding-flow --to-version 1.4.2
+
+# Export/import flows
+tolstoy flows export user-onboarding-flow > flow.yaml
+tolstoy flows import < flow.yaml --env staging
+
+# Flow comparison
+tolstoy flows diff user-onboarding-flow --between 1.4.2 1.5.0
+tolstoy flows diff --env production staging
+```
+</CodeGroup>
+
+### **Action Management**
+
+Manage individual workflow actions and build custom action libraries:
+
+<CodeGroup>
+```bash Action Library
+# List available actions
+tolstoy actions list
+tolstoy actions list --category email --provider sendgrid
+tolstoy actions search "database query"
+
+# Action details
+tolstoy actions describe email
+tolstoy actions schema slack_message --output json
+
+# Custom actions
+tolstoy actions create --from-file custom-action.yaml
+tolstoy actions test my-custom-action --input test-data.json
+```
+
+```bash Action Development
+# Scaffold new action
+tolstoy actions scaffold my-action --language typescript
+tolstoy actions scaffold http-request --language python
+
+# Validate action definition
+tolstoy actions validate custom-action.yaml
+tolstoy actions lint ./actions/*.yaml
+
+# Publish actions
+tolstoy actions publish my-custom-action --version 1.0.0
+tolstoy actions unpublish my-custom-action --version 1.0.0
+```
+</CodeGroup>
+
+### **Tool Integration Management**
+
+Connect and manage external service integrations:
+
+<CodeGroup>
+```bash Tool Configuration
+# List available tools
+tolstoy tools list
+tolstoy tools list --category database --status connected
+
+# Connect new tools
+tolstoy tools connect github --interactive
+tolstoy tools connect slack --webhook-url https://hooks.slack.com/...
+
+# Tool authentication
+tolstoy tools auth github --oauth
+tolstoy tools auth database --connection-string "postgres://..."
+tolstoy tools test-connection github
+```
+
+```bash Tool Management
+# Update tool configuration
+tolstoy tools configure slack --channel "#alerts"
+tolstoy tools rotate-keys github
+tolstoy tools disconnect old-database --confirm
+
+# Tool templates
+tolstoy tools template create --from github-integration
+tolstoy tools template apply database-template --tool my-postgres
+```
+</CodeGroup>
+
+### **User & Organization Management**
+
+Manage users, roles, and organizational settings:
+
+<CodeGroup>
+```bash User Management
+# List users
+tolstoy users list --role admin
+tolstoy users list --status active --created-after 2024-01-01
+
+# User operations
+tolstoy users invite user@example.com --role developer
+tolstoy users update user_123 --role admin
+tolstoy users deactivate user_456 --reason "left company"
+
+# Role management
+tolstoy roles list
+tolstoy roles create custom-role --permissions flows:read,actions:execute
+tolstoy users assign-role user_123 custom-role
+```
+
+```bash Organization Settings
+# Organization info
+tolstoy orgs current
+tolstoy orgs list --user current
+
+# Settings management
+tolstoy orgs configure --timezone "America/New_York"
+tolstoy orgs set-quota executions 10000
+tolstoy orgs billing --show-usage
+
+# API key management
+tolstoy api-keys list
+tolstoy api-keys create --name "ci-cd-key" --expires-in 90d
+tolstoy api-keys revoke key_789def012ghi
+```
+</CodeGroup>
+
+### **Monitoring & Observability**
+
+Monitor workflow executions and system performance:
+
+<CodeGroup>
+```bash Execution Monitoring
+# List executions
+tolstoy executions list --status running
+tolstoy executions list --flow user-onboarding --since 24h
+tolstoy executions list --failed --limit 10
+
+# Execution details
+tolstoy executions describe exec_123abc456def
+tolstoy executions logs exec_123abc456def --follow
+tolstoy executions retry exec_123abc456def
+
+# Performance analysis
+tolstoy executions stats --flow user-onboarding --period 7d
+tolstoy executions analyze --bottlenecks --since 1h
+```
+
+```bash Metrics & Analytics
+# System metrics
+tolstoy metrics system --period 1h
+tolstoy metrics flows --top 10 --by execution-count
+tolstoy metrics errors --group-by action --since 24h
+
+# Custom dashboards
+tolstoy dashboards list
+tolstoy dashboards create performance-dashboard --config dashboard.yaml
+tolstoy dashboards export my-dashboard > dashboard-config.yaml
+
+# Alerts
+tolstoy alerts list --active
+tolstoy alerts create high-failure-rate --config alert.yaml
+tolstoy alerts test my-alert --dry-run
+```
+</CodeGroup>
+
+### **Webhook Management**
+
+Configure and manage webhook integrations:
+
+<CodeGroup>
+```bash Webhook Configuration
+# List webhooks
+tolstoy webhooks list --active
+tolstoy webhooks list --url-contains "api.external-system.com"
+
+# Create webhooks
+tolstoy webhooks create --url https://api.example.com/webhook \
+  --events flow.completed,flow.failed \
+  --secret webhook_secret_123
+
+# Test webhooks
+tolstoy webhooks test webhook_abc123def456 --event flow.completed
+tolstoy webhooks logs webhook_abc123def456 --failed-only --since 1h
+
+# Webhook security
+tolstoy webhooks rotate-secret webhook_abc123def456
+tolstoy webhooks verify-signature --payload @payload.json --signature sha256=abc123
+```
+</CodeGroup>
+
+## Advanced Features
+
+### **Scripting & Automation**
+
+Build powerful automation scripts using the CLI:
+
+<Tabs>
+  <Tab title="Bash Scripting">
+    **Deployment Pipeline Script**
+    
+    ```bash
+    #!/bin/bash
+    
+    # deployment.sh - Automated deployment pipeline
+    set -euo pipefail
+    
+    ENVIRONMENT="${1:-staging}"
+    VERSION="${2:-$(git rev-parse --short HEAD)}"
+    
+    echo "Deploying to $ENVIRONMENT (version: $VERSION)"
+    
+    # Validate flows before deployment
+    echo "Validating flows..."
+    tolstoy flows validate --all --strict
+    
+    # Run tests
+    echo "Running flow tests..."
+    tolstoy flows test --all --parallel 5 --env test
+    
+    # Deploy flows
+    echo "Deploying flows to $ENVIRONMENT..."
+    tolstoy flows deploy --all --env "$ENVIRONMENT" --version "$VERSION" --wait
+    
+    # Verify deployment
+    echo "Verifying deployment..."
+    tolstoy flows health-check --env "$ENVIRONMENT" --timeout 5m
+    
+    # Update monitoring
+    echo "Configuring monitoring..."
+    tolstoy alerts enable --env "$ENVIRONMENT"
+    tolstoy dashboards update deployment-dashboard --env "$ENVIRONMENT"
+    
+    echo "Deployment completed successfully!"
+    
+    # Send notification
+    tolstoy webhooks trigger deployment-notification --data '{
+      "environment": "'$ENVIRONMENT'",
+      "version": "'$VERSION'",
+      "status": "success",
+      "deployed_at": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+    }'
+    ```
+  </Tab>
+  
+  <Tab title="PowerShell">
+    **Windows Automation Script**
+    
+    ```powershell
+    # deployment.ps1 - PowerShell deployment script
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory=$false)]
+        [string]$Environment = "staging",
+        
+        [Parameter(Mandatory=$false)]
+        [string]$Version = (git rev-parse --short HEAD)
+    )
+    
+    $ErrorActionPreference = "Stop"
+    
+    Write-Host "Deploying to $Environment (version: $Version)" -ForegroundColor Green
+    
+    try {
+        # Validate flows
+        Write-Host "Validating flows..." -ForegroundColor Yellow
+        tolstoy flows validate --all --strict
+        
+        # Run tests
+        Write-Host "Running flow tests..." -ForegroundColor Yellow
+        $testResult = tolstoy flows test --all --parallel 5 --env test --output json | ConvertFrom-Json
+        
+        if ($testResult.failed_count -gt 0) {
+            throw "Test failures detected. Aborting deployment."
+        }
+        
+        # Deploy flows
+        Write-Host "Deploying flows to $Environment..." -ForegroundColor Yellow
+        tolstoy flows deploy --all --env $Environment --version $Version --wait
+        
+        # Health check
+        Write-Host "Performing health check..." -ForegroundColor Yellow
+        tolstoy flows health-check --env $Environment --timeout 5m
+        
+        Write-Host "Deployment completed successfully!" -ForegroundColor Green
+        
+        # Log deployment
+        $deploymentLog = @{
+            environment = $Environment
+            version = $Version
+            status = "success"
+            deployed_at = (Get-Date -Format "yyyy-MM-ddTHH:mm:ssZ")
+        }
+        
+        $deploymentLog | ConvertTo-Json | Out-File -FilePath "deployment-$Environment-$Version.json"
+        
+    } catch {
+        Write-Error "Deployment failed: $($_.Exception.Message)"
+        
+        # Rollback on failure
+        Write-Host "Rolling back deployment..." -ForegroundColor Red
+        tolstoy flows rollback --all --env $Environment
+        
+        exit 1
+    }
+    ```
+  </Tab>
+  
+  <Tab title="CI/CD Integration">
+    **GitHub Actions Workflow**
+    
+    ```yaml
+    # .github/workflows/deploy.yml
+    name: Deploy Tolstoy Workflows
+    
+    on:
+      push:
+        branches: [main]
+      pull_request:
+        branches: [main]
+    
+    env:
+      TOLSTOY_API_KEY: ${{ secrets.TOLSTOY_API_KEY }}
+    
+    jobs:
+      test:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+          
+          - name: Setup Tolstoy CLI
+            run: |
+              curl -fsSL https://get.tolstoy.dev | bash
+              echo "$HOME/.tolstoy/bin" >> $GITHUB_PATH
+          
+          - name: Authenticate
+            run: tolstoy auth login --api-key $TOLSTOY_API_KEY
+          
+          - name: Validate Flows
+            run: tolstoy flows validate --all --strict
+          
+          - name: Run Tests
+            run: tolstoy flows test --all --parallel 5 --env test
+      
+      deploy-staging:
+        needs: test
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        environment: staging
+        steps:
+          - uses: actions/checkout@v3
+          
+          - name: Setup Tolstoy CLI
+            run: |
+              curl -fsSL https://get.tolstoy.dev | bash
+              echo "$HOME/.tolstoy/bin" >> $GITHUB_PATH
+          
+          - name: Deploy to Staging
+            run: |
+              tolstoy auth login --api-key $TOLSTOY_API_KEY
+              tolstoy flows deploy --all --env staging --version ${{ github.sha }} --wait
+              tolstoy flows health-check --env staging --timeout 5m
+      
+      deploy-production:
+        needs: deploy-staging
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        environment: production
+        steps:
+          - uses: actions/checkout@v3
+          
+          - name: Setup Tolstoy CLI
+            run: |
+              curl -fsSL https://get.tolstoy.dev | bash
+              echo "$HOME/.tolstoy/bin" >> $GITHUB_PATH
+          
+          - name: Deploy to Production
+            run: |
+              tolstoy auth login --api-key $TOLSTOY_API_KEY
+              tolstoy flows deploy --all --env production --version ${{ github.sha }} --wait
+              tolstoy flows health-check --env production --timeout 5m
+          
+          - name: Notify Success
+            run: |
+              tolstoy webhooks trigger deployment-notification --data '{
+                "environment": "production",
+                "version": "${{ github.sha }}",
+                "status": "success",
+                "deployed_at": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'",
+                "deployed_by": "${{ github.actor }}"
+              }'
+    ```
+  </Tab>
+</Tabs>
+
+### **Template & Code Generation**
+
+Accelerate development with templates and code generation:
+
+<CodeGroup>
+```bash Flow Templates
+# List available templates
+tolstoy templates list --category workflow
+tolstoy templates search "email automation"
+
+# Create from template
+tolstoy flows create-from-template email-onboarding \
+  --name "user-welcome-flow" \
+  --vars '{"sender_email":"noreply@company.com"}'
+
+# Custom templates
+tolstoy templates create my-template --from-flow user-onboarding-flow
+tolstoy templates publish my-template --version 1.0.0
+tolstoy templates install community/data-pipeline-template
+```
+
+```bash Code Generation
+# Generate SDK code
+tolstoy codegen client --language typescript --output ./src/tolstoy-client.ts
+tolstoy codegen client --language python --output ./tolstoy_client.py
+
+# Generate workflow stubs
+tolstoy codegen workflow --template rest-api --output ./workflows/
+tolstoy codegen action --name custom-processor --language javascript
+
+# Generate documentation
+tolstoy docs generate --format markdown --output ./docs/
+tolstoy docs generate --format html --theme modern --output ./public/docs/
+```
+</CodeGroup>
+
+### **Plugin System**
+
+Extend CLI functionality with plugins:
+
+<CodeGroup>
+```bash Plugin Management
+# List available plugins
+tolstoy plugins list --official
+tolstoy plugins list --community
+tolstoy plugins search kubernetes
+
+# Install plugins
+tolstoy plugins install kubectl-integration
+tolstoy plugins install @community/terraform-provider
+
+# Plugin usage
+tolstoy kubectl apply --flow-namespace production
+tolstoy terraform plan --sync-with-flows
+```
+
+```bash Custom Plugin Development
+# Create plugin template
+tolstoy plugins scaffold my-plugin --language go
+tolstoy plugins scaffold slack-enhanced --language typescript
+
+# Test plugin locally
+tolstoy plugins test ./my-plugin --dry-run
+tolstoy plugins validate ./my-plugin/plugin.yaml
+
+# Publish plugin
+tolstoy plugins publish my-plugin --version 1.0.0
+tolstoy plugins unpublish my-plugin --version 1.0.0
+```
+</CodeGroup>
+
+## Configuration Files & Project Structure
+
+### **Project Organization**
+
+Structure your Tolstoy projects for maximum productivity:
+
+```
+my-tolstoy-project/
+├── .tolstoy.yaml                 # Project configuration
+├── flows/                        # Workflow definitions
+│   ├── user-onboarding/
+│   │   ├── flow.yaml            # Main flow definition
+│   │   ├── test-scenarios.yaml   # Test cases
+│   │   └── README.md            # Documentation
+│   ├── data-processing/
+│   │   ├── flow.yaml
+│   │   ├── actions/             # Custom actions
+│   │   │   ├── validate-data.js
+│   │   │   └── transform-data.py
+│   │   └── config/              # Environment configs
+│   │       ├── development.yaml
+│   │       ├── staging.yaml
+│   │       └── production.yaml
+│   └── shared/                   # Shared components
+│       ├── actions/
+│       ├── templates/
+│       └── schemas/
+├── tools/                        # Tool configurations
+│   ├── github.yaml
+│   ├── slack.yaml
+│   └── database.yaml
+├── templates/                    # Custom templates
+│   ├── email-workflow/
+│   └── data-pipeline/
+├── scripts/                      # Automation scripts
+│   ├── deploy.sh
+│   ├── test.sh
+│   └── backup.sh
+├── tests/                        # Test files
+│   ├── integration/
+│   ├── unit/
+│   └── fixtures/
+└── docs/                        # Documentation
+    ├── flows/
+    ├── runbooks/
+    └── api-reference/
+```
+
+### **Configuration File Examples**
+
+<Tabs>
+  <Tab title="Flow Definition">
+    **Complete Flow Configuration**
+    
+    ```yaml
+    # flows/user-onboarding/flow.yaml
+    apiVersion: tolstoy.dev/v1
+    kind: Flow
+    metadata:
+      name: user-onboarding
+      version: 1.5.0
+      description: Complete user onboarding workflow
+      labels:
+        team: growth
+        priority: high
+        environment: production
+      annotations:
+        tolstoy.dev/created-by: user@company.com
+        tolstoy.dev/last-updated: "2024-01-15T10:30:00Z"
+    
+    spec:
+      trigger:
+        type: webhook
+        path: /user-signup
+        authentication:
+          type: api_key
+          header: X-API-Key
+        validation:
+          schema: |
+            {
+              "type": "object",
+              "required": ["email", "name"],
+              "properties": {
+                "email": {"type": "string", "format": "email"},
+                "name": {"type": "string", "minLength": 1},
+                "metadata": {"type": "object"}
+              }
+            }
+      
+      variables:
+        - name: user_email
+          value: "{{trigger.body.email}}"
+        - name: user_name  
+          value: "{{trigger.body.name}}"
+        - name: signup_date
+          value: "{{now()}}"
+      
+      steps:
+        - key: validate_user
+          name: Validate User Data
+          action: data_validation
+          inputs:
+            data: "{{trigger.body}}"
+            schema: "user_schema"
+          conditions:
+            - when: "{{trigger.body.email}} != null"
+          retry_policy:
+            attempts: 3
+            delay: 10s
+          timeout: 30s
+        
+        - key: check_existing_user
+          name: Check for Existing User
+          action: database_query
+          inputs:
+            query: "SELECT id FROM users WHERE email = ?"
+            params: ["{{user_email}}"]
+          conditions:
+            - when: "{{validate_user.valid}} == true"
+        
+        - key: create_user_account
+          name: Create User Account
+          action: database_insert
+          inputs:
+            table: users
+            data:
+              email: "{{user_email}}"
+              name: "{{user_name}}"
+              created_at: "{{signup_date}}"
+              status: pending
+          conditions:
+            - when: "{{check_existing_user.rows.length}} == 0"
+        
+        - key: send_welcome_email
+          name: Send Welcome Email
+          action: email
+          inputs:
+            to: "{{user_email}}"
+            subject: "Welcome to {{organization.name}}!"
+            template: welcome_email
+            variables:
+              user_name: "{{user_name}}"
+              verification_url: "{{env.APP_URL}}/verify?token={{create_user_account.verification_token}}"
+          parallel: true
+        
+        - key: update_crm
+          name: Update CRM
+          action: salesforce_create_contact
+          inputs:
+            FirstName: "{{user_name}}"
+            Email: "{{user_email}}"
+            LeadSource: "Website"
+            Status: "New Lead"
+          parallel: true
+          error_handling:
+            continue_on_error: true
+            log_errors: true
+        
+        - key: track_signup_event
+          name: Track Signup Event
+          action: analytics_track
+          inputs:
+            event: user_signed_up
+            properties:
+              user_email: "{{user_email}}"
+              signup_date: "{{signup_date}}"
+              source: "website"
+          parallel: true
+      
+      error_handling:
+        global_retry_policy:
+          attempts: 2
+          delay: 30s
+          backoff: exponential
+        on_error:
+          - action: slack_message
+            inputs:
+              channel: "#alerts"
+              message: "User onboarding failed for {{user_email}}: {{error.message}}"
+      
+      monitoring:
+        sla:
+          completion_time: 5m
+          success_rate: 99%
+        alerts:
+          - condition: execution_time > 5m
+            action: notify_team
+          - condition: failure_rate > 1%
+            action: escalate_oncall
+        metrics:
+          - execution_time
+          - success_rate
+          - user_conversion_rate
+    ```
+  </Tab>
+  
+  <Tab title="Tool Configuration">
+    **Tool Integration Setup**
+    
+    ```yaml
+    # tools/integrations.yaml
+    tools:
+      github:
+        type: github
+        authentication:
+          type: oauth2
+          client_id: "{{env.GITHUB_CLIENT_ID}}"
+          client_secret: "{{env.GITHUB_CLIENT_SECRET}}"
+        configuration:
+          base_url: https://api.github.com
+          default_org: my-company
+          webhook_secret: "{{env.GITHUB_WEBHOOK_SECRET}}"
+        permissions:
+          - repo:read
+          - issues:write
+          - pull_requests:write
+      
+      slack:
+        type: slack  
+        authentication:
+          type: bot_token
+          token: "{{env.SLACK_BOT_TOKEN}}"
+        configuration:
+          default_channel: "#general"
+          mention_users: true
+          thread_replies: false
+        rate_limits:
+          messages_per_minute: 20
+          api_calls_per_minute: 60
+      
+      database:
+        type: postgresql
+        authentication:
+          type: connection_string
+          url: "{{env.DATABASE_URL}}"
+        configuration:
+          max_connections: 10
+          timeout: 30s
+          ssl_mode: require
+        health_check:
+          enabled: true
+          interval: 30s
+          query: "SELECT 1"
+      
+      email_service:
+        type: sendgrid
+        authentication:
+          type: api_key
+          key: "{{env.SENDGRID_API_KEY}}"
+        configuration:
+          from_email: "noreply@company.com"
+          from_name: "Company Name"
+          reply_to: "support@company.com"
+        templates:
+          welcome_email: d-1234567890abcdef
+          password_reset: d-fedcba0987654321
+    ```
+  </Tab>
+  
+  <Tab title="Environment Configuration">
+    **Multi-Environment Setup**
+    
+    ```yaml
+    # .tolstoy.yaml
+    organization: org_123abc456def
+    
+    environments:
+      development:
+        api_url: https://api-dev.tolstoy.dev
+        organization: org_dev_456def789ghi
+        debug: true
+        log_level: debug
+        variables:
+          APP_URL: https://app-dev.company.com
+          DATABASE_URL: postgres://localhost:5432/tolstoy_dev
+          REDIS_URL: redis://localhost:6379/0
+      
+      staging:
+        api_url: https://api-staging.tolstoy.dev
+        organization: org_staging_789ghi012jkl
+        debug: false
+        log_level: info
+        variables:
+          APP_URL: https://app-staging.company.com
+          DATABASE_URL: "{{env.STAGING_DATABASE_URL}}"
+          REDIS_URL: "{{env.STAGING_REDIS_URL}}"
+      
+      production:
+        api_url: https://api.tolstoy.dev
+        organization: org_prod_012jkl345mno
+        debug: false
+        log_level: warn
+        variables:
+          APP_URL: https://app.company.com
+          DATABASE_URL: "{{env.PRODUCTION_DATABASE_URL}}"
+          REDIS_URL: "{{env.PRODUCTION_REDIS_URL}}"
+    
+    defaults:
+      flow:
+        timeout: 10m
+        retry_policy:
+          attempts: 3
+          delay: 30s
+          backoff: exponential
+        monitoring:
+          enabled: true
+          sla:
+            completion_time: 5m
+            success_rate: 99%
+      
+      action:
+        timeout: 5m
+        retry_policy:
+          attempts: 2
+          delay: 10s
+    
+    directories:
+      flows: ./flows
+      actions: ./actions
+      tools: ./tools
+      templates: ./templates
+      tests: ./tests
+      docs: ./docs
+    
+    # CLI-specific settings
+    cli:
+      output_format: table
+      auto_approve: false
+      parallel_executions: 5
+      default_timeout: 30s
+    ```
+  </Tab>
+</Tabs>
+
+## Debugging & Troubleshooting
+
+### **Debug Mode & Logging**
+
+<Tabs>
+  <Tab title="Debug Commands">
+    **Enable Debug Output**
+    
+    ```bash
+    # Global debug mode
+    tolstoy config set log-level debug
+    
+    # Per-command debug
+    tolstoy flows list --debug --verbose
+    tolstoy flows execute my-flow --debug --log-level trace
+    
+    # Debug specific execution
+    tolstoy executions debug exec_123abc456def --step-by-step
+    tolstoy executions replay exec_123abc456def --debug
+    
+    # Network debugging
+    tolstoy flows list --debug-http --show-request --show-response
+    ```
+    
+    **Debug Output Examples:**
+    ```
+    DEBUG[2024-01-15 10:30:00] HTTP Request: GET /v1/flows
+    DEBUG[2024-01-15 10:30:00] Headers: Authorization=Bearer sk_live_***
+    DEBUG[2024-01-15 10:30:00] Response Status: 200 OK
+    DEBUG[2024-01-15 10:30:00] Response Body: {"flows": [...]}
+    DEBUG[2024-01-15 10:30:01] Execution Time: 234ms
+    ```
+  </Tab>
+  
+  <Tab title="Log Analysis">
+    **Log Commands**
+    
+    ```bash
+    # Stream logs in real-time
+    tolstoy logs --follow --since 10m
+    tolstoy flows logs my-flow --tail --filter error
+    
+    # Execution-specific logs
+    tolstoy executions logs exec_123abc456def --format json
+    tolstoy executions logs exec_123abc456def --step validate_user
+    
+    # Aggregate log analysis
+    tolstoy logs analyze --period 24h --group-by error_type
+    tolstoy logs search "database timeout" --since 1h
+    ```
+    
+    **Log Filtering:**
+    ```bash
+    # Filter by level
+    tolstoy logs --level error --since 1h
+    
+    # Filter by component
+    tolstoy logs --component execution-engine --filter "step_failed"
+    
+    # Custom queries
+    tolstoy logs query 'level:ERROR AND message:timeout' --count
+    ```
+  </Tab>
+  
+  <Tab title="Performance Analysis">
+    **Performance Debugging**
+    
+    ```bash
+    # Execution performance analysis
+    tolstoy executions analyze exec_123abc456def --bottlenecks
+    tolstoy executions profile my-flow --period 7d --percentiles
+    
+    # Flow performance comparison
+    tolstoy flows compare my-flow --versions 1.4.0,1.5.0 --metric execution_time
+    
+    # System performance
+    tolstoy system metrics --detailed --period 1h
+    tolstoy system health --all-components
+    ```
+    
+    **Performance Reports:**
+    ```bash
+    # Generate performance report
+    tolstoy performance report --flow my-flow --output performance-report.html
+    
+    # Resource usage analysis
+    tolstoy resources analyze --top 10 --by cpu_time
+    tolstoy resources optimize --recommendations
+    ```
+  </Tab>
+</Tabs>
+
+### **Common Issues & Solutions**
+
+<Accordion>
+  <AccordionItem title="Authentication Issues">
+    **Problem:** Authentication failures or expired tokens
+    
+    ```bash
+    # Check current authentication status
+    tolstoy auth whoami
+    
+    # Refresh authentication
+    tolstoy auth refresh
+    
+    # Re-authenticate
+    tolstoy auth logout
+    tolstoy auth login
+    
+    # Check API key validity
+    tolstoy auth verify --api-key sk_live_your_key
+    ```
+    
+    **Common Causes:**
+    - Expired API key or token
+    - Incorrect organization context
+    - Network connectivity issues
+    - Invalid credentials in configuration
+  </AccordionItem>
+  
+  <AccordionItem title="Flow Execution Failures">
+    **Problem:** Workflows failing during execution
+    
+    ```bash
+    # Debug specific execution
+    tolstoy executions debug exec_123abc456def --verbose
+    
+    # Check execution logs
+    tolstoy executions logs exec_123abc456def --all-steps
+    
+    # Validate flow definition
+    tolstoy flows validate my-flow --strict
+    
+    # Test with mock data
+    tolstoy flows test my-flow --dry-run --input-file test-data.json
+    ```
+    
+    **Debugging Steps:**
+    1. Check action configurations and inputs
+    2. Verify tool connections and authentication
+    3. Validate input data schemas
+    4. Review error messages and stack traces
+  </AccordionItem>
+  
+  <AccordionItem title="Performance Issues">
+    **Problem:** Slow execution or timeouts
+    
+    ```bash
+    # Analyze performance bottlenecks
+    tolstoy executions profile my-flow --bottlenecks --since 24h
+    
+    # Check system resources
+    tolstoy system metrics --resource-usage --period 1h
+    
+    # Optimize flow configuration
+    tolstoy flows optimize my-flow --recommendations
+    
+    # Test with performance monitoring
+    tolstoy flows execute my-flow --monitor-performance
+    ```
+    
+    **Optimization Tips:**
+    - Use parallel execution where possible
+    - Implement proper retry policies
+    - Optimize database queries and API calls
+    - Use caching for frequently accessed data
+  </AccordionItem>
+  
+  <AccordionItem title="Configuration Issues">
+    **Problem:** CLI configuration or environment setup issues
+    
+    ```bash
+    # Validate configuration
+    tolstoy config validate --all-environments
+    
+    # Reset configuration
+    tolstoy config reset --confirm
+    
+    # Check environment variables
+    tolstoy env vars --show-resolved --env staging
+    
+    # Verify tool connections
+    tolstoy tools test-connection --all
+    ```
+    
+    **Configuration Checklist:**
+    1. API credentials are correct
+    2. Organization and environment settings
+    3. Tool authentication and permissions
+    4. Network and firewall settings
+  </AccordionItem>
+</Accordion>
+
+## Best Practices
+
+### **CLI Workflow Best Practices**
+
+<CardGroup cols={2}>
+  <Card title="Version Control" icon="code-branch">
+    **Track Your Workflows**
+    - Store all flow definitions in version control
+    - Use meaningful commit messages
+    - Tag releases with semantic versioning
+    - Maintain separate branches for environments
+  </Card>
+  <Card title="Environment Management" icon="server">
+    **Multi-Environment Strategy**  
+    - Use consistent naming conventions
+    - Separate configurations per environment
+    - Implement proper promotion workflows
+    - Use environment-specific secrets
+  </Card>
+</CardGroup>
+
+### **Security Best Practices**
+
+<Tabs>
+  <Tab title="API Key Management">
+    **Secure Key Handling**
+    
+    ```bash
+    # Use environment variables for API keys
+    export TOLSTOY_API_KEY=sk_live_your_key_here
+    
+    # Set key expiration
+    tolstoy api-keys create --name production --expires-in 90d
+    
+    # Rotate keys regularly
+    tolstoy api-keys rotate production-key --generate-new
+    
+    # Use key-specific permissions
+    tolstoy api-keys create --name ci-cd --permissions flows:deploy,executions:read
+    ```
+    
+    **Key Storage:**
+    - Never commit API keys to version control
+    - Use secure secret management systems
+    - Implement key rotation policies
+    - Monitor key usage and access
+  </Tab>
+  
+  <Tab title="Access Control">
+    **Role-Based Security**
+    
+    ```bash
+    # Create role-specific API keys
+    tolstoy api-keys create --name readonly-key --role viewer
+    tolstoy api-keys create --name deploy-key --role deployer
+    
+    # Audit user access
+    tolstoy users audit --show-permissions --export audit.csv
+    
+    # Monitor access patterns
+    tolstoy logs search "auth_failed" --since 24h --alert-on-threshold 10
+    ```
+  </Tab>
+  
+  <Tab title="Network Security">
+    **Secure Communication**
+    
+    ```bash
+    # Use HTTPS endpoints only
+    tolstoy config set api-url https://api.tolstoy.dev
+    
+    # Configure proxy settings
+    tolstoy config set proxy https://corporate-proxy:8080
+    
+    # Enable certificate validation
+    tolstoy config set verify-ssl true
+    
+    # Set up IP restrictions
+    tolstoy orgs configure --allowed-ips "10.0.0.0/8,192.168.0.0/16"
+    ```
+  </Tab>
+</Tabs>
+
+### **Development Workflow**
+
+<Steps>
+  <Step title="Local Development">
+    Set up local development environment with test data and mock services
+    ```bash
+    tolstoy init --template starter-project
+    tolstoy env create local --copy-from development
+    tolstoy tools mock --all --local
+    ```
+  </Step>
+  <Step title="Testing">
+    Implement comprehensive testing before deployment
+    ```bash
+    tolstoy flows test --all --coverage --parallel 5
+    tolstoy flows validate --strict --lint
+    tolstoy security scan --workflows --tools
+    ```
+  </Step>
+  <Step title="Staging Deployment">
+    Deploy to staging environment for integration testing
+    ```bash
+    tolstoy flows deploy --all --env staging --wait
+    tolstoy flows health-check --env staging --timeout 5m
+    tolstoy flows test --integration --env staging
+    ```
+  </Step>
+  <Step title="Production Deployment">
+    Deploy to production with proper monitoring and rollback capability
+    ```bash
+    tolstoy flows deploy --all --env production --approve --wait
+    tolstoy monitors enable --env production
+    tolstoy alerts configure --production-alerts
+    ```
+  </Step>
+</Steps>
+
+## CLI Reference Quick Guide
+
+### **Essential Commands Cheat Sheet**
+
+<CodeGroup>
+```bash Authentication
+# Login/logout
+tolstoy auth login
+tolstoy auth logout
+tolstoy auth whoami
+
+# API keys
+tolstoy api-keys list
+tolstoy api-keys create --name "my-key"
+tolstoy api-keys revoke key_abc123
+```
+
+```bash Flow Management
+# List and filter
+tolstoy flows list --status active
+tolstoy flows list --tag production
+
+# Create and deploy
+tolstoy flows create --from-file flow.yaml
+tolstoy flows deploy my-flow --env production
+
+# Execute and test
+tolstoy flows execute my-flow --input '{...}'
+tolstoy flows test my-flow --scenario happy-path
+```
+
+```bash Monitoring
+# Executions
+tolstoy executions list --failed --since 1h
+tolstoy executions logs exec_123 --follow
+
+# Metrics
+tolstoy metrics flows --top 10
+tolstoy metrics system --period 24h
+
+# Alerts
+tolstoy alerts list --active
+tolstoy alerts create --config alert.yaml
+```
+
+```bash Configuration
+# Environment management
+tolstoy env list
+tolstoy env use staging
+tolstoy config set organization org_123
+
+# Tool management
+tolstoy tools list --connected
+tolstoy tools connect github --oauth
+tolstoy tools test-connection database
+```
+</CodeGroup>
+
+### **Global Flags**
+
+| Flag | Description | Example |
+|------|-------------|---------|
+| `--debug` | Enable debug output | `tolstoy flows list --debug` |
+| `--output` | Output format (table, json, yaml) | `tolstoy flows list --output json` |
+| `--env` | Specify environment | `tolstoy flows deploy --env production` |
+| `--org` | Specify organization | `tolstoy flows list --org org_123` |
+| `--config` | Custom config file | `tolstoy --config ~/.tolstoy/custom.yaml` |
+| `--no-color` | Disable colored output | `tolstoy flows list --no-color` |
+| `--verbose` | Verbose output | `tolstoy flows test --verbose` |
+| `--quiet` | Suppress output | `tolstoy flows deploy --quiet` |
+
+## Getting Help & Support
+
+### **Built-in Help System**
+
+<CodeGroup>
+```bash Command Help
+# General help
+tolstoy help
+tolstoy --help
+
+# Command-specific help
+tolstoy flows --help
+tolstoy flows create --help
+
+# Subcommand help
+tolstoy auth login --help
+tolstoy executions debug --help
+```
+
+```bash Documentation
+# Open documentation
+tolstoy docs open
+tolstoy docs search "webhook setup"
+
+# Generate local docs
+tolstoy docs generate --output ./docs
+tolstoy docs serve --port 8080
+```
+</CodeGroup>
+
+### **Community Resources**
+
+<CardGroup cols={3}>
+  <Card title="Documentation" icon="book" href="/docs">
+    Comprehensive guides, tutorials, and API reference documentation
+  </Card>
+  <Card title="GitHub Repository" icon="github" href="https://github.com/tolstoy/cli">
+    Source code, issues, and contribution guidelines
+  </Card>
+  <Card title="Community Forum" icon="comments" href="https://community.tolstoy.dev">
+    Ask questions and share knowledge with the community
+  </Card>
+</CardGroup>
+
+### **Professional Support**
+
+For enterprise customers and complex use cases:
+
+- **Priority Support** - Dedicated support team with SLA guarantees
+- **Professional Services** - Implementation consulting and custom development
+- **Training Programs** - On-site training and certification programs
+- **Architecture Review** - Best practices assessment and optimization recommendations
+
+Contact [support@tolstoy.dev](mailto:support@tolstoy.dev) for more information.
+
+---
+
+*Get started with the Tolstoy CLI today and supercharge your workflow automation development!*

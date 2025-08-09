@@ -1,0 +1,72 @@
+---
+title: Executions API
+description: Monitor and manage workflow executions
+---
+
+# Executions API
+
+The Executions API allows you to monitor, manage, and retrieve information about workflow executions. When you execute a flow, it creates an execution record that tracks the progress and results of each step.
+
+## Execution Object
+
+An execution represents a single run of a workflow with specific inputs.
+
+### Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `id` | string | Unique identifier for the execution |
+| `flow_id` | string | ID of the flow being executed |
+| `status` | enum | Current status (`queued`, `running`, `completed`, `failed`, `cancelled`) |
+| `inputs` | object | Input parameters provided to the execution |
+| `outputs` | object | Final outputs from the execution (available when completed) |
+| `steps` | array | Array of step execution details |
+| `created_at` | timestamp | When the execution was started |
+| `completed_at` | timestamp | When the execution finished (null if still running) |
+
+## Get an Execution
+
+Retrieve details of a specific execution.
+
+```bash
+curl https://api.tolstoy.dev/v1/executions/exec_1234567890 \
+  -H "Authorization: Bearer sk_live_..."
+```
+
+## List Executions
+
+Retrieve a list of executions with optional filtering.
+
+```bash
+curl https://api.tolstoy.dev/v1/executions \
+  -H "Authorization: Bearer sk_live_..."
+```
+
+## Cancel an Execution
+
+Stop a running execution.
+
+```bash
+curl -X POST https://api.tolstoy.dev/v1/executions/exec_1234567890/cancel \
+  -H "Authorization: Bearer sk_live_..."
+```
+
+## Stream Execution Updates
+
+Get real-time updates for an execution using Server-Sent Events.
+
+```bash
+curl https://api.tolstoy.dev/v1/executions/exec_1234567890/stream \
+  -H "Authorization: Bearer sk_live_..."
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Flows API" icon="diagram-project" href="/api-reference/flows">
+    Create and manage workflows
+  </Card>
+  <Card title="Actions API" icon="play" href="/api-reference/actions">
+    Explore available actions
+  </Card>
+</CardGroup>

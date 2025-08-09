@@ -1,318 +1,3229 @@
 ---
-title: Overview
-sidebar_position: 1
+title: "SDK Overview"
+description: "Comprehensive guide to Tolstoy SDKs for seamless workflow automation integration across popular programming languages"
 ---
 
-# Tolstoy TypeScript SDK
+# SDK Overview
 
-The official TypeScript SDK for the Tolstoy workflow automation platform. Build powerful integrations with type safety and modern JavaScript/TypeScript patterns.
+The Tolstoy SDKs provide powerful, type-safe, and developer-friendly interfaces for integrating workflow automation into your applications. Built with modern development practices and designed for production use, our SDKs offer comprehensive functionality while maintaining simplicity and reliability.
 
-## Why Use the Tolstoy SDK?
+<img
+  className="block dark:hidden"
+  src="/images/sdk-hero-light.png"
+  alt="Tolstoy SDK Overview Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/sdk-hero-dark.png"
+  alt="Tolstoy SDK Overview Dark"
+/>
 
-- **🔒 Multi-tenant Ready**: Built-in support for organization and user context
-- **🔐 OAuth2 Authentication**: Full support for 7 major OAuth2 providers with auto-refresh
-- **📝 Full Type Safety**: Complete TypeScript support with IntelliSense
-- **⚡ Action Execution**: Direct action execution with automatic credential injection
-- **📊 Monitoring Ready**: Built-in Prometheus metrics and health monitoring
-- **🎯 Simple & Powerful**: Helper methods for common tasks + raw API access
-- **⚡ Production Ready**: Comprehensive error handling and testing
-- **🔄 Always Current**: Auto-generated from OpenAPI specification
+## Why Choose Tolstoy SDKs?
 
-## Quick Overview
+<CardGroup cols={2}>
+  <Card title="Type Safety" icon="shield-check">
+    Full TypeScript definitions and compile-time type checking across all SDKs, ensuring robust and reliable integrations.
+  </Card>
+  <Card title="Developer Experience" icon="heart">
+    Intuitive APIs, comprehensive documentation, and extensive code examples for rapid development and easy maintenance.
+  </Card>
+  <Card title="Production Ready" icon="gear">
+    Built-in retry logic, error handling, caching, and monitoring features designed for enterprise-scale applications.
+  </Card>
+  <Card title="Multi-Language Support" icon="globe">
+    Consistent APIs across JavaScript, Python, Go, Rust, and more, enabling teams to work in their preferred languages.
+  </Card>
+</CardGroup>
 
-```typescript
-import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+## Available SDKs
 
-const client = new TolstoyClient(
-  'https://tolstoy.getpullse.com',
-  'your-org-id',
-  'your-user-id'
-);
+<Tabs>
+  <Tab title="JavaScript/TypeScript">
+    **@tolstoy/sdk** - The flagship SDK with complete TypeScript support
+    
+    <CardGroup cols={2}>
+      <Card title="Installation" icon="download">
+        ```bash
+        npm install @tolstoy/sdk
+        # or
+        yarn add @tolstoy/sdk
+        # or  
+        pnpm add @tolstoy/sdk
+        ```
+      </Card>
+      <Card title="Features" icon="star">
+        - Full TypeScript definitions
+        - Async/await and Promise support
+        - Automatic retries and exponential backoff
+        - Built-in caching and request deduplication
+        - WebSocket support for real-time updates
+        - Comprehensive error handling
+      </Card>
+    </Tabs>
+    
+    **Quick Start:**
+    ```typescript
+    import { TolstoyClient } from '@tolstoy/sdk';
+    
+    const client = new TolstoyClient({
+      apiKey: process.env.TOLSTOY_API_KEY,
+      environment: 'production'
+    });
+    
+    // Create and execute a workflow
+    const flow = await client.flows.create({
+      name: 'User Onboarding',
+      steps: [
+        {
+          key: 'send_welcome_email',
+          action: 'email',
+          inputs: {
+            to: '{{inputs.email}}',
+            subject: 'Welcome to our platform!',
+            template: 'welcome'
+          }
+        }
+      ]
+    });
+    
+    const execution = await client.flows.execute(flow.id, {
+      inputs: { email: 'user@example.com' }
+    });
+    ```
+    
+    **Advanced Configuration:**
+    ```typescript
+    const client = new TolstoyClient({
+      apiKey: process.env.TOLSTOY_API_KEY,
+      baseUrl: 'https://api.tolstoy.dev/v1',
+      timeout: 30000,
+      retryConfig: {
+        attempts: 3,
+        delay: 1000,
+        backoff: 'exponential',
+        retryCondition: (error) => error.status >= 500
+      },
+      cache: {
+        enabled: true,
+        ttl: 300000, // 5 minutes
+        maxSize: 1000
+      },
+      logging: {
+        level: 'info',
+        enableRequestLogging: true,
+        enableResponseLogging: false
+      }
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Python">
+    **tolstoy-python** - Pythonic SDK with sync and async support
+    
+    <CardGroup cols={2}>
+      <Card title="Installation" icon="download">
+        ```bash
+        pip install tolstoy-python
+        # or
+        poetry add tolstoy-python
+        # or
+        pipenv install tolstoy-python
+        ```
+      </Card>
+      <Card title="Features" icon="star">
+        - Type hints and modern Python features
+        - Sync and async client implementations
+        - Automatic request retries
+        - Comprehensive error handling
+        - Built-in logging and debugging
+        - Django and Flask integrations
+      </Card>
+    </CardGroup>
+    
+    **Synchronous Usage:**
+    ```python
+    from tolstoy import TolstoyClient
+    
+    client = TolstoyClient(api_key=os.environ['TOLSTOY_API_KEY'])
+    
+    # Create a workflow
+    flow = client.flows.create({
+        'name': 'User Onboarding',
+        'steps': [
+            {
+                'key': 'send_welcome_email',
+                'action': 'email',
+                'inputs': {
+                    'to': '{{inputs.email}}',
+                    'subject': 'Welcome!',
+                    'template': 'welcome'
+                }
+            }
+        ]
+    })
+    
+    # Execute workflow
+    execution = client.flows.execute(flow.id, {
+        'inputs': {'email': 'user@example.com'}
+    })
+    
+    print(f"Execution started: {execution.id}")
+    ```
+    
+    **Asynchronous Usage:**
+    ```python
+    import asyncio
+    from tolstoy import AsyncTolstoyClient
+    
+    async def main():
+        client = AsyncTolstoyClient(api_key=os.environ['TOLSTOY_API_KEY'])
+        
+        # Create multiple flows concurrently
+        flows = await asyncio.gather(
+            client.flows.create({'name': 'Flow 1', 'steps': [...]}),
+            client.flows.create({'name': 'Flow 2', 'steps': [...]}),
+            client.flows.create({'name': 'Flow 3', 'steps': [...]})
+        )
+        
+        # Execute them in parallel
+        executions = await asyncio.gather(
+            *[client.flows.execute(flow.id, {'inputs': {}}) for flow in flows]
+        )
+        
+        # Wait for all to complete
+        results = await asyncio.gather(
+            *[client.executions.wait_for_completion(exec.id) for exec in executions]
+        )
+        
+        return results
+    
+    # Run async function
+    results = asyncio.run(main())
+    ```
+  </Tab>
+  
+  <Tab title="Go">
+    **tolstoy-go** - High-performance Go SDK with idiomatic interfaces
+    
+    <CardGroup cols={2}>
+      <Card title="Installation" icon="download">
+        ```bash
+        go get -u github.com/tolstoy/tolstoy-go
+        ```
+      </Card>
+      <Card title="Features" icon="star">
+        - Idiomatic Go interfaces and patterns
+        - Context-based request cancellation
+        - Structured logging integration
+        - Built-in metrics and tracing
+        - Comprehensive error types
+        - Connection pooling and reuse
+      </Card>
+    </CardGroup>
+    
+    **Basic Usage:**
+    ```go
+    package main
+    
+    import (
+        "context"
+        "log"
+        "os"
+        "time"
+        
+        "github.com/tolstoy/tolstoy-go"
+    )
+    
+    func main() {
+        client := tolstoy.NewClient(&tolstoy.Config{
+            APIKey: os.Getenv("TOLSTOY_API_KEY"),
+            Timeout: 30 * time.Second,
+        })
+        
+        ctx := context.Background()
+        
+        // Create a workflow
+        flow, err := client.Flows.Create(ctx, &tolstoy.CreateFlowRequest{
+            Name: "User Onboarding",
+            Steps: []tolstoy.FlowStep{
+                {
+                    Key:    "send_welcome_email",
+                    Action: "email",
+                    Inputs: map[string]interface{}{
+                        "to":       "{{inputs.email}}",
+                        "subject":  "Welcome!",
+                        "template": "welcome",
+                    },
+                },
+            },
+        })
+        if err != nil {
+            log.Fatalf("Failed to create flow: %v", err)
+        }
+        
+        // Execute workflow
+        execution, err := client.Flows.Execute(ctx, flow.ID, &tolstoy.ExecuteFlowRequest{
+            Inputs: map[string]interface{}{
+                "email": "user@example.com",
+            },
+        })
+        if err != nil {
+            log.Fatalf("Failed to execute flow: %v", err)
+        }
+        
+        log.Printf("Execution started: %s", execution.ID)
+    }
+    ```
+    
+    **Advanced Configuration:**
+    ```go
+    client := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:  os.Getenv("TOLSTOY_API_KEY"),
+        BaseURL: "https://api.tolstoy.dev/v1",
+        Timeout: 30 * time.Second,
+        RetryConfig: &tolstoy.RetryConfig{
+            Attempts:    3,
+            Delay:       time.Second,
+            MaxDelay:    10 * time.Second,
+            Backoff:     tolstoy.ExponentialBackoff,
+            RetryOn:     []int{500, 502, 503, 504},
+        },
+        HTTPClient: &http.Client{
+            Timeout: 30 * time.Second,
+            Transport: &http.Transport{
+                MaxIdleConns:       10,
+                IdleConnTimeout:    90 * time.Second,
+                DisableCompression: false,
+            },
+        },
+        Logger: logrus.StandardLogger(),
+    })
+    ```
+  </Tab>
+  
+  <Tab title="Rust">
+    **tolstoy-rust** - Memory-safe SDK with zero-copy deserialization
+    
+    <CardGroup cols={2}>
+      <Card title="Installation" icon="download">
+        ```toml
+        [dependencies]
+        tolstoy = "0.3.0"
+        tokio = { version = "1.0", features = ["full"] }
+        serde = { version = "1.0", features = ["derive"] }
+        ```
+      </Card>
+      <Card title="Features" icon="star">
+        - Memory safety and zero-cost abstractions
+        - Full async/await support with Tokio
+        - Compile-time type safety
+        - Zero-copy JSON deserialization
+        - Built-in tracing and metrics
+        - Comprehensive error handling
+      </Card>
+    </CardGroup>
+    
+    **Basic Usage:**
+    ```rust
+    use tolstoy::{TolstoyClient, CreateFlowRequest, FlowStep, ExecuteFlowRequest};
+    use std::collections::HashMap;
+    use std::env;
+    
+    #[tokio::main]
+    async fn main() -> Result<(), Box<dyn std::error::Error>> {
+        let client = TolstoyClient::new(&env::var("TOLSTOY_API_KEY")?);
+        
+        // Create workflow
+        let mut inputs = HashMap::new();
+        inputs.insert("to".to_string(), "{{inputs.email}}".to_string());
+        inputs.insert("subject".to_string(), "Welcome!".to_string());
+        inputs.insert("template".to_string(), "welcome".to_string());
+        
+        let flow = client.flows().create(CreateFlowRequest {
+            name: "User Onboarding".to_string(),
+            steps: vec![FlowStep {
+                key: "send_welcome_email".to_string(),
+                action: "email".to_string(),
+                inputs,
+                ..Default::default()
+            }],
+            ..Default::default()
+        }).await?;
+        
+        // Execute workflow
+        let mut execution_inputs = HashMap::new();
+        execution_inputs.insert("email".to_string(), "user@example.com".to_string());
+        
+        let execution = client.flows().execute(&flow.id, ExecuteFlowRequest {
+            inputs: Some(execution_inputs),
+            ..Default::default()
+        }).await?;
+        
+        println!("Execution started: {}", execution.id);
+        Ok(())
+    }
+    ```
+    
+    **With Custom Configuration:**
+    ```rust
+    use tolstoy::{TolstoyClient, ClientConfig, RetryConfig};
+    use std::time::Duration;
+    
+    let client = TolstoyClient::with_config(
+        &env::var("TOLSTOY_API_KEY")?,
+        ClientConfig {
+            base_url: Some("https://api.tolstoy.dev/v1".to_string()),
+            timeout: Some(Duration::from_secs(30)),
+            retry_config: Some(RetryConfig {
+                attempts: 3,
+                delay: Duration::from_millis(1000),
+                max_delay: Some(Duration::from_secs(10)),
+                backoff_multiplier: 2.0,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
+    );
+    ```
+  </Tab>
+  
+  <Tab title="Additional Languages">
+    **Community & Enterprise SDKs**
+    
+    <CardGroup cols={2}>
+      <Card title="Java" icon="coffee">
+        **tolstoy-java** - Enterprise Java SDK
+        ```xml
+        <dependency>
+          <groupId>dev.tolstoy</groupId>
+          <artifactId>tolstoy-java-sdk</artifactId>
+          <version>1.2.0</version>
+        </dependency>
+        ```
+        - Spring Boot integration
+        - Reactive streams support
+        - Comprehensive logging
+      </Card>
+      <Card title="C#/.NET" icon="microsoft">
+        **Tolstoy.SDK** - .NET SDK
+        ```bash
+        dotnet add package Tolstoy.SDK
+        ```
+        - Async/await patterns
+        - Dependency injection support
+        - Entity Framework integration
+      </Card>
+      <Card title="PHP" icon="php">
+        **tolstoy/php-sdk** - PHP SDK
+        ```bash
+        composer require tolstoy/php-sdk
+        ```
+        - PSR-4 autoloading
+        - Laravel integration
+        - Guzzle HTTP client
+      </Card>
+      <Card title="Ruby" icon="gem">
+        **tolstoy-ruby** - Ruby gem
+        ```ruby
+        gem 'tolstoy-ruby'
+        ```
+        - Rails integration
+        - ActiveJob background processing
+        - Comprehensive testing utilities
+      </Card>
+    </CardGroup>
+    
+    **Request New Language:**
+    Don't see your preferred language? [Request a new SDK](https://github.com/tolstoy/sdk-requests/issues/new) or contribute to our community SDK development program.
+  </Tab>
+</Tabs>
 
-// OAuth2 Authentication Setup
-await client.configureOAuth2({
-  toolId: 'github-tool-id',
-  provider: 'github',
-  clientId: 'your-github-client-id',
-  clientSecret: 'your-github-client-secret',
-  redirectUri: 'https://your-app.com/callback'
+## Core SDK Features
+
+<CardGroup cols={2}>
+  <Card title="Unified API Interface" icon="layer-group">
+    **Consistent Experience Across Languages**
+    - Identical method names and patterns
+    - Same parameter structures
+    - Unified error handling approach
+    - Consistent authentication flow
+  </Card>
+  <Card title="Advanced Error Handling" icon="shield-alt">
+    **Comprehensive Error Management**
+    - Structured error types with detailed information
+    - Automatic retry with configurable policies
+    - Circuit breaker pattern for resilience  
+    - Custom error recovery strategies
+  </Card>
+  <Card title="Performance Optimization" icon="tachometer-alt">
+    **Built-in Performance Features**
+    - Request caching and deduplication
+    - Connection pooling and reuse
+    - Compressed request/response handling
+    - Efficient pagination and streaming
+  </Card>
+  <Card title="Developer Experience" icon="code">
+    **Enhanced Development Workflow**
+    - IDE auto-completion and IntelliSense
+    - Comprehensive TypeScript definitions
+    - Built-in debugging and logging
+    - Extensive code examples and docs
+  </Card>
+</CardGroup>
+
+### Authentication & Security
+
+All SDKs provide secure, production-ready authentication:
+
+<CodeGroup>
+```typescript TypeScript - API Key
+const client = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  environment: 'production',
+  security: {
+    validateSSL: true,
+    timeout: 30000,
+    userAgent: 'MyApp/1.0.0'
+  }
 });
 
-// Execute workflows with automatic auth injection
-const execution = await client.runFlow('flow_123', {
-  userId: 'user_456',
-  email: 'user@example.com'
+// Automatic key rotation support
+client.on('keyExpired', async () => {
+  await client.rotateApiKey(newKey);
 });
-
-// Execute standalone actions
-const actionResult = await client.executeAction('github-create-issue', {
-  title: 'Bug Report',
-  body: 'Found an issue with the authentication flow',
-  labels: ['bug', 'priority-high']
-});
-
-// Monitor system health
-const health = await client.getDetailedHealth();
-console.log(`System status: ${health.database.status}`);
 ```
 
-## Key Features
+```python Python - OAuth2 Flow
+from tolstoy import TolstoyClient, OAuth2Config
 
-### 🔐 OAuth2 Authentication
-Full OAuth2 integration with automatic token refresh for GitHub, Google, Microsoft, Slack, Discord, LinkedIn, and Facebook.
+# OAuth2 configuration
+oauth_config = OAuth2Config(
+    client_id=os.environ['TOLSTOY_CLIENT_ID'],
+    client_secret=os.environ['TOLSTOY_CLIENT_SECRET'],
+    redirect_uri='https://myapp.com/oauth/callback',
+    scopes=['flows:read', 'flows:execute']
+)
 
-### ⚡ Action Execution
-Execute individual actions directly with automatic credential injection and comprehensive input validation.
+client = TolstoyClient(oauth_config=oauth_config)
 
-### 📊 Health Monitoring
-Multi-level health checks with detailed system metrics, database status, and Redis connection monitoring.
+# Handle OAuth2 flow
+auth_url = client.get_authorization_url()
+# Redirect user to auth_url, then handle callback
+token = client.exchange_code_for_token(authorization_code)
+```
 
-### ⚡ Workflow Automation
-Execute and monitor workflows with full type safety. Support for both synchronous and asynchronous execution modes.
+```go Go - Context-based Auth
+ctx := context.WithValue(context.Background(), tolstoy.APIKeyContextKey, apiKey)
 
-### 🔧 Tool Integrations
-Create and manage connections to external APIs and services. Support for multiple authentication methods including OAuth2 and API keys.
+// All requests use context for authentication
+flows, err := client.Flows.List(ctx, &tolstoy.ListFlowsRequest{
+    Limit: 50,
+})
 
-### 🔗 Event-Driven Architecture
-Set up webhooks for real-time notifications about workflow events, user actions, and system changes.
+// Automatic token refresh
+client.SetTokenRefreshCallback(func(ctx context.Context) (string, error) {
+    return refreshToken(ctx)
+})
+```
 
-### 📊 Complete API Coverage
-Access to all **60+ API endpoints** across health, organizations, users, tools, actions, flows, logs, webhooks, and authentication.
+```rust Rust - Secure Token Storage
+use tolstoy::{TolstoyClient, AuthConfig, SecureTokenStorage};
 
-## Package Information
+// Secure token storage with encryption
+let token_storage = SecureTokenStorage::new()
+    .with_encryption_key(&encryption_key)
+    .with_rotation_schedule(Duration::from_secs(3600));
 
-- **Package**: `@joosuhail/tolstoy-sdk@1.0.1`
-- **Size**: 28.2 KB compressed, 235.4 kB unpacked  
-- **Dependencies**: axios (production-ready)
-- **Node.js**: 16.0.0+ required
-- **TypeScript**: 5.0.0+ recommended
+let client = TolstoyClient::with_auth(AuthConfig {
+    token_storage: Some(token_storage),
+    auto_refresh: true,
+    ..Default::default()
+});
+```
+</CodeGroup>
 
-## Architecture
+### Type Safety & Code Generation
 
-The SDK provides two levels of access:
+Our SDKs provide comprehensive type safety and IDE integration:
 
-### 1. Helper Methods (Recommended)
-Simplified methods for common operations with sensible defaults.
+<Tabs>
+  <Tab title="TypeScript">
+    **Full Type Definitions**
+    ```typescript
+    import { TolstoyClient, Flow, FlowStep, ExecutionResult } from '@tolstoy/sdk';
 
-```typescript
-// OAuth2 authentication setup
-await client.setupOAuth2('github', {
-  clientId: 'your-client-id',
-  clientSecret: 'your-client-secret',
-  redirectUri: 'https://your-app.com/callback'
+    // Complete type safety for all operations
+    const client = new TolstoyClient({ apiKey: process.env.TOLSTOY_API_KEY });
+
+    // Flow creation with full IntelliSense
+    const flow: Flow = await client.flows.create({
+      name: 'User Onboarding',
+      description: 'Complete user onboarding workflow',
+      steps: [
+        {
+          key: 'validate_email',
+          action: 'email_validation',
+          inputs: {
+            email: '{{inputs.user_email}}', // String template
+            strict: true                    // Boolean flag
+          },
+          conditions: [
+            { when: '{{inputs.user_email}} != null' }
+          ],
+          retryPolicy: {
+            attempts: 3,
+            delay: '30s',
+            backoff: 'exponential'
+          }
+        } as FlowStep
+      ],
+      settings: {
+        timeout: '10m',
+        concurrency: 5
+      }
+    });
+
+    // Type-safe execution
+    const result: ExecutionResult = await client.flows.execute(flow.id, {
+      inputs: {
+        user_email: 'user@example.com',
+        user_id: 12345
+      }
+    });
+
+    // Compile-time error checking
+    // This will cause a TypeScript error:
+    // await client.flows.execute(flow.id, {
+    //   inputs: { invalid_field: 'value' }
+    // });
+    ```
+
+    **Generic Types for Custom Data**
+    ```typescript
+    interface UserOnboardingInputs {
+      email: string;
+      firstName: string;
+      lastName: string;
+      companyName?: string;
+    }
+
+    interface OnboardingResult {
+      userId: string;
+      accountId: string;
+      onboardingComplete: boolean;
+    }
+
+    // Type-safe workflow execution
+    const execution = await client.flows.execute<UserOnboardingInputs, OnboardingResult>(
+      'user_onboarding_flow',
+      {
+        inputs: {
+          email: 'user@example.com',
+          firstName: 'John',
+          lastName: 'Doe'
+        }
+      }
+    );
+
+    // Result is properly typed
+    const result: OnboardingResult = await execution.waitForCompletion();
+    console.log(`User ${result.userId} onboarded successfully`);
+    ```
+  </Tab>
+
+  <Tab title="Python">
+    **Type Hints & Pydantic Models**
+    ```python
+    from typing import Dict, List, Optional
+    from pydantic import BaseModel, EmailStr
+    from tolstoy import TolstoyClient, Flow, FlowStep, ExecutionResult
+
+    # Define typed models
+    class UserOnboardingInputs(BaseModel):
+        email: EmailStr
+        first_name: str
+        last_name: str
+        company_name: Optional[str] = None
+
+    class OnboardingResult(BaseModel):
+        user_id: str
+        account_id: str
+        onboarding_complete: bool
+
+    client = TolstoyClient(api_key=os.environ['TOLSTOY_API_KEY'])
+
+    # Create flow with type validation
+    flow: Flow = client.flows.create(
+        name='User Onboarding',
+        steps=[
+            FlowStep(
+                key='validate_email',
+                action='email_validation',
+                inputs={
+                    'email': '{{inputs.email}}',
+                    'strict': True
+                }
+            )
+        ]
+    )
+
+    # Type-safe execution with automatic validation
+    inputs = UserOnboardingInputs(
+        email='user@example.com',
+        first_name='John',
+        last_name='Doe'
+    )
+
+    result: ExecutionResult[OnboardingResult] = await client.flows.execute(
+        flow.id,
+        inputs=inputs.dict()
+    )
+
+    # Wait for completion with typed result
+    onboarding_result = await result.wait_for_completion()
+    print(f"User {onboarding_result.user_id} onboarded successfully")
+    ```
+
+    **Runtime Validation**
+    ```python
+    from tolstoy.validation import validate_flow_inputs, ValidationError
+
+    try:
+        # Automatic input validation based on flow schema
+        validated_inputs = validate_flow_inputs(flow.id, {
+            'email': 'user@example.com',
+            'first_name': 'John'
+        })
+        
+        execution = client.flows.execute(flow.id, inputs=validated_inputs)
+        
+    except ValidationError as e:
+        print(f"Input validation failed: {e.errors}")
+        for error in e.errors:
+            print(f"Field '{error.field}': {error.message}")
+    ```
+  </Tab>
+
+  <Tab title="Go">
+    **Struct-Based Type Safety**
+    ```go
+    package main
+
+    import (
+        "context"
+        "encoding/json"
+        
+        "github.com/tolstoy/tolstoy-go"
+    )
+
+    // Define typed structures
+    type UserOnboardingInputs struct {
+        Email       string `json:"email" validate:"required,email"`
+        FirstName   string `json:"first_name" validate:"required"`
+        LastName    string `json:"last_name" validate:"required"`
+        CompanyName string `json:"company_name,omitempty"`
+    }
+
+    type OnboardingResult struct {
+        UserID              string `json:"user_id"`
+        AccountID           string `json:"account_id"`
+        OnboardingComplete  bool   `json:"onboarding_complete"`
+    }
+
+    func main() {
+        client := tolstoy.NewClient(&tolstoy.Config{
+            APIKey: os.Getenv("TOLSTOY_API_KEY"),
+        })
+
+        ctx := context.Background()
+
+        // Create flow with typed inputs
+        flow, err := client.Flows.Create(ctx, &tolstoy.CreateFlowRequest{
+            Name: "User Onboarding",
+            Steps: []tolstoy.FlowStep{
+                {
+                    Key:    "validate_email",
+                    Action: "email_validation",
+                    Inputs: map[string]interface{}{
+                        "email":  "{{inputs.email}}",
+                        "strict": true,
+                    },
+                },
+            },
+        })
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        // Type-safe execution
+        inputs := UserOnboardingInputs{
+            Email:     "user@example.com",
+            FirstName: "John",
+            LastName:  "Doe",
+        }
+
+        inputsJSON, _ := json.Marshal(inputs)
+        var inputsMap map[string]interface{}
+        json.Unmarshal(inputsJSON, &inputsMap)
+
+        execution, err := client.Flows.Execute(ctx, flow.ID, &tolstoy.ExecuteFlowRequest{
+            Inputs: inputsMap,
+        })
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        // Wait for completion with result parsing
+        result, err := client.Executions.WaitForCompletion(ctx, execution.ID)
+        if err != nil {
+            log.Fatal(err)
+        }
+
+        var onboardingResult OnboardingResult
+        resultJSON, _ := json.Marshal(result.Output)
+        json.Unmarshal(resultJSON, &onboardingResult)
+
+        log.Printf("User %s onboarded successfully", onboardingResult.UserID)
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Error Handling & Resilience
+
+Comprehensive error handling with intelligent retry strategies:
+
+<CodeGroup>
+```typescript TypeScript - Advanced Error Handling
+import { 
+  TolstoyClient, 
+  TolstoyError, 
+  ValidationError, 
+  NetworkError, 
+  RateLimitError 
+} from '@tolstoy/sdk';
+
+const client = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  retryConfig: {
+    attempts: 3,
+    delay: 1000,
+    backoff: 'exponential',
+    maxDelay: 10000,
+    retryCondition: (error) => {
+      // Custom retry logic
+      if (error instanceof NetworkError) return true;
+      if (error instanceof RateLimitError) return true;
+      if (error.status >= 500) return true;
+      return false;
+    },
+    onRetry: (attempt, error) => {
+      console.log(`Retry attempt ${attempt} due to: ${error.message}`);
+    }
+  }
 });
 
-// Simple action execution with auto-auth
-const result = await client.executeAction('create-github-issue', {
-  title: 'New Feature Request',
-  body: 'Please add OAuth2 support'
+try {
+  const execution = await client.flows.execute('flow_123', {
+    inputs: { email: 'user@example.com' }
+  });
+  
+  const result = await execution.waitForCompletion({
+    timeout: 300000, // 5 minutes
+    pollInterval: 2000 // Check every 2 seconds
+  });
+  
+} catch (error) {
+  if (error instanceof ValidationError) {
+    console.error('Input validation failed:', error.validationErrors);
+    error.validationErrors.forEach(err => {
+      console.error(`Field ${err.field}: ${err.message}`);
+    });
+  } else if (error instanceof RateLimitError) {
+    console.error(`Rate limited. Retry after: ${error.retryAfter}s`);
+    // Implement exponential backoff
+    setTimeout(() => retryOperation(), error.retryAfter * 1000);
+  } else if (error instanceof NetworkError) {
+    console.error('Network error:', error.message);
+    // Implement circuit breaker logic
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+```python Python - Comprehensive Exception Handling
+from tolstoy import (
+    TolstoyClient, 
+    TolstoyError, 
+    ValidationError, 
+    NetworkError, 
+    RateLimitError,
+    TimeoutError
+)
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+client = TolstoyClient(
+    api_key=os.environ['TOLSTOY_API_KEY'],
+    retry_config={
+        'attempts': 3,
+        'delay': 1.0,
+        'backoff': 'exponential',
+        'max_delay': 10.0
+    }
+)
+
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=4, max=10)
+)
+async def execute_workflow_with_retry(flow_id: str, inputs: dict):
+    try:
+        execution = await client.flows.execute(flow_id, inputs=inputs)
+        
+        # Stream execution updates
+        async for update in client.executions.stream(execution.id):
+            if update.type == 'completed':
+                return update.result
+            elif update.type == 'failed':
+                raise TolstoyError(f"Workflow failed: {update.error}")
+            elif update.type == 'step_completed':
+                print(f"Step {update.step_key} completed")
+                
+    except ValidationError as e:
+        print(f"Validation error: {e.message}")
+        for error in e.errors:
+            print(f"  - {error['field']}: {error['message']}")
+        raise
+        
+    except RateLimitError as e:
+        print(f"Rate limited. Waiting {e.retry_after} seconds...")
+        await asyncio.sleep(e.retry_after)
+        raise
+        
+    except TimeoutError as e:
+        print(f"Request timed out after {e.timeout} seconds")
+        raise
+        
+    except NetworkError as e:
+        print(f"Network error: {e.message}")
+        # Log for monitoring
+        logger.error("Network error in workflow execution", extra={
+            'error': str(e),
+            'flow_id': flow_id,
+            'retry_attempt': e.retry_attempt
+        })
+        raise
+
+# Usage
+try:
+    result = await execute_workflow_with_retry('user_onboarding', {
+        'email': 'user@example.com'
+    })
+    print(f"Workflow completed: {result}")
+except Exception as e:
+    print(f"Workflow failed after retries: {e}")
+```
+
+```go Go - Robust Error Handling
+package main
+
+import (
+    "context"
+    "errors"
+    "fmt"
+    "log"
+    "time"
+    
+    "github.com/tolstoy/tolstoy-go"
+)
+
+func executeWorkflowWithRetries(ctx context.Context, client *tolstoy.Client, flowID string, inputs map[string]interface{}) (*tolstoy.ExecutionResult, error) {
+    var lastErr error
+    
+    for attempt := 1; attempt <= 3; attempt++ {
+        execution, err := client.Flows.Execute(ctx, flowID, &tolstoy.ExecuteFlowRequest{
+            Inputs: inputs,
+        })
+        
+        if err != nil {
+            var validationErr *tolstoy.ValidationError
+            var rateLimitErr *tolstoy.RateLimitError
+            var networkErr *tolstoy.NetworkError
+            
+            switch {
+            case errors.As(err, &validationErr):
+                // Don't retry validation errors
+                log.Printf("Validation error: %v", validationErr.Details)
+                return nil, err
+                
+            case errors.As(err, &rateLimitErr):
+                log.Printf("Rate limited. Waiting %d seconds...", rateLimitErr.RetryAfter)
+                select {
+                case <-time.After(time.Duration(rateLimitErr.RetryAfter) * time.Second):
+                    continue // Retry after waiting
+                case <-ctx.Done():
+                    return nil, ctx.Err()
+                }
+                
+            case errors.As(err, &networkErr):
+                log.Printf("Network error on attempt %d: %v", attempt, networkErr)
+                if attempt < 3 {
+                    backoff := time.Duration(attempt*attempt) * time.Second
+                    select {
+                    case <-time.After(backoff):
+                        continue
+                    case <-ctx.Done():
+                        return nil, ctx.Err()
+                    }
+                }
+                
+            default:
+                log.Printf("Unknown error on attempt %d: %v", attempt, err)
+            }
+            
+            lastErr = err
+            continue
+        }
+        
+        // Wait for completion with timeout
+        result, err := client.Executions.WaitForCompletion(ctx, execution.ID, &tolstoy.WaitOptions{
+            Timeout:      5 * time.Minute,
+            PollInterval: 2 * time.Second,
+        })
+        
+        if err != nil {
+            lastErr = err
+            continue
+        }
+        
+        return result, nil
+    }
+    
+    return nil, fmt.Errorf("workflow execution failed after 3 attempts. Last error: %w", lastErr)
+}
+
+func main() {
+    client := tolstoy.NewClient(&tolstoy.Config{
+        APIKey: os.Getenv("TOLSTOY_API_KEY"),
+    })
+    
+    ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+    defer cancel()
+    
+    result, err := executeWorkflowWithRetries(ctx, client, "user_onboarding", map[string]interface{}{
+        "email": "user@example.com",
+    })
+    
+    if err != nil {
+        log.Fatalf("Workflow execution failed: %v", err)
+    }
+    
+    log.Printf("Workflow completed successfully: %+v", result)
+}
+```
+</CodeGroup>
+
+## Advanced SDK Features
+
+### Real-Time Operations
+
+<Tabs>
+  <Tab title="WebSocket Streaming">
+    **Live Execution Updates**
+    
+    <CodeGroup>
+    ```typescript TypeScript
+    import { TolstoyClient } from '@tolstoy/sdk';
+    
+    const client = new TolstoyClient({
+      apiKey: process.env.TOLSTOY_API_KEY,
+      websocket: {
+        enabled: true,
+        reconnect: true,
+        heartbeat: 30000
+      }
+    });
+    
+    // Stream execution updates in real-time
+    const execution = await client.flows.execute('flow_123', {
+      inputs: { email: 'user@example.com' }
+    });
+    
+    // Listen for real-time updates
+    execution.on('started', (data) => {
+      console.log('Execution started:', data.executionId);
+    });
+    
+    execution.on('stepCompleted', (data) => {
+      console.log(`Step ${data.stepKey} completed in ${data.duration}ms`);
+      updateProgressBar(data.progress);
+    });
+    
+    execution.on('completed', (data) => {
+      console.log('Execution completed:', data.result);
+      showSuccessMessage(data.result);
+    });
+    
+    execution.on('failed', (data) => {
+      console.error('Execution failed:', data.error);
+      showErrorMessage(data.error);
+    });
+    
+    // Stream multiple executions
+    const executionStream = client.executions.streamAll({
+      filters: { status: ['running', 'pending'] },
+      organizationId: 'org_123'
+    });
+    
+    for await (const update of executionStream) {
+      console.log('Update received:', update);
+      updateDashboard(update);
+    }
+    ```
+    
+    ```python Python
+    import asyncio
+    from tolstoy import AsyncTolstoyClient
+    
+    client = AsyncTolstoyClient(
+        api_key=os.environ['TOLSTOY_API_KEY'],
+        websocket_config={
+            'enabled': True,
+            'reconnect': True,
+            'heartbeat_interval': 30
+        }
+    )
+    
+    async def handle_execution_updates():
+        execution = await client.flows.execute('flow_123', {
+            'inputs': {'email': 'user@example.com'}
+        })
+        
+        # Stream execution updates
+        async for update in client.executions.stream(execution.id):
+            if update.type == 'started':
+                print(f"Execution started: {update.execution_id}")
+            elif update.type == 'step_completed':
+                print(f"Step {update.step_key} completed")
+                await update_progress_bar(update.progress)
+            elif update.type == 'completed':
+                print(f"Execution completed: {update.result}")
+                break
+            elif update.type == 'failed':
+                print(f"Execution failed: {update.error}")
+                break
+    
+    # Stream all organization executions
+    async def stream_organization_executions():
+        async for update in client.executions.stream_all(
+            filters={'status': ['running', 'pending']},
+            organization_id='org_123'
+        ):
+            print(f"Organization update: {update}")
+            await update_dashboard(update)
+    
+    # Run both streams concurrently
+    await asyncio.gather(
+        handle_execution_updates(),
+        stream_organization_executions()
+    )
+    ```
+    
+    ```go Go
+    package main
+    
+    import (
+        "context"
+        "fmt"
+        "log"
+        
+        "github.com/tolstoy/tolstoy-go"
+    )
+    
+    func main() {
+        client := tolstoy.NewClient(&tolstoy.Config{
+            APIKey: os.Getenv("TOLSTOY_API_KEY"),
+            WebSocket: &tolstoy.WebSocketConfig{
+                Enabled:   true,
+                Reconnect: true,
+                Heartbeat: 30 * time.Second,
+            },
+        })
+        
+        ctx := context.Background()
+        
+        // Execute flow and stream updates
+        execution, err := client.Flows.Execute(ctx, "flow_123", &tolstoy.ExecuteFlowRequest{
+            Inputs: map[string]interface{}{
+                "email": "user@example.com",
+            },
+        })
+        if err != nil {
+            log.Fatal(err)
+        }
+        
+        // Stream execution updates
+        updates, err := client.Executions.Stream(ctx, execution.ID)
+        if err != nil {
+            log.Fatal(err)
+        }
+        
+        for update := range updates {
+            switch update.Type {
+            case "started":
+                fmt.Printf("Execution started: %s\n", update.ExecutionID)
+            case "step_completed":
+                fmt.Printf("Step %s completed in %dms\n", update.StepKey, update.Duration)
+            case "completed":
+                fmt.Printf("Execution completed: %+v\n", update.Result)
+                return
+            case "failed":
+                fmt.Printf("Execution failed: %s\n", update.Error.Message)
+                return
+            }
+        }
+    }
+    ```
+    </CodeGroup>
+  </Tab>
+  
+  <Tab title="Server-Sent Events">
+    **HTTP-based Streaming**
+    
+    <CodeGroup>
+    ```typescript TypeScript - SSE
+    import { TolstoyClient } from '@tolstoy/sdk';
+    
+    const client = new TolstoyClient({
+      apiKey: process.env.TOLSTOY_API_KEY,
+      streaming: {
+        transport: 'sse', // Server-Sent Events
+        bufferSize: 1000,
+        reconnect: true
+      }
+    });
+    
+    // Stream workflow execution events
+    const eventStream = client.events.stream({
+      types: ['execution.started', 'execution.completed', 'execution.failed'],
+      filters: {
+        organizationId: 'org_123',
+        flowIds: ['flow_123', 'flow_456']
+      }
+    });
+    
+    eventStream.addEventListener('execution.started', (event) => {
+      const data = JSON.parse(event.data);
+      console.log('New execution started:', data.executionId);
+      addToExecutionQueue(data);
+    });
+    
+    eventStream.addEventListener('execution.completed', (event) => {
+      const data = JSON.parse(event.data);
+      console.log('Execution completed:', data.executionId);
+      updateExecutionStatus(data.executionId, 'completed', data.result);
+    });
+    
+    eventStream.addEventListener('error', (event) => {
+      console.error('SSE connection error:', event);
+      // Automatic reconnection is handled by the SDK
+    });
+    
+    // Close stream when done
+    // eventStream.close();
+    ```
+    
+    ```python Python - SSE
+    import asyncio
+    from tolstoy import AsyncTolstoyClient
+    
+    client = AsyncTolstoyClient(
+        api_key=os.environ['TOLSTOY_API_KEY'],
+        streaming_config={
+            'transport': 'sse',
+            'buffer_size': 1000,
+            'reconnect': True
+        }
+    )
+    
+    async def handle_sse_events():
+        # Stream organization events
+        async for event in client.events.stream(
+            types=['execution.started', 'execution.completed', 'execution.failed'],
+            filters={
+                'organization_id': 'org_123',
+                'flow_ids': ['flow_123', 'flow_456']
+            }
+        ):
+            if event.type == 'execution.started':
+                print(f"New execution started: {event.data['execution_id']}")
+                await add_to_execution_queue(event.data)
+                
+            elif event.type == 'execution.completed':
+                print(f"Execution completed: {event.data['execution_id']}")
+                await update_execution_status(
+                    event.data['execution_id'], 
+                    'completed', 
+                    event.data['result']
+                )
+                
+            elif event.type == 'execution.failed':
+                print(f"Execution failed: {event.data['execution_id']}")
+                await handle_execution_failure(event.data)
+    
+    # Run the event handler
+    await handle_sse_events()
+    ```
+    </CodeGroup>
+  </Tab>
+  
+  <Tab title="Webhook Integration">
+    **SDK-Assisted Webhook Handling**
+    
+    <CodeGroup>
+    ```typescript Express.js Integration
+    import express from 'express';
+    import { TolstoyClient, WebhookValidator } from '@tolstoy/sdk';
+    
+    const app = express();
+    const client = new TolstoyClient({ apiKey: process.env.TOLSTOY_API_KEY });
+    const webhookValidator = new WebhookValidator(process.env.WEBHOOK_SECRET);
+    
+    app.use(express.raw({ type: 'application/json' }));
+    
+    app.post('/tolstoy-webhook', async (req, res) => {
+      try {
+        // Validate webhook signature
+        const isValid = webhookValidator.validate(
+          req.body,
+          req.headers['x-tolstoy-signature'] as string
+        );
+        
+        if (!isValid) {
+          return res.status(401).send('Invalid signature');
+        }
+        
+        const event = JSON.parse(req.body.toString());
+        
+        // Handle different event types
+        switch (event.type) {
+          case 'flow.execution.completed':
+            await handleExecutionCompleted(event.data);
+            break;
+            
+          case 'flow.execution.failed':
+            await handleExecutionFailed(event.data);
+            break;
+            
+          case 'flow.created':
+            await handleFlowCreated(event.data);
+            break;
+            
+          default:
+            console.log(`Unhandled event type: ${event.type}`);
+        }
+        
+        res.status(200).send('OK');
+        
+      } catch (error) {
+        console.error('Webhook processing error:', error);
+        res.status(500).send('Internal Server Error');
+      }
+    });
+    
+    async function handleExecutionCompleted(data: any) {
+      console.log(`Execution ${data.execution_id} completed`);
+      
+      // Update database
+      await updateExecutionInDatabase(data.execution_id, {
+        status: 'completed',
+        result: data.result,
+        completed_at: data.completed_at
+      });
+      
+      // Send notification
+      await sendNotification({
+        type: 'execution_completed',
+        execution_id: data.execution_id,
+        flow_name: data.flow_name
+      });
+    }
+    ```
+    
+    ```python FastAPI Integration
+    from fastapi import FastAPI, Request, HTTPException
+    from tolstoy import TolstoyClient, WebhookValidator
+    import os
+    
+    app = FastAPI()
+    client = TolstoyClient(api_key=os.environ['TOLSTOY_API_KEY'])
+    webhook_validator = WebhookValidator(os.environ['WEBHOOK_SECRET'])
+    
+    @app.post("/tolstoy-webhook")
+    async def handle_webhook(request: Request):
+        try:
+            body = await request.body()
+            signature = request.headers.get('x-tolstoy-signature')
+            
+            # Validate webhook signature
+            if not webhook_validator.validate(body, signature):
+                raise HTTPException(status_code=401, detail="Invalid signature")
+            
+            event = json.loads(body.decode('utf-8'))
+            
+            # Handle different event types
+            if event['type'] == 'flow.execution.completed':
+                await handle_execution_completed(event['data'])
+            elif event['type'] == 'flow.execution.failed':
+                await handle_execution_failed(event['data'])
+            elif event['type'] == 'flow.created':
+                await handle_flow_created(event['data'])
+            else:
+                print(f"Unhandled event type: {event['type']}")
+            
+            return {"status": "ok"}
+            
+        except Exception as e:
+            print(f"Webhook processing error: {e}")
+            raise HTTPException(status_code=500, detail="Internal Server Error")
+    
+    async def handle_execution_completed(data: dict):
+        print(f"Execution {data['execution_id']} completed")
+        
+        # Update database
+        await update_execution_in_database(data['execution_id'], {
+            'status': 'completed',
+            'result': data['result'],
+            'completed_at': data['completed_at']
+        })
+        
+        # Send notification
+        await send_notification({
+            'type': 'execution_completed',
+            'execution_id': data['execution_id'],
+            'flow_name': data['flow_name']
+        })
+    ```
+    </CodeGroup>
+  </Tab>
+</Tabs>
+
+### Performance & Optimization
+
+<CardGroup cols={2}>
+  <Card title="Request Caching" icon="database">
+    **Intelligent Caching**
+    - Automatic response caching with TTL
+    - Request deduplication for concurrent calls
+    - Conditional requests with ETags
+    - Custom cache strategies per resource type
+  </Card>
+  <Card title="Connection Management" icon="network-wired">
+    **Optimized Networking**
+    - HTTP/2 support with multiplexing
+    - Connection pooling and reuse
+    - Automatic compression (gzip/brotli)
+    - Keep-alive connections for reduced latency
+  </Card>
+</CardGroup>
+
+<CodeGroup>
+```typescript TypeScript - Performance Config
+const client = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  
+  // Caching configuration
+  cache: {
+    enabled: true,
+    storage: 'memory', // or 'redis' for distributed caching
+    defaultTTL: 300, // 5 minutes
+    maxSize: 1000, // Max cached items
+    strategies: {
+      'flows': { ttl: 600 }, // Cache flows for 10 minutes
+      'executions': { ttl: 30 }, // Cache execution status for 30 seconds
+      'tools': { ttl: 3600 } // Cache tools for 1 hour
+    }
+  },
+  
+  // HTTP/2 and connection optimization
+  http: {
+    version: '2.0',
+    keepAlive: true,
+    maxConnections: 10,
+    compression: true,
+    timeout: 30000
+  },
+  
+  // Request deduplication
+  deduplication: {
+    enabled: true,
+    windowMs: 1000, // Deduplicate identical requests within 1 second
+    keyGenerator: (url, params) => `${url}:${JSON.stringify(params)}`
+  }
 });
 
-// Simple workflow execution
-const execution = await client.runFlow('flow_id', inputs);
+// Cached requests
+const flows1 = await client.flows.list(); // API call made
+const flows2 = await client.flows.list(); // Returned from cache
 
-// Health monitoring
-const health = await client.checkHealth();
+// Request deduplication
+const [result1, result2] = await Promise.all([
+  client.flows.get('flow_123'), // API call made
+  client.flows.get('flow_123')  // Deduplicated, same result
+]);
 ```
 
-### 2. Raw API Access (Advanced)
-Direct access to all generated endpoints for advanced use cases.
+```python Python - Performance Features
+from tolstoy import AsyncTolstoyClient
+import asyncio
 
-```typescript
-// Advanced OAuth2 operations
-const authUrl = await client.raw.auth.authControllerGetAuthorizeUrl({
-  provider: 'github',
-  orgId: 'org_123',
-  userId: 'user_456'
-});
+client = AsyncTolstoyClient(
+    api_key=os.environ['TOLSTOY_API_KEY'],
+    
+    # Connection pooling
+    connector_config={
+        'limit': 100,  # Max connections
+        'limit_per_host': 10,  # Per host limit
+        'keepalive_timeout': 60,
+        'enable_cleanup_closed': True
+    },
+    
+    # Caching configuration
+    cache_config={
+        'enabled': True,
+        'backend': 'memory',  # or 'redis'
+        'default_ttl': 300,
+        'strategies': {
+            'flows': {'ttl': 600},
+            'executions': {'ttl': 30},
+            'tools': {'ttl': 3600}
+        }
+    },
+    
+    # Request optimization
+    request_config={
+        'compression': True,
+        'deduplication': True,
+        'timeout': aiohttp.ClientTimeout(total=30)
+    }
+)
 
-// Direct action execution
-const actionResult = await client.raw.actions.actionsControllerExecute(
-  'action_id',
-  { inputs: { title: 'Issue Title' } }
-);
-
-// Detailed health monitoring
-const health = await client.raw.health.healthControllerGetDetailedHealth();
-
-// Prometheus metrics access
-const metrics = await client.raw.metrics.metricsControllerGetMetrics();
+# Efficient batch operations
+async def process_multiple_flows():
+    # Use semaphore to limit concurrent requests
+    semaphore = asyncio.Semaphore(5)  # Max 5 concurrent requests
+    
+    async def execute_flow(flow_id):
+        async with semaphore:
+            return await client.flows.execute(flow_id, {'inputs': {}})
+    
+    # Execute multiple flows concurrently
+    flow_ids = ['flow_1', 'flow_2', 'flow_3', 'flow_4', 'flow_5']
+    results = await asyncio.gather(
+        *[execute_flow(flow_id) for flow_id in flow_ids],
+        return_exceptions=True
+    )
+    
+    return results
 ```
 
-## Multi-Tenant Architecture
+```go Go - High Performance
+package main
 
-Built for SaaS applications with organization-level isolation:
+import (
+    "context"
+    "crypto/tls"
+    "net/http"
+    "time"
+    
+    "github.com/tolstoy/tolstoy-go"
+    "golang.org/x/net/http2"
+)
 
-```typescript
-// Different clients for different tenants
-const clientA = new TolstoyClient(baseUrl, 'org_a', 'user_123');
-const clientB = new TolstoyClient(baseUrl, 'org_b', 'user_456');
+func main() {
+    // Custom HTTP client with optimizations
+    transport := &http.Transport{
+        MaxIdleConns:       100,
+        IdleConnTimeout:    90 * time.Second,
+        DisableCompression: false,
+        TLSClientConfig: &tls.Config{
+            MinVersion: tls.VersionTLS12,
+        },
+    }
+    
+    // Enable HTTP/2
+    http2.ConfigureTransport(transport)
+    
+    httpClient := &http.Client{
+        Transport: transport,
+        Timeout:   30 * time.Second,
+    }
+    
+    client := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:     os.Getenv("TOLSTOY_API_KEY"),
+        HTTPClient: httpClient,
+        
+        // Caching configuration
+        Cache: &tolstoy.CacheConfig{
+            Enabled:    true,
+            DefaultTTL: 5 * time.Minute,
+            MaxSize:    1000,
+            Strategies: map[string]tolstoy.CacheStrategy{
+                "flows":      {TTL: 10 * time.Minute},
+                "executions": {TTL: 30 * time.Second},
+                "tools":      {TTL: time.Hour},
+            },
+        },
+        
+        // Request deduplication
+        Deduplication: &tolstoy.DeduplicationConfig{
+            Enabled:  true,
+            WindowMs: 1000,
+        },
+    })
+    
+    ctx := context.Background()
+    
+    // Batch operations with worker pool
+    flowIDs := []string{"flow_1", "flow_2", "flow_3", "flow_4", "flow_5"}
+    results := make(chan *tolstoy.ExecutionResult, len(flowIDs))
+    errors := make(chan error, len(flowIDs))
+    
+    // Worker pool with 3 workers
+    for i := 0; i < 3; i++ {
+        go worker(ctx, client, flowIDs, results, errors)
+    }
+    
+    // Collect results
+    for i := 0; i < len(flowIDs); i++ {
+        select {
+        case result := <-results:
+            fmt.Printf("Flow executed: %s\n", result.ID)
+        case err := <-errors:
+            fmt.Printf("Error: %v\n", err)
+        case <-ctx.Done():
+            return
+        }
+    }
+}
 
-// Each client operates in its own tenant context
-await clientA.runFlow('flow_id', inputs); // Isolated to org_a
-await clientB.runFlow('flow_id', inputs); // Isolated to org_b
+func worker(ctx context.Context, client *tolstoy.Client, flowIDs []string, results chan<- *tolstoy.ExecutionResult, errors chan<- error) {
+    for _, flowID := range flowIDs {
+        execution, err := client.Flows.Execute(ctx, flowID, &tolstoy.ExecuteFlowRequest{
+            Inputs: map[string]interface{}{},
+        })
+        
+        if err != nil {
+            errors <- err
+            continue
+        }
+        
+        results <- execution
+    }
+}
 ```
+</CodeGroup>
 
-## CLI Tool
+## Complete SDK Feature Matrix
 
-In addition to the TypeScript SDK, Tolstoy provides a powerful command-line interface for managing authentication, executing actions, and automating workflows.
+| Feature | TypeScript | Python | Go | Rust | Java | C# | PHP | Ruby |
+|---------|------------|--------|----|------|------|----|----- |------|
+| **Authentication** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Type Safety** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| **Async/Await** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **WebSocket Streaming** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Server-Sent Events** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Webhook Validation** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **File Uploads** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Pagination** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Advanced Error Handling** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Automatic Retries** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Request Caching** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Connection Pooling** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **HTTP/2 Support** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| **Request Deduplication** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Metrics & Tracing** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ | ⚠️ |
+| **Mock Client for Testing** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-### 🖥️ Command-Line Interface
-Perfect for scripts, CI/CD pipelines, and system administration:
+**Legend:** ✅ Full Support | ⚠️ Partial Support | ❌ Not Available
 
-```bash
-# Configure tool authentication
-tolstoy tool auth api-key --org my-org --tool github --key ghp_xxxxxxxxxxxx
+## Testing & Development Tools
 
-# Execute actions directly
-tolstoy actions:execute --org my-org --key send-email '{"to": "user@example.com", "subject": "Hello"}'
+### Mock Clients
 
-# Manage OAuth2 flows
-tolstoy auth login --tool github --user user-123
-```
+All SDKs provide comprehensive mock clients for testing:
 
-**Key CLI Features:**
-- 🔧 **Tool Configuration**: Set up API keys and OAuth2 credentials
-- ⚡ **Action Execution**: Run individual actions with JSON inputs
-- 🔐 **User Authentication**: Handle OAuth2 login flows
-- 📝 **Template Management**: Import and manage workflow templates
-- 🚀 **CI/CD Ready**: Perfect for automation and scripting
-
-**[→ Learn more about the CLI](/sdk/cli)**
-
-## Getting Started
-
-Ready to start building? Choose your path:
-
-### 🚀 New to Tolstoy?
-Start with the **[Installation Guide](/sdk/installation)** and **[Quick Start](/sdk/quickstart)** to get up and running in minutes.
-
-### 🖥️ Prefer Command Line?
-Use the **[CLI Tool](/sdk/cli)** for scripts, automation, and quick testing.
-
-### 🔐 Setting Up Access?
-Learn about **[Authentication](/sdk/authentication)** and multi-tenant configuration.
-
-### 🎯 Building Integrations?
-Explore **[Core Features](/sdk/core-features)** for workflows, tools, and webhooks.
-
-### 💡 Need Examples?
-Check out **[Real-World Examples](/sdk/examples)** including user onboarding, e-commerce, and marketing automation.
-
-### 📚 Looking for Details?
-Dive into the **[Complete API Reference](/sdk/api-reference)** for all methods and types.
-
-## Popular Use Cases
-
-### User Onboarding
-Automate new user setup with multi-step workflows including account creation, welcome emails, and feature tutorials.
-
-### E-commerce Automation  
-Handle order processing, inventory management, shipping notifications, and customer communications.
-
-### Marketing Campaigns
-Execute multi-channel campaigns with personalization, A/B testing, and performance tracking.
-
-### Customer Support
-Automate ticket routing, response generation, escalation rules, and satisfaction surveys.
-
-### Integration Management
-Connect external services, manage API credentials, and monitor integration health.
-
-## Community & Support
-
-- **📖 Documentation**: Complete guides and API reference
-- **🐛 Issues**: Report bugs and request features  
-- **💬 Community**: Join our developer community
-- **🔄 Updates**: SDK automatically syncs with API changes
-
-## Ready to Build? Choose Your Path
-
-<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-  <div className="border rounded-lg p-4 bg-gradient-to-br from-blue-50 to-blue-100">
-    <h3 className="text-lg font-semibold mb-2 text-blue-900">🚀 Quick Start</h3>
-    <p className="text-sm text-blue-700 mb-3">Install the SDK and execute your first workflow in under 2 minutes with comprehensive examples.</p>
-    <div className="space-y-2">
-      <a href="/sdk/quickstart" className="block text-blue-600 font-medium hover:text-blue-800">Quick Start Guide →</a>
-      <a href="/sdk/getting-started/installation" className="block text-blue-600 text-sm hover:text-blue-800">Installation & Setup →</a>
-    </div>
-  </div>
+<Tabs>
+  <Tab title="TypeScript Testing">
+    **Jest Integration**
+    ```typescript
+    import { MockTolstoyClient, createMockFlow } from '@tolstoy/sdk/testing';
+    
+    describe('Workflow Integration', () => {
+      let mockClient: MockTolstoyClient;
+      
+      beforeEach(() => {
+        mockClient = new MockTolstoyClient();
+      });
+      
+      it('should create and execute a workflow', async () => {
+        // Setup mock responses
+        const mockFlow = createMockFlow({
+          name: 'Test Flow',
+          steps: [{ key: 'test_step', action: 'email' }]
+        });
+        
+        mockClient.flows.create.mockResolvedValue(mockFlow);
+        mockClient.flows.execute.mockResolvedValue({
+          id: 'exec_test_123',
+          status: 'running',
+          startedAt: new Date()
+        });
+        
+        // Test your code
+        const result = await myWorkflowService.createAndExecute(mockClient);
+        
+        // Assertions
+        expect(mockClient.flows.create).toHaveBeenCalledWith({
+          name: 'Test Flow',
+          steps: expect.any(Array)
+        });
+        
+        expect(result.executionId).toBe('exec_test_123');
+      });
+      
+      it('should handle workflow failures gracefully', async () => {
+        // Setup mock failure
+        mockClient.flows.execute.mockRejectedValue(
+          new ValidationError('Invalid input data', {
+            field: 'email',
+            message: 'Invalid email format'
+          })
+        );
+        
+        // Test error handling
+        await expect(
+          myWorkflowService.executeFlow(mockClient, 'flow_123', {
+            email: 'invalid-email'
+          })
+        ).rejects.toThrow(ValidationError);
+      });
+    });
+    ```
+    
+    **Playwright E2E Testing**
+    ```typescript
+    import { test, expect } from '@playwright/test';
+    import { TolstoyTestEnvironment } from '@tolstoy/sdk/testing';
+    
+    test.describe('Workflow E2E Tests', () => {
+      let testEnv: TolstoyTestEnvironment;
+      
+      test.beforeAll(async () => {
+        testEnv = await TolstoyTestEnvironment.create({
+          mockWebhooks: true,
+          seedData: {
+            flows: ['user_onboarding', 'email_campaign'],
+            tools: ['email_service', 'slack_integration']
+          }
+        });
+      });
+      
+      test.afterAll(async () => {
+        await testEnv.cleanup();
+      });
+      
+      test('should complete user onboarding workflow', async ({ page }) => {
+        // Navigate to application
+        await page.goto('/dashboard');
+        
+        // Trigger workflow execution
+        await page.click('[data-testid="execute-onboarding"]');
+        await page.fill('[data-testid="user-email"]', 'test@example.com');
+        await page.click('[data-testid="submit"]');
+        
+        // Wait for workflow completion
+        await page.waitForSelector('[data-testid="execution-completed"]');
+        
+        // Verify webhook was called
+        const webhookCalls = testEnv.getWebhookCalls();
+        expect(webhookCalls).toHaveLength(1);
+        expect(webhookCalls[0].type).toBe('flow.execution.completed');
+      });
+    });
+    ```
+  </Tab>
   
-  <div className="border rounded-lg p-4 bg-gradient-to-br from-green-50 to-green-100">
-    <h3 className="text-lg font-semibold mb-2 text-green-900">🖥️ CLI Integration</h3>
-    <p className="text-sm text-green-700 mb-3">Command-line tools for authentication, configuration, and automated deployment workflows.</p>
-    <div className="space-y-2">
-      <a href="/cli/overview" className="block text-green-600 font-medium hover:text-green-800">CLI Documentation →</a>
-      <a href="/cli/getting-started/installation" className="block text-green-600 text-sm hover:text-green-800">CLI Setup Guide →</a>
-    </div>
-  </div>
+  <Tab title="Python Testing">
+    **Pytest Integration**
+    ```python
+    import pytest
+    import asyncio
+    from tolstoy.testing import MockTolstoyClient, create_mock_flow
+    from myapp.services import WorkflowService
+    
+    @pytest.fixture
+    def mock_client():
+        return MockTolstoyClient()
+    
+    @pytest.mark.asyncio
+    async def test_create_and_execute_workflow(mock_client):
+        # Setup mock responses
+        mock_flow = create_mock_flow({
+            'name': 'Test Flow',
+            'steps': [{'key': 'test_step', 'action': 'email'}]
+        })
+        
+        mock_client.flows.create.return_value = mock_flow
+        mock_client.flows.execute.return_value = {
+            'id': 'exec_test_123',
+            'status': 'running',
+            'started_at': '2024-01-21T10:30:00Z'
+        }
+        
+        # Test the service
+        service = WorkflowService(mock_client)
+        result = await service.create_and_execute()
+        
+        # Assertions
+        mock_client.flows.create.assert_called_once_with({
+            'name': 'Test Flow',
+            'steps': mock.ANY
+        })
+        
+        assert result['execution_id'] == 'exec_test_123'
+    
+    @pytest.mark.asyncio
+    async def test_workflow_failure_handling(mock_client):
+        from tolstoy import ValidationError
+        
+        # Setup mock failure
+        mock_client.flows.execute.side_effect = ValidationError(
+            'Invalid input data',
+            errors=[{'field': 'email', 'message': 'Invalid email format'}]
+        )
+        
+        service = WorkflowService(mock_client)
+        
+        with pytest.raises(ValidationError) as exc_info:
+            await service.execute_flow('flow_123', {'email': 'invalid-email'})
+        
+        assert 'Invalid input data' in str(exc_info.value)
+    ```
+    
+    **FastAPI Test Integration**
+    ```python
+    from fastapi.testclient import TestClient
+    from tolstoy.testing import TolstoyTestEnvironment
+    from myapp.main import app
+    
+    @pytest.fixture
+    async def test_environment():
+        env = await TolstoyTestEnvironment.create({
+            'mock_webhooks': True,
+            'seed_data': {
+                'flows': ['user_onboarding', 'email_campaign'],
+                'tools': ['email_service', 'slack_integration']
+            }
+        })
+        yield env
+        await env.cleanup()
+    
+    def test_webhook_endpoint(test_environment):
+        client = TestClient(app)
+        
+        # Simulate webhook event
+        webhook_payload = {
+            'type': 'flow.execution.completed',
+            'data': {
+                'execution_id': 'exec_123',
+                'flow_name': 'User Onboarding',
+                'status': 'completed'
+            }
+        }
+        
+        response = client.post(
+            '/tolstoy-webhook',
+            json=webhook_payload,
+            headers={'x-tolstoy-signature': test_environment.generate_signature(webhook_payload)}
+        )
+        
+        assert response.status_code == 200
+        assert response.json() == {'status': 'ok'}
+    ```
+  </Tab>
   
-  <div className="border rounded-lg p-4 bg-gradient-to-br from-purple-50 to-purple-100">
-    <h3 className="text-lg font-semibold mb-2 text-purple-900">💡 Real Examples</h3>
-    <p className="text-sm text-purple-700 mb-3">Complete implementations for user onboarding, e-commerce, marketing automation, and more.</p>
-    <div className="space-y-2">
-      <a href="/sdk/examples" className="block text-purple-600 font-medium hover:text-purple-800">View Examples →</a>
-      <a href="/sdk/examples/user-onboarding" className="block text-purple-600 text-sm hover:text-purple-800">User Onboarding →</a>
-      <a href="/sdk/examples/ecommerce" className="block text-purple-600 text-sm hover:text-purple-800">E-commerce Automation →</a>
-    </div>
-  </div>
-  
-  <div className="border rounded-lg p-4 bg-gradient-to-br from-orange-50 to-orange-100">
-    <h3 className="text-lg font-semibold mb-2 text-orange-900">🔧 Core Features</h3>
-    <p className="text-sm text-orange-700 mb-3">Master workflows, tools, webhooks, multi-tenant architecture, and advanced patterns.</p>
-    <div className="space-y-2">
-      <a href="/sdk/core-features" className="block text-orange-600 font-medium hover:text-orange-800">Explore Features →</a>
-      <a href="/sdk/authentication" className="block text-orange-600 text-sm hover:text-orange-800">Authentication →</a>
-      <a href="/sdk/guides/multi-tenant" className="block text-orange-600 text-sm hover:text-orange-800">Multi-Tenant Setup →</a>
-    </div>
-  </div>
-  
-  <div className="border rounded-lg p-4 bg-gradient-to-br from-gray-50 to-gray-100">
-    <h3 className="text-lg font-semibold mb-2 text-gray-900">📚 Complete Reference</h3>
-    <p className="text-sm text-gray-700 mb-3">Comprehensive API documentation, method signatures, and TypeScript type definitions.</p>
-    <div className="space-y-2">
-      <a href="/sdk/api-reference" className="block text-gray-600 font-medium hover:text-gray-800">API Reference →</a>
-      <a href="/sdk/resources/flows/overview" className="block text-gray-600 text-sm hover:text-gray-800">Flows API →</a>
-      <a href="/sdk/resources/tools/overview" className="block text-gray-600 text-sm hover:text-gray-800">Tools API →</a>
-    </div>
-  </div>
-  
-  <div className="border rounded-lg p-4 bg-gradient-to-br from-indigo-50 to-indigo-100">
-    <h3 className="text-lg font-semibold mb-2 text-indigo-900">🎓 Learning Resources</h3>
-    <p className="text-sm text-indigo-700 mb-3">Tutorials, best practices, troubleshooting guides, and community resources.</p>
-    <div className="space-y-2">
-      <a href="/sdk/guides" className="block text-indigo-600 font-medium hover:text-indigo-800">Guides & Tutorials →</a>
-      <a href="/sdk/troubleshooting" className="block text-indigo-600 text-sm hover:text-indigo-800">Troubleshooting →</a>
-      <a href="/sdk/best-practices" className="block text-indigo-600 text-sm hover:text-indigo-800">Best Practices →</a>
-    </div>
-  </div>
-</div>
+  <Tab title="Go Testing">
+    **Standard Testing Package**
+    ```go
+    package main
+    
+    import (
+        "context"
+        "testing"
+        
+        "github.com/stretchr/testify/assert"
+        "github.com/stretchr/testify/mock"
+        "github.com/tolstoy/tolstoy-go"
+        "github.com/tolstoy/tolstoy-go/testing"
+    )
+    
+    func TestWorkflowService_CreateAndExecute(t *testing.T) {
+        // Setup mock client
+        mockClient := tolstoytesting.NewMockClient(t)
+        
+        // Setup mock expectations
+        mockFlow := &tolstoy.Flow{
+            ID:   "flow_test_123",
+            Name: "Test Flow",
+        }
+        
+        mockExecution := &tolstoy.Execution{
+            ID:        "exec_test_456",
+            FlowID:    "flow_test_123",
+            Status:    "running",
+            StartedAt: time.Now(),
+        }
+        
+        mockClient.On("CreateFlow", mock.Anything, mock.AnythingOfType("*tolstoy.CreateFlowRequest")).
+            Return(mockFlow, nil)
+        
+        mockClient.On("ExecuteFlow", mock.Anything, "flow_test_123", mock.AnythingOfType("*tolstoy.ExecuteFlowRequest")).
+            Return(mockExecution, nil)
+        
+        // Test the service
+        service := NewWorkflowService(mockClient)
+        result, err := service.CreateAndExecute(context.Background())
+        
+        // Assertions
+        assert.NoError(t, err)
+        assert.Equal(t, "exec_test_456", result.ExecutionID)
+        
+        // Verify mock expectations
+        mockClient.AssertExpectations(t)
+    }
+    
+    func TestWorkflowService_HandleFailure(t *testing.T) {
+        mockClient := tolstoytesting.NewMockClient(t)
+        
+        // Setup mock failure
+        expectedError := &tolstoy.ValidationError{
+            Message: "Invalid input data",
+            Details: map[string]string{
+                "email": "Invalid email format",
+            },
+        }
+        
+        mockClient.On("ExecuteFlow", mock.Anything, "flow_123", mock.Anything).
+            Return(nil, expectedError)
+        
+        service := NewWorkflowService(mockClient)
+        
+        _, err := service.ExecuteFlow(context.Background(), "flow_123", map[string]interface{}{
+            "email": "invalid-email",
+        })
+        
+        assert.Error(t, err)
+        assert.IsType(t, &tolstoy.ValidationError{}, err)
+        assert.Contains(t, err.Error(), "Invalid input data")
+    }
+    ```
+  </Tab>
+</Tabs>
 
-## Why Choose Tolstoy SDK?
+### Development Environment Setup
 
-<div className="bg-gray-50 border-l-4 border-blue-500 p-6 my-8">
-  <div className="flex">
-    <div className="flex-shrink-0">
-      <span className="text-2xl">🎯</span>
-    </div>
-    <div className="ml-3">
-      <h3 className="text-lg font-medium text-gray-900">Built for Production Scale</h3>
-      <div className="mt-2 text-sm text-gray-700 space-y-2">
-        <p>• <strong>Type Safety:</strong> Full TypeScript support with IntelliSense and compile-time validation</p>
-        <p>• <strong>Error Handling:</strong> Comprehensive error types with retry strategies and fallback mechanisms</p>
-        <p>• <strong>Multi-Tenant:</strong> Built-in organization isolation for SaaS applications</p>
-        <p>• <strong>Performance:</strong> Connection pooling, intelligent caching, and optimized API calls</p>
-        <p>• <strong>Monitoring:</strong> Real-time webhooks, detailed logging, and execution analytics</p>
-        <p>• <strong>Security:</strong> API key management, OAuth2 support, and webhook signature verification</p>
-      </div>
-    </div>
-  </div>
-</div>
+<Tabs>
+  <Tab title="Docker Development">
+    **Docker Compose for Local Development**
+    ```yaml
+    # docker-compose.dev.yml
+    version: '3.8'
+    services:
+      tolstoy-sandbox:
+        image: tolstoy/sandbox:latest
+        ports:
+          - "8080:8080"
+        environment:
+          - TOLSTOY_ENV=sandbox
+          - LOG_LEVEL=debug
+        volumes:
+          - ./config:/etc/tolstoy/config
+          
+      webhook-receiver:
+        image: tolstoy/webhook-receiver:latest
+        ports:
+          - "3000:3000"
+        environment:
+          - TOLSTOY_WEBHOOK_SECRET=dev_secret_123
+          
+      redis:
+        image: redis:7-alpine
+        ports:
+          - "6379:6379"
+          
+      postgres:
+        image: postgres:15-alpine
+        ports:
+          - "5432:5432"
+        environment:
+          - POSTGRES_DB=tolstoy_dev
+          - POSTGRES_USER=tolstoy
+          - POSTGRES_PASSWORD=dev_password
+    ```
+    
+    **Development Scripts**
+    ```bash
+    #!/bin/bash
+    # scripts/dev-setup.sh
+    
+    echo "Setting up Tolstoy development environment..."
+    
+    # Start services
+    docker-compose -f docker-compose.dev.yml up -d
+    
+    # Wait for services to be ready
+    echo "Waiting for services to start..."
+    sleep 10
+    
+    # Setup test data
+    docker exec tolstoy-sandbox-1 /bin/bash -c "
+      tolstoy-cli flows create-from-template user-onboarding
+      tolstoy-cli tools connect email --provider sendgrid --api-key dev_key
+      tolstoy-cli webhooks create --url http://webhook-receiver:3000/tolstoy
+    "
+    
+    echo "Development environment ready!"
+    echo "API Base URL: http://localhost:8080"
+    echo "Webhook URL: http://localhost:3000/tolstoy"
+    ```
+  </Tab>
+  
+  <Tab title="Local Configuration">
+    **Environment Configuration**
+    ```bash
+    # .env.development
+    TOLSTOY_API_KEY=sk_test_development_key_here
+    TOLSTOY_BASE_URL=http://localhost:8080
+    TOLSTOY_WEBHOOK_SECRET=dev_webhook_secret_123
+    TOLSTOY_ENVIRONMENT=development
+    
+    # Logging
+    TOLSTOY_LOG_LEVEL=debug
+    TOLSTOY_LOG_FORMAT=pretty
+    
+    # Performance
+    TOLSTOY_ENABLE_CACHING=true
+    TOLSTOY_CACHE_TTL=60
+    TOLSTOY_HTTP_TIMEOUT=30000
+    
+    # Development features
+    TOLSTOY_MOCK_EXTERNAL_SERVICES=true
+    TOLSTOY_ENABLE_REQUEST_LOGGING=true
+    TOLSTOY_VALIDATE_SCHEMAS=true
+    ```
+    
+    **VSCode Configuration**
+    ```json
+    {
+      "tolstoy.apiKey": "${env:TOLSTOY_API_KEY}",
+      "tolstoy.baseUrl": "${env:TOLSTOY_BASE_URL}",
+      "tolstoy.environment": "development",
+      "tolstoy.enableAutoCompletion": true,
+      "tolstoy.validateOnSave": true,
+      "tolstoy.showExecutionLogs": true
+    }
+    ```
+    
+    **Development Workflow**
+    ```typescript
+    // Development utilities
+    import { TolstoyClient, DevTools } from '@tolstoy/sdk';
+    
+    const client = new TolstoyClient({
+      apiKey: process.env.TOLSTOY_API_KEY,
+      environment: 'development',
+      devMode: true,
+      logging: {
+        level: 'debug',
+        logRequests: true,
+        logResponses: true
+      }
+    });
+    
+    // Enable development features
+    DevTools.enableMockMode(client, {
+      mockExternalServices: true,
+      recordInteractions: true,
+      generateTestData: true
+    });
+    
+    // Development helpers
+    const devHelper = new DevTools.Helper(client);
+    
+    // Quickly create test flows
+    const testFlow = await devHelper.createTestFlow('email-workflow', {
+      steps: ['validate_email', 'send_welcome', 'update_crm'],
+      mockData: true
+    });
+    
+    // Generate test executions
+    const testExecutions = await devHelper.generateTestExecutions(testFlow.id, {
+      count: 10,
+      scenarios: ['success', 'failure', 'timeout']
+    });
+    
+    // Export development data
+    await devHelper.exportData('./dev-data.json', {
+      includeFlows: true,
+      includeExecutions: true,
+      includeTools: true
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Integration Examples
+
+### Real-World Use Cases
+
+<Tabs>
+  <Tab title="E-commerce Order Processing">
+    **Complete Order Workflow**
+    ```typescript
+    import { TolstoyClient } from '@tolstoy/sdk';
+    
+    interface OrderData {
+      orderId: string;
+      customerId: string;
+      items: Array<{
+        sku: string;
+        quantity: number;
+        price: number;
+      }>;
+      shippingAddress: Address;
+      paymentMethod: PaymentMethod;
+    }
+    
+    class OrderProcessingService {
+      constructor(private client: TolstoyClient) {}
+      
+      async processOrder(orderData: OrderData): Promise<string> {
+        // Create comprehensive order processing workflow
+        const flow = await this.client.flows.create({
+          name: 'Complete Order Processing',
+          description: 'End-to-end order processing with payments, inventory, and fulfillment',
+          steps: [
+            {
+              key: 'validate_order',
+              name: 'Validate Order Data',
+              action: 'data_validation',
+              inputs: {
+                data: '{{inputs.order}}',
+                schema: 'order_schema',
+                strict: true
+              },
+              retryPolicy: {
+                attempts: 2,
+                delay: '5s'
+              }
+            },
+            {
+              key: 'check_inventory',
+              name: 'Check Inventory Availability',
+              action: 'inventory_check',
+              inputs: {
+                items: '{{inputs.order.items}}',
+                warehouse: 'primary'
+              },
+              conditions: [
+                { when: '{{validate_order.valid}} == true' }
+              ]
+            },
+            {
+              key: 'calculate_pricing',
+              name: 'Calculate Total Pricing',
+              action: 'pricing_calculator',
+              inputs: {
+                items: '{{inputs.order.items}}',
+                customer_tier: '{{inputs.order.customer_tier}}',
+                shipping_address: '{{inputs.order.shipping_address}}',
+                apply_discounts: true
+              },
+              parallel: true
+            },
+            {
+              key: 'process_payment',
+              name: 'Process Payment',
+              action: 'stripe_charge',
+              inputs: {
+                amount: '{{calculate_pricing.total}}',
+                currency: 'usd',
+                customer_id: '{{inputs.order.customer_id}}',
+                payment_method: '{{inputs.order.payment_method}}',
+                description: 'Order {{inputs.order.order_id}}'
+              },
+              conditions: [
+                { when: '{{check_inventory.available}} == true' }
+              ],
+              retryPolicy: {
+                attempts: 3,
+                delay: '10s',
+                backoff: 'exponential'
+              }
+            },
+            {
+              key: 'reserve_inventory',
+              name: 'Reserve Inventory Items',
+              action: 'inventory_reserve',
+              inputs: {
+                items: '{{inputs.order.items}}',
+                order_id: '{{inputs.order.order_id}}',
+                expires_at: '{{now() + "24h"}}'
+              },
+              conditions: [
+                { when: '{{process_payment.status}} == "succeeded"' }
+              ]
+            },
+            {
+              key: 'create_shipment',
+              name: 'Create Shipping Label',
+              action: 'shippo_create_shipment',
+              inputs: {
+                to_address: '{{inputs.order.shipping_address}}',
+                from_address: '{{env.WAREHOUSE_ADDRESS}}',
+                items: '{{inputs.order.items}}',
+                service_level: '{{inputs.order.shipping_speed}}'
+              },
+              parallel: true
+            },
+            {
+              key: 'update_order_status',
+              name: 'Update Order in Database',
+              action: 'database_update',
+              inputs: {
+                table: 'orders',
+                where: { id: '{{inputs.order.order_id}}' },
+                data: {
+                  status: 'processing',
+                  payment_id: '{{process_payment.charge_id}}',
+                  tracking_number: '{{create_shipment.tracking_number}}',
+                  updated_at: '{{now()}}'
+                }
+              }
+            },
+            {
+              key: 'send_confirmation',
+              name: 'Send Order Confirmation',
+              action: 'email',
+              inputs: {
+                to: '{{inputs.order.customer_email}}',
+                template: 'order_confirmation',
+                variables: {
+                  order_id: '{{inputs.order.order_id}}',
+                  total: '{{process_payment.amount}}',
+                  tracking_number: '{{create_shipment.tracking_number}}',
+                  estimated_delivery: '{{create_shipment.estimated_delivery}}'
+                }
+              },
+              parallel: true
+            },
+            {
+              key: 'notify_fulfillment',
+              name: 'Notify Fulfillment Team',
+              action: 'slack_message',
+              inputs: {
+                channel: '#fulfillment',
+                message: 'New order ready for fulfillment: {{inputs.order.order_id}}',
+                attachments: [{
+                  title: 'Order Details',
+                  fields: [
+                    { title: 'Order ID', value: '{{inputs.order.order_id}}' },
+                    { title: 'Items', value: '{{inputs.order.items.length}}' },
+                    { title: 'Total', value: '${{process_payment.amount}}' }
+                  ]
+                }]
+              },
+              parallel: true
+            }
+          ],
+          errorHandling: {
+            onFailure: [
+              {
+                action: 'database_update',
+                inputs: {
+                  table: 'orders',
+                  where: { id: '{{inputs.order.order_id}}' },
+                  data: { status: 'failed', error: '{{error.message}}' }
+                }
+              },
+              {
+                action: 'slack_message',
+                inputs: {
+                  channel: '#alerts',
+                  message: '🚨 Order processing failed: {{inputs.order.order_id}} - {{error.message}}'
+                }
+              }
+            ]
+          },
+          settings: {
+            timeout: '10m',
+            concurrency: 3
+          }
+        });
+        
+        // Execute the workflow
+        const execution = await this.client.flows.execute(flow.id, {
+          inputs: { order: orderData }
+        });
+        
+        // Set up real-time monitoring
+        execution.on('stepCompleted', (data) => {
+          console.log(`Order ${orderData.orderId}: Step ${data.stepKey} completed`);
+          this.notifyOrderProgress(orderData.orderId, data.stepKey, data.progress);
+        });
+        
+        execution.on('failed', (data) => {
+          console.error(`Order ${orderData.orderId} failed:`, data.error);
+          this.handleOrderFailure(orderData.orderId, data.error);
+        });
+        
+        return execution.id;
+      }
+      
+      private async notifyOrderProgress(orderId: string, step: string, progress: number) {
+        // Update customer with order progress
+        await this.client.flows.execute('customer_notification_flow', {
+          inputs: {
+            customer_id: orderId,
+            message: `Your order is being processed: ${step}`,
+            progress: progress
+          }
+        });
+      }
+      
+      private async handleOrderFailure(orderId: string, error: any) {
+        // Implement failure recovery logic
+        if (error.type === 'payment_failed') {
+          await this.client.flows.execute('payment_retry_flow', {
+            inputs: { order_id: orderId, retry_count: 1 }
+          });
+        } else if (error.type === 'inventory_unavailable') {
+          await this.client.flows.execute('backorder_flow', {
+            inputs: { order_id: orderId }
+          });
+        }
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="DevOps CI/CD Pipeline">
+    **Automated Deployment Pipeline**
+    ```python
+    from tolstoy import AsyncTolstoyClient
+    from typing import Dict, List, Optional
+    
+    class CICDPipelineService:
+        def __init__(self, client: AsyncTolstoyClient):
+            self.client = client
+    
+        async def create_deployment_pipeline(self, 
+                                           repository: str, 
+                                           environments: List[str]) -> str:
+            """Create a complete CI/CD deployment pipeline"""
+            
+            flow = await self.client.flows.create({
+                'name': f'CI/CD Pipeline - {repository}',
+                'description': f'Complete deployment pipeline for {repository}',
+                'steps': [
+                    {
+                        'key': 'checkout_code',
+                        'name': 'Checkout Source Code',
+                        'action': 'git_checkout',
+                        'inputs': {
+                            'repository': repository,
+                            'ref': '{{inputs.git_ref}}',
+                            'token': '{{env.GITHUB_TOKEN}}'
+                        }
+                    },
+                    {
+                        'key': 'run_tests',
+                        'name': 'Run Test Suite',
+                        'action': 'shell_command',
+                        'inputs': {
+                            'command': 'npm test',
+                            'working_directory': '{{checkout_code.path}}',
+                            'timeout': '10m'
+                        },
+                        'retry_policy': {
+                            'attempts': 2,
+                            'delay': '30s'
+                        }
+                    },
+                    {
+                        'key': 'security_scan',
+                        'name': 'Security Vulnerability Scan',
+                        'action': 'snyk_test',
+                        'inputs': {
+                            'path': '{{checkout_code.path}}',
+                            'severity_threshold': 'high'
+                        },
+                        'parallel': True
+                    },
+                    {
+                        'key': 'build_application',
+                        'name': 'Build Application',
+                        'action': 'docker_build',
+                        'inputs': {
+                            'context': '{{checkout_code.path}}',
+                            'dockerfile': 'Dockerfile',
+                            'tags': ['{{inputs.image_name}}:{{inputs.git_ref}}'],
+                            'cache_from': ['{{inputs.image_name}}:latest']
+                        },
+                        'conditions': [
+                            {'when': '{{run_tests.exit_code}} == 0'},
+                            {'when': '{{security_scan.high_severity_count}} == 0'}
+                        ]
+                    },
+                    {
+                        'key': 'push_image',
+                        'name': 'Push Docker Image',
+                        'action': 'docker_push',
+                        'inputs': {
+                            'image': '{{inputs.image_name}}:{{inputs.git_ref}}',
+                            'registry': '{{env.DOCKER_REGISTRY}}',
+                            'username': '{{env.REGISTRY_USERNAME}}',
+                            'password': '{{env.REGISTRY_PASSWORD}}'
+                        }
+                    },
+                    {
+                        'key': 'deploy_staging',
+                        'name': 'Deploy to Staging',
+                        'action': 'kubernetes_deploy',
+                        'inputs': {
+                            'namespace': 'staging',
+                            'image': '{{inputs.image_name}}:{{inputs.git_ref}}',
+                            'manifests': ['k8s/staging/'],
+                            'wait_for_rollout': True
+                        }
+                    },
+                    {
+                        'key': 'run_e2e_tests',
+                        'name': 'Run E2E Tests',
+                        'action': 'playwright_test',
+                        'inputs': {
+                            'base_url': 'https://staging.myapp.com',
+                            'test_suite': 'e2e/critical-path.spec.ts'
+                        },
+                        'timeout': '15m'
+                    },
+                    {
+                        'key': 'deploy_production',
+                        'name': 'Deploy to Production',
+                        'action': 'kubernetes_deploy',
+                        'inputs': {
+                            'namespace': 'production',
+                            'image': '{{inputs.image_name}}:{{inputs.git_ref}}',
+                            'manifests': ['k8s/production/'],
+                            'strategy': 'blue-green',
+                            'wait_for_rollout': True
+                        },
+                        'conditions': [
+                            {'when': '{{run_e2e_tests.passed}} == true'},
+                            {'when': '{{inputs.deploy_to_prod}} == true'}
+                        ]
+                    },
+                    {
+                        'key': 'health_check',
+                        'name': 'Production Health Check',
+                        'action': 'http_check',
+                        'inputs': {
+                            'url': 'https://api.myapp.com/health',
+                            'expected_status': 200,
+                            'timeout': '30s',
+                            'retries': 5
+                        }
+                    },
+                    {
+                        'key': 'notify_team',
+                        'name': 'Notify Team of Deployment',
+                        'action': 'slack_message',
+                        'inputs': {
+                            'channel': '#deployments',
+                            'message': f'🚀 Successfully deployed {repository} to production',
+                            'attachments': [{
+                                'title': 'Deployment Details',
+                                'fields': [
+                                    {'title': 'Repository', 'value': repository},
+                                    {'title': 'Version', 'value': '{{inputs.git_ref}}'},
+                                    {'title': 'Duration', 'value': '{{execution.duration}}'},
+                                    {'title': 'Deployed By', 'value': '{{inputs.deployed_by}}'}
+                                ],
+                                'color': 'good'
+                            }]
+                        },
+                        'parallel': True
+                    }
+                ],
+                'error_handling': {
+                    'on_failure': [
+                        {
+                            'action': 'slack_message',
+                            'inputs': {
+                                'channel': '#deployments',
+                                'message': f'❌ Deployment failed for {repository}: {{error.message}}',
+                                'attachments': [{
+                                    'title': 'Failure Details',
+                                    'fields': [
+                                        {'title': 'Failed Step', 'value': '{{error.step}}'},
+                                        {'title': 'Error', 'value': '{{error.message}}'},
+                                        {'title': 'Logs', 'value': '{{error.logs}}'}
+                                    ],
+                                    'color': 'danger'
+                                }]
+                            }
+                        }
+                    ]
+                }
+            })
+            
+            return flow.id
+    
+        async def trigger_deployment(self, 
+                                   pipeline_id: str, 
+                                   git_ref: str, 
+                                   deploy_to_prod: bool = False) -> str:
+            """Trigger a deployment pipeline execution"""
+            
+            execution = await self.client.flows.execute(pipeline_id, {
+                'inputs': {
+                    'git_ref': git_ref,
+                    'image_name': 'myapp/api',
+                    'deploy_to_prod': deploy_to_prod,
+                    'deployed_by': 'github-actions'
+                }
+            })
+            
+            # Monitor deployment progress
+            async for update in self.client.executions.stream(execution.id):
+                if update.type == 'step_completed':
+                    print(f"✅ Step completed: {update.step_key}")
+                elif update.type == 'step_failed':
+                    print(f"❌ Step failed: {update.step_key} - {update.error}")
+                elif update.type == 'completed':
+                    print(f"🎉 Deployment completed successfully!")
+                    break
+                elif update.type == 'failed':
+                    print(f"💥 Deployment failed: {update.error}")
+                    break
+            
+            return execution.id
+    ```
+  </Tab>
+  
+  <Tab title="Customer Support Automation">
+    **Intelligent Support Ticket Workflow**
+    ```go
+    package main
+    
+    import (
+        "context"
+        "fmt"
+        "log"
+        
+        "github.com/tolstoy/tolstoy-go"
+    )
+    
+    type SupportTicket struct {
+        ID          string            `json:"id"`
+        CustomerID  string            `json:"customer_id"`
+        Subject     string            `json:"subject"`
+        Description string            `json:"description"`
+        Priority    string            `json:"priority"`
+        Category    string            `json:"category"`
+        Metadata    map[string]string `json:"metadata"`
+    }
+    
+    type SupportService struct {
+        client *tolstoy.Client
+    }
+    
+    func NewSupportService(client *tolstoy.Client) *SupportService {
+        return &SupportService{client: client}
+    }
+    
+    func (s *SupportService) CreateTicketProcessingFlow(ctx context.Context) (*tolstoy.Flow, error) {
+        flow, err := s.client.Flows.Create(ctx, &tolstoy.CreateFlowRequest{
+            Name:        "Intelligent Support Ticket Processing",
+            Description: "Automated support ticket processing with AI categorization and routing",
+            Steps: []tolstoy.FlowStep{
+                {
+                    Key:    "analyze_ticket",
+                    Name:   "AI Ticket Analysis",
+                    Action: "openai_classify",
+                    Inputs: map[string]interface{}{
+                        "text":   "{{inputs.ticket.subject}} {{inputs.ticket.description}}",
+                        "model":  "gpt-4",
+                        "prompt": "Analyze this support ticket and determine: 1) Priority (low/medium/high/critical), 2) Category (technical/billing/general), 3) Sentiment (positive/neutral/negative), 4) Complexity (simple/moderate/complex)",
+                    },
+                    RetryPolicy: &tolstoy.RetryPolicy{
+                        Attempts: 3,
+                        Delay:    "10s",
+                    },
+                },
+                {
+                    Key:    "check_customer_tier",
+                    Name:   "Check Customer Tier",
+                    Action: "database_query",
+                    Inputs: map[string]interface{}{
+                        "query": "SELECT tier, support_level FROM customers WHERE id = ?",
+                        "params": []interface{}{"{{inputs.ticket.customer_id}}"},
+                    },
+                    Parallel: true,
+                },
+                {
+                    Key:    "search_knowledge_base",
+                    Name:   "Search Knowledge Base",
+                    Action: "elasticsearch_search",
+                    Inputs: map[string]interface{}{
+                        "index": "knowledge_base",
+                        "query": "{{inputs.ticket.subject}}",
+                        "size":  5,
+                    },
+                    Parallel: true,
+                },
+                {
+                    Key:    "determine_routing",
+                    Name:   "Determine Ticket Routing",
+                    Action: "javascript",
+                    Inputs: map[string]interface{}{
+                        "code": `
+                            function route(ticket, analysis, customer, kb_results) {
+                                // Auto-resolve if knowledge base has high-confidence answer
+                                if (kb_results.hits[0]?.score > 0.9 && analysis.complexity === 'simple') {
+                                    return {
+                                        action: 'auto_resolve',
+                                        assignee: null,
+                                        kb_article: kb_results.hits[0].id
+                                    };
+                                }
+                                
+                                // Route based on priority and customer tier
+                                let team = 'general';
+                                if (analysis.category === 'technical') team = 'engineering';
+                                else if (analysis.category === 'billing') team = 'finance';
+                                
+                                // Priority customers get escalated
+                                if (customer.tier === 'enterprise' && analysis.priority === 'high') {
+                                    team = 'premium_support';
+                                }
+                                
+                                return {
+                                    action: 'assign',
+                                    team: team,
+                                    priority: analysis.priority,
+                                    sla_hours: getSLAHours(customer.tier, analysis.priority)
+                                };
+                            }
+                            
+                            function getSLAHours(tier, priority) {
+                                const slaMatrix = {
+                                    enterprise: { critical: 2, high: 4, medium: 24, low: 72 },
+                                    business: { critical: 4, high: 8, medium: 48, low: 120 },
+                                    standard: { critical: 24, high: 48, medium: 120, low: 240 }
+                                };
+                                return slaMatrix[tier][priority] || 240;
+                            }
+                            
+                            return route(
+                                {{inputs.ticket}}, 
+                                {{analyze_ticket.result}}, 
+                                {{check_customer_tier.rows[0]}}, 
+                                {{search_knowledge_base.result}}
+                            );
+                        `,
+                    },
+                    Conditions: []tolstoy.Condition{
+                        {When: "{{analyze_ticket.success}} == true"},
+                        {When: "{{check_customer_tier.rows.length}} > 0"},
+                    },
+                },
+                {
+                    Key:    "auto_resolve_ticket",
+                    Name:   "Auto-resolve with Knowledge Base",
+                    Action: "email",
+                    Inputs: map[string]interface{}{
+                        "to":       "{{inputs.ticket.customer_email}}",
+                        "template": "auto_resolution",
+                        "variables": map[string]interface{}{
+                            "ticket_id":    "{{inputs.ticket.id}}",
+                            "kb_article":   "{{determine_routing.kb_article}}",
+                            "customer_name": "{{inputs.ticket.customer_name}}",
+                        },
+                    },
+                    Conditions: []tolstoy.Condition{
+                        {When: "{{determine_routing.action}} == 'auto_resolve'"},
+                    },
+                },
+                {
+                    Key:    "assign_to_team",
+                    Name:   "Assign to Support Team",
+                    Action: "jira_create_issue",
+                    Inputs: map[string]interface{}{
+                        "project":     "SUPPORT",
+                        "issue_type":  "Task",
+                        "summary":     "{{inputs.ticket.subject}}",
+                        "description": "{{inputs.ticket.description}}",
+                        "priority":    "{{determine_routing.priority}}",
+                        "assignee":    "{{determine_routing.team}}",
+                        "labels":      []string{"{{analyze_ticket.result.category}}", "tier-{{check_customer_tier.rows[0].tier}}"},
+                        "custom_fields": map[string]interface{}{
+                            "sla_hours":     "{{determine_routing.sla_hours}}",
+                            "customer_id":   "{{inputs.ticket.customer_id}}",
+                            "ticket_source": "automated",
+                        },
+                    },
+                    Conditions: []tolstoy.Condition{
+                        {When: "{{determine_routing.action}} == 'assign'"},
+                    },
+                },
+                {
+                    Key:    "notify_customer",
+                    Name:   "Notify Customer of Assignment",
+                    Action: "email",
+                    Inputs: map[string]interface{}{
+                        "to":       "{{inputs.ticket.customer_email}}",
+                        "template": "ticket_assigned",
+                        "variables": map[string]interface{}{
+                            "ticket_id":      "{{inputs.ticket.id}}",
+                            "jira_ticket":    "{{assign_to_team.key}}",
+                            "estimated_sla":  "{{determine_routing.sla_hours}} hours",
+                            "customer_name":  "{{inputs.ticket.customer_name}}",
+                        },
+                    },
+                    Conditions: []tolstoy.Condition{
+                        {When: "{{assign_to_team.success}} == true"},
+                    },
+                    Parallel: true,
+                },
+                {
+                    Key:    "notify_team",
+                    Name:   "Notify Support Team",
+                    Action: "slack_message",
+                    Inputs: map[string]interface{}{
+                        "channel": "#{{determine_routing.team}}",
+                        "message": "🎫 New {{determine_routing.priority}} priority ticket assigned",
+                        "attachments": []map[string]interface{}{
+                            {
+                                "title": "Ticket: {{inputs.ticket.subject}}",
+                                "fields": []map[string]interface{}{
+                                    {"title": "Customer", "value": "{{inputs.ticket.customer_name}} ({{check_customer_tier.rows[0].tier}})"},
+                                    {"title": "Category", "value": "{{analyze_ticket.result.category}}"},
+                                    {"title": "Priority", "value": "{{determine_routing.priority}}"},
+                                    {"title": "SLA", "value": "{{determine_routing.sla_hours}} hours"},
+                                    {"title": "JIRA", "value": "{{assign_to_team.key}}"},
+                                },
+                                "color": "{{determine_routing.priority == 'critical' ? 'danger' : 'warning'}}",
+                            },
+                        },
+                    },
+                    Conditions: []tolstoy.Condition{
+                        {When: "{{assign_to_team.success}} == true"},
+                    },
+                    Parallel: true,
+                },
+                {
+                    Key:    "update_ticket_status",
+                    Name:   "Update Ticket Status",
+                    Action: "database_update",
+                    Inputs: map[string]interface{}{
+                        "table": "support_tickets",
+                        "where": map[string]interface{}{"id": "{{inputs.ticket.id}}"},
+                        "data": map[string]interface{}{
+                            "status":       "{{determine_routing.action == 'auto_resolve' ? 'resolved' : 'assigned'}}",
+                            "assigned_to":  "{{determine_routing.team}}",
+                            "priority":     "{{determine_routing.priority}}",
+                            "category":     "{{analyze_ticket.result.category}}",
+                            "jira_ticket":  "{{assign_to_team.key}}",
+                            "sla_deadline": "{{now() + determine_routing.sla_hours + 'h'}}",
+                            "updated_at":   "{{now()}}",
+                        },
+                    },
+                },
+            ],
+            ErrorHandling: &tolstoy.ErrorHandling{
+                OnFailure: []tolstoy.FlowStep{
+                    {
+                        Action: "slack_message",
+                        Inputs: map[string]interface{}{
+                            "channel": "#support-alerts",
+                            "message": "🚨 Failed to process support ticket {{inputs.ticket.id}}: {{error.message}}",
+                        },
+                    },
+                    {
+                        Action: "database_update",
+                        Inputs: map[string]interface{}{
+                            "table": "support_tickets",
+                            "where": map[string]interface{}{"id": "{{inputs.ticket.id}}"},
+                            "data": map[string]interface{}{
+                                "status":      "processing_failed",
+                                "error":       "{{error.message}}",
+                                "updated_at":  "{{now()}}",
+                            },
+                        },
+                    },
+                },
+            },
+            Settings: &tolstoy.FlowSettings{
+                Timeout:     "5m",
+                Concurrency: 2,
+            },
+        })
+        
+        if err != nil {
+            return nil, fmt.Errorf("failed to create support flow: %w", err)
+        }
+        
+        return flow, nil
+    }
+    
+    func (s *SupportService) ProcessTicket(ctx context.Context, flowID string, ticket SupportTicket) (string, error) {
+        execution, err := s.client.Flows.Execute(ctx, flowID, &tolstoy.ExecuteFlowRequest{
+            Inputs: map[string]interface{}{
+                "ticket": ticket,
+            },
+        })
+        if err != nil {
+            return "", fmt.Errorf("failed to execute support flow: %w", err)
+        }
+        
+        // Monitor execution for logging
+        go s.monitorExecution(ctx, execution.ID, ticket.ID)
+        
+        return execution.ID, nil
+    }
+    
+    func (s *SupportService) monitorExecution(ctx context.Context, executionID, ticketID string) {
+        updates, err := s.client.Executions.Stream(ctx, executionID)
+        if err != nil {
+            log.Printf("Failed to stream execution updates: %v", err)
+            return
+        }
+        
+        for update := range updates {
+            switch update.Type {
+            case "step_completed":
+                log.Printf("Ticket %s: Step %s completed", ticketID, update.StepKey)
+            case "completed":
+                log.Printf("Ticket %s: Processing completed successfully", ticketID)
+                return
+            case "failed":
+                log.Printf("Ticket %s: Processing failed: %s", ticketID, update.Error.Message)
+                return
+            }
+        }
+    }
+    
+    func main() {
+        client := tolstoy.NewClient(&tolstoy.Config{
+            APIKey: os.Getenv("TOLSTOY_API_KEY"),
+        })
+        
+        service := NewSupportService(client)
+        ctx := context.Background()
+        
+        // Create the support processing flow
+        flow, err := service.CreateTicketProcessingFlow(ctx)
+        if err != nil {
+            log.Fatalf("Failed to create support flow: %v", err)
+        }
+        
+        log.Printf("Support flow created: %s", flow.ID)
+        
+        // Example: Process a sample ticket
+        ticket := SupportTicket{
+            ID:          "ticket_123",
+            CustomerID:  "customer_456",
+            Subject:     "Unable to log in to my account",
+            Description: "I've been trying to log in for the past hour but keep getting 'invalid credentials' error",
+            Priority:    "medium",
+            Category:    "technical",
+        }
+        
+        executionID, err := service.ProcessTicket(ctx, flow.ID, ticket)
+        if err != nil {
+            log.Fatalf("Failed to process ticket: %v", err)
+        }
+        
+        log.Printf("Ticket processing started: %s", executionID)
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/sdk/installation">
+    Detailed installation instructions and setup for each SDK language
+  </Card>
+  <Card title="Code Examples" icon="code" href="/sdk/examples">
+    Comprehensive examples and use cases for real-world applications
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/overview">
+    Complete API documentation with endpoint details and parameters
+  </Card>
+  <Card title="Best Practices" icon="star" href="/best-practices">
+    Performance optimization and production deployment guidelines
+  </Card>
+</CardGroup>
+
+### Getting Help
+
+<CardGroup cols={3}>
+  <Card title="Documentation" icon="book">
+    Comprehensive guides, tutorials, and API reference
+  </Card>
+  <Card title="Community" icon="users">
+    Join our developer community for support and discussions
+  </Card>
+  <Card title="GitHub" icon="github">
+    Report issues, contribute, and explore SDK source code
+  </Card>
+</CardGroup>
+
+**Professional Support:**
+- **Enterprise Support** - Dedicated support with SLA guarantees
+- **Professional Services** - Implementation consulting and custom development
+- **Training Programs** - SDK training and certification programs
 
 ---
 
-<div className="text-center text-gray-600 text-sm mt-12">
-  <p><strong>🔄 Always Up-to-Date</strong></p>
-  <p>The Tolstoy TypeScript SDK is automatically generated from our OpenAPI specification and stays synchronized with the latest API changes.</p>
-  <p className="mt-2">Package: <code>@joosuhail/tolstoy-sdk</code> | Size: 26.8 KB compressed | Node.js 16+ | TypeScript 5+ recommended</p>
-</div>
+*Ready to start building with Tolstoy SDKs? Choose your preferred language and dive into our comprehensive examples and documentation.*
+
+## Common Patterns
+
+### Async/Await Operations
+
+All SDKs support modern async/await patterns for non-blocking operations:
+
+<CodeGroup>
+```javascript Node.js
+// Parallel execution
+const [flows, tools, executions] = await Promise.all([
+  client.flows.list(),
+  client.tools.list(),
+  client.executions.list()
+]);
+
+// Sequential with error handling
+try {
+  const flow = await client.flows.create(flowData);
+  const execution = await client.flows.execute(flow.id, inputs);
+  const result = await client.executions.waitForCompletion(execution.id);
+  return result;
+} catch (error) {
+  console.error('Workflow failed:', error);
+  throw error;
+}
+```
+
+```python Python
+import asyncio
+from tolstoy import AsyncClient
+
+async def main():
+    client = AsyncClient(api_key=os.getenv('TOLSTOY_API_KEY'))
+    
+    # Parallel execution
+    flows, tools, executions = await asyncio.gather(
+        client.flows.list(),
+        client.tools.list(),
+        client.executions.list()
+    )
+    
+    # Sequential with error handling
+    try:
+        flow = await client.flows.create(flow_data)
+        execution = await client.flows.execute(flow.id, inputs)
+        result = await client.executions.wait_for_completion(execution.id)
+        return result
+    except TolstoyError as error:
+        print(f'Workflow failed: {error}')
+        raise
+
+asyncio.run(main())
+```
+
+```go Go
+// Using contexts for timeout control
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
+flow, err := client.Flows.Create(ctx, createParams)
+if err != nil {
+    return err
+}
+
+execution, err := client.Flows.Execute(ctx, flow.ID, executeParams)
+if err != nil {
+    return err
+}
+
+result, err := client.Executions.WaitForCompletion(ctx, execution.ID)
+return result, err
+```
+</CodeGroup>
+
+### Pagination
+
+Handle large datasets with built-in pagination support:
+
+<CodeGroup>
+```javascript Node.js
+// Iterate through all flows
+for await (const flow of client.flows.listAll()) {
+  console.log('Flow:', flow.name);
+}
+
+// Manual pagination
+let offset = 0;
+const limit = 50;
+let hasMore = true;
+
+while (hasMore) {
+  const response = await client.flows.list({ limit, offset });
+  response.data.forEach(flow => console.log(flow.name));
+  
+  offset += limit;
+  hasMore = response.hasMore;
+}
+```
+
+```python Python
+# Iterate through all flows
+async for flow in client.flows.list_all():
+    print(f'Flow: {flow.name}')
+
+# Manual pagination
+offset = 0
+limit = 50
+has_more = True
+
+while has_more:
+    response = await client.flows.list(limit=limit, offset=offset)
+    for flow in response.data:
+        print(flow.name)
+    
+    offset += limit
+    has_more = response.has_more
+```
+
+```go Go
+// Use the built-in iterator
+iter := client.Flows.ListAll(ctx, &tolstoy.ListFlowsParams{})
+for iter.Next() {
+    flow := iter.Current()
+    fmt.Printf("Flow: %s\n", flow.Name)
+}
+if err := iter.Err(); err != nil {
+    return err
+}
+```
+</CodeGroup>
+
+### Streaming and Webhooks
+
+Real-time updates and webhook handling:
+
+<CodeGroup>
+```javascript Node.js
+// Stream execution updates
+const stream = client.executions.stream('exec_123');
+
+stream.on('status', (update) => {
+  console.log('Status:', update.status);
+});
+
+stream.on('step_completed', (update) => {
+  console.log('Step completed:', update.stepKey);
+});
+
+stream.on('completed', (result) => {
+  console.log('Execution completed:', result);
+});
+
+// Webhook verification
+app.post('/webhook', (req, res) => {
+  if (client.webhooks.verify(req.headers, req.body)) {
+    const event = req.body;
+    console.log('Webhook received:', event.type);
+    res.status(200).send('OK');
+  } else {
+    res.status(400).send('Invalid signature');
+  }
+});
+```
+
+```python Python
+# Stream execution updates
+async for update in client.executions.stream('exec_123'):
+    if update.type == 'status':
+        print(f'Status: {update.status}')
+    elif update.type == 'step_completed':
+        print(f'Step completed: {update.step_key}')
+    elif update.type == 'completed':
+        print(f'Execution completed: {update.result}')
+
+# Webhook verification
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    if client.webhooks.verify(request.headers, request.data):
+        event = request.json
+        print(f'Webhook received: {event["type"]}')
+        return 'OK', 200
+    else:
+        return 'Invalid signature', 400
+```
+</CodeGroup>
+
+## Configuration Options
+
+All SDKs support comprehensive configuration:
+
+<CodeGroup>
+```javascript Node.js
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  baseUrl: 'https://api.tolstoy.dev',
+  timeout: 30000,
+  retryCount: 3,
+  retryDelay: 1000,
+  maxRetryDelay: 10000,
+  retryOn: ['timeout', 'server_error'],
+  userAgent: 'MyApp/1.0.0',
+  headers: {
+    'X-Custom-Header': 'value'
+  }
+});
+```
+
+```python Python
+client = Client(
+    api_key=os.getenv('TOLSTOY_API_KEY'),
+    base_url='https://api.tolstoy.dev',
+    timeout=30,
+    retry_count=3,
+    retry_delay=1.0,
+    max_retry_delay=10.0,
+    retry_on=['timeout', 'server_error'],
+    user_agent='MyApp/1.0.0',
+    headers={
+        'X-Custom-Header': 'value'
+    }
+)
+```
+
+```go Go
+client := tolstoy.NewClient(&tolstoy.Config{
+    APIKey:        os.Getenv("TOLSTOY_API_KEY"),
+    BaseURL:       "https://api.tolstoy.dev",
+    Timeout:       30 * time.Second,
+    RetryCount:    3,
+    RetryDelay:    time.Second,
+    MaxRetryDelay: 10 * time.Second,
+    UserAgent:     "MyApp/1.0.0",
+    Headers: map[string]string{
+        "X-Custom-Header": "value",
+    },
+})
+```
+</CodeGroup>
+
+## Testing and Development
+
+### Mock Client
+
+All SDKs provide mock clients for testing:
+
+<CodeGroup>
+```javascript Node.js
+import { MockClient } from '@tolstoy/sdk/testing';
+
+const mockClient = new MockClient();
+
+// Set up mock responses
+mockClient.flows.create.mockResolvedValue({
+  id: 'flow_123',
+  name: 'Test Flow'
+});
+
+// Use in tests
+const result = await myFunction(mockClient);
+expect(mockClient.flows.create).toHaveBeenCalledWith({
+  name: 'Test Flow'
+});
+```
+
+```python Python
+from tolstoy.testing import MockClient
+
+mock_client = MockClient()
+
+# Set up mock responses
+mock_client.flows.create.return_value = {
+    'id': 'flow_123',
+    'name': 'Test Flow'
+}
+
+# Use in tests
+result = await my_function(mock_client)
+mock_client.flows.create.assert_called_with({
+    'name': 'Test Flow'
+})
+```
+</CodeGroup>
+
+### Development Mode
+
+Enable debug logging and verbose output:
+
+<CodeGroup>
+```javascript Node.js
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  debug: true,
+  logLevel: 'debug'
+});
+```
+
+```python Python
+import logging
+
+logging.basicConfig(level=logging.DEBUG)
+
+client = Client(
+    api_key=os.getenv('TOLSTOY_API_KEY'),
+    debug=True
+)
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/sdk/installation">
+    Detailed installation instructions for each SDK
+  </Card>
+  <Card title="Code Examples" icon="code" href="/sdk/examples">
+    Complete examples and use cases
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/authentication">
+    Detailed API documentation
+  </Card>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Build your first workflow in 5 minutes
+  </Card>
+</CardGroup>

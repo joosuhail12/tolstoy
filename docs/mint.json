@@ -1,0 +1,389 @@
+{
+  "name": "Tolstoy Documentation",
+  "theme": "quill",
+  "favicon": "/favicon.svg",
+  "logo": {
+    "light": "/logo-light.svg",
+    "dark": "/logo-dark.svg"
+  },
+  "colors": {
+    "primary": "#2563eb",
+    "light": "#3b82f6",
+    "dark": "#1e40af",
+    "background": {
+      "light": "#ffffff",
+      "dark": "#0f172a"
+    }
+  },
+  "topbar": {
+    "style": "gradient"
+  },
+  "tabs": [
+    {
+      "name": "Product",
+      "url": "product"
+    },
+    {
+      "name": "CLI",
+      "url": "cli"
+    },
+    {
+      "name": "TypeScript SDK",
+      "url": "sdk"
+    },
+    {
+      "name": "API Reference",
+      "url": "api"
+    },
+    {
+      "name": "Internal Docs",
+      "url": "internal"
+    }
+  ],
+  "anchors": [
+    {
+      "name": "GitHub",
+      "icon": "github",
+      "url": "https://github.com/joosuhail12/tolstoy"
+    },
+    {
+      "name": "Community",
+      "icon": "slack", 
+      "url": "mailto:support@tolstoy.dev"
+    },
+    {
+      "name": "API Playground",
+      "icon": "play",
+      "url": "https://api.tolstoy.dev/docs"
+    }
+  ],
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "introduction",
+        "quickstart",
+        "installation"
+      ]
+    },
+    {
+      "group": "Product Documentation",
+      "pages": [
+        "product/overview",
+        {
+          "group": "Organizations",
+          "pages": [
+            "product/organizations/overview",
+            "product/organizations/creating",
+            "product/organizations/managing",
+            "product/organizations/settings"
+          ]
+        },
+        {
+          "group": "Users & Teams",
+          "pages": [
+            "product/users/overview",
+            "product/users/roles-permissions",
+            "product/users/inviting-users",
+            "product/users/oauth-setup"
+          ]
+        },
+        {
+          "group": "Tools & Integrations",
+          "pages": [
+            "product/tools/overview",
+            "product/tools/creating-tools",
+            "product/tools/authentication-types",
+            "product/tools/oauth-configuration",
+            "product/tools/secrets-management"
+          ]
+        },
+        {
+          "group": "Actions",
+          "pages": [
+            "product/actions/overview",
+            "product/actions/creating-actions",
+            "product/actions/input-schemas",
+            "product/actions/conditional-logic",
+            "product/actions/testing-actions"
+          ]
+        },
+        {
+          "group": "Workflows (Flows)",
+          "pages": [
+            "product/flows/overview",
+            "product/flows/creating-flows",
+            "product/flows/step-configuration",
+            "product/flows/variables-templating",
+            "product/flows/error-handling",
+            "product/flows/executing-flows"
+          ]
+        },
+        {
+          "group": "Monitoring & Logs",
+          "pages": [
+            "product/monitoring/overview",
+            "product/monitoring/execution-logs",
+            "product/monitoring/metrics",
+            "product/monitoring/health-checks",
+            "product/monitoring/real-time-updates"
+          ]
+        },
+        {
+          "group": "Webhooks & Events",
+          "pages": [
+            "product/webhooks/overview",
+            "product/webhooks/creating-webhooks",
+            "product/webhooks/event-types",
+            "product/webhooks/testing-webhooks",
+            "product/webhooks/security"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "CLI Documentation",
+      "pages": [
+        "cli/overview",
+        "cli/installation",
+        "cli/authentication",
+        {
+          "group": "Commands",
+          "pages": [
+            "cli/commands/organizations",
+            "cli/commands/users",
+            "cli/commands/tools",
+            "cli/commands/actions",
+            "cli/commands/flows",
+            "cli/commands/logs",
+            "cli/commands/webhooks",
+            "cli/commands/auth"
+          ]
+        },
+        "cli/configuration",
+        "cli/scripting",
+        "cli/troubleshooting"
+      ]
+    },
+    {
+      "group": "TypeScript SDK",
+      "pages": [
+        "sdk/overview",
+        "sdk/installation",
+        "sdk/quickstart",
+        "sdk/authentication",
+        {
+          "group": "Client Methods",
+          "pages": [
+            "sdk/organizations",
+            "sdk/users",
+            "sdk/tools",
+            "sdk/actions",
+            "sdk/flows",
+            "sdk/execution-logs",
+            "sdk/webhooks",
+            "sdk/health"
+          ]
+        },
+        {
+          "group": "Advanced Features",
+          "pages": [
+            "sdk/error-handling",
+            "sdk/pagination",
+            "sdk/retries",
+            "sdk/webhooks-handling",
+            "sdk/real-time"
+          ]
+        },
+        "sdk/examples",
+        "sdk/typescript-support"
+      ]
+    },
+    {
+      "group": "API Reference",
+      "pages": [
+        "api/overview",
+        "api/authentication",
+        "api/rate-limiting",
+        "api/errors",
+        "api/pagination",
+        {
+          "group": "Organizations",
+          "pages": [
+            "api/organizations/list",
+            "api/organizations/create",
+            "api/organizations/get",
+            "api/organizations/update",
+            "api/organizations/delete",
+            "api/organizations/analytics"
+          ]
+        },
+        {
+          "group": "Users",
+          "pages": [
+            "api/users/list",
+            "api/users/create",
+            "api/users/get",
+            "api/users/update",
+            "api/users/delete"
+          ]
+        },
+        {
+          "group": "Tools",
+          "pages": [
+            "api/tools/list",
+            "api/tools/create",
+            "api/tools/get",
+            "api/tools/update",
+            "api/tools/delete",
+            "api/tools/auth-config",
+            "api/tools/secrets"
+          ]
+        },
+        {
+          "group": "Actions",
+          "pages": [
+            "api/actions/list",
+            "api/actions/create",
+            "api/actions/get",
+            "api/actions/update",
+            "api/actions/delete",
+            "api/actions/execute"
+          ]
+        },
+        {
+          "group": "Flows",
+          "pages": [
+            "api/flows/list",
+            "api/flows/create",
+            "api/flows/get",
+            "api/flows/update",
+            "api/flows/delete",
+            "api/flows/execute",
+            "api/flows/executions",
+            "api/flows/execution-status",
+            "api/flows/cancel",
+            "api/flows/retry",
+            "api/flows/metrics"
+          ]
+        },
+        {
+          "group": "Execution Logs",
+          "pages": [
+            "api/execution-logs/list",
+            "api/execution-logs/get",
+            "api/execution-logs/filter"
+          ]
+        },
+        {
+          "group": "Webhooks",
+          "pages": [
+            "api/webhooks/list",
+            "api/webhooks/create",
+            "api/webhooks/get",
+            "api/webhooks/update",
+            "api/webhooks/delete",
+            "api/webhooks/toggle",
+            "api/webhooks/test",
+            "api/webhooks/event-types"
+          ]
+        },
+        {
+          "group": "Authentication",
+          "pages": [
+            "api/auth/oauth-login",
+            "api/auth/oauth-callback",
+            "api/auth/tool-auth"
+          ]
+        },
+        {
+          "group": "Health & Status",
+          "pages": [
+            "api/health/status",
+            "api/health/detailed",
+            "api/health/metrics"
+          ]
+        }
+      ]
+    },
+    {
+      "group": "Internal Documentation",
+      "pages": [
+        "internal/overview",
+        "internal/onboarding",
+        {
+          "group": "Architecture",
+          "pages": [
+            "internal/architecture/overview",
+            "internal/architecture/database-schema",
+            "internal/architecture/api-layer",
+            "internal/architecture/execution-engine",
+            "internal/architecture/authentication",
+            "internal/architecture/multi-tenant",
+            "internal/architecture/caching",
+            "internal/architecture/queue-system"
+          ]
+        },
+        {
+          "group": "Development",
+          "pages": [
+            "internal/development/setup",
+            "internal/development/testing",
+            "internal/development/debugging",
+            "internal/development/database-migrations",
+            "internal/development/adding-features",
+            "internal/development/code-standards"
+          ]
+        },
+        {
+          "group": "Services & Components",
+          "pages": [
+            "internal/services/organizations",
+            "internal/services/users",
+            "internal/services/tools",
+            "internal/services/actions",
+            "internal/services/flows",
+            "internal/services/execution-engine",
+            "internal/services/webhooks",
+            "internal/services/auth",
+            "internal/services/metrics",
+            "internal/services/cache",
+            "internal/services/secrets"
+          ]
+        },
+        {
+          "group": "Operations",
+          "pages": [
+            "internal/operations/deployment",
+            "internal/operations/monitoring",
+            "internal/operations/logging",
+            "internal/operations/security",
+            "internal/operations/performance",
+            "internal/operations/troubleshooting",
+            "internal/operations/disaster-recovery"
+          ]
+        },
+        {
+          "group": "Integrations",
+          "pages": [
+            "internal/integrations/aws-secrets",
+            "internal/integrations/inngest",
+            "internal/integrations/ably",
+            "internal/integrations/daytona",
+            "internal/integrations/prometheus",
+            "internal/integrations/sentry"
+          ]
+        }
+      ]
+    }
+  ],
+  "api": {
+    "playground": {
+      "mode": "show"
+    }
+  },
+  "footerSocials": {
+    "github": "https://github.com/joosuhail12/tolstoy",
+    "linkedin": "https://linkedin.com/company/tolstoy"
+  }
+}

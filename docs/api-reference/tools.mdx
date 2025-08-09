@@ -1,0 +1,552 @@
+---
+title: Tools API
+description: Manage external tool integrations and configurations
+---
+
+# Tools API
+
+Tools represent external services and integrations that Tolstoy can connect to. They provide authentication credentials and configuration for actions to use when interacting with third-party services.
+
+## Tool Object
+
+A tool contains the configuration and credentials needed to connect to an external service.
+
+### Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `id` | string | Unique identifier for the tool |
+| `name` | string | Human-readable name for the tool |
+| `type` | string | Tool type (e.g., `slack`, `sendgrid`, `github`) |
+| `description` | string | Optional description of the tool |
+| `config` | object | Configuration parameters for the tool |
+| `status` | enum | Tool status (`active`, `inactive`, `error`) |
+| `created_at` | timestamp | When the tool was created |
+| `updated_at` | timestamp | When the tool was last updated |
+
+### Example Tool Object
+
+```json
+{
+  "id": "tool_1234567890",
+  "name": "Company Slack",
+  "type": "slack",
+  "description": "Main Slack workspace for notifications",
+  "status": "active",
+  "config": {
+    "workspace": "company-workspace",
+    "channels": ["#general", "#alerts", "#notifications"]
+  },
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+<Note>
+Sensitive credentials are never returned in API responses for security reasons.
+</Note>
+
+## List Tools
+
+Retrieve a list of configured tools for your organization.
+
+<CodeGroup>
+```bash cURL
+curl https://api.tolstoy.dev/v1/tools \
+  -H "Authorization: Bearer sk_live_..."
+```
+
+```javascript Node.js
+const tools = await client.tools.list({
+  type: 'slack',
+  status: 'active'
+});
+```
+
+```python Python
+tools = client.tools.list(
+    type='slack',
+    status='active'
+)
+```
+</CodeGroup>
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `type` | string | Filter by tool type |
+| `status` | enum | Filter by status (`active`, `inactive`, `error`) |
+| `limit` | integer | Number of tools to return (max 100, default 20) |
+| `offset` | integer | Number of tools to skip |
+
+## Get a Tool
+
+Retrieve details of a specific tool.
+
+<CodeGroup>
+```bash cURL
+curl https://api.tolstoy.dev/v1/tools/tool_1234567890 \
+  -H "Authorization: Bearer sk_live_..."
+```
+
+```javascript Node.js
+const tool = await client.tools.get('tool_1234567890');
+```
+
+```python Python
+tool = client.tools.get('tool_1234567890')
+```
+</CodeGroup>
+
+## Create a Tool
+
+Create a new tool integration.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.tolstoy.dev/v1/tools \
+  -H "Authorization: Bearer sk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Company Slack",
+    "type": "slack",
+    "description": "Main Slack workspace",
+    "credentials": {
+      "bot_token": "xoxb-your-bot-token",
+      "signing_secret": "your-signing-secret"
+    },
+    "config": {
+      "workspace": "company-workspace"
+    }
+  }'
+```
+
+```javascript Node.js
+const tool = await client.tools.create({
+  name: 'Company Slack',
+  type: 'slack',
+  description: 'Main Slack workspace',
+  credentials: {
+    bot_token: 'xoxb-your-bot-token',
+    signing_secret: 'your-signing-secret'
+  },
+  config: {
+    workspace: 'company-workspace'
+  }
+});
+```
+
+```python Python
+tool = client.tools.create({
+    'name': 'Company Slack',
+    'type': 'slack',
+    'description': 'Main Slack workspace',
+    'credentials': {
+        'bot_token': 'xoxb-your-bot-token',
+        'signing_secret': 'your-signing-secret'
+    },
+    'config': {
+        'workspace': 'company-workspace'
+    }
+})
+```
+</CodeGroup>
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | Yes | Name of the tool |
+| `type` | string | Yes | Tool type identifier |
+| `description` | string | No | Description of the tool |
+| `credentials` | object | Yes | Authentication credentials |
+| `config` | object | No | Additional configuration |
+
+## Update a Tool
+
+Update an existing tool's configuration or credentials.
+
+<CodeGroup>
+```bash cURL
+curl -X PATCH https://api.tolstoy.dev/v1/tools/tool_1234567890 \
+  -H "Authorization: Bearer sk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Updated Slack Integration",
+    "config": {
+      "workspace": "new-workspace"
+    }
+  }'
+```
+
+```javascript Node.js
+const tool = await client.tools.update('tool_1234567890', {
+  name: 'Updated Slack Integration',
+  config: {
+    workspace: 'new-workspace'
+  }
+});
+```
+
+```python Python
+tool = client.tools.update('tool_1234567890', {
+    'name': 'Updated Slack Integration',
+    'config': {
+        'workspace': 'new-workspace'
+    }
+})
+```
+</CodeGroup>
+
+## Delete a Tool
+
+Delete a tool integration. This will also disable any workflows using this tool.
+
+<CodeGroup>
+```bash cURL
+curl -X DELETE https://api.tolstoy.dev/v1/tools/tool_1234567890 \
+  -H "Authorization: Bearer sk_live_..."
+```
+
+```javascript Node.js
+await client.tools.delete('tool_1234567890');
+```
+
+```python Python
+client.tools.delete('tool_1234567890')
+```
+</CodeGroup>
+
+<Warning>
+Deleting a tool will cause any workflows using it to fail. Make sure to update your workflows before deleting a tool.
+</Warning>
+
+## Test Tool Connection
+
+Verify that a tool is configured correctly and can connect to the external service.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.tolstoy.dev/v1/tools/tool_1234567890/test \
+  -H "Authorization: Bearer sk_live_..."
+```
+
+```javascript Node.js
+const result = await client.tools.test('tool_1234567890');
+```
+
+```python Python
+result = client.tools.test('tool_1234567890')
+```
+</CodeGroup>
+
+### Response
+
+```json
+{
+  "success": true,
+  "message": "Connection successful",
+  "details": {
+    "workspace": "company-workspace",
+    "bot_name": "Tolstoy Bot",
+    "permissions": ["chat:write", "channels:read"]
+  },
+  "tested_at": "2024-01-15T10:30:00Z"
+}
+```
+
+## Available Tool Types
+
+### Slack
+
+Connect to Slack workspaces for sending messages and notifications.
+
+**Required Credentials:**
+- `bot_token` - Slack bot user OAuth token
+- `signing_secret` - Slack app signing secret (for webhooks)
+
+**Configuration Options:**
+- `workspace` - Workspace name/ID
+- `default_channel` - Default channel for messages
+
+**Example:**
+```json
+{
+  "type": "slack",
+  "credentials": {
+    "bot_token": "xoxb-1234-5678-abcdef",
+    "signing_secret": "abc123def456"
+  },
+  "config": {
+    "workspace": "my-company",
+    "default_channel": "#general"
+  }
+}
+```
+
+### SendGrid
+
+Email delivery service integration.
+
+**Required Credentials:**
+- `api_key` - SendGrid API key
+
+**Configuration Options:**
+- `from_email` - Default sender email
+- `from_name` - Default sender name
+- `template_engine` - Template processing engine
+
+**Example:**
+```json
+{
+  "type": "sendgrid",
+  "credentials": {
+    "api_key": "SG.abc123.def456"
+  },
+  "config": {
+    "from_email": "noreply@company.com",
+    "from_name": "Company Notifications"
+  }
+}
+```
+
+### GitHub
+
+GitHub API integration for repository operations.
+
+**Required Credentials:**
+- `access_token` - GitHub personal access token or OAuth token
+
+**Configuration Options:**
+- `organization` - GitHub organization name
+- `default_repo` - Default repository name
+
+**Example:**
+```json
+{
+  "type": "github",
+  "credentials": {
+    "access_token": "ghp_abc123def456"
+  },
+  "config": {
+    "organization": "my-company",
+    "default_repo": "main-project"
+  }
+}
+```
+
+### AWS
+
+Amazon Web Services integration.
+
+**Required Credentials:**
+- `access_key_id` - AWS access key ID
+- `secret_access_key` - AWS secret access key
+- `region` - AWS region
+
+**Configuration Options:**
+- `assume_role_arn` - IAM role ARN to assume
+- `session_duration` - Session duration in seconds
+
+**Example:**
+```json
+{
+  "type": "aws",
+  "credentials": {
+    "access_key_id": "AKIAEXAMPLE",
+    "secret_access_key": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    "region": "us-east-1"
+  },
+  "config": {
+    "assume_role_arn": "arn:aws:iam::123456789012:role/TolstoyRole"
+  }
+}
+```
+
+### Database
+
+Database connection for SQL operations.
+
+**Required Credentials:**
+- `connection_string` - Database connection string
+
+**Configuration Options:**
+- `pool_size` - Connection pool size
+- `timeout` - Query timeout in seconds
+
+**Example:**
+```json
+{
+  "type": "database",
+  "credentials": {
+    "connection_string": "postgresql://user:pass@localhost:5432/dbname"
+  },
+  "config": {
+    "pool_size": 10,
+    "timeout": 30
+  }
+}
+```
+
+## Using Tools in Workflows
+
+Tools are referenced in workflow actions using the `tool` parameter:
+
+```json
+{
+  "key": "send_slack_message",
+  "action": "slack",
+  "tool": "tool_1234567890",
+  "inputs": {
+    "channel": "#alerts",
+    "message": "Workflow completed successfully"
+  }
+}
+```
+
+### Tool Selection
+
+If multiple tools of the same type exist, you can specify which one to use:
+
+```json
+{
+  "key": "send_to_dev_slack",
+  "action": "slack",
+  "tool": "dev_slack_tool",
+  "inputs": {
+    "channel": "#dev-alerts",
+    "message": "Build completed"
+  }
+}
+```
+
+### Default Tools
+
+If no tool is specified, Tolstoy will use the first active tool of the required type:
+
+```json
+{
+  "key": "send_email",
+  "action": "email",
+  "inputs": {
+    "to": "user@example.com",
+    "subject": "Notification",
+    "body": "Your process is complete"
+  }
+}
+```
+
+## Tool Permissions
+
+Tools operate with the permissions granted by their credentials. Ensure your tools have the necessary permissions for the actions they'll perform.
+
+### Slack Permissions
+
+- `chat:write` - Send messages to channels
+- `channels:read` - List public channels
+- `groups:read` - List private channels
+- `users:read` - Read user information
+
+### GitHub Permissions
+
+- `repo` - Full repository access
+- `read:org` - Read organization membership
+- `write:repo_hook` - Manage webhooks
+
+### AWS Permissions
+
+Configure IAM policies with minimal required permissions:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "ses:SendEmail"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+## Error Handling
+
+Tool-related errors can occur during workflow execution:
+
+### Authentication Errors
+```json
+{
+  "error": {
+    "type": "tool_authentication_error",
+    "message": "Invalid credentials for Slack tool",
+    "tool_id": "tool_1234567890",
+    "tool_type": "slack"
+  }
+}
+```
+
+### Configuration Errors
+```json
+{
+  "error": {
+    "type": "tool_configuration_error",
+    "message": "Missing required configuration: workspace",
+    "tool_id": "tool_1234567890"
+  }
+}
+```
+
+### Connection Errors
+```json
+{
+  "error": {
+    "type": "tool_connection_error",
+    "message": "Unable to connect to Slack API",
+    "tool_id": "tool_1234567890",
+    "retry_after": 300
+  }
+}
+```
+
+## Security Best Practices
+
+### Credential Management
+- Use environment variables for sensitive credentials
+- Rotate credentials regularly
+- Use service accounts with minimal permissions
+- Enable audit logging for credential access
+
+### Access Control
+- Limit tool access to specific teams or users
+- Use role-based permissions
+- Monitor tool usage and access patterns
+- Disable unused tools promptly
+
+### Network Security
+- Use HTTPS for all tool communications
+- Whitelist IP addresses when possible
+- Enable VPC/private networking for cloud services
+- Monitor network traffic to external services
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Flow Examples" icon="diagram-project" href="/sdk/examples">
+    See how tools are used in complete workflows
+  </Card>
+  <Card title="Actions API" icon="play" href="/api-reference/actions">
+    Learn about actions that use tools
+  </Card>
+  <Card title="Security Guide" icon="shield" href="/security">
+    Best practices for secure tool integration
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting">
+    Common tool configuration issues
+  </Card>
+</CardGroup>

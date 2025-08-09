@@ -1,0 +1,139 @@
+---
+title: GitHub Actions Setup
+description: Guide for setting up GitHub Actions with Tolstoy workflows
+---
+
+# GitHub Actions Setup Guide
+
+## Overview
+
+This guide shows how to set up GitHub Actions for automated Tolstoy workflow deployment and testing.
+
+## Prerequisites
+
+- GitHub repository with Tolstoy workflows
+- Tolstoy API key with appropriate permissions
+- Access to repository secrets
+
+## Basic Setup
+
+### 1. Store Secrets
+
+Add these secrets to your GitHub repository:
+- `TOLSTOY_API_KEY`: Your Tolstoy API key
+- `TOLSTOY_BASE_URL`: API endpoint (usually https://api.tolstoy.dev)
+
+### 2. Create Workflow File
+
+Create `.github/workflows/tolstoy-deploy.yml`:
+
+```yaml
+name: Deploy Tolstoy Workflows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        
+    - name: Install dependencies
+      run: npm install @tolstoy/sdk
+      
+    - name: Deploy workflows
+      env:
+        TOLSTOY_API_KEY: ${{ secrets.TOLSTOY_API_KEY }}
+        TOLSTOY_BASE_URL: ${{ secrets.TOLSTOY_BASE_URL }}
+      run: node deploy-workflows.js
+```
+
+### 3. Create Deployment Script
+
+Create `deploy-workflows.js`:
+
+```javascript
+const { Client } = require('@tolstoy/sdk');
+const fs = require('fs');
+const path = require('path');
+
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  baseUrl: process.env.TOLSTOY_BASE_URL
+});
+
+async function deployWorkflows() {
+  const workflowsDir = path.join(__dirname, 'workflows');
+  const files = fs.readdirSync(workflowsDir);
+  
+  for (const file of files) {
+    if (file.endsWith('.json')) {
+      const workflow = JSON.parse(
+        fs.readFileSync(path.join(workflowsDir, file), 'utf8')
+      );
+      
+      try {
+        const flow = await client.flows.create(workflow);
+        console.log(`Deployed workflow: ${flow.name} (${flow.id})`);
+      } catch (error) {
+        console.error(`Failed to deploy ${file}:`, error.message);
+        process.exit(1);
+      }
+    }
+  }
+}
+
+deployWorkflows();
+```
+
+## Advanced Configuration
+
+### Testing Workflows
+
+Add testing steps to your GitHub Actions:
+
+```yaml
+- name: Test workflows
+  env:
+    TOLSTOY_API_KEY: ${{ secrets.TOLSTOY_API_KEY }}
+  run: |
+    node test-workflows.js
+```
+
+### Environment-Specific Deployment
+
+Deploy to different environments based on branch:
+
+```yaml
+- name: Deploy to staging
+  if: github.ref == 'refs/heads/develop'
+  env:
+    TOLSTOY_API_KEY: ${{ secrets.TOLSTOY_STAGING_API_KEY }}
+  run: node deploy-workflows.js
+  
+- name: Deploy to production
+  if: github.ref == 'refs/heads/main'
+  env:
+    TOLSTOY_API_KEY: ${{ secrets.TOLSTOY_PROD_API_KEY }}
+  run: node deploy-workflows.js
+```
+
+## Best Practices
+
+1. Use separate API keys for different environments
+2. Test workflows in staging before production
+3. Store sensitive data in GitHub secrets
+4. Monitor deployment results
+5. Implement rollback procedures
+
+For more information, see the [CI/CD documentation](/ci-cd).

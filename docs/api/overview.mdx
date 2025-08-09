@@ -1,0 +1,2109 @@
+---
+title: "API Overview"
+description: "Complete REST API reference for the Tolstoy workflow automation platform with authentication and integration examples"
+---
+
+# API Overview
+
+The Tolstoy REST API provides comprehensive programmatic access to all platform functionality. Built with modern API design principles, it offers consistent endpoints, detailed error handling, and extensive documentation to help developers integrate workflow automation into their applications.
+
+<img
+  className="block dark:hidden"
+  src="/images/api-hero-light.png"
+  alt="Tolstoy API Overview Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/api-hero-dark.png"
+  alt="Tolstoy API Overview Dark"
+/>
+
+## API Fundamentals
+
+<CardGroup cols={2}>
+  <Card title="RESTful Design" icon="globe">
+    Standard HTTP methods, status codes, and JSON payloads following REST principles for predictable interactions.
+  </Card>
+  <Card title="Comprehensive Coverage" icon="layer-group">
+    Complete API coverage for flows, actions, tools, users, organizations, webhooks, and execution monitoring.
+  </Card>
+  <Card title="Type Safety" icon="shield">
+    Full OpenAPI 3.0 specification with generated TypeScript definitions and validation schemas.
+  </Card>
+  <Card title="Developer Experience" icon="code">
+    Extensive documentation, code examples, and interactive API explorer for rapid development.
+  </Card>
+</CardGroup>
+
+## Base URL & Versioning
+
+### **API Endpoints**
+
+<Tabs>
+  <Tab title="Production">
+    **Primary Endpoint**
+    ```
+    https://api.tolstoy.dev/v1
+    ```
+    
+    **Regional Endpoints**
+    ```
+    https://api-us.tolstoy.dev/v1      # US East
+    https://api-eu.tolstoy.dev/v1      # Europe
+    https://api-asia.tolstoy.dev/v1    # Asia Pacific
+    ```
+  </Tab>
+  
+  <Tab title="Development">
+    **Sandbox Environment**
+    ```
+    https://api-sandbox.tolstoy.dev/v1
+    ```
+    
+    **Local Development**
+    ```
+    http://localhost:8080/v1           # Default local setup
+    http://api.localhost:3000/v1       # Docker development
+    ```
+  </Tab>
+  
+  <Tab title="Enterprise">
+    **On-Premise Deployments**
+    ```
+    https://your-domain.com/api/v1     # Self-hosted
+    https://internal-api.company.com/v1 # Internal deployment
+    ```
+    
+    **Dedicated Cloud**
+    ```
+    https://api-company.tolstoy.dev/v1 # Dedicated instance
+    ```
+  </Tab>
+</Tabs>
+
+### **API Versioning**
+
+The API uses semantic versioning with backwards compatibility guarantees:
+
+- **Current Version:** `v1` (stable)
+- **Legacy Support:** `v0` (deprecated, supported until 2024-12-31)
+- **Preview Features:** `v2-preview` (experimental)
+
+```http
+GET /v1/flows HTTP/1.1
+Host: api.tolstoy.dev
+Accept: application/vnd.tolstoy.v1+json
+```
+
+## Authentication
+
+### **API Key Authentication**
+
+The primary authentication method uses API keys with Bearer token format:
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://api.tolstoy.dev/v1/flows" \
+  -H "Authorization: Bearer sk_live_1234567890abcdef" \
+  -H "Content-Type: application/json"
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.tolstoy.dev/v1/flows', {
+  headers: {
+    'Authorization': 'Bearer sk_live_1234567890abcdef',
+    'Content-Type': 'application/json'
+  }
+});
+```
+
+```python Python
+import requests
+
+headers = {
+    'Authorization': 'Bearer sk_live_1234567890abcdef',
+    'Content-Type': 'application/json'
+}
+
+response = requests.get('https://api.tolstoy.dev/v1/flows', headers=headers)
+```
+
+```go Go
+package main
+
+import (
+    "net/http"
+    "io/ioutil"
+)
+
+func main() {
+    client := &http.Client{}
+    req, _ := http.NewRequest("GET", "https://api.tolstoy.dev/v1/flows", nil)
+    req.Header.Set("Authorization", "Bearer sk_live_1234567890abcdef")
+    req.Header.Set("Content-Type", "application/json")
+    
+    resp, _ := client.Do(req)
+    defer resp.Body.Close()
+    body, _ := ioutil.ReadAll(resp.Body)
+}
+```
+</CodeGroup>
+
+### **API Key Management**
+
+<Tabs>
+  <Tab title="Key Types">
+    **Live Keys**
+    - Format: `sk_live_...`
+    - Full production access
+    - Rate limits apply
+    - Audit logging enabled
+    
+    **Test Keys**
+    - Format: `sk_test_...`
+    - Sandbox environment access
+    - No rate limits
+    - Safe for development
+    
+    **Restricted Keys**
+    - Format: `sk_restricted_...`
+    - Limited scope permissions
+    - Specific resource access
+    - Enhanced security
+  </Tab>
+  
+  <Tab title="Key Permissions">
+    **Scope-based Permissions**
+    ```json
+    {
+      "key_id": "key_abc123def456",
+      "name": "CI/CD Deploy Key",
+      "permissions": [
+        "flows:read",
+        "flows:deploy",
+        "executions:read",
+        "webhooks:create"
+      ],
+      "restrictions": {
+        "ip_whitelist": ["10.0.0.0/8"],
+        "allowed_organizations": ["org_123abc456def"]
+      },
+      "expires_at": "2024-12-31T23:59:59Z"
+    }
+    ```
+    
+    **Available Scopes:**
+    - `flows:*` - All flow operations
+    - `actions:*` - Action management
+    - `tools:*` - Integration tools
+    - `users:*` - User management
+    - `orgs:*` - Organization admin
+    - `webhooks:*` - Webhook management
+    - `executions:read` - Execution monitoring
+  </Tab>
+  
+  <Tab title="Security Features">
+    **Enhanced Security**
+    
+    ```http
+    POST /v1/api-keys HTTP/1.1
+    Host: api.tolstoy.dev
+    Authorization: Bearer sk_live_admin_key
+    Content-Type: application/json
+    
+    {
+      "name": "Secure Deploy Key",
+      "permissions": ["flows:deploy"],
+      "security": {
+        "ip_restrictions": ["203.0.113.0/24"],
+        "time_restrictions": {
+          "allowed_hours": [9, 17],
+          "timezone": "America/New_York"
+        },
+        "mfa_required": true,
+        "expires_in": "90d"
+      }
+    }
+    ```
+    
+    **Security Features:**
+    - IP address restrictions
+    - Time-based access control
+    - Multi-factor authentication
+    - Automatic key rotation
+    - Usage monitoring and alerts
+  </Tab>
+</Tabs>
+
+### **OAuth2 Integration**
+
+For applications requiring user context and delegated access:
+
+<CodeGroup>
+```javascript OAuth2 Flow
+// Step 1: Redirect to authorization server
+const authUrl = `https://auth.tolstoy.dev/oauth/authorize?` +
+  `client_id=${CLIENT_ID}&` +
+  `response_type=code&` +
+  `scope=flows:read flows:write&` +
+  `redirect_uri=${REDIRECT_URI}&` +
+  `state=${STATE}`;
+
+window.location.href = authUrl;
+
+// Step 2: Handle authorization code
+const urlParams = new URLSearchParams(window.location.search);
+const code = urlParams.get('code');
+
+// Step 3: Exchange code for access token
+const tokenResponse = await fetch('https://auth.tolstoy.dev/oauth/token', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Authorization': `Basic ${btoa(`${CLIENT_ID}:${CLIENT_SECRET}`)}`
+  },
+  body: new URLSearchParams({
+    grant_type: 'authorization_code',
+    code: code,
+    redirect_uri: REDIRECT_URI
+  })
+});
+
+const tokens = await tokenResponse.json();
+// Use tokens.access_token for API requests
+```
+
+```python Python OAuth2
+import requests
+from urllib.parse import urlencode
+
+# Step 1: Build authorization URL
+auth_params = {
+    'client_id': CLIENT_ID,
+    'response_type': 'code',
+    'scope': 'flows:read flows:write executions:read',
+    'redirect_uri': REDIRECT_URI,
+    'state': generate_state()
+}
+auth_url = f"https://auth.tolstoy.dev/oauth/authorize?{urlencode(auth_params)}"
+
+# Step 2: Exchange authorization code for tokens
+token_data = {
+    'grant_type': 'authorization_code',
+    'code': authorization_code,
+    'redirect_uri': REDIRECT_URI
+}
+
+response = requests.post(
+    'https://auth.tolstoy.dev/oauth/token',
+    data=token_data,
+    auth=(CLIENT_ID, CLIENT_SECRET)
+)
+
+tokens = response.json()
+access_token = tokens['access_token']
+```
+</CodeGroup>
+
+## Core Resources
+
+### **Flows - Workflow Management**
+
+Flows represent complete workflow definitions with their execution logic:
+
+<CodeGroup>
+```http List Flows
+GET /v1/flows HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+
+# Response
+{
+  "flows": [
+    {
+      "id": "flow_abc123def456",
+      "name": "User Onboarding",
+      "description": "Complete user onboarding workflow",
+      "status": "active",
+      "version": "1.2.0",
+      "created_at": "2024-01-15T10:30:00Z",
+      "updated_at": "2024-01-20T15:45:00Z",
+      "steps_count": 5,
+      "executions_count": 1247,
+      "success_rate": 98.5,
+      "avg_execution_time": 42000,
+      "tags": ["onboarding", "production"]
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "per_page": 20,
+    "total": 156,
+    "total_pages": 8
+  }
+}
+```
+
+```http Create Flow
+POST /v1/flows HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+Content-Type: application/json
+
+{
+  "name": "Order Processing Flow",
+  "description": "Process customer orders end-to-end",
+  "steps": [
+    {
+      "key": "validate_order",
+      "name": "Validate Order Data",
+      "action": "data_validation",
+      "inputs": {
+        "data": "{{trigger.body}}",
+        "schema": "order_schema"
+      },
+      "retry_policy": {
+        "attempts": 3,
+        "delay": "10s"
+      }
+    },
+    {
+      "key": "charge_payment",
+      "name": "Process Payment",
+      "action": "stripe_charge",
+      "inputs": {
+        "amount": "{{validate_order.total}}",
+        "currency": "usd",
+        "source": "{{validate_order.payment_token}}"
+      },
+      "conditions": [
+        {"when": "{{validate_order.valid}} == true"}
+      ]
+    }
+  ],
+  "trigger": {
+    "type": "webhook",
+    "path": "/order-webhook"
+  },
+  "settings": {
+    "timeout": "10m",
+    "retry_policy": {
+      "attempts": 2,
+      "delay": "30s"
+    }
+  }
+}
+```
+
+```http Execute Flow
+POST /v1/flows/flow_abc123def456/executions HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+Content-Type: application/json
+
+{
+  "inputs": {
+    "customer_email": "customer@example.com",
+    "order_id": "order_789ghi012jkl",
+    "amount": 99.99
+  },
+  "metadata": {
+    "source": "api",
+    "user_id": "user_456def789ghi"
+  }
+}
+
+# Response
+{
+  "execution_id": "exec_def456ghi789",
+  "flow_id": "flow_abc123def456",
+  "status": "running",
+  "started_at": "2024-01-21T10:30:00Z",
+  "inputs": { ... },
+  "metadata": { ... }
+}
+```
+
+```http Flow Status & Metrics
+GET /v1/flows/flow_abc123def456/metrics?period=7d HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+
+# Response
+{
+  "flow_id": "flow_abc123def456",
+  "period": "7d",
+  "metrics": {
+    "total_executions": 342,
+    "successful_executions": 337,
+    "failed_executions": 5,
+    "success_rate": 98.5,
+    "avg_execution_time": 45200,
+    "median_execution_time": 38000,
+    "p95_execution_time": 78000,
+    "executions_by_day": [
+      {"date": "2024-01-21", "count": 52, "success_rate": 100},
+      {"date": "2024-01-20", "count": 48, "success_rate": 97.9}
+    ],
+    "error_breakdown": {
+      "timeout": 2,
+      "api_error": 2,
+      "validation_error": 1
+    }
+  }
+}
+```
+</CodeGroup>
+
+### **Actions - Workflow Building Blocks**
+
+Actions are reusable components that perform specific operations within flows:
+
+<CodeGroup>
+```http List Actions
+GET /v1/actions?category=email&provider=sendgrid HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+
+# Response
+{
+  "actions": [
+    {
+      "id": "action_email_sendgrid",
+      "name": "Send Email (SendGrid)",
+      "category": "email",
+      "provider": "sendgrid",
+      "description": "Send transactional emails using SendGrid",
+      "input_schema": {
+        "type": "object",
+        "required": ["to", "subject", "content"],
+        "properties": {
+          "to": {"type": "string", "format": "email"},
+          "subject": {"type": "string"},
+          "content": {"type": "string"},
+          "template_id": {"type": "string"}
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "properties": {
+          "message_id": {"type": "string"},
+          "status": {"type": "string"},
+          "delivered_at": {"type": "string", "format": "date-time"}
+        }
+      },
+      "configuration": {
+        "auth_required": true,
+        "rate_limits": {
+          "requests_per_minute": 100
+        }
+      }
+    }
+  ]
+}
+```
+
+```http Create Custom Action
+POST /v1/actions HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+Content-Type: application/json
+
+{
+  "name": "Custom Data Processor",
+  "category": "data",
+  "description": "Process and transform data with custom logic",
+  "code": {
+    "language": "javascript",
+    "source": "function process(inputs) { return { transformed: inputs.data.toUpperCase() }; }"
+  },
+  "input_schema": {
+    "type": "object",
+    "required": ["data"],
+    "properties": {
+      "data": {"type": "string"},
+      "options": {"type": "object"}
+    }
+  },
+  "output_schema": {
+    "type": "object",
+    "properties": {
+      "transformed": {"type": "string"},
+      "metadata": {"type": "object"}
+    }
+  },
+  "settings": {
+    "timeout": "30s",
+    "memory_limit": "128MB"
+  }
+}
+```
+
+```http Test Action
+POST /v1/actions/action_email_sendgrid/test HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+Content-Type: application/json
+
+{
+  "inputs": {
+    "to": "test@example.com",
+    "subject": "Test Email",
+    "content": "This is a test email from Tolstoy"
+  },
+  "dry_run": true
+}
+
+# Response
+{
+  "test_id": "test_ghi789jkl012",
+  "status": "success",
+  "execution_time": 1250,
+  "output": {
+    "message_id": "msg_test_123abc",
+    "status": "queued",
+    "delivered_at": "2024-01-21T10:35:00Z"
+  },
+  "logs": [
+    {
+      "timestamp": "2024-01-21T10:34:58Z",
+      "level": "info",
+      "message": "Validating input parameters"
+    },
+    {
+      "timestamp": "2024-01-21T10:34:59Z",
+      "level": "info",
+      "message": "Connecting to SendGrid API"
+    }
+  ]
+}
+```
+</CodeGroup>
+
+### **Tools - Integration Management**
+
+Tools represent external service integrations and authentication configurations:
+
+<CodeGroup>
+```http List Tools
+GET /v1/tools?status=connected HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+
+# Response
+{
+  "tools": [
+    {
+      "id": "tool_github_123",
+      "name": "GitHub Integration",
+      "type": "github",
+      "status": "connected",
+      "configuration": {
+        "base_url": "https://api.github.com",
+        "organization": "my-company",
+        "default_repo": "main-repo"
+      },
+      "authentication": {
+        "type": "oauth2",
+        "scopes": ["repo", "issues"],
+        "expires_at": "2024-06-15T10:30:00Z"
+      },
+      "health": {
+        "status": "healthy",
+        "last_check": "2024-01-21T10:30:00Z",
+        "response_time": 145
+      },
+      "usage": {
+        "requests_today": 1247,
+        "requests_this_month": 38962,
+        "rate_limit_remaining": 4753
+      }
+    }
+  ]
+}
+```
+
+```http Connect Tool
+POST /v1/tools HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+Content-Type: application/json
+
+{
+  "name": "Slack Notifications",
+  "type": "slack",
+  "authentication": {
+    "type": "bot_token",
+    "token": "xoxb-EXAMPLE-TOKEN-REPLACE-WITH-REAL"
+  },
+  "configuration": {
+    "default_channel": "#general",
+    "workspace_id": "T1234567890",
+    "mention_users": true
+  },
+  "settings": {
+    "timeout": "30s",
+    "retry_policy": {
+      "attempts": 3,
+      "delay": "10s"
+    }
+  }
+}
+
+# Response
+{
+  "tool_id": "tool_slack_456",
+  "name": "Slack Notifications",
+  "status": "connecting",
+  "connection_url": "https://slack.com/oauth/v2/authorize?client_id=...",
+  "setup_instructions": {
+    "steps": [
+      "Click the connection URL to authorize",
+      "Select the appropriate Slack workspace",
+      "Grant the requested permissions"
+    ]
+  }
+}
+```
+
+```http Test Tool Connection
+POST /v1/tools/tool_slack_456/test HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+
+# Response
+{
+  "status": "success",
+  "response_time": 234,
+  "connection_details": {
+    "workspace": "My Company Workspace",
+    "bot_user": "@tolstoy-bot",
+    "permissions": ["chat:write", "channels:read"],
+    "rate_limits": {
+      "messages_per_minute": 100,
+      "remaining": 95
+    }
+  },
+  "test_results": {
+    "api_connectivity": "pass",
+    "authentication": "pass",
+    "permissions": "pass"
+  }
+}
+```
+</CodeGroup>
+
+### **Executions - Workflow Monitoring**
+
+Track and monitor workflow executions with detailed logging and metrics:
+
+<CodeGroup>
+```http List Executions
+GET /v1/executions?status=failed&since=24h&limit=10 HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+
+# Response
+{
+  "executions": [
+    {
+      "id": "exec_failed_123abc",
+      "flow_id": "flow_user_onboarding",
+      "flow_name": "User Onboarding",
+      "status": "failed",
+      "started_at": "2024-01-21T09:15:00Z",
+      "completed_at": "2024-01-21T09:17:30Z",
+      "duration": 150000,
+      "error": {
+        "type": "action_timeout",
+        "message": "Email action timed out after 30 seconds",
+        "step": "send_welcome_email",
+        "code": "TIMEOUT_ERROR"
+      },
+      "steps_completed": 2,
+      "steps_total": 5,
+      "inputs": {
+        "user_email": "user@example.com",
+        "user_name": "John Doe"
+      }
+    }
+  ]
+}
+```
+
+```http Execution Details
+GET /v1/executions/exec_failed_123abc HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+
+# Response
+{
+  "id": "exec_failed_123abc",
+  "flow_id": "flow_user_onboarding",
+  "status": "failed",
+  "started_at": "2024-01-21T09:15:00Z",
+  "completed_at": "2024-01-21T09:17:30Z",
+  "duration": 150000,
+  "inputs": { ... },
+  "outputs": { ... },
+  "steps": [
+    {
+      "key": "validate_user",
+      "name": "Validate User Data",
+      "status": "completed",
+      "started_at": "2024-01-21T09:15:02Z",
+      "completed_at": "2024-01-21T09:15:05Z",
+      "duration": 3000,
+      "inputs": { ... },
+      "outputs": { ... }
+    },
+    {
+      "key": "create_account",
+      "name": "Create User Account",
+      "status": "completed",
+      "started_at": "2024-01-21T09:15:05Z",
+      "completed_at": "2024-01-21T09:15:12Z",
+      "duration": 7000,
+      "inputs": { ... },
+      "outputs": { ... }
+    },
+    {
+      "key": "send_welcome_email",
+      "name": "Send Welcome Email",
+      "status": "failed",
+      "started_at": "2024-01-21T09:15:12Z",
+      "failed_at": "2024-01-21T09:17:30Z",
+      "duration": 138000,
+      "error": {
+        "type": "timeout",
+        "message": "Email service timeout after 30 seconds",
+        "details": {
+          "provider": "sendgrid",
+          "endpoint": "https://api.sendgrid.com/v3/mail/send"
+        }
+      },
+      "retry_attempts": 2
+    }
+  ]
+}
+```
+
+```http Execution Logs
+GET /v1/executions/exec_failed_123abc/logs HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+
+# Response
+{
+  "logs": [
+    {
+      "timestamp": "2024-01-21T09:15:00Z",
+      "level": "info",
+      "step": null,
+      "message": "Execution started",
+      "metadata": {
+        "execution_id": "exec_failed_123abc",
+        "flow_version": "1.2.0"
+      }
+    },
+    {
+      "timestamp": "2024-01-21T09:15:02Z",
+      "level": "info",
+      "step": "validate_user",
+      "message": "Starting data validation",
+      "metadata": {
+        "action": "data_validation",
+        "input_size": 247
+      }
+    },
+    {
+      "timestamp": "2024-01-21T09:17:25Z",
+      "level": "warn",
+      "step": "send_welcome_email",
+      "message": "Email service responding slowly",
+      "metadata": {
+        "response_time": 25000,
+        "retry_attempt": 1
+      }
+    },
+    {
+      "timestamp": "2024-01-21T09:17:30Z",
+      "level": "error",
+      "step": "send_welcome_email",
+      "message": "Email action failed with timeout",
+      "metadata": {
+        "error_code": "TIMEOUT_ERROR",
+        "timeout_duration": 30000
+      }
+    }
+  ]
+}
+```
+
+```http Retry Execution
+POST /v1/executions/exec_failed_123abc/retry HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+Content-Type: application/json
+
+{
+  "from_step": "send_welcome_email",
+  "modified_inputs": {
+    "timeout": "60s",
+    "retry_policy": {
+      "attempts": 5,
+      "delay": "15s"
+    }
+  }
+}
+
+# Response
+{
+  "new_execution_id": "exec_retry_456def",
+  "status": "queued",
+  "retry_from_step": "send_welcome_email",
+  "estimated_start": "2024-01-21T10:32:00Z"
+}
+```
+</CodeGroup>
+
+### **Users & Organizations**
+
+Manage users, roles, and organizational settings:
+
+<CodeGroup>
+```http List Users
+GET /v1/users?role=admin&status=active HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+
+# Response
+{
+  "users": [
+    {
+      "id": "user_admin_123",
+      "email": "admin@company.com",
+      "name": "Jane Admin",
+      "role": "admin",
+      "status": "active",
+      "last_login": "2024-01-21T08:30:00Z",
+      "created_at": "2023-06-15T10:00:00Z",
+      "permissions": [
+        "flows:*",
+        "users:*",
+        "orgs:*"
+      ],
+      "mfa_enabled": true
+    }
+  ]
+}
+```
+
+```http Create User
+POST /v1/users HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+Content-Type: application/json
+
+{
+  "email": "developer@company.com",
+  "name": "New Developer",
+  "role": "developer",
+  "permissions": [
+    "flows:create",
+    "flows:read",
+    "flows:update",
+    "actions:read",
+    "executions:read"
+  ],
+  "send_invitation": true,
+  "invitation_message": "Welcome to the Tolstoy development team!"
+}
+```
+
+```http Organization Settings
+GET /v1/organizations/current HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+
+# Response
+{
+  "id": "org_company_123",
+  "name": "Acme Corporation",
+  "domain": "acme.com",
+  "plan": "enterprise",
+  "settings": {
+    "timezone": "America/New_York",
+    "date_format": "YYYY-MM-DD",
+    "retention_period": "365d",
+    "audit_logging": true
+  },
+  "limits": {
+    "users": 100,
+    "flows": 1000,
+    "executions_per_month": 50000,
+    "storage_gb": 100
+  },
+  "usage": {
+    "users": 23,
+    "active_flows": 87,
+    "executions_this_month": 12847,
+    "storage_used_gb": 23.4
+  }
+}
+```
+</CodeGroup>
+
+### **Webhooks - Event Integration**
+
+Configure webhooks to receive real-time notifications about workflow events:
+
+<CodeGroup>
+```http Create Webhook
+POST /v1/webhooks HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+Content-Type: application/json
+
+{
+  "name": "Flow Completion Notifications",
+  "url": "https://api.myapp.com/tolstoy-webhook",
+  "events": [
+    "flow.execution.completed",
+    "flow.execution.failed",
+    "flow.execution.timeout"
+  ],
+  "secret": "webhook_secret_abc123def456",
+  "headers": {
+    "X-Custom-Header": "MyApp-Webhook",
+    "Authorization": "Bearer my-webhook-token"
+  },
+  "retry_policy": {
+    "attempts": 5,
+    "delay": "30s",
+    "backoff": "exponential"
+  },
+  "filters": {
+    "flow_tags": ["production"],
+    "organization_id": "org_company_123"
+  }
+}
+
+# Response
+{
+  "webhook_id": "webhook_notifications_789",
+  "name": "Flow Completion Notifications",
+  "status": "active",
+  "created_at": "2024-01-21T10:30:00Z",
+  "verification_required": true,
+  "challenge_url": "https://api.myapp.com/tolstoy-webhook?challenge=abc123"
+}
+```
+
+```http Webhook Event Examples
+# Flow Execution Completed
+{
+  "id": "event_flow_completed_123",
+  "type": "flow.execution.completed",
+  "timestamp": "2024-01-21T10:35:00Z",
+  "data": {
+    "execution_id": "exec_success_456def",
+    "flow_id": "flow_user_onboarding",
+    "flow_name": "User Onboarding",
+    "status": "completed",
+    "duration": 45000,
+    "inputs": {
+      "user_email": "user@example.com"
+    },
+    "outputs": {
+      "user_id": "user_new_789ghi",
+      "account_created": true
+    }
+  },
+  "organization_id": "org_company_123"
+}
+
+# Flow Execution Failed
+{
+  "id": "event_flow_failed_456",
+  "type": "flow.execution.failed",
+  "timestamp": "2024-01-21T10:37:30Z",
+  "data": {
+    "execution_id": "exec_failed_789abc",
+    "flow_id": "flow_payment_processing",
+    "flow_name": "Payment Processing",
+    "status": "failed",
+    "duration": 15000,
+    "error": {
+      "type": "payment_declined",
+      "message": "Credit card declined",
+      "step": "process_payment",
+      "code": "PAYMENT_DECLINED"
+    },
+    "inputs": {
+      "amount": 99.99,
+      "currency": "USD"
+    }
+  },
+  "organization_id": "org_company_123"
+}
+```
+
+```http List Webhook Deliveries
+GET /v1/webhooks/webhook_notifications_789/deliveries?status=failed&limit=5 HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+
+# Response
+{
+  "deliveries": [
+    {
+      "id": "delivery_failed_123",
+      "webhook_id": "webhook_notifications_789",
+      "event_type": "flow.execution.failed",
+      "status": "failed",
+      "attempts": 3,
+      "last_attempt_at": "2024-01-21T10:45:00Z",
+      "response_code": 500,
+      "response_body": "Internal Server Error",
+      "next_retry_at": "2024-01-21T11:00:00Z",
+      "created_at": "2024-01-21T10:40:00Z"
+    }
+  ]
+}
+```
+
+```http Retry Webhook Delivery
+POST /v1/webhooks/webhook_notifications_789/deliveries/delivery_failed_123/retry HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+
+# Response
+{
+  "delivery_id": "delivery_failed_123",
+  "status": "queued",
+  "retry_attempt": 4,
+  "estimated_delivery": "2024-01-21T11:05:00Z"
+}
+```
+</CodeGroup>
+
+## Advanced Features
+
+### **Bulk Operations**
+
+Perform operations on multiple resources efficiently:
+
+<CodeGroup>
+```http Bulk Flow Operations
+POST /v1/flows/bulk HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+Content-Type: application/json
+
+{
+  "operation": "update",
+  "filters": {
+    "tags": ["production"],
+    "status": "active"
+  },
+  "updates": {
+    "settings": {
+      "timeout": "15m",
+      "retry_policy": {
+        "attempts": 5,
+        "delay": "60s"
+      }
+    }
+  }
+}
+
+# Response
+{
+  "operation_id": "bulk_op_123abc",
+  "status": "in_progress",
+  "total_items": 23,
+  "processed_items": 0,
+  "estimated_completion": "2024-01-21T10:45:00Z"
+}
+```
+
+```http Bulk Execution Launch
+POST /v1/executions/bulk HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+Content-Type: application/json
+
+{
+  "flow_id": "flow_user_migration",
+  "executions": [
+    {
+      "inputs": {"user_id": "user_001", "migration_type": "premium"},
+      "metadata": {"batch": "2024-01-21", "priority": "high"}
+    },
+    {
+      "inputs": {"user_id": "user_002", "migration_type": "standard"},
+      "metadata": {"batch": "2024-01-21", "priority": "normal"}
+    }
+  ],
+  "execution_settings": {
+    "parallel_limit": 10,
+    "delay_between": "5s"
+  }
+}
+```
+</CodeGroup>
+
+### **Real-time Updates**
+
+Subscribe to real-time updates using WebSocket connections:
+
+<CodeGroup>
+```javascript WebSocket Connection
+const ws = new WebSocket('wss://api.tolstoy.dev/v1/ws');
+
+ws.onopen = () => {
+  // Authenticate WebSocket connection
+  ws.send(JSON.stringify({
+    type: 'auth',
+    token: 'sk_live_1234567890abcdef'
+  }));
+  
+  // Subscribe to execution updates
+  ws.send(JSON.stringify({
+    type: 'subscribe',
+    channel: 'executions',
+    filters: {
+      flow_id: 'flow_user_onboarding',
+      status: ['running', 'completed', 'failed']
+    }
+  }));
+};
+
+ws.onmessage = (event) => {
+  const message = JSON.parse(event.data);
+  
+  switch (message.type) {
+    case 'execution.started':
+      console.log('Execution started:', message.data.execution_id);
+      break;
+      
+    case 'execution.step.completed':
+      console.log('Step completed:', message.data.step_key);
+      updateProgress(message.data.execution_id, message.data.progress);
+      break;
+      
+    case 'execution.completed':
+      console.log('Execution completed:', message.data.execution_id);
+      showResults(message.data);
+      break;
+      
+    case 'execution.failed':
+      console.log('Execution failed:', message.data.error);
+      handleError(message.data);
+      break;
+  }
+};
+```
+
+```python Python WebSocket
+import websocket
+import json
+import threading
+
+def on_message(ws, message):
+    data = json.loads(message)
+    
+    if data['type'] == 'execution.completed':
+        print(f"Execution {data['data']['execution_id']} completed")
+        process_results(data['data'])
+    elif data['type'] == 'execution.failed':
+        print(f"Execution failed: {data['data']['error']['message']}")
+        handle_failure(data['data'])
+
+def on_open(ws):
+    # Authenticate
+    auth_message = {
+        'type': 'auth',
+        'token': 'sk_live_1234567890abcdef'
+    }
+    ws.send(json.dumps(auth_message))
+    
+    # Subscribe to updates
+    subscribe_message = {
+        'type': 'subscribe',
+        'channel': 'executions',
+        'filters': {'organization_id': 'org_company_123'}
+    }
+    ws.send(json.dumps(subscribe_message))
+
+ws = websocket.WebSocketApp(
+    "wss://api.tolstoy.dev/v1/ws",
+    on_open=on_open,
+    on_message=on_message
+)
+
+ws.run_forever()
+```
+</CodeGroup>
+
+### **Advanced Filtering & Search**
+
+Powerful query capabilities for finding and filtering resources:
+
+<CodeGroup>
+```http Advanced Flow Search
+GET /v1/flows/search HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+Content-Type: application/json
+
+{
+  "query": {
+    "bool": {
+      "must": [
+        {"match": {"name": "user onboarding"}},
+        {"term": {"status": "active"}},
+        {"range": {"created_at": {"gte": "2024-01-01"}}}
+      ],
+      "filter": [
+        {"terms": {"tags": ["production", "critical"]}},
+        {"range": {"success_rate": {"gte": 95}}}
+      ]
+    }
+  },
+  "sort": [
+    {"executions_count": {"order": "desc"}},
+    {"created_at": {"order": "asc"}}
+  ],
+  "highlight": {
+    "fields": {"name": {}, "description": {}}
+  }
+}
+```
+
+```http Execution Analytics Query
+POST /v1/executions/analytics HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+Content-Type: application/json
+
+{
+  "metrics": ["avg_duration", "success_rate", "error_count"],
+  "dimensions": ["flow_id", "hour_of_day"],
+  "filters": {
+    "date_range": {
+      "start": "2024-01-15T00:00:00Z",
+      "end": "2024-01-21T23:59:59Z"
+    },
+    "flow_tags": ["production"]
+  },
+  "group_by": ["flow_id"],
+  "having": {
+    "success_rate": {"lt": 95}
+  }
+}
+```
+</CodeGroup>
+
+## Rate Limits & Performance
+
+### **Rate Limiting**
+
+<Tabs>
+  <Tab title="Rate Limit Tiers">
+    **Free Tier**
+    - 1,000 requests/hour
+    - 100 executions/day
+    - Burst limit: 50 requests/minute
+    
+    **Pro Tier**
+    - 10,000 requests/hour
+    - 1,000 executions/day
+    - Burst limit: 200 requests/minute
+    
+    **Enterprise Tier**
+    - 100,000 requests/hour
+    - 10,000 executions/day
+    - Burst limit: 1,000 requests/minute
+    - Custom limits available
+  </Tab>
+  
+  <Tab title="Rate Limit Headers">
+    **HTTP Headers**
+    ```http
+    HTTP/1.1 200 OK
+    X-RateLimit-Limit: 10000
+    X-RateLimit-Remaining: 9845
+    X-RateLimit-Reset: 1642785600
+    X-RateLimit-Burst-Limit: 200
+    X-RateLimit-Burst-Remaining: 195
+    Retry-After: 3600
+    ```
+    
+    **Rate Limit Exceeded**
+    ```http
+    HTTP/1.1 429 Too Many Requests
+    X-RateLimit-Limit: 10000
+    X-RateLimit-Remaining: 0
+    X-RateLimit-Reset: 1642785600
+    Retry-After: 3600
+    
+    {
+      "error": {
+        "type": "rate_limit_exceeded",
+        "message": "Rate limit exceeded. Try again in 3600 seconds.",
+        "details": {
+          "limit": 10000,
+          "window": "1h",
+          "retry_after": 3600
+        }
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Rate Limit Best Practices">
+    **Handling Rate Limits**
+    ```javascript
+    async function makeRequestWithRetry(url, options, maxRetries = 3) {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        const response = await fetch(url, options);
+        
+        if (response.status === 429) {
+          const retryAfter = parseInt(response.headers.get('Retry-After') || '60');
+          console.log(`Rate limited. Retrying in ${retryAfter} seconds...`);
+          await sleep(retryAfter * 1000);
+          continue;
+        }
+        
+        if (response.ok) {
+          return response;
+        }
+        
+        throw new Error(`Request failed: ${response.status}`);
+      }
+      
+      throw new Error('Max retries exceeded');
+    }
+    ```
+    
+    **Best Practices:**
+    - Implement exponential backoff
+    - Respect Retry-After headers
+    - Use bulk operations when possible
+    - Cache responses appropriately
+    - Monitor rate limit headers
+  </Tab>
+</Tabs>
+
+### **Pagination**
+
+Handle large datasets efficiently with cursor-based pagination:
+
+<CodeGroup>
+```http Cursor-based Pagination
+GET /v1/flows?limit=50&cursor=eyJpZCI6ImZsb3dfMTIzIiwiY3JlYXRlZF9hdCI6IjIwMjQifQ HTTP/1.1
+Host: api.tolstoy.dev
+Authorization: Bearer sk_live_1234567890abcdef
+
+# Response
+{
+  "flows": [ ... ],
+  "pagination": {
+    "limit": 50,
+    "has_more": true,
+    "next_cursor": "eyJpZCI6ImZsb3dfNDU2IiwiY3JlYXRlZF9hdCI6IjIwMjQifQ",
+    "previous_cursor": "eyJpZCI6ImZsb3dfMDEyIiwiY3JlYXRlZF9hdCI6IjIwMjQifQ"
+  }
+}
+```
+
+```javascript Pagination Helper
+async function getAllFlows() {
+  const allFlows = [];
+  let cursor = null;
+  
+  do {
+    const params = new URLSearchParams({
+      limit: '100',
+      ...(cursor && { cursor })
+    });
+    
+    const response = await fetch(`https://api.tolstoy.dev/v1/flows?${params}`, {
+      headers: { 'Authorization': 'Bearer sk_live_1234567890abcdef' }
+    });
+    
+    const data = await response.json();
+    allFlows.push(...data.flows);
+    cursor = data.pagination.next_cursor;
+    
+  } while (cursor);
+  
+  return allFlows;
+}
+```
+</CodeGroup>
+
+## Error Handling
+
+### **Error Response Format**
+
+All API errors follow a consistent structure:
+
+```http
+HTTP/1.1 400 Bad Request
+Content-Type: application/json
+
+{
+  "error": {
+    "type": "validation_error",
+    "message": "Invalid input data",
+    "code": "INVALID_INPUT",
+    "details": {
+      "field": "email",
+      "reason": "Invalid email format",
+      "received": "invalid-email",
+      "expected": "Valid email address"
+    },
+    "request_id": "req_abc123def456",
+    "timestamp": "2024-01-21T10:30:00Z"
+  }
+}
+```
+
+### **Error Types & Codes**
+
+<Tabs>
+  <Tab title="Client Errors (4xx)">
+    **400 Bad Request**
+    - `validation_error` - Invalid input data
+    - `malformed_request` - Malformed JSON or query parameters
+    - `missing_required_field` - Required field not provided
+    
+    **401 Unauthorized**
+    - `invalid_api_key` - API key is invalid or expired
+    - `insufficient_permissions` - API key lacks required permissions
+    - `organization_mismatch` - Resource not in API key's organization
+    
+    **404 Not Found**
+    - `resource_not_found` - Requested resource doesn't exist
+    - `endpoint_not_found` - API endpoint doesn't exist
+    
+    **409 Conflict**
+    - `resource_conflict` - Resource already exists or conflicts
+    - `concurrent_modification` - Resource modified concurrently
+    
+    **429 Too Many Requests**
+    - `rate_limit_exceeded` - Rate limit exceeded
+    - `quota_exceeded` - Monthly quota exceeded
+  </Tab>
+  
+  <Tab title="Server Errors (5xx)">
+    **500 Internal Server Error**
+    - `internal_error` - Unexpected server error
+    - `database_error` - Database operation failed
+    - `external_service_error` - Third-party service error
+    
+    **502 Bad Gateway**
+    - `upstream_error` - Error from upstream service
+    - `integration_error` - External integration failed
+    
+    **503 Service Unavailable**
+    - `service_maintenance` - Service temporarily unavailable
+    - `capacity_exceeded` - Service at capacity
+    
+    **504 Gateway Timeout**
+    - `execution_timeout` - Workflow execution timed out
+    - `upstream_timeout` - Upstream service timeout
+  </Tab>
+  
+  <Tab title="Error Handling Examples">
+    **Comprehensive Error Handling**
+    ```javascript
+    async function handleApiRequest(url, options) {
+      try {
+        const response = await fetch(url, options);
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          
+          switch (response.status) {
+            case 400:
+              throw new ValidationError(errorData.error);
+            case 401:
+              throw new AuthenticationError(errorData.error);
+            case 404:
+              throw new NotFoundError(errorData.error);
+            case 429:
+              throw new RateLimitError(errorData.error);
+            case 500:
+              throw new ServerError(errorData.error);
+            default:
+              throw new ApiError(errorData.error);
+          }
+        }
+        
+        return await response.json();
+        
+      } catch (error) {
+        if (error instanceof TypeError) {
+          throw new NetworkError('Network connection failed');
+        }
+        throw error;
+      }
+    }
+    
+    // Usage
+    try {
+      const flows = await handleApiRequest('/v1/flows', {
+        headers: { 'Authorization': 'Bearer sk_live_...' }
+      });
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        console.log('Validation failed:', error.details);
+      } else if (error instanceof RateLimitError) {
+        console.log('Rate limited. Retry after:', error.retryAfter);
+      } else {
+        console.log('Unexpected error:', error.message);
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## SDKs & Libraries
+
+### **Official SDKs**
+
+<CardGroup cols={2}>
+  <Card title="TypeScript/Node.js" icon="js">
+    ```bash
+    npm install @tolstoy/api-client
+    ```
+    Full-featured SDK with TypeScript support, automatic retries, and comprehensive error handling.
+  </Card>
+  <Card title="Python" icon="python">
+    ```bash
+    pip install tolstoy-api
+    ```
+    Pythonic SDK with async/await support, automatic pagination, and integrated logging.
+  </Card>
+  <Card title="Go" icon="golang">
+    ```bash
+    go get github.com/tolstoy/tolstoy-go
+    ```
+    Idiomatic Go SDK with context support, structured logging, and comprehensive testing.
+  </Card>
+  <Card title="Rust" icon="rust">
+    ```bash
+    cargo add tolstoy-api
+    ```
+    Memory-safe Rust SDK with full type safety, async support, and zero-copy deserialization.
+  </Card>
+</CardGroup>
+
+### **SDK Examples**
+
+<CodeGroup>
+```typescript TypeScript SDK
+import { TolstoyClient } from '@tolstoy/api-client';
+
+const client = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  baseUrl: 'https://api.tolstoy.dev/v1',
+  timeout: 30000,
+  retryConfig: {
+    attempts: 3,
+    delay: 1000,
+    backoff: 'exponential'
+  }
+});
+
+// Create and execute a flow
+async function createAndExecuteFlow() {
+  try {
+    const flow = await client.flows.create({
+      name: 'User Onboarding',
+      steps: [
+        {
+          key: 'send_welcome',
+          action: 'email',
+          inputs: {
+            to: '{{inputs.email}}',
+            subject: 'Welcome!',
+            body: 'Welcome to our platform!'
+          }
+        }
+      ]
+    });
+    
+    const execution = await client.flows.execute(flow.id, {
+      inputs: { email: 'user@example.com' }
+    });
+    
+    // Wait for completion
+    const result = await client.executions.waitForCompletion(execution.id, {
+      timeout: 60000,
+      pollInterval: 2000
+    });
+    
+    console.log('Flow completed:', result.status);
+    return result;
+    
+  } catch (error) {
+    if (error instanceof TolstoyError) {
+      console.error('API Error:', error.type, error.message);
+    } else {
+      console.error('Unexpected error:', error.message);
+    }
+  }
+}
+```
+
+```python Python SDK
+from tolstoy import TolstoyClient, TolstoyError
+import asyncio
+
+client = TolstoyClient(
+    api_key=os.environ['TOLSTOY_API_KEY'],
+    base_url='https://api.tolstoy.dev/v1',
+    timeout=30,
+    retry_config={
+        'attempts': 3,
+        'delay': 1.0,
+        'backoff': 'exponential'
+    }
+)
+
+async def create_and_execute_flow():
+    try:
+        # Create flow
+        flow = await client.flows.create({
+            'name': 'User Onboarding',
+            'steps': [
+                {
+                    'key': 'send_welcome',
+                    'action': 'email',
+                    'inputs': {
+                        'to': '{{inputs.email}}',
+                        'subject': 'Welcome!',
+                        'body': 'Welcome to our platform!'
+                    }
+                }
+            ]
+        })
+        
+        # Execute flow
+        execution = await client.flows.execute(flow.id, {
+            'inputs': {'email': 'user@example.com'}
+        })
+        
+        # Stream execution updates
+        async for update in client.executions.stream(execution.id):
+            if update.type == 'completed':
+                print(f'Flow completed: {update.status}')
+                break
+            elif update.type == 'failed':
+                print(f'Flow failed: {update.error.message}')
+                break
+                
+        return execution
+        
+    except TolstoyError as error:
+        print(f'API Error: {error.type} - {error.message}')
+        if error.details:
+            print(f'Details: {error.details}')
+    except Exception as error:
+        print(f'Unexpected error: {error}')
+
+# Run async function
+asyncio.run(create_and_execute_flow())
+```
+
+```go Go SDK
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+    "time"
+    
+    "github.com/tolstoy/tolstoy-go"
+)
+
+func main() {
+    client := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:  os.Getenv("TOLSTOY_API_KEY"),
+        BaseURL: "https://api.tolstoy.dev/v1",
+        Timeout: 30 * time.Second,
+        RetryConfig: &tolstoy.RetryConfig{
+            Attempts: 3,
+            Delay:    time.Second,
+            Backoff:  tolstoy.ExponentialBackoff,
+        },
+    })
+    
+    ctx := context.Background()
+    
+    // Create flow
+    flow, err := client.Flows.Create(ctx, &tolstoy.CreateFlowRequest{
+        Name: "User Onboarding",
+        Steps: []tolstoy.FlowStep{
+            {
+                Key:    "send_welcome",
+                Action: "email",
+                Inputs: map[string]interface{}{
+                    "to":      "{{inputs.email}}",
+                    "subject": "Welcome!",
+                    "body":    "Welcome to our platform!",
+                },
+            },
+        },
+    })
+    if err != nil {
+        log.Fatalf("Failed to create flow: %v", err)
+    }
+    
+    // Execute flow
+    execution, err := client.Flows.Execute(ctx, flow.ID, &tolstoy.ExecuteFlowRequest{
+        Inputs: map[string]interface{}{
+            "email": "user@example.com",
+        },
+    })
+    if err != nil {
+        log.Fatalf("Failed to execute flow: %v", err)
+    }
+    
+    // Wait for completion with timeout
+    ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
+    defer cancel()
+    
+    result, err := client.Executions.WaitForCompletion(ctx, execution.ID)
+    if err != nil {
+        log.Fatalf("Execution failed or timed out: %v", err)
+    }
+    
+    fmt.Printf("Flow completed with status: %s\n", result.Status)
+}
+```
+</CodeGroup>
+
+## Testing & Development
+
+### **API Testing**
+
+<Tabs>
+  <Tab title="Testing Environments">
+    **Sandbox Environment**
+    ```bash
+    # Base URL for testing
+    https://api-sandbox.tolstoy.dev/v1
+    
+    # Test API keys
+    sk_test_1234567890abcdef  # Full access test key
+    sk_test_readonly_abcdef   # Read-only test key
+    sk_test_restricted_xyz    # Limited scope test key
+    ```
+    
+    **Test Features:**
+    - No rate limiting
+    - Mock external services
+    - Reset data regularly
+    - Detailed debug logging
+    - Webhook testing endpoints
+  </Tab>
+  
+  <Tab title="Mock Responses">
+    **Testing with Mocks**
+    ```javascript
+    // Mock successful flow creation
+    fetchMock.post('https://api.tolstoy.dev/v1/flows', {
+      status: 201,
+      body: {
+        id: 'flow_test_123',
+        name: 'Test Flow',
+        status: 'active',
+        created_at: '2024-01-21T10:30:00Z'
+      }
+    });
+    
+    // Mock execution with delay
+    fetchMock.post('https://api.tolstoy.dev/v1/flows/flow_test_123/executions', 
+      new Promise(resolve => 
+        setTimeout(() => resolve({
+          body: {
+            execution_id: 'exec_test_456',
+            status: 'running',
+            started_at: '2024-01-21T10:31:00Z'
+          }
+        }), 1000)
+      )
+    );
+    ```
+  </Tab>
+  
+  <Tab title="Integration Tests">
+    **API Integration Testing**
+    ```typescript
+    describe('Tolstoy API Integration', () => {
+      let client: TolstoyClient;
+      let testFlow: Flow;
+      
+      beforeAll(() => {
+        client = new TolstoyClient({
+          apiKey: process.env.TOLSTOY_TEST_API_KEY,
+          baseUrl: 'https://api-sandbox.tolstoy.dev/v1'
+        });
+      });
+      
+      beforeEach(async () => {
+        // Create test flow
+        testFlow = await client.flows.create({
+          name: `Test Flow ${Date.now()}`,
+          steps: [
+            {
+              key: 'test_step',
+              action: 'delay',
+              inputs: { duration: '1s' }
+            }
+          ]
+        });
+      });
+      
+      afterEach(async () => {
+        // Cleanup test flow
+        if (testFlow) {
+          await client.flows.delete(testFlow.id);
+        }
+      });
+      
+      test('should create and execute flow successfully', async () => {
+        const execution = await client.flows.execute(testFlow.id, {
+          inputs: { test: true }
+        });
+        
+        expect(execution.status).toBe('running');
+        expect(execution.flow_id).toBe(testFlow.id);
+        
+        // Wait for completion
+        const result = await client.executions.waitForCompletion(
+          execution.id, 
+          { timeout: 10000 }
+        );
+        
+        expect(result.status).toBe('completed');
+      });
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### **API Explorer & Documentation**
+
+<CardGroup cols={2}>
+  <Card title="Interactive API Explorer" icon="play">
+    Use our interactive API explorer to test endpoints, view responses, and generate code examples.
+    
+    [Open API Explorer →](https://api.tolstoy.dev/docs)
+  </Card>
+  <Card title="OpenAPI Specification" icon="file-code">
+    Download the complete OpenAPI 3.0 specification for code generation and validation.
+    
+    [Download OpenAPI Spec →](https://api.tolstoy.dev/openapi.json)
+  </Card>
+</CardGroup>
+
+### **Postman Collection**
+
+Import our comprehensive Postman collection:
+
+```bash
+# Import collection URL
+https://api.tolstoy.dev/postman/tolstoy-api.json
+
+# Environment variables
+{
+  "api_key": "your_api_key_here",
+  "base_url": "https://api.tolstoy.dev/v1",
+  "organization_id": "your_org_id"
+}
+```
+
+## Performance & Optimization
+
+### **Caching Strategies**
+
+<Tabs>
+  <Tab title="Response Caching">
+    **Cache-Control Headers**
+    ```http
+    HTTP/1.1 200 OK
+    Cache-Control: public, max-age=300
+    ETag: "abc123def456"
+    Last-Modified: Wed, 21 Jan 2024 10:30:00 GMT
+    
+    # Conditional requests
+    If-None-Match: "abc123def456"
+    If-Modified-Since: Wed, 21 Jan 2024 10:30:00 GMT
+    ```
+    
+    **Cacheable Resources:**
+    - Flow definitions (5 minutes)
+    - Action schemas (1 hour)
+    - Tool configurations (15 minutes)
+    - User profiles (10 minutes)
+    - Organization settings (30 minutes)
+  </Tab>
+  
+  <Tab title="Client-side Caching">
+    **SDK Caching**
+    ```typescript
+    const client = new TolstoyClient({
+      apiKey: 'sk_live_...',
+      cache: {
+        enabled: true,
+        ttl: {
+          'flows': 300,      // 5 minutes
+          'actions': 3600,   // 1 hour
+          'users': 600       // 10 minutes
+        },
+        storage: 'memory'  // or 'redis', 'file'
+      }
+    });
+    
+    // Cached request (subsequent calls return cached data)
+    const flows = await client.flows.list();
+    ```
+  </Tab>
+  
+  <Tab title="Cache Invalidation">
+    **Cache Management**
+    ```http
+    # Purge specific resource cache
+    POST /v1/cache/invalidate HTTP/1.1
+    Host: api.tolstoy.dev
+    Authorization: Bearer sk_live_1234567890abcdef
+    Content-Type: application/json
+    
+    {
+      "resources": ["flows", "actions"],
+      "keys": ["flow_abc123", "action_email"]
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### **Batch Operations**
+
+Optimize performance with batch requests:
+
+```javascript
+// Batch multiple operations
+const batchResponse = await client.batch([
+  { method: 'GET', path: '/flows' },
+  { method: 'GET', path: '/actions' },
+  { method: 'GET', path: '/tools' },
+  {
+    method: 'POST',
+    path: '/flows',
+    body: { name: 'New Flow', steps: [...] }
+  }
+]);
+
+// Process batch results
+batchResponse.forEach((response, index) => {
+  if (response.status === 200) {
+    console.log(`Request ${index} succeeded:`, response.data);
+  } else {
+    console.error(`Request ${index} failed:`, response.error);
+  }
+});
+```
+
+## Security Best Practices
+
+### **API Key Security**
+
+<CardGroup cols={2}>
+  <Card title="Key Management" icon="key">
+    **Best Practices**
+    - Store keys in environment variables
+    - Use different keys per environment
+    - Rotate keys regularly (90 days max)
+    - Monitor key usage and access patterns
+    - Use restricted keys with minimal permissions
+  </Card>
+  <Card title="Access Control" icon="shield">
+    **Security Features**
+    - IP address restrictions
+    - Time-based access controls
+    - Scope-based permissions
+    - Multi-factor authentication
+    - Audit logging for all API access
+  </Card>
+</CardGroup>
+
+### **Data Protection**
+
+```javascript
+// Encrypt sensitive data before sending
+const crypto = require('crypto');
+
+function encryptSensitiveData(data, key) {
+  const cipher = crypto.createCipher('aes-256-gcm', key);
+  let encrypted = cipher.update(JSON.stringify(data), 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return encrypted;
+}
+
+// Use encrypted data in API requests
+const encryptedInputs = encryptSensitiveData({
+  ssn: '123-45-6789',
+  credit_card: '4111-1111-1111-1111'
+}, process.env.ENCRYPTION_KEY);
+
+await client.flows.execute(flowId, {
+  inputs: { encrypted_data: encryptedInputs }
+});
+```
+
+## Getting Help & Support
+
+### **API Support Resources**
+
+<CardGroup cols={3}>
+  <Card title="API Documentation" icon="book" href="/api">
+    Complete API reference with examples and interactive testing capabilities
+  </Card>
+  <Card title="SDK Documentation" icon="code" href="/sdk">
+    Language-specific SDK guides with examples and best practices
+  </Card>
+  <Card title="Community Forum" icon="comments" href="https://community.tolstoy.dev">
+    Ask questions and share knowledge with the developer community
+  </Card>
+</CardGroup>
+
+### **Developer Support**
+
+For technical questions and integration assistance:
+
+- **Developer Forum** - [community.tolstoy.dev](https://community.tolstoy.dev)
+- **GitHub Issues** - [github.com/tolstoy/api-issues](https://github.com/tolstoy/api-issues)
+- **Email Support** - [api-support@tolstoy.dev](mailto:api-support@tolstoy.dev)
+- **Enterprise Support** - Priority support with SLA guarantees
+
+### **API Status & Updates**
+
+Stay informed about API changes and status:
+
+- **Status Page** - [status.tolstoy.dev](https://status.tolstoy.dev)
+- **Changelog** - [changelog.tolstoy.dev](https://changelog.tolstoy.dev)
+- **Developer Newsletter** - API updates and best practices
+- **Breaking Changes** - Advance notice of API changes with migration guides
+
+---
+
+*Ready to integrate the Tolstoy API into your application? Start with our [Quick Start Guide](/quickstart) or explore our [comprehensive SDK documentation](/sdk/overview).*

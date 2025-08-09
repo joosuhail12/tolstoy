@@ -1,0 +1,758 @@
+---
+title: "Configuration"
+description: "Complete guide to configuring Tolstoy for your environment"
+---
+
+# Configuration
+
+Tolstoy offers extensive configuration options to tailor the platform to your specific needs. This guide covers environment setup, database configuration, security settings, and integration parameters.
+
+## Environment Variables
+
+### Core Configuration
+
+<CodeGroup>
+```bash Database & Cache
+# PostgreSQL Database
+DATABASE_URL="postgresql://user:password@localhost:5432/tolstoy"
+DATABASE_SSL_MODE="prefer"
+DATABASE_POOL_SIZE=20
+DATABASE_CONNECTION_TIMEOUT=5000
+
+# Redis Cache
+REDIS_URL="redis://localhost:6379"
+REDIS_PASSWORD=""
+REDIS_DATABASE=0
+REDIS_MAX_RETRIES=3
+```
+
+```bash Authentication & Security
+# JWT Configuration
+JWT_SECRET="your-super-secure-jwt-secret-key-here"
+JWT_EXPIRES_IN="24h"
+JWT_REFRESH_EXPIRES_IN="7d"
+
+# Encryption Keys
+ENCRYPTION_KEY="base64-encoded-32-byte-encryption-key"
+COOKIE_SECRET="secure-cookie-signing-secret"
+
+# CORS Settings
+CORS_ORIGIN="https://app.tolstoy.dev,http://localhost:3000"
+CORS_CREDENTIALS=true
+```
+
+```bash External Services
+# AWS Configuration
+AWS_REGION="us-east-1"
+AWS_ACCESS_KEY_ID="your-aws-access-key"
+AWS_SECRET_ACCESS_KEY="your-aws-secret-key"
+AWS_SECRETS_MANAGER_PREFIX="tolstoy/"
+
+# Ably Real-time
+ABLY_API_KEY="your-ably-api-key"
+ABLY_ENVIRONMENT="production"
+
+# Inngest
+INNGEST_EVENT_KEY="your-inngest-event-key"
+INNGEST_SIGNING_KEY="your-inngest-signing-key"
+```
+
+```bash Monitoring & Observability
+# Sentry Error Tracking
+SENTRY_DSN="https://your-sentry-dsn@sentry.io/project-id"
+SENTRY_ENVIRONMENT="production"
+SENTRY_RELEASE="1.0.0"
+
+# Logging
+LOG_LEVEL="info"
+LOG_FORMAT="json"
+PINO_LOG_LEVEL="info"
+
+# Metrics
+PROMETHEUS_METRICS_ENABLED=true
+METRICS_PORT=9090
+```
+</CodeGroup>
+
+### OAuth Provider Configuration
+
+Configure OAuth providers for seamless authentication:
+
+<Tabs>
+  <Tab title="GitHub">
+    ```bash
+    # GitHub OAuth
+    GITHUB_CLIENT_ID="your-github-client-id"
+    GITHUB_CLIENT_SECRET="your-github-client-secret"
+    GITHUB_REDIRECT_URI="https://api.tolstoy.dev/auth/oauth/callback/github"
+    GITHUB_SCOPE="user:email,read:user"
+    ```
+  </Tab>
+  
+  <Tab title="Google">
+    ```bash
+    # Google OAuth
+    GOOGLE_CLIENT_ID="your-google-client-id"
+    GOOGLE_CLIENT_SECRET="your-google-client-secret"
+    GOOGLE_REDIRECT_URI="https://api.tolstoy.dev/auth/oauth/callback/google"
+    GOOGLE_SCOPE="openid profile email"
+    ```
+  </Tab>
+  
+  <Tab title="Microsoft">
+    ```bash
+    # Microsoft OAuth
+    MICROSOFT_CLIENT_ID="your-microsoft-client-id"
+    MICROSOFT_CLIENT_SECRET="your-microsoft-client-secret"
+    MICROSOFT_REDIRECT_URI="https://api.tolstoy.dev/auth/oauth/callback/microsoft"
+    MICROSOFT_TENANT="common"
+    ```
+  </Tab>
+  
+  <Tab title="Slack">
+    ```bash
+    # Slack OAuth
+    SLACK_CLIENT_ID="your-slack-client-id"
+    SLACK_CLIENT_SECRET="your-slack-client-secret"
+    SLACK_REDIRECT_URI="https://api.tolstoy.dev/auth/oauth/callback/slack"
+    SLACK_SCOPE="users:read,users:read.email"
+    ```
+  </Tab>
+</Tabs>
+
+## Database Configuration
+
+### PostgreSQL Setup
+
+Tolstoy requires PostgreSQL 14+ with specific extensions:
+
+```sql
+-- Required extensions
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+
+-- Performance optimization
+CREATE EXTENSION IF NOT EXISTS "pg_stat_statements";
+```
+
+### Connection Pool Settings
+
+<CodeGroup>
+```typescript Connection Pool Configuration
+{
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "username": "tolstoy_user",
+    "password": "secure_password",
+    "database": "tolstoy_production",
+    "ssl": {
+      "rejectUnauthorized": false,
+      "ca": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----"
+    },
+    "pool": {
+      "min": 2,
+      "max": 20,
+      "acquireTimeoutMillis": 5000,
+      "idleTimeoutMillis": 30000,
+      "createTimeoutMillis": 3000,
+      "destroyTimeoutMillis": 5000,
+      "reapIntervalMillis": 1000
+    },
+    "migrations": {
+      "directory": "./prisma/migrations",
+      "tableName": "_prisma_migrations"
+    }
+  }
+}
+```
+
+```yaml Docker Compose Database
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: tolstoy
+      POSTGRES_USER: tolstoy_user
+      POSTGRES_PASSWORD: secure_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    command: >
+      postgres
+        -c max_connections=100
+        -c shared_preload_libraries=pg_stat_statements
+        -c pg_stat_statements.track=all
+        -c log_statement=all
+        -c log_duration=on
+
+volumes:
+  postgres_data:
+```
+</CodeGroup>
+
+### Redis Configuration
+
+Redis is used for caching, session storage, and real-time features:
+
+```yaml
+# Redis Configuration (redis.conf)
+# Network
+bind 0.0.0.0
+port 6379
+protected-mode yes
+requirepass your-redis-password
+
+# Memory
+maxmemory 2gb
+maxmemory-policy allkeys-lru
+
+# Persistence
+save 900 1
+save 300 10
+save 60 10000
+
+# Performance
+tcp-keepalive 300
+timeout 300
+tcp-backlog 511
+
+# Logging
+loglevel notice
+logfile /var/log/redis/redis.log
+```
+
+## Application Configuration
+
+### Server Settings
+
+<CodeGroup>
+```typescript Server Configuration
+{
+  "server": {
+    "port": 3000,
+    "host": "0.0.0.0",
+    "bodyLimit": "50mb",
+    "keepAliveTimeout": 65000,
+    "headersTimeout": 66000,
+    "maxHeadersCount": 1000
+  },
+  "cors": {
+    "origin": [
+      "https://app.tolstoy.dev",
+      "https://admin.tolstoy.dev"
+    ],
+    "credentials": true,
+    "methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    "allowedHeaders": [
+      "Content-Type",
+      "Authorization",
+      "X-Organization-ID",
+      "X-Request-ID"
+    ]
+  }
+}
+```
+
+```yaml Rate Limiting
+rateLimiting:
+  global:
+    windowMs: 900000  # 15 minutes
+    max: 1000         # requests per window
+    
+  auth:
+    windowMs: 900000  # 15 minutes  
+    max: 10           # login attempts per window
+    
+  api:
+    windowMs: 60000   # 1 minute
+    max: 100          # requests per minute
+    
+  webhooks:
+    windowMs: 60000   # 1 minute
+    max: 1000         # webhook calls per minute
+```
+</CodeGroup>
+
+### Execution Environment
+
+Configure the workflow execution environment:
+
+```typescript
+{
+  "execution": {
+    "timeout": {
+      "default": 300000,    // 5 minutes
+      "maximum": 3600000    // 1 hour
+    },
+    "concurrency": {
+      "maxConcurrentFlows": 100,
+      "maxConcurrentActions": 50,
+      "queueCapacity": 10000
+    },
+    "retry": {
+      "defaultMaxRetries": 3,
+      "defaultBackoffMs": 1000,
+      "maxBackoffMs": 30000,
+      "backoffMultiplier": 2
+    },
+    "sandbox": {
+      "memoryLimit": "256MB",
+      "cpuLimit": "0.5",
+      "networkAccess": true,
+      "allowedDomains": ["api.github.com", "api.slack.com"],
+      "timeout": 30000
+    }
+  }
+}
+```
+
+## Security Configuration
+
+### Encryption & Secrets
+
+<CodeGroup>
+```typescript Encryption Settings
+{
+  "security": {
+    "encryption": {
+      "algorithm": "aes-256-gcm",
+      "keyDerivation": "pbkdf2",
+      "iterations": 100000,
+      "saltLength": 32,
+      "ivLength": 16,
+      "tagLength": 16
+    },
+    "secrets": {
+      "provider": "aws-secrets-manager",
+      "region": "us-east-1",
+      "keyPrefix": "tolstoy/",
+      "cacheTimeout": 300000,
+      "rotationEnabled": true
+    }
+  }
+}
+```
+
+```bash Environment Security
+# Disable development features in production
+NODE_ENV=production
+DEBUG=false
+SWAGGER_ENABLED=false
+
+# Security headers
+HELMET_ENABLED=true
+HSTS_MAX_AGE=31536000
+CONTENT_SECURITY_POLICY=true
+
+# Request validation
+REQUEST_SIZE_LIMIT=50mb
+PARAMETER_LIMIT=1000
+URL_LENGTH_LIMIT=2000
+```
+</CodeGroup>
+
+### Multi-tenant Configuration
+
+Configure organization-level isolation:
+
+```typescript
+{
+  "multiTenant": {
+    "isolation": {
+      "level": "organization",
+      "encryptionPerTenant": true,
+      "databaseRowLevelSecurity": true
+    },
+    "limits": {
+      "maxFlowsPerOrg": 1000,
+      "maxActionsPerOrg": 5000,
+      "maxExecutionsPerMonth": 100000,
+      "storageQuotaGB": 10
+    },
+    "features": {
+      "customDomain": true,
+      "ssoIntegration": true,
+      "auditLogging": true,
+      "apiAccess": true
+    }
+  }
+}
+```
+
+## Monitoring Configuration
+
+### Metrics & Health Checks
+
+<CodeGroup>
+```typescript Prometheus Metrics
+{
+  "metrics": {
+    "prometheus": {
+      "enabled": true,
+      "port": 9090,
+      "path": "/metrics",
+      "collectDefaultMetrics": true,
+      "gcDurationBuckets": [0.001, 0.01, 0.1, 1, 2, 5]
+    },
+    "custom": {
+      "flowExecutionDuration": true,
+      "actionExecutionCount": true,
+      "organizationMetrics": true,
+      "errorRates": true
+    }
+  }
+}
+```
+
+```yaml Health Check Configuration
+healthCheck:
+  enabled: true
+  path: "/health"
+  timeout: 5000
+  
+  checks:
+    - name: "database"
+      type: "postgresql"
+      critical: true
+      timeout: 3000
+      
+    - name: "redis"
+      type: "redis"
+      critical: true
+      timeout: 2000
+      
+    - name: "external-apis"
+      type: "http"
+      critical: false
+      urls:
+        - "https://api.github.com/zen"
+        - "https://slack.com/api/api.test"
+```
+</CodeGroup>
+
+### Logging Configuration
+
+Configure structured logging with Pino:
+
+```typescript
+{
+  "logging": {
+    "level": "info",
+    "format": "json",
+    "timestamp": true,
+    "colorize": false,
+    "redact": [
+      "password",
+      "authorization",
+      "cookie",
+      "*.password",
+      "*.token",
+      "*.secret"
+    ],
+    "serializers": {
+      "req": true,
+      "res": true,
+      "err": true
+    },
+    "transport": {
+      "target": "pino-pretty",
+      "options": {
+        "colorize": true,
+        "translateTime": "SYS:standard"
+      }
+    }
+  }
+}
+```
+
+## Configuration Files
+
+### Docker Configuration
+
+<CodeGroup>
+```dockerfile Production Dockerfile
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production && npm cache clean --force
+
+COPY . .
+RUN npm run build
+
+FROM node:18-alpine AS runtime
+
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S tolstoy -u 1001
+
+WORKDIR /app
+COPY --from=builder --chown=tolstoy:nodejs /app/dist ./dist
+COPY --from=builder --chown=tolstoy:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=tolstoy:nodejs /app/package.json ./
+
+USER tolstoy
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:3000/health || exit 1
+
+CMD ["node", "dist/main.js"]
+```
+
+```yaml Docker Compose Setup
+version: '3.8'
+
+services:
+  tolstoy-api:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+    depends_on:
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: tolstoy
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+</CodeGroup>
+
+## Environment-Specific Configurations
+
+### Development Environment
+
+<CodeGroup>
+```bash Development .env
+NODE_ENV=development
+DEBUG=true
+LOG_LEVEL=debug
+
+# Development database
+DATABASE_URL="postgresql://tolstoy:password@localhost:5432/tolstoy_dev"
+REDIS_URL="redis://localhost:6379/1"
+
+# Development OAuth (use test apps)
+GITHUB_CLIENT_ID="dev-github-client-id"
+GITHUB_CLIENT_SECRET="dev-github-client-secret"
+
+# Disable external services in development
+SENTRY_DSN=""
+ABLY_API_KEY="development-key"
+INNGEST_EVENT_KEY="development-key"
+
+# Development-friendly settings
+CORS_ORIGIN="http://localhost:3000,http://localhost:3001"
+JWT_EXPIRES_IN="7d"
+SWAGGER_ENABLED=true
+```
+
+```json package.json Scripts
+{
+  "scripts": {
+    "dev": "nest start --watch",
+    "dev:debug": "nest start --debug --watch",
+    "dev:seed": "tsx prisma/seed.ts",
+    "dev:reset": "prisma migrate reset --force",
+    "dev:studio": "prisma studio",
+    "test:watch": "jest --watch",
+    "test:e2e": "jest --config ./test/jest-e2e.json"
+  }
+}
+```
+</CodeGroup>
+
+### Production Environment
+
+```bash
+NODE_ENV=production
+DEBUG=false
+LOG_LEVEL=info
+
+# Production database with connection pooling
+DATABASE_URL="postgresql://tolstoy:secure_password@prod-db.company.com:5432/tolstoy"
+DATABASE_SSL_MODE=require
+DATABASE_POOL_SIZE=25
+
+# Production Redis with clustering
+REDIS_URL="redis://prod-redis.company.com:6379"
+REDIS_PASSWORD="secure-redis-password"
+
+# Production OAuth
+GITHUB_CLIENT_ID="prod-github-client-id"
+GITHUB_CLIENT_SECRET="prod-github-client-secret"
+
+# Production monitoring
+SENTRY_DSN="https://your-production-sentry-dsn"
+PROMETHEUS_METRICS_ENABLED=true
+
+# Security hardening
+HELMET_ENABLED=true
+RATE_LIMITING_ENABLED=true
+CORS_ORIGIN="https://app.tolstoy.dev"
+```
+
+## Configuration Validation
+
+Tolstoy includes built-in configuration validation:
+
+<CodeGroup>
+```typescript Configuration Schema
+import { IsString, IsNumber, IsBoolean, IsOptional } from 'class-validator';
+
+export class AppConfig {
+  @IsString()
+  NODE_ENV: string;
+
+  @IsNumber()
+  PORT: number;
+
+  @IsString()
+  DATABASE_URL: string;
+
+  @IsString()
+  REDIS_URL: string;
+
+  @IsString()
+  JWT_SECRET: string;
+
+  @IsOptional()
+  @IsBoolean()
+  SWAGGER_ENABLED?: boolean;
+
+  @IsOptional()
+  @IsString()
+  SENTRY_DSN?: string;
+}
+```
+
+```bash Validation Command
+# Validate configuration before startup
+npm run config:validate
+
+# Check all required environment variables
+npm run config:check
+
+# Generate configuration template
+npm run config:template
+```
+</CodeGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Security" icon="shield-halved">
+    - Use environment-specific secrets
+    - Enable encryption for sensitive data  
+    - Configure proper CORS origins
+    - Set up rate limiting
+    - Use strong JWT secrets
+  </Card>
+  
+  <Card title="Performance" icon="gauge-high">
+    - Optimize database connection pools
+    - Configure Redis for your workload
+    - Set appropriate timeouts
+    - Monitor resource usage
+    - Use caching effectively
+  </Card>
+  
+  <Card title="Reliability" icon="heart-pulse">
+    - Configure health checks
+    - Set up monitoring and alerting
+    - Use graceful shutdowns
+    - Implement circuit breakers
+    - Plan for disaster recovery
+  </Card>
+  
+  <Card title="Operations" icon="gears">
+    - Use configuration management
+    - Implement proper logging
+    - Automate deployments
+    - Monitor configuration drift
+    - Document all settings
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+### Common Configuration Issues
+
+<Accordion>
+  <AccordionItem title="Database Connection Errors">
+    ```bash
+    # Test database connectivity
+    npm run db:test
+    
+    # Check connection parameters
+    psql $DATABASE_URL -c "SELECT version();"
+    
+    # Verify SSL settings
+    psql "postgresql://user:pass@host:5432/db?sslmode=require"
+    ```
+  </AccordionItem>
+  
+  <AccordionItem title="Redis Connection Issues">
+    ```bash
+    # Test Redis connectivity
+    redis-cli -u $REDIS_URL ping
+    
+    # Check Redis configuration
+    redis-cli -u $REDIS_URL CONFIG GET "*"
+    
+    # Monitor Redis performance
+    redis-cli -u $REDIS_URL MONITOR
+    ```
+  </AccordionItem>
+  
+  <AccordionItem title="OAuth Configuration Problems">
+    ```bash
+    # Validate OAuth redirect URIs
+    curl -X POST "https://api.tolstoy.dev/auth/oauth/validate" \
+         -H "Content-Type: application/json" \
+         -d '{"provider": "github"}'
+    
+    # Test OAuth flow
+    npm run test:oauth
+    ```
+  </AccordionItem>
+</Accordion>
+
+## Next Steps
+
+- [Deploy your Tolstoy instance](/deployment/overview)
+- [Set up monitoring and observability](/monitoring/execution-tracking)  
+- [Configure security and authentication](/security/authentication)
+- [Learn about core concepts](/concepts/organizations)

@@ -1,622 +1,1035 @@
 ---
-title: Examples
-sidebar_position: 5
+title: SDK Examples
+description: Complete examples and use cases for Tolstoy SDKs
 ---
 
-# Real-World Examples
+# SDK Examples
 
-Complete examples showing how to integrate the Tolstoy SDK into real applications.
+This page provides complete, real-world examples of using Tolstoy SDKs to build powerful workflow automation solutions. Each example includes full code, explanations, and best practices.
 
-## User Onboarding Automation
+## Basic Examples
 
-Complete user onboarding system with workflow execution and webhook monitoring.
+### Simple Email Notification Flow
 
-```typescript
-import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+A basic workflow that sends an email notification when triggered.
 
-class UserOnboardingService {
-  private tolstoy: TolstoyClient;
+<CodeGroup>
+```typescript Node.js/TypeScript
+import { Client } from '@tolstoy/sdk';
 
-  constructor(orgId: string) {
-    this.tolstoy = new TolstoyClient(
-      process.env.TOLSTOY_API_URL!,
-      orgId,
-      'onboarding_service',
-      process.env.TOLSTOY_TOKEN
-    );
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY!
+});
+
+async function createEmailNotificationFlow() {
+  // Create the flow
+  const flow = await client.flows.create({
+    name: 'Email Notification Flow',
+    description: 'Sends email notifications for important events',
+    steps: [
+      {
+        key: 'send_notification',
+        action: 'email',
+        inputs: {
+          to: '{{inputs.recipient_email}}',
+          subject: '{{inputs.subject}}',
+          body: `
+            <h2>{{inputs.event_type}} Notification</h2>
+            <p>{{inputs.message}}</p>
+            <p><strong>Timestamp:</strong> {{inputs.timestamp}}</p>
+          `
+        }
+      }
+    ]
+  });
+
+  console.log('Flow created:', flow.id);
+  return flow;
+}
+
+async function sendNotification(flowId: string, eventData: any) {
+  const execution = await client.flows.execute(flowId, {
+    inputs: {
+      recipient_email: eventData.email,
+      subject: `${eventData.type} - Urgent Notification`,
+      event_type: eventData.type,
+      message: eventData.description,
+      timestamp: new Date().toISOString()
+    }
+  });
+
+  // Wait for completion
+  const result = await client.executions.waitForCompletion(execution.id);
+  console.log('Notification sent:', result.status);
+  return result;
+}
+
+// Usage
+createEmailNotificationFlow().then(flow => {
+  sendNotification(flow.id, {
+    email: 'admin@company.com',
+    type: 'System Alert',
+    description: 'Server CPU usage exceeded 90%'
+  });
+});
+```
+
+```python Python
+import os
+from tolstoy import Client
+
+client = Client(api_key=os.getenv('TOLSTOY_API_KEY'))
+
+async def create_email_notification_flow():
+    """Create a simple email notification flow"""
+    flow = await client.flows.create({
+        'name': 'Email Notification Flow',
+        'description': 'Sends email notifications for important events',
+        'steps': [
+            {
+                'key': 'send_notification',
+                'action': 'email',
+                'inputs': {
+                    'to': '{{inputs.recipient_email}}',
+                    'subject': '{{inputs.subject}}',
+                    'body': '''
+                        <h2>{{inputs.event_type}} Notification</h2>
+                        <p>{{inputs.message}}</p>
+                        <p><strong>Timestamp:</strong> {{inputs.timestamp}}</p>
+                    '''
+                }
+            }
+        ]
+    })
+    
+    print(f'Flow created: {flow.id}')
+    return flow
+
+async def send_notification(flow_id: str, event_data: dict):
+    """Send a notification using the flow"""
+    execution = await client.flows.execute(flow_id, {
+        'inputs': {
+            'recipient_email': event_data['email'],
+            'subject': f"{event_data['type']} - Urgent Notification",
+            'event_type': event_data['type'],
+            'message': event_data['description'],
+            'timestamp': datetime.now().isoformat()
+        }
+    })
+    
+    # Wait for completion
+    result = await client.executions.wait_for_completion(execution.id)
+    print(f'Notification sent: {result.status}')
+    return result
+
+# Usage
+import asyncio
+from datetime import datetime
+
+async def main():
+    flow = await create_email_notification_flow()
+    await send_notification(flow.id, {
+        'email': 'admin@company.com',
+        'type': 'System Alert',
+        'description': 'Server CPU usage exceeded 90%'
+    })
+
+asyncio.run(main())
+```
+
+```go Go
+package main
+
+import (
+    "context"
+    "fmt"
+    "os"
+    "time"
+    
+    "github.com/tolstoy/tolstoy-go"
+)
+
+func createEmailNotificationFlow(client *tolstoy.Client) (*tolstoy.Flow, error) {
+    ctx := context.Background()
+    
+    flow, err := client.Flows.Create(ctx, &tolstoy.CreateFlowParams{
+        Name:        "Email Notification Flow",
+        Description: "Sends email notifications for important events",
+        Steps: []tolstoy.Step{
+            {
+                Key:    "send_notification",
+                Action: "email",
+                Inputs: map[string]interface{}{
+                    "to":      "{{inputs.recipient_email}}",
+                    "subject": "{{inputs.subject}}",
+                    "body": `
+                        <h2>{{inputs.event_type}} Notification</h2>
+                        <p>{{inputs.message}}</p>
+                        <p><strong>Timestamp:</strong> {{inputs.timestamp}}</p>
+                    `,
+                },
+            },
+        },
+    })
+    
+    if err != nil {
+        return nil, err
+    }
+    
+    fmt.Printf("Flow created: %s\n", flow.ID)
+    return flow, nil
+}
+
+func sendNotification(client *tolstoy.Client, flowID string, eventData map[string]interface{}) error {
+    ctx := context.Background()
+    
+    execution, err := client.Flows.Execute(ctx, flowID, &tolstoy.ExecuteFlowParams{
+        Inputs: map[string]interface{}{
+            "recipient_email": eventData["email"],
+            "subject":        fmt.Sprintf("%s - Urgent Notification", eventData["type"]),
+            "event_type":     eventData["type"],
+            "message":        eventData["description"],
+            "timestamp":      time.Now().Format(time.RFC3339),
+        },
+    })
+    
+    if err != nil {
+        return err
+    }
+    
+    // Wait for completion
+    result, err := client.Executions.WaitForCompletion(ctx, execution.ID)
+    if err != nil {
+        return err
+    }
+    
+    fmt.Printf("Notification sent: %s\n", result.Status)
+    return nil
+}
+
+func main() {
+    client := tolstoy.NewClient(&tolstoy.Config{
+        APIKey: os.Getenv("TOLSTOY_API_KEY"),
+    })
+    
+    flow, err := createEmailNotificationFlow(client)
+    if err != nil {
+        panic(err)
+    }
+    
+    eventData := map[string]interface{}{
+        "email":       "admin@company.com",
+        "type":        "System Alert",
+        "description": "Server CPU usage exceeded 90%",
+    }
+    
+    if err := sendNotification(client, flow.ID, eventData); err != nil {
+        panic(err)
+    }
+}
+```
+</CodeGroup>
+
+### Data Processing Pipeline
+
+A workflow that fetches data from an API, processes it, and stores the results.
+
+<CodeGroup>
+```typescript Node.js/TypeScript
+import { Client } from '@tolstoy/sdk';
+
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY!
+});
+
+async function createDataProcessingPipeline() {
+  const flow = await client.flows.create({
+    name: 'User Data Processing Pipeline',
+    description: 'Fetches, processes, and stores user data',
+    steps: [
+      // Step 1: Fetch data from API
+      {
+        key: 'fetch_users',
+        action: 'http_request',
+        inputs: {
+          url: 'https://jsonplaceholder.typicode.com/users',
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      },
+      
+      // Step 2: Process and transform data
+      {
+        key: 'process_users',
+        action: 'transform',
+        inputs: {
+          data: '{{steps.fetch_users.outputs.body}}',
+          operations: [
+            {
+              type: 'map',
+              expression: `{
+                id: id,
+                name: name,
+                email: email,
+                company: company.name,
+                location: address.city + ', ' + address.zipcode
+              }`
+            },
+            {
+              type: 'filter',
+              condition: 'email.includes("@")'
+            }
+          ]
+        }
+      },
+      
+      // Step 3: Store processed data
+      {
+        key: 'store_data',
+        action: 'database',
+        inputs: {
+          operation: 'bulk_insert',
+          table: 'processed_users',
+          data: '{{steps.process_users.outputs.result}}',
+          on_conflict: 'update'
+        }
+      },
+      
+      // Step 4: Send completion notification
+      {
+        key: 'notify_completion',
+        action: 'slack',
+        inputs: {
+          channel: '#data-pipeline',
+          message: `
+            ✅ User data processing completed
+            • Fetched: {{steps.fetch_users.outputs.body.length}} users
+            • Processed: {{steps.process_users.outputs.count}} valid users
+            • Stored: {{steps.store_data.outputs.inserted_count}} records
+          `
+        }
+      }
+    ]
+  });
+
+  console.log('Data pipeline created:', flow.id);
+  return flow;
+}
+
+async function runDataPipeline(flowId: string) {
+  const execution = await client.flows.execute(flowId);
+  
+  // Monitor progress
+  const stream = client.executions.stream(execution.id);
+  
+  stream.on('step_completed', (update) => {
+    console.log(`✅ Step completed: ${update.stepKey}`);
+  });
+  
+  stream.on('completed', (result) => {
+    console.log('Pipeline completed successfully!');
+    console.log('Results:', result.outputs);
+  });
+  
+  stream.on('failed', (error) => {
+    console.error('Pipeline failed:', error);
+  });
+  
+  return execution;
+}
+
+// Usage
+createDataProcessingPipeline().then(flow => {
+  runDataPipeline(flow.id);
+});
+```
+
+```python Python
+import asyncio
+from tolstoy import AsyncClient
+
+client = AsyncClient(api_key=os.getenv('TOLSTOY_API_KEY'))
+
+async def create_data_processing_pipeline():
+    """Create a comprehensive data processing pipeline"""
+    flow = await client.flows.create({
+        'name': 'User Data Processing Pipeline',
+        'description': 'Fetches, processes, and stores user data',
+        'steps': [
+            # Step 1: Fetch data from API
+            {
+                'key': 'fetch_users',
+                'action': 'http_request',
+                'inputs': {
+                    'url': 'https://jsonplaceholder.typicode.com/users',
+                    'method': 'GET',
+                    'headers': {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            },
+            
+            # Step 2: Process and transform data
+            {
+                'key': 'process_users',
+                'action': 'transform',
+                'inputs': {
+                    'data': '{{steps.fetch_users.outputs.body}}',
+                    'operations': [
+                        {
+                            'type': 'map',
+                            'expression': '''{ 
+                                id: id,
+                                name: name,
+                                email: email,
+                                company: company.name,
+                                location: address.city + ', ' + address.zipcode
+                            }'''
+                        },
+                        {
+                            'type': 'filter',
+                            'condition': 'email.includes("@")'
+                        }
+                    ]
+                }
+            },
+            
+            # Step 3: Store processed data  
+            {
+                'key': 'store_data',
+                'action': 'database',
+                'inputs': {
+                    'operation': 'bulk_insert',
+                    'table': 'processed_users',
+                    'data': '{{steps.process_users.outputs.result}}',
+                    'on_conflict': 'update'
+                }
+            },
+            
+            # Step 4: Send completion notification
+            {
+                'key': 'notify_completion',
+                'action': 'slack',
+                'inputs': {
+                    'channel': '#data-pipeline',
+                    'message': '''
+                        ✅ User data processing completed
+                        • Fetched: {{steps.fetch_users.outputs.body.length}} users
+                        • Processed: {{steps.process_users.outputs.count}} valid users
+                        • Stored: {{steps.store_data.outputs.inserted_count}} records
+                    '''
+                }
+            }
+        ]
+    })
+    
+    print(f'Data pipeline created: {flow.id}')
+    return flow
+
+async def run_data_pipeline(flow_id: str):
+    """Run the data pipeline and monitor progress"""
+    execution = await client.flows.execute(flow_id)
+    
+    # Monitor progress
+    async for update in client.executions.stream(execution.id):
+        if update.type == 'step_completed':
+            print(f'✅ Step completed: {update.step_key}')
+        elif update.type == 'completed':
+            print('Pipeline completed successfully!')
+            print(f'Results: {update.outputs}')
+            break
+        elif update.type == 'failed':
+            print(f'Pipeline failed: {update.error}')
+            break
+    
+    return execution
+
+# Usage
+async def main():
+    flow = await create_data_processing_pipeline()
+    await run_data_pipeline(flow.id)
+
+asyncio.run(main())
+```
+</CodeGroup>
+
+## Advanced Examples
+
+### Conditional Workflow with Error Handling
+
+A robust workflow that includes conditional logic, retry mechanisms, and comprehensive error handling.
+
+<CodeGroup>
+```typescript Node.js/TypeScript
+import { Client, TolstoyError } from '@tolstoy/sdk';
+
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY!
+});
+
+async function createAdvancedWorkflow() {
+  const flow = await client.flows.create({
+    name: 'Advanced Order Processing Workflow',
+    description: 'Processes orders with validation, payment, and fulfillment',
+    steps: [
+      // Step 1: Validate order
+      {
+        key: 'validate_order',
+        action: 'evaluate',
+        inputs: {
+          expression: `
+            {{inputs.order.amount}} > 0 AND 
+            {{inputs.order.items.length}} > 0 AND
+            {{inputs.order.customer_email}} !== null
+          `
+        }
+      },
+      
+      // Step 2: Check inventory (conditional)
+      {
+        key: 'check_inventory',
+        action: 'http_request',
+        condition: '{{steps.validate_order.outputs.result}} === true',
+        inputs: {
+          url: 'https://api.inventory.com/check',
+          method: 'POST',
+          body: {
+            items: '{{inputs.order.items}}'
+          }
+        },
+        retry: {
+          max_attempts: 3,
+          delay: 2000,
+          exponential_backoff: true
+        }
+      },
+      
+      // Step 3: Process payment (conditional)
+      {
+        key: 'process_payment',
+        action: 'http_request',
+        condition: '{{steps.check_inventory.outputs.status_code}} === 200',
+        inputs: {
+          url: 'https://api.payments.com/charge',
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer {{secrets.payment_api_key}}'
+          },
+          body: {
+            amount: '{{inputs.order.amount}}',
+            currency: '{{inputs.order.currency}}',
+            customer: '{{inputs.order.customer_id}}'
+          }
+        },
+        retry: {
+          max_attempts: 2,
+          delay: 5000
+        }
+      },
+      
+      // Step 4a: Success notification
+      {
+        key: 'send_success_email',
+        action: 'email',
+        condition: '{{steps.process_payment.outputs.body.status}} === "succeeded"',
+        inputs: {
+          to: '{{inputs.order.customer_email}}',
+          subject: 'Order Confirmation - #{{inputs.order.id}}',
+          template: 'order_confirmation',
+          data: {
+            order: '{{inputs.order}}',
+            payment_id: '{{steps.process_payment.outputs.body.id}}'
+          }
+        }
+      },
+      
+      // Step 4b: Failure notification
+      {
+        key: 'send_failure_email',
+        action: 'email',
+        condition: '{{steps.process_payment.outputs.body.status}} !== "succeeded"',
+        inputs: {
+          to: '{{inputs.order.customer_email}}',
+          subject: 'Order Processing Failed - #{{inputs.order.id}}',
+          template: 'order_failure',
+          data: {
+            order: '{{inputs.order}}',
+            error: '{{steps.process_payment.outputs.body.error}}'
+          }
+        }
+      },
+      
+      // Step 5: Update order status
+      {
+        key: 'update_order_status',
+        action: 'database',
+        inputs: {
+          operation: 'update',
+          table: 'orders',
+          where: { id: '{{inputs.order.id}}' },
+          data: {
+            status: `{{steps.process_payment.outputs.body.status === "succeeded" ? "confirmed" : "failed"}}`,
+            payment_id: '{{steps.process_payment.outputs.body.id}}',
+            updated_at: '{{Date.now()}}'
+          }
+        }
+      }
+    ],
+    
+    // Global error handling
+    error_handling: {
+      on_failure: {
+        action: 'slack',
+        inputs: {
+          channel: '#order-alerts',
+          message: `
+            🚨 Order processing failed
+            Order ID: {{inputs.order.id}}
+            Customer: {{inputs.order.customer_email}}
+            Error: {{error.message}}
+          `
+        }
+      }
+    }
+  });
+
+  return flow;
+}
+
+class OrderProcessor {
+  private client: Client;
+  private flowId: string;
+
+  constructor(flowId: string) {
+    this.client = client;
+    this.flowId = flowId;
   }
 
-  async onboardNewUser(userData: {
-    email: string;
-    name: string;
-    plan: string;
-    referralCode?: string;
-  }) {
+  async processOrder(order: any) {
     try {
-      // Start onboarding workflow
-      const execution = await this.tolstoy.runFlow('user_onboarding_v2', {
-        user: userData,
-        timestamp: new Date().toISOString(),
-        source: 'api_signup',
-        features: this.getFeaturesForPlan(userData.plan)
+      const execution = await this.client.flows.execute(this.flowId, {
+        inputs: { order }
       });
 
-      // Set up completion monitoring
-      await this.setupOnboardingWebhook(execution.data.executionId, userData.email);
+      // Wait for completion with timeout
+      const result = await this.client.executions.waitForCompletion(
+        execution.id,
+        { timeout: 300000 } // 5 minutes
+      );
 
-      return {
-        success: true,
-        executionId: execution.data.executionId,
-        message: 'Onboarding started successfully'
-      };
+      if (result.status === 'completed') {
+        console.log('Order processed successfully:', order.id);
+        return { success: true, executionId: execution.id };
+      } else {
+        console.error('Order processing failed:', result.error);
+        return { success: false, error: result.error };
+      }
     } catch (error) {
-      console.error('Onboarding failed:', error);
-      
-      // Send failure notification
-      await this.notifyOnboardingFailure(userData.email, error.message);
-      
-      throw new Error(`Onboarding failed: ${error.message}`);
+      if (error instanceof TolstoyError) {
+        console.error('Tolstoy API error:', error.type, error.message);
+      } else {
+        console.error('Unexpected error:', error);
+      }
+      throw error;
     }
   }
 
-  private async setupOnboardingWebhook(executionId: string, userEmail: string) {
-    return this.tolstoy.createWebhook({
-      name: `Onboarding Webhook - ${userEmail}`,
-      url: `${process.env.APP_URL}/webhooks/onboarding-complete`,
-      events: ['flow.completed', 'flow.failed'],
-      active: true,
-      metadata: {
-        executionId,
-        userEmail,
-        type: 'onboarding'
-      }
-    });
-  }
+  async batchProcessOrders(orders: any[]) {
+    const results = await Promise.allSettled(
+      orders.map(order => this.processOrder(order))
+    );
 
-  private getFeaturesForPlan(plan: string) {
-    const features = {
-      free: ['basic_dashboard', 'email_support'],
-      pro: ['advanced_analytics', 'priority_support', 'api_access'],
-      enterprise: ['custom_integrations', 'dedicated_support', 'sso']
-    };
-    return features[plan] || features.free;
-  }
+    const successful = results.filter(r => r.status === 'fulfilled').length;
+    const failed = results.filter(r => r.status === 'rejected').length;
 
-  private async notifyOnboardingFailure(email: string, error: string) {
-    // Implementation depends on your notification system
-    console.error(`Onboarding failed for ${email}: ${error}`);
+    console.log(`Batch processing completed: ${successful} successful, ${failed} failed`);
+    return results;
   }
 }
 
 // Usage
-const onboarding = new UserOnboardingService('org_123');
+async function main() {
+  const flow = await createAdvancedWorkflow();
+  const processor = new OrderProcessor(flow.id);
 
-await onboarding.onboardNewUser({
-  email: 'john@example.com',
-  name: 'John Doe',
-  plan: 'pro',
-  referralCode: 'FRIEND2024'
-});
-```
+  const sampleOrder = {
+    id: 'order_123',
+    customer_id: 'cust_456',
+    customer_email: 'customer@example.com',
+    amount: 99.99,
+    currency: 'USD',
+    items: [
+      { sku: 'ITEM-001', quantity: 2 },
+      { sku: 'ITEM-002', quantity: 1 }
+    ]
+  };
 
-## E-commerce Order Processing
-
-Automated order fulfillment with inventory management and notifications.
-
-```typescript
-import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
-
-class OrderProcessingService {
-  private tolstoy: TolstoyClient;
-
-  constructor() {
-    this.tolstoy = new TolstoyClient(
-      process.env.TOLSTOY_API_URL!,
-      process.env.ECOMMERCE_ORG_ID!,
-      'order_processor'
-    );
-  }
-
-  async processOrder(order: {
-    orderId: string;
-    customerId: string;
-    items: Array<{ sku: string; quantity: number; price: number }>;
-    shippingAddress: any;
-    paymentMethod: string;
-  }) {
-    // Execute order processing workflow
-    const execution = await this.tolstoy.runFlow('order_fulfillment', {
-      order: {
-        ...order,
-        timestamp: new Date().toISOString(),
-        totalAmount: this.calculateTotal(order.items)
-      },
-      processing: {
-        priority: this.getOrderPriority(order),
-        warehouse: await this.selectWarehouse(order.shippingAddress),
-        shippingMethod: this.determineShipping(order)
-      }
-    });
-
-    // Set up order tracking webhooks
-    await this.setupOrderWebhooks(order.orderId, order.customerId);
-
-    return execution.data.executionId;
-  }
-
-  private calculateTotal(items: any[]) {
-    return items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  }
-
-  private getOrderPriority(order: any): 'high' | 'normal' | 'low' {
-    const total = this.calculateTotal(order.items);
-    if (total > 500) return 'high';
-    if (total > 100) return 'normal';
-    return 'low';
-  }
-
-  private async selectWarehouse(address: any) {
-    // Logic to select optimal warehouse
-    return 'warehouse_west';
-  }
-
-  private determineShipping(order: any) {
-    // Logic to determine shipping method
-    return 'standard';
-  }
-
-  private async setupOrderWebhooks(orderId: string, customerId: string) {
-    const webhookEvents = [
-      'order.payment_processed',
-      'order.inventory_reserved',
-      'order.shipped',
-      'order.delivered',
-      'order.cancelled'
-    ];
-
-    return this.tolstoy.createWebhook({
-      name: `Order Tracking - ${orderId}`,
-      url: `${process.env.APP_URL}/webhooks/order-updates`,
-      events: webhookEvents,
-      metadata: { orderId, customerId }
-    });
-  }
-
-  async cancelOrder(orderId: string, reason: string) {
-    return this.tolstoy.runFlow('order_cancellation', {
-      orderId,
-      reason,
-      timestamp: new Date().toISOString()
-    });
-  }
-
-  async getOrderStatus(executionId: string) {
-    const status = await this.tolstoy.getFlowExecution('order_fulfillment', executionId);
-    return {
-      status: status.data.status,
-      currentStep: status.data.currentStep,
-      estimatedCompletion: status.data.estimatedCompletion
-    };
-  }
-}
-```
-
-## Marketing Automation Campaign
-
-Multi-channel marketing campaign with personalization and A/B testing.
-
-```typescript
-import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
-
-class MarketingCampaignService {
-  private tolstoy: TolstoyClient;
-
-  constructor() {
-    this.tolstoy = new TolstoyClient(
-      process.env.TOLSTOY_API_URL!,
-      process.env.MARKETING_ORG_ID!,
-      'campaign_manager'
-    );
-  }
-
-  async launchCampaign(campaign: {
-    name: string;
-    audience: string[];
-    channels: ('email' | 'sms' | 'push' | 'social')[];
-    content: {
-      subject: string;
-      template: string;
-      variables: Record<string, any>;
-    };
-    schedule: {
-      startDate: Date;
-      timezone: string;
-      frequency?: 'once' | 'daily' | 'weekly';
-    };
-    abTest?: {
-      enabled: boolean;
-      variants: string[];
-      splitRatio: number[];
-    };
-  }) {
-    // Launch campaign workflow
-    const execution = await this.tolstoy.runFlow('marketing_campaign', {
-      campaign: {
-        ...campaign,
-        id: `campaign_${Date.now()}`,
-        createdAt: new Date().toISOString()
-      },
-      segmentation: await this.buildAudienceSegments(campaign.audience),
-      personalization: await this.preparePersonalization(campaign.content),
-      analytics: {
-        trackOpens: true,
-        trackClicks: true,
-        trackConversions: true
-      }
-    });
-
-    // Set up campaign monitoring
-    await this.setupCampaignMonitoring(execution.data.executionId, campaign.name);
-
-    return {
-      executionId: execution.data.executionId,
-      campaignId: `campaign_${Date.now()}`,
-      estimatedReach: campaign.audience.length
-    };
-  }
-
-  private async buildAudienceSegments(audience: string[]) {
-    // Segment audience based on various criteria
-    return {
-      segments: [
-        { name: 'high_value', count: Math.floor(audience.length * 0.2) },
-        { name: 'regular', count: Math.floor(audience.length * 0.6) },
-        { name: 'new_users', count: Math.floor(audience.length * 0.2) }
-      ]
-    };
-  }
-
-  private async preparePersonalization(content: any) {
-    return {
-      dynamicContent: true,
-      variables: content.variables,
-      localization: 'auto'
-    };
-  }
-
-  private async setupCampaignMonitoring(executionId: string, campaignName: string) {
-    const events = [
-      'campaign.started',
-      'campaign.email_sent',
-      'campaign.opened',
-      'campaign.clicked',
-      'campaign.converted',
-      'campaign.completed'
-    ];
-
-    return this.tolstoy.createWebhook({
-      name: `Campaign Monitor - ${campaignName}`,
-      url: `${process.env.APP_URL}/webhooks/campaign-analytics`,
-      events,
-      metadata: { executionId, campaignName }
-    });
-  }
-
-  async getCampaignAnalytics(executionId: string) {
-    const execution = await this.tolstoy.getFlowExecution('marketing_campaign', executionId);
-    
-    return {
-      status: execution.data.status,
-      metrics: {
-        sent: execution.data.metrics?.sent || 0,
-        opened: execution.data.metrics?.opened || 0,
-        clicked: execution.data.metrics?.clicked || 0,
-        converted: execution.data.metrics?.converted || 0,
-        openRate: this.calculateRate(
-          execution.data.metrics?.opened, 
-          execution.data.metrics?.sent
-        ),
-        clickRate: this.calculateRate(
-          execution.data.metrics?.clicked, 
-          execution.data.metrics?.opened
-        ),
-        conversionRate: this.calculateRate(
-          execution.data.metrics?.converted, 
-          execution.data.metrics?.clicked
-        )
-      }
-    };
-  }
-
-  private calculateRate(numerator: number = 0, denominator: number = 0): string {
-    if (denominator === 0) return '0%';
-    return `${((numerator / denominator) * 100).toFixed(2)}%`;
-  }
-}
-```
-
-## Customer Support Automation
-
-Automated ticket routing and response system with escalation rules.
-
-```typescript
-import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
-
-class SupportAutomationService {
-  private tolstoy: TolstoyClient;
-
-  constructor() {
-    this.tolstoy = new TolstoyClient(
-      process.env.TOLSTOY_API_URL!,
-      process.env.SUPPORT_ORG_ID!,
-      'support_automation'
-    );
-  }
-
-  async processTicket(ticket: {
-    id: string;
-    customerId: string;
-    subject: string;
-    description: string;
-    priority: 'low' | 'medium' | 'high' | 'critical';
-    category: string;
-    channel: 'email' | 'chat' | 'phone';
-  }) {
-    // Analyze and route ticket
-    const execution = await this.tolstoy.runFlow('support_ticket_processing', {
-      ticket: {
-        ...ticket,
-        receivedAt: new Date().toISOString()
-      },
-      routing: {
-        department: this.determineDepartment(ticket.category),
-        agent: await this.selectAgent(ticket.priority),
-        sla: this.getSLA(ticket.priority)
-      },
-      automation: {
-        autoResponse: this.shouldSendAutoResponse(ticket),
-        knowledgeBaseSearch: true,
-        sentimentAnalysis: true
-      }
-    });
-
-    // Set up ticket monitoring
-    await this.setupTicketMonitoring(ticket.id, ticket.customerId);
-
-    return execution.data.executionId;
-  }
-
-  private determineDepartment(category: string): string {
-    const departmentMap: Record<string, string> = {
-      'billing': 'finance',
-      'technical': 'engineering',
-      'account': 'customer_success',
-      'general': 'support'
-    };
-    return departmentMap[category] || 'support';
-  }
-
-  private async selectAgent(priority: string) {
-    // Logic to select best available agent
-    const agents = await this.getAvailableAgents();
-    
-    if (priority === 'critical') {
-      return agents.senior[0] || agents.regular[0];
-    }
-    
-    return agents.regular[0] || agents.senior[0];
-  }
-
-  private async getAvailableAgents() {
-    // Mock implementation - integrate with your agent management system
-    return {
-      senior: ['agent_1', 'agent_2'],
-      regular: ['agent_3', 'agent_4', 'agent_5']
-    };
-  }
-
-  private getSLA(priority: string) {
-    const slaHours = {
-      critical: 1,
-      high: 4,
-      medium: 24,
-      low: 72
-    };
-    return slaHours[priority] || 24;
-  }
-
-  private shouldSendAutoResponse(ticket: any): boolean {
-    return ticket.channel === 'email' && ticket.priority !== 'critical';
-  }
-
-  private async setupTicketMonitoring(ticketId: string, customerId: string) {
-    const events = [
-      'ticket.assigned',
-      'ticket.responded',
-      'ticket.escalated',
-      'ticket.resolved',
-      'ticket.reopened'
-    ];
-
-    return this.tolstoy.createWebhook({
-      name: `Ticket Monitor - ${ticketId}`,
-      url: `${process.env.APP_URL}/webhooks/ticket-updates`,
-      events,
-      metadata: { ticketId, customerId }
-    });
-  }
-
-  async escalateTicket(ticketId: string, reason: string) {
-    return this.tolstoy.runFlow('ticket_escalation', {
-      ticketId,
-      reason,
-      escalatedAt: new Date().toISOString(),
-      escalatedBy: 'system'
-    });
-  }
-}
-```
-
-## Multi-Tenant SaaS Integration
-
-Complete multi-tenant setup with organization isolation and user management.
-
-```typescript
-import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
-
-class MultiTenantTolstoyService {
-  private clients = new Map<string, TolstoyClient>();
-
-  getClientForTenant(orgId: string, userId: string, token?: string): TolstoyClient {
-    const key = `${orgId}:${userId}`;
-    
-    if (!this.clients.has(key)) {
-      const client = new TolstoyClient(
-        process.env.TOLSTOY_API_URL!,
-        orgId,
-        userId,
-        token
-      );
-      this.clients.set(key, client);
-    }
-    
-    return this.clients.get(key)!;
-  }
-
-  async executeWorkflowForTenant(
-    orgId: string, 
-    userId: string, 
-    flowId: string, 
-    inputs: any
-  ) {
-    const client = this.getClientForTenant(orgId, userId);
-    return client.runFlow(flowId, inputs);
-  }
-
-  async setupTenantWebhooks(orgId: string, userId: string) {
-    const client = this.getClientForTenant(orgId, userId);
-    
-    return client.createWebhook({
-      name: `Tenant Webhook - ${orgId}`,
-      url: `${process.env.APP_URL}/webhooks/tenant/${orgId}`,
-      events: ['flow.completed', 'flow.failed'],
-      active: true,
-      metadata: { orgId, userId }
-    });
-  }
-
-  async getTenantAnalytics(orgId: string, userId: string) {
-    const client = this.getClientForTenant(orgId, userId);
-    
-    const [flows, executions] = await Promise.all([
-      client.listFlows(),
-      client.raw.flows.flowsControllerGetFlowExecutions('')
-    ]);
-
-    return {
-      totalFlows: flows.data.length,
-      activeFlows: flows.data.filter(f => f.active).length,
-      totalExecutions: executions.data?.length || 0,
-      // Add more analytics as needed
-    };
-  }
+  await processor.processOrder(sampleOrder);
 }
 
-// Usage in Express.js middleware
+main().catch(console.error);
+```
+</CodeGroup>
+
+### Real-time Event Processing
+
+A workflow that processes real-time events from webhooks or streams.
+
+<CodeGroup>
+```typescript Node.js/TypeScript
+import { Client } from '@tolstoy/sdk';
 import express from 'express';
 
-const app = express();
-const tolstoyService = new MultiTenantTolstoyService();
-
-app.use(async (req, res, next) => {
-  const orgId = req.headers['x-org-id'] as string;
-  const userId = req.headers['x-user-id'] as string;
-  
-  if (!orgId || !userId) {
-    return res.status(400).json({ error: 'Missing tenant headers' });
-  }
-
-  req.tolstoy = tolstoyService.getClientForTenant(orgId, userId);
-  next();
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY!
 });
 
-app.post('/api/workflows/execute', async (req, res) => {
-  try {
-    const { flowId, inputs } = req.body;
-    const execution = await req.tolstoy.runFlow(flowId, inputs);
-    res.json(execution.data);
-  } catch (error) {
-    res.status(500).json({ error: error.message });
+class EventProcessor {
+  private flowId: string;
+  private app: express.Application;
+
+  constructor(flowId: string) {
+    this.flowId = flowId;
+    this.app = express();
+    this.setupMiddleware();
+    this.setupRoutes();
   }
-});
-```
 
-## Testing and Development
+  private setupMiddleware() {
+    this.app.use(express.json());
+    this.app.use(express.raw({ type: 'application/webhook+json' }));
+  }
 
-Examples for testing SDK integrations and development workflows.
-
-```typescript
-import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
-
-// Mock client for testing
-class MockTolstoyClient {
-  async runFlow(flowId: string, inputs: any) {
-    return {
-      data: {
-        executionId: `mock_exec_${Date.now()}`,
-        status: 'running'
+  private setupRoutes() {
+    // GitHub webhook endpoint
+    this.app.post('/webhooks/github', async (req, res) => {
+      const signature = req.headers['x-hub-signature-256'] as string;
+      
+      // Verify webhook signature
+      if (!this.verifyGitHubSignature(req.body, signature)) {
+        return res.status(401).send('Invalid signature');
       }
-    };
+
+      const event = req.body;
+      await this.processGitHubEvent(event);
+      res.status(200).send('OK');
+    });
+
+    // Stripe webhook endpoint
+    this.app.post('/webhooks/stripe', async (req, res) => {
+      const signature = req.headers['stripe-signature'] as string;
+      
+      try {
+        // Process Stripe event
+        await this.processStripeEvent(req.body, signature);
+        res.status(200).send('OK');
+      } catch (error) {
+        console.error('Stripe webhook error:', error);
+        res.status(400).send('Webhook error');
+      }
+    });
+
+    // Generic event endpoint
+    this.app.post('/events', async (req, res) => {
+      await this.processGenericEvent(req.body);
+      res.status(200).send('OK');
+    });
   }
 
-  async listFlows() {
-    return {
-      data: [
-        { id: 'flow_1', name: 'Test Flow', active: true },
-        { id: 'flow_2', name: 'Another Flow', active: false }
-      ]
-    };
+  private async processGitHubEvent(event: any) {
+    const execution = await client.flows.execute(this.flowId, {
+      inputs: {
+        source: 'github',
+        event_type: event.action,
+        repository: event.repository?.name,
+        branch: event.ref?.replace('refs/heads/', ''),
+        author: event.pusher?.name || event.sender?.login,
+        commits: event.commits || [],
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    console.log(`GitHub event processed: ${execution.id}`);
+  }
+
+  private async processStripeEvent(event: any, signature: string) {
+    // Verify Stripe signature here
+    
+    const execution = await client.flows.execute(this.flowId, {
+      inputs: {
+        source: 'stripe',
+        event_type: event.type,
+        customer_id: event.data?.object?.customer,
+        amount: event.data?.object?.amount,
+        currency: event.data?.object?.currency,
+        status: event.data?.object?.status,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    console.log(`Stripe event processed: ${execution.id}`);
+  }
+
+  private async processGenericEvent(eventData: any) {
+    const execution = await client.flows.execute(this.flowId, {
+      inputs: {
+        source: 'generic',
+        ...eventData,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    console.log(`Generic event processed: ${execution.id}`);
+  }
+
+  private verifyGitHubSignature(payload: Buffer, signature: string): boolean {
+    // Implement GitHub signature verification
+    // This is a simplified example
+    return true;
+  }
+
+  public start(port: number = 3000) {
+    this.app.listen(port, () => {
+      console.log(`Event processor listening on port ${port}`);
+    });
   }
 }
 
-// Test helper
-function createTestClient(useMock = false): TolstoyClient {
-  if (useMock || process.env.NODE_ENV === 'test') {
-    return new MockTolstoyClient() as any;
-  }
+async function createEventProcessingFlow() {
+  const flow = await client.flows.create({
+    name: 'Real-time Event Processing Flow',
+    description: 'Processes events from various sources in real-time',
+    steps: [
+      // Step 1: Route event based on source
+      {
+        key: 'route_event',
+        action: 'evaluate',
+        inputs: {
+          source: '{{inputs.source}}',
+          event_type: '{{inputs.event_type}}'
+        }
+      },
+      
+      // Step 2a: Process GitHub events
+      {
+        key: 'process_github_event',
+        action: 'transform',
+        condition: '{{inputs.source}} === "github"',
+        inputs: {
+          data: '{{inputs}}',
+          operations: [
+            {
+              type: 'map',
+              expression: `{
+                type: "code_push",
+                repository: repository,
+                branch: branch,
+                author: author,
+                commit_count: commits.length,
+                message: "New commits pushed to " + repository + " on " + branch
+              }`
+            }
+          ]
+        }
+      },
+      
+      // Step 2b: Process Stripe events
+      {
+        key: 'process_stripe_event',
+        action: 'transform',
+        condition: '{{inputs.source}} === "stripe"',
+        inputs: {
+          data: '{{inputs}}',
+          operations: [
+            {
+              type: 'map',
+              expression: `{
+                type: "payment_event",
+                customer: customer_id,
+                amount_formatted: (amount / 100).toFixed(2) + " " + currency.toUpperCase(),
+                status: status,
+                message: "Payment " + status + " for " + (amount / 100).toFixed(2) + " " + currency.toUpperCase()
+              }`
+            }
+          ]
+        }
+      },
+      
+      // Step 3: Send notification based on event type
+      {
+        key: 'send_notification',
+        action: 'slack',
+        inputs: {
+          channel: '#events',
+          message: `
+            📡 **{{inputs.source}} Event**
+            Type: {{inputs.event_type}}
+            Message: {{steps.process_github_event.outputs.result.message || steps.process_stripe_event.outputs.result.message}}
+            Time: {{inputs.timestamp}}
+          `
+        }
+      },
+      
+      // Step 4: Store event for analytics
+      {
+        key: 'store_event',
+        action: 'database',
+        inputs: {
+          operation: 'insert',
+          table: 'events',
+          data: {
+            source: '{{inputs.source}}',
+            event_type: '{{inputs.event_type}}',
+            processed_data: '{{steps.process_github_event.outputs.result || steps.process_stripe_event.outputs.result}}',
+            raw_data: '{{inputs}}',
+            processed_at: '{{inputs.timestamp}}'
+          }
+        }
+      }
+    ]
+  });
 
-  return new TolstoyClient(
-    process.env.TOLSTOY_TEST_URL || 'https://api-test.tolstoy.dev',
-    'test_org',
-    'test_user',
-    process.env.TOLSTOY_TEST_TOKEN
-  );
+  return flow;
 }
 
-// Jest test example
-describe('Workflow Integration', () => {
-  let client: TolstoyClient;
+// Usage
+async function main() {
+  const flow = await createEventProcessingFlow();
+  const processor = new EventProcessor(flow.id);
+  processor.start(3000);
+}
 
-  beforeEach(() => {
-    client = createTestClient(true); // Use mock
-  });
-
-  it('should execute workflow successfully', async () => {
-    const result = await client.runFlow('test_flow', { userId: 'test_123' });
-    expect(result.data.executionId).toBeDefined();
-    expect(result.data.status).toBe('running');
-  });
-
-  it('should list flows', async () => {
-    const flows = await client.listFlows();
-    expect(flows.data).toHaveLength(2);
-    expect(flows.data[0].name).toBe('Test Flow');
-  });
-});
+main().catch(console.error);
 ```
+</CodeGroup>
+
+## Integration Examples
+
+### Multi-Service Integration
+
+Example showing how to integrate multiple services in a single workflow.
+
+<CodeGroup>
+```typescript Node.js/TypeScript
+async function createMultiServiceIntegration() {
+  return await client.flows.create({
+    name: 'Multi-Service Customer Onboarding',
+    description: 'Comprehensive customer onboarding across multiple services',
+    steps: [
+      // CRM Integration
+      {
+        key: 'create_crm_contact',
+        action: 'http_request',
+        inputs: {
+          url: 'https://api.hubspot.com/crm/v3/objects/contacts',
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer {{secrets.hubspot_token}}',
+            'Content-Type': 'application/json'
+          },
+          body: {
+            properties: {
+              firstname: '{{inputs.customer.first_name}}',
+              lastname: '{{inputs.customer.last_name}}',
+              email: '{{inputs.customer.email}}',
+              phone: '{{inputs.customer.phone}}'
+            }
+          }
+        }
+      },
+      
+      // Email Marketing Platform
+      {
+        key: 'add_to_mailchimp',
+        action: 'http_request',
+        inputs: {
+          url: 'https://us1.api.mailchimp.com/3.0/lists/{{secrets.mailchimp_list_id}}/members',
+          method: 'POST',
+          headers: {
+            'Authorization': 'apikey {{secrets.mailchimp_api_key}}'
+          },
+          body: {
+            email_address: '{{inputs.customer.email}}',
+            status: 'subscribed',
+            merge_fields: {
+              FNAME: '{{inputs.customer.first_name}}',
+              LNAME: '{{inputs.customer.last_name}}'
+            }
+          }
+        }
+      },
+      
+      // Slack Notification
+      {
+        key: 'notify_sales_team',
+        action: 'slack',
+        inputs: {
+          channel: '#sales',
+          message: `
+            🎉 New customer signed up!
+            • Name: {{inputs.customer.first_name}} {{inputs.customer.last_name}}
+            • Email: {{inputs.customer.email}}
+            • CRM ID: {{steps.create_crm_contact.outputs.body.id}}
+            • Source: {{inputs.customer.source}}
+          `
+        }
+      },
+      
+      // Google Sheets Logging
+      {
+        key: 'log_to_sheets',
+        action: 'google_sheets',
+        inputs: {
+          spreadsheet_id: '{{secrets.tracking_sheet_id}}',
+          range: 'Signups!A:F',
+          values: [[
+            '{{inputs.customer.first_name}}',
+            '{{inputs.customer.last_name}}',
+            '{{inputs.customer.email}}',
+            '{{inputs.customer.source}}',
+            '{{steps.create_crm_contact.outputs.body.id}}',
+            '{{Date.now()}}'
+          ]]
+        }
+      },
+      
+      // Welcome Email
+      {
+        key: 'send_welcome_email',
+        action: 'email',
+        inputs: {
+          to: '{{inputs.customer.email}}',
+          subject: 'Welcome to Our Platform! 🚀',
+          template: 'welcome_email',
+          data: {
+            first_name: '{{inputs.customer.first_name}}',
+            onboarding_link: 'https://app.example.com/onboard'
+          }
+        }
+      }
+    ]
+  });
+}
+```
+</CodeGroup>
+
+These examples demonstrate the power and flexibility of Tolstoy SDKs for building complex automation workflows. Each example includes proper error handling, monitoring, and best practices for production use.
 
 ## Next Steps
 
-- [API Reference](/sdk/api-reference) - Complete method documentation
-- [Advanced Usage](/sdk/advanced-usage) - Expert patterns and optimization
-- [Troubleshooting](/sdk/troubleshooting) - Common issues and solutions
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api-reference/authentication">
+    Explore detailed API documentation
+  </Card>
+  <Card title="SDK Installation" icon="download" href="/sdk/installation">
+    Get started with SDK installation
+  </Card>
+  <Card title="Best Practices" icon="star" href="/best-practices">
+    Learn workflow design best practices
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>

@@ -1,0 +1,127 @@
+---
+title: Troubleshooting
+description: Common issues and solutions when using Tolstoy
+---
+
+# Troubleshooting
+
+This guide covers common issues you might encounter while using Tolstoy and provides solutions to resolve them quickly.
+
+## Authentication Issues
+
+### Invalid API Key
+
+**Error:** `401 Unauthorized - Invalid API key`
+
+**Solution:**
+1. Verify your API key is correct and properly formatted
+2. Check that your API key hasn't expired or been revoked
+3. Ensure you're using the correct environment (live vs test)
+4. Verify the API key has necessary permissions
+
+### API Key Not Found
+
+**Error:** `Authentication header missing`
+
+**Solution:**
+```bash
+# Correct format
+curl -H "Authorization: Bearer sk_live_your_key_here" \
+     https://api.tolstoy.dev/v1/flows
+```
+
+## Flow Execution Issues
+
+### Flow Validation Errors
+
+**Error:** `Flow validation failed`
+
+**Common causes:**
+- Circular step dependencies
+- Invalid action references
+- Missing required inputs
+
+**Solution:**
+1. Check step dependencies don't form loops
+2. Verify all referenced actions exist
+3. Ensure required inputs are provided
+
+### Execution Timeouts
+
+**Error:** `Execution timed out`
+
+**Solution:**
+1. Increase timeout limits in your flow configuration
+2. Optimize long-running steps
+3. Use background execution for lengthy processes
+
+## SDK Issues
+
+### Installation Problems
+
+**Node.js:**
+```bash
+# Clear cache and reinstall
+npm cache clean --force
+rm -rf node_modules package-lock.json
+npm install @tolstoy/sdk
+```
+
+**Python:**
+```bash
+# Use virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install tolstoy-sdk
+```
+
+### Connection Issues
+
+**Error:** `Connection timeout`
+
+**Solutions:**
+1. Check your network connection
+2. Verify firewall settings allow HTTPS traffic
+3. Try increasing timeout values
+4. Use proxy configuration if behind corporate firewall
+
+## API Rate Limiting
+
+**Error:** `429 Too Many Requests`
+
+**Solution:**
+1. Implement exponential backoff retry logic
+2. Reduce request frequency
+3. Consider upgrading your plan for higher limits
+4. Cache responses where possible
+
+## Common Error Codes
+
+| Code | Meaning | Solution |
+|------|---------|----------|
+| 400 | Bad Request | Check request format and parameters |
+| 401 | Unauthorized | Verify API key and permissions |
+| 403 | Forbidden | Check account permissions |
+| 404 | Not Found | Verify resource exists and ID is correct |
+| 429 | Rate Limited | Implement retry logic with backoff |
+| 500 | Server Error | Retry request, contact support if persistent |
+
+## Getting Help
+
+If you can't resolve an issue:
+
+1. **Check Status Page:** [status.tolstoy.dev](https://status.tolstoy.dev)
+2. **Search Documentation:** Use the search feature to find relevant guides
+3. **GitHub Issues:** [github.com/joosuhail12/tolstoy](https://github.com/joosuhail12/tolstoy)
+4. **Contact Support:** support@tolstoy.dev
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="book" href="/api-reference/authentication">
+    Review API documentation
+  </Card>
+  <Card title="SDK Examples" icon="code" href="/sdk/examples">
+    Learn from working examples
+  </Card>
+</CardGroup>

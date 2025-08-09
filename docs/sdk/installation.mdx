@@ -1,55 +1,628 @@
 ---
-title: Installation
-sidebar_position: 1
+title: SDK Installation
+description: Detailed installation instructions for all Tolstoy SDKs
 ---
 
-# Installation
+# SDK Installation
 
-Get started with the Tolstoy TypeScript SDK in seconds.
+This guide provides detailed installation instructions for all official Tolstoy SDKs across different programming languages and package managers.
 
-## Package Manager Installation
+## Node.js / TypeScript
 
-### npm
-```bash
-npm install @joosuhail/tolstoy-sdk
+### Prerequisites
+
+- Node.js 16.0 or higher
+- npm, yarn, or pnpm package manager
+
+### Installation
+
+<CodeGroup>
+```bash npm
+npm install @tolstoy/sdk
 ```
 
-### Yarn
-```bash
-yarn add @joosuhail/tolstoy-sdk
+```bash yarn
+yarn add @tolstoy/sdk
 ```
 
-### pnpm
-```bash
-pnpm add @joosuhail/tolstoy-sdk
+```bash pnpm
+pnpm add @tolstoy/sdk
 ```
+</CodeGroup>
 
-## Package Details
+### TypeScript Support
 
-- **Package Name**: `@joosuhail/tolstoy-sdk`
-- **Current Version**: `1.0.0`
-- **Size**: 26.8 KB compressed, 221.7 KB unpacked
-- **Dependencies**: axios (production-ready)
-- **TypeScript**: Full type definitions included
-
-## Requirements
-
-- **Node.js**: 16.0.0 or higher
-- **TypeScript**: 5.0.0 or higher (for TypeScript projects)
-- **Browser**: Modern browsers with ES2020 support
-
-## Verify Installation
-
-After installation, verify the SDK is working:
+The Node.js SDK includes full TypeScript definitions out of the box. No additional packages are needed.
 
 ```typescript
-import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+import { Client, Flow, Execution } from '@tolstoy/sdk';
 
-console.log('Tolstoy SDK installed successfully!');
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY
+});
 ```
+
+### CommonJS vs ES Modules
+
+The SDK supports both CommonJS and ES modules:
+
+<CodeGroup>
+```javascript ES Modules
+import { Client } from '@tolstoy/sdk';
+```
+
+```javascript CommonJS
+const { Client } = require('@tolstoy/sdk');
+```
+</CodeGroup>
+
+### Version Requirements
+
+| SDK Version | Node.js Version | TypeScript Version |
+|-------------|-----------------|-------------------|
+| 2.x | ≥16.0 | ≥4.5 |
+| 1.x | ≥14.0 | ≥4.0 |
+
+## Python
+
+### Prerequisites
+
+- Python 3.8 or higher
+- pip or poetry package manager
+
+### Installation
+
+<CodeGroup>
+```bash pip
+pip install tolstoy-sdk
+```
+
+```bash poetry
+poetry add tolstoy-sdk
+```
+
+```bash conda
+conda install -c conda-forge tolstoy-sdk
+```
+</CodeGroup>
+
+### Virtual Environment (Recommended)
+
+```bash
+# Create virtual environment
+python -m venv tolstoy-env
+
+# Activate (Linux/Mac)
+source tolstoy-env/bin/activate
+
+# Activate (Windows)
+tolstoy-env\Scripts\activate
+
+# Install SDK
+pip install tolstoy-sdk
+```
+
+### Async Support
+
+For async operations, install with async dependencies:
+
+```bash
+pip install "tolstoy-sdk[async]"
+```
+
+Then use the async client:
+
+```python
+from tolstoy import AsyncClient
+
+client = AsyncClient(api_key='your-api-key')
+```
+
+### Type Hints
+
+The Python SDK includes full type hints for better IDE support:
+
+```python
+from typing import Dict, Any
+from tolstoy import Client, Flow, Execution
+
+client: Client = Client(api_key='your-api-key')
+flow: Flow = await client.flows.get('flow_123')
+```
+
+### Version Requirements
+
+| SDK Version | Python Version | Dependencies |
+|-------------|----------------|--------------|
+| 2.x | ≥3.8 | requests, aiohttp (async) |
+| 1.x | ≥3.7 | requests |
+
+## Go
+
+### Prerequisites
+
+- Go 1.19 or higher
+
+### Installation
+
+```bash
+go get github.com/tolstoy/tolstoy-go
+```
+
+### Usage
+
+```go
+package main
+
+import (
+    "context"
+    "os"
+    
+    "github.com/tolstoy/tolstoy-go"
+)
+
+func main() {
+    client := tolstoy.NewClient(&tolstoy.Config{
+        APIKey: os.Getenv("TOLSTOY_API_KEY"),
+    })
+    
+    // Use the client
+    flows, err := client.Flows.List(context.Background(), nil)
+    if err != nil {
+        panic(err)
+    }
+}
+```
+
+### Module Requirements
+
+Add to your `go.mod`:
+
+```go
+module your-app
+
+go 1.19
+
+require (
+    github.com/tolstoy/tolstoy-go v2.0.0
+)
+```
+
+### Version Requirements
+
+| SDK Version | Go Version | Dependencies |
+|-------------|------------|--------------|
+| 2.x | ≥1.19 | Minimal stdlib |
+| 1.x | ≥1.18 | net/http |
+
+## Rust
+
+### Prerequisites
+
+- Rust 1.60 or higher
+- Cargo package manager
+
+### Installation
+
+Add to your `Cargo.toml`:
+
+```toml
+[dependencies]
+tolstoy = "2.0.0"
+tokio = { version = "1.0", features = ["full"] }
+serde_json = "1.0"
+```
+
+### Usage
+
+```rust
+use tolstoy::{Client, Config};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = Client::new(Config {
+        api_key: std::env::var("TOLSTOY_API_KEY")?,
+        ..Default::default()
+    });
+    
+    let flows = client.flows().list(None).await?;
+    println!("Found {} flows", flows.len());
+    
+    Ok(())
+}
+```
+
+### Features
+
+The Rust SDK supports optional features:
+
+```toml
+[dependencies]
+tolstoy = { version = "2.0.0", features = ["rustls", "native-tls"] }
+```
+
+Available features:
+- `rustls` - Use rustls for TLS (default)
+- `native-tls` - Use native TLS implementation
+- `streams` - Enable streaming support
+
+### Version Requirements
+
+| SDK Version | Rust Version | Dependencies |
+|-------------|--------------|--------------|
+| 2.x | ≥1.60 | tokio, reqwest, serde |
+| 1.x | ≥1.56 | tokio, reqwest |
+
+## Community SDKs
+
+### Java
+
+```xml
+<dependency>
+    <groupId>com.tolstoy</groupId>
+    <artifactId>tolstoy-java</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+### C#
+
+```bash
+dotnet add package Tolstoy.SDK
+```
+
+### Ruby
+
+```bash
+gem install tolstoy
+```
+
+### PHP
+
+```bash
+composer require tolstoy/sdk
+```
+
+## Environment Setup
+
+### Environment Variables
+
+Set up your environment variables for development:
+
+<CodeGroup>
+```bash Linux/Mac
+export TOLSTOY_API_KEY="sk_live_your_api_key_here"
+export TOLSTOY_API_URL="https://api.tolstoy.dev"
+```
+
+```cmd Windows
+set TOLSTOY_API_KEY=sk_live_your_api_key_here
+set TOLSTOY_API_URL=https://api.tolstoy.dev
+```
+
+```powershell PowerShell
+$env:TOLSTOY_API_KEY="sk_live_your_api_key_here"
+$env:TOLSTOY_API_URL="https://api.tolstoy.dev"
+```
+</CodeGroup>
+
+### Configuration Files
+
+Create a `.env` file in your project root:
+
+```bash
+# .env file
+TOLSTOY_API_KEY=sk_live_your_api_key_here
+TOLSTOY_API_URL=https://api.tolstoy.dev
+TOLSTOY_TIMEOUT=30000
+TOLSTOY_RETRY_COUNT=3
+```
+
+Load environment variables in your application:
+
+<CodeGroup>
+```javascript Node.js
+import dotenv from 'dotenv';
+import { Client } from '@tolstoy/sdk';
+
+dotenv.config();
+
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY
+});
+```
+
+```python Python
+import os
+from dotenv import load_dotenv
+from tolstoy import Client
+
+load_dotenv()
+
+client = Client(api_key=os.getenv('TOLSTOY_API_KEY'))
+```
+
+```go Go
+import (
+    "github.com/joho/godotenv"
+    "github.com/tolstoy/tolstoy-go"
+)
+
+func main() {
+    godotenv.Load()
+    
+    client := tolstoy.NewClient(&tolstoy.Config{
+        APIKey: os.Getenv("TOLSTOY_API_KEY"),
+    })
+}
+```
+</CodeGroup>
+
+## IDE Configuration
+
+### Visual Studio Code
+
+Install recommended extensions:
+
+1. **For Node.js/TypeScript:**
+   - TypeScript and JavaScript Language Features
+   - ESLint
+   - Prettier
+
+2. **For Python:**
+   - Python
+   - Pylance
+   - Python Docstring Generator
+
+3. **For Go:**
+   - Go
+   - Go Test Explorer
+
+4. **For Rust:**
+   - Rust Analyzer
+   - CodeLLDB (debugging)
+
+### IntelliJ IDEA / WebStorm
+
+1. Enable TypeScript support
+2. Configure code style for your language
+3. Set up debugging configurations
+
+### Settings
+
+Create a `.vscode/settings.json` for consistent formatting:
+
+```json
+{
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  }
+}
+```
+
+## Verification
+
+Test your installation with a simple script:
+
+<CodeGroup>
+```javascript Node.js
+// test.js
+import { Client } from '@tolstoy/sdk';
+
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY
+});
+
+async function test() {
+  try {
+    const status = await client.health.getStatus();
+    console.log('✅ SDK installed successfully');
+    console.log('Status:', status);
+  } catch (error) {
+    console.error('❌ Installation test failed:', error.message);
+  }
+}
+
+test();
+```
+
+```python Python
+# test.py
+import os
+from tolstoy import Client
+
+client = Client(api_key=os.getenv('TOLSTOY_API_KEY'))
+
+try:
+    status = client.health.get_status()
+    print('✅ SDK installed successfully')
+    print(f'Status: {status}')
+except Exception as error:
+    print(f'❌ Installation test failed: {error}')
+```
+
+```go Go
+// test.go
+package main
+
+import (
+    "context"
+    "fmt"
+    "os"
+    
+    "github.com/tolstoy/tolstoy-go"
+)
+
+func main() {
+    client := tolstoy.NewClient(&tolstoy.Config{
+        APIKey: os.Getenv("TOLSTOY_API_KEY"),
+    })
+    
+    status, err := client.Health.GetStatus(context.Background())
+    if err != nil {
+        fmt.Printf("❌ Installation test failed: %v\n", err)
+        return
+    }
+    
+    fmt.Println("✅ SDK installed successfully")
+    fmt.Printf("Status: %+v\n", status)
+}
+```
+
+```rust Rust
+// test.rs
+use tolstoy::{Client, Config};
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let client = Client::new(Config {
+        api_key: std::env::var("TOLSTOY_API_KEY")?,
+        ..Default::default()
+    });
+    
+    match client.health().get_status().await {
+        Ok(status) => {
+            println!("✅ SDK installed successfully");
+            println!("Status: {:?}", status);
+        }
+        Err(error) => {
+            println!("❌ Installation test failed: {}", error);
+        }
+    }
+    
+    Ok(())
+}
+```
+</CodeGroup>
+
+Run the test:
+
+<CodeGroup>
+```bash Node.js
+node test.js
+# or with TypeScript
+npx tsx test.ts
+```
+
+```bash Python
+python test.py
+```
+
+```bash Go
+go run test.go
+```
+
+```bash Rust
+cargo run --bin test
+```
+</CodeGroup>
+
+Expected output:
+```
+✅ SDK installed successfully
+Status: { status: 'healthy', version: '1.0.0' }
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Module Not Found
+
+**Node.js:**
+```bash
+# Clear npm cache and reinstall
+npm cache clean --force
+rm -rf node_modules package-lock.json
+npm install
+```
+
+**Python:**
+```bash
+# Check if package is installed
+pip list | grep tolstoy
+
+# Reinstall if needed
+pip uninstall tolstoy-sdk
+pip install tolstoy-sdk
+```
+
+#### 2. Type Errors (TypeScript)
+
+```bash
+# Ensure TypeScript is installed
+npm install -D typescript @types/node
+
+# Generate or update types
+npm run build
+```
+
+#### 3. SSL/Certificate Issues
+
+**Node.js:**
+```javascript
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  rejectUnauthorized: false // Only for development
+});
+```
+
+**Python:**
+```python
+import ssl
+import certifi
+
+client = Client(
+    api_key=os.getenv('TOLSTOY_API_KEY'),
+    verify_ssl=certifi.where()
+)
+```
+
+#### 4. Proxy Configuration
+
+<CodeGroup>
+```javascript Node.js
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  proxy: 'http://proxy.company.com:8080'
+});
+```
+
+```python Python
+client = Client(
+    api_key=os.getenv('TOLSTOY_API_KEY'),
+    proxies={
+        'https': 'http://proxy.company.com:8080'
+    }
+)
+```
+</CodeGroup>
+
+### Getting Help
+
+If you encounter installation issues:
+
+1. Check the [GitHub Issues](https://github.com/tolstoy/tolstoy-sdk-node/issues)
+2. Review [troubleshooting documentation](/troubleshooting)
+3. Contact support at support@tolstoy.dev
 
 ## Next Steps
 
-- [Quick Start Guide](/sdk/quickstart) - Get up and running in 2 minutes
-- [Authentication](/sdk/authentication) - Configure multi-tenant access
-- [API Reference](/sdk/api-reference) - Explore all available methods
+Now that you have the SDK installed:
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Build your first workflow in 5 minutes
+  </Card>
+  <Card title="Code Examples" icon="code" href="/sdk/examples">
+    Explore complete examples and use cases
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/authentication">
+    Dive into detailed API documentation
+  </Card>
+  <Card title="SDK Overview" icon="layers" href="/sdk/overview">
+    Learn about SDK features and capabilities
+  </Card>
+</CardGroup>

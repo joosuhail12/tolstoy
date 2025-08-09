@@ -1,0 +1,141 @@
+---
+title: "Installation & Setup"
+description: "Complete guide to installing and configuring Tolstoy"
+---
+
+# Installation & Setup
+
+This guide covers everything you need to install, configure, and deploy Tolstoy in your environment.
+
+## System Requirements
+
+### **Minimum Requirements**
+- **Node.js** 18+ with npm/yarn
+- **PostgreSQL** 13+ (or Neon database)
+- **Redis** 6+ (or Upstash Redis)
+- **Memory** 2GB RAM minimum, 4GB recommended
+- **Storage** 10GB available space
+
+### **Production Requirements**
+- **CPU** 4+ cores recommended
+- **Memory** 8GB+ RAM
+- **Storage** 50GB+ SSD storage
+- **Network** Reliable internet connection for external integrations
+- **SSL Certificate** for HTTPS endpoints
+
+### **Cloud Services**
+- **AWS Account** for Secrets Manager (optional but recommended)
+- **Sentry Account** for error monitoring (optional)
+- **Inngest Account** for workflow execution (required for production)
+
+## Quick Start (Development)
+
+The fastest way to get Tolstoy running locally:
+
+<CodeGroup>
+
+```bash Docker Compose
+# Clone the repository
+git clone https://github.com/joosuhail12/tolstoy.git
+cd tolstoy
+
+# Start services with Docker
+docker-compose up -d
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+cp .env.example .env
+
+# Run database migrations
+npx prisma migrate dev
+
+# Start the development server
+npm run start:dev
+```
+
+```bash Manual Setup
+# Clone and install
+git clone https://github.com/joosuhail12/tolstoy.git
+cd tolstoy
+npm install
+
+# Set up PostgreSQL database
+createdb tolstoy_dev
+
+# Set up Redis (using Homebrew on macOS)
+brew install redis
+brew services start redis
+
+# Configure environment
+cp .env.example .env
+# Edit .env with your database and Redis URLs
+
+# Run migrations and start
+npx prisma migrate dev
+npm run start:dev
+```
+
+</CodeGroup>
+
+## Environment Configuration
+
+### **Required Environment Variables**
+
+```bash .env
+# Database Configuration
+DATABASE_URL="postgresql://username:password@localhost:5432/tolstoy"
+DIRECT_URL="postgresql://username:password@localhost:5432/tolstoy"
+
+# Redis Configuration
+REDIS_URL="redis://localhost:6379"
+
+# Application Configuration
+NODE_ENV="development"
+PORT="3000"
+API_BASE_URL="http://localhost:3000"
+
+# JWT Configuration
+JWT_SECRET="your-secure-random-jwt-secret"
+
+# Inngest Configuration
+INNGEST_EVENT_KEY="your-inngest-event-key"
+INNGEST_SIGNING_KEY="your-inngest-signing-key"
+```
+
+### **Optional Environment Variables**
+
+```bash .env
+# AWS Secrets Manager
+AWS_REGION="us-east-1"
+AWS_SECRET_ACCESS_KEY="your-aws-secret-key"
+AWS_ACCESS_KEY_ID="your-aws-access-key"
+
+# Sentry Error Monitoring  
+SENTRY_DSN="your-sentry-dsn"
+
+# Ably Real-time (for WebSocket features)
+ABLY_API_KEY="your-ably-api-key"
+
+# Daytona Sandbox (for code execution)
+DAYTONA_BASE_URL="your-daytona-instance"
+DAYTONA_API_KEY="your-daytona-api-key"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+    Create your first workflow
+  </Card>
+  <Card title="Product Overview" icon="book-open" href="/product/overview">
+    Learn about Tolstoy features
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/overview">
+    Explore the complete API
+  </Card>
+  <Card title="CLI Documentation" icon="terminal" href="/cli/overview">
+    Use the command-line interface
+  </Card>
+</CardGroup>

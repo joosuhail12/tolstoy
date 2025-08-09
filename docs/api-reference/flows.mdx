@@ -1,0 +1,448 @@
+---
+title: Flows API
+description: Create, manage, and execute workflows with the Flows API
+---
+
+# Flows API
+
+Flows are the core of Tolstoy - they represent workflows that can be executed to automate tasks and processes. This API allows you to create, update, list, and execute flows programmatically.
+
+## Flow Object
+
+A flow represents a complete workflow definition with steps, configuration, and metadata.
+
+### Attributes
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `id` | string | Unique identifier for the flow |
+| `name` | string | Human-readable name for the flow |
+| `description` | string | Optional description of what the flow does |
+| `steps` | array | Array of step objects defining the workflow |
+| `status` | enum | Status of the flow (`active`, `draft`, `archived`) |
+| `created_at` | timestamp | When the flow was created |
+| `updated_at` | timestamp | When the flow was last updated |
+| `version` | integer | Version number of the flow |
+
+### Example Flow Object
+
+```json
+{
+  "id": "flow_1234567890",
+  "name": "Data Processing Pipeline",
+  "description": "Processes incoming data and sends notifications",
+  "status": "active",
+  "version": 1,
+  "steps": [
+    {
+      "key": "fetch_data",
+      "action": "http_request",
+      "inputs": {
+        "url": "https://api.example.com/data",
+        "method": "GET"
+      }
+    },
+    {
+      "key": "process_data",
+      "action": "transform",
+      "inputs": {
+        "data": "{{steps.fetch_data.response.body}}",
+        "transformation": "filter_valid"
+      }
+    }
+  ],
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+
+## Create a Flow
+
+Creates a new flow with the provided configuration.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.tolstoy.dev/v1/flows \
+  -H "Authorization: Bearer sk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My New Flow",
+    "description": "A sample workflow",
+    "steps": [
+      {
+        "key": "greeting",
+        "action": "echo",
+        "inputs": {
+          "message": "Hello World!"
+        }
+      }
+    ]
+  }'
+```
+
+```javascript Node.js
+const flow = await client.flows.create({
+  name: 'My New Flow',
+  description: 'A sample workflow',
+  steps: [
+    {
+      key: 'greeting',
+      action: 'echo',
+      inputs: {
+        message: 'Hello World!'
+      }
+    }
+  ]
+});
+```
+
+```python Python
+flow = client.flows.create({
+    'name': 'My New Flow',
+    'description': 'A sample workflow',
+    'steps': [
+        {
+            'key': 'greeting',
+            'action': 'echo',
+            'inputs': {
+                'message': 'Hello World!'
+            }
+        }
+    ]
+})
+```
+</CodeGroup>
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `name` | string | Yes | Name of the flow |
+| `description` | string | No | Description of the flow |
+| `steps` | array | Yes | Array of step definitions |
+| `status` | enum | No | Initial status (`draft` or `active`, defaults to `draft`) |
+
+## List Flows
+
+Retrieves a list of flows for your organization.
+
+<CodeGroup>
+```bash cURL
+curl https://api.tolstoy.dev/v1/flows \
+  -H "Authorization: Bearer sk_live_..."
+```
+
+```javascript Node.js
+const flows = await client.flows.list({
+  limit: 10,
+  status: 'active'
+});
+```
+
+```python Python
+flows = client.flows.list(
+    limit=10,
+    status='active'
+)
+```
+</CodeGroup>
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `limit` | integer | Number of flows to return (max 100, default 20) |
+| `offset` | integer | Number of flows to skip (default 0) |
+| `status` | enum | Filter by status (`active`, `draft`, `archived`) |
+| `search` | string | Search flows by name or description |
+
+## Get a Flow
+
+Retrieves the details of a specific flow.
+
+<CodeGroup>
+```bash cURL
+curl https://api.tolstoy.dev/v1/flows/flow_1234567890 \
+  -H "Authorization: Bearer sk_live_..."
+```
+
+```javascript Node.js
+const flow = await client.flows.get('flow_1234567890');
+```
+
+```python Python
+flow = client.flows.get('flow_1234567890')
+```
+</CodeGroup>
+
+## Update a Flow
+
+Updates an existing flow. Only provided fields will be updated.
+
+<CodeGroup>
+```bash cURL
+curl -X PATCH https://api.tolstoy.dev/v1/flows/flow_1234567890 \
+  -H "Authorization: Bearer sk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Updated Flow Name",
+    "status": "active"
+  }'
+```
+
+```javascript Node.js
+const flow = await client.flows.update('flow_1234567890', {
+  name: 'Updated Flow Name',
+  status: 'active'
+});
+```
+
+```python Python
+flow = client.flows.update('flow_1234567890', {
+    'name': 'Updated Flow Name',
+    'status': 'active'
+})
+```
+</CodeGroup>
+
+## Execute a Flow
+
+Starts execution of a flow with optional input parameters.
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.tolstoy.dev/v1/flows/flow_1234567890/execute \
+  -H "Authorization: Bearer sk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputs": {
+      "user_id": "user_123",
+      "email": "user@example.com"
+    }
+  }'
+```
+
+```javascript Node.js
+const execution = await client.flows.execute('flow_1234567890', {
+  inputs: {
+    user_id: 'user_123',
+    email: 'user@example.com'
+  }
+});
+```
+
+```python Python
+execution = client.flows.execute('flow_1234567890', {
+    'inputs': {
+        'user_id': 'user_123',
+        'email': 'user@example.com'
+    }
+})
+```
+</CodeGroup>
+
+### Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `inputs` | object | No | Input parameters for the flow execution |
+| `webhook_url` | string | No | URL to receive execution completion webhook |
+
+### Response
+
+Returns an execution object:
+
+```json
+{
+  "id": "exec_1234567890",
+  "flow_id": "flow_1234567890",
+  "status": "running",
+  "inputs": {
+    "user_id": "user_123",
+    "email": "user@example.com"
+  },
+  "created_at": "2024-01-15T10:30:00Z"
+}
+```
+
+## Delete a Flow
+
+Permanently deletes a flow. This action cannot be undone.
+
+<CodeGroup>
+```bash cURL
+curl -X DELETE https://api.tolstoy.dev/v1/flows/flow_1234567890 \
+  -H "Authorization: Bearer sk_live_..."
+```
+
+```javascript Node.js
+await client.flows.delete('flow_1234567890');
+```
+
+```python Python
+client.flows.delete('flow_1234567890')
+```
+</CodeGroup>
+
+<Warning>
+Deleting a flow will also delete all associated execution history. Consider archiving flows instead of deleting them.
+</Warning>
+
+## Flow Validation
+
+When creating or updating flows, the API validates the workflow definition to ensure it can be executed successfully.
+
+### Validation Rules
+
+- **Step Keys**: Must be unique within the flow
+- **Action References**: All actions must be valid and available
+- **Input Dependencies**: Referenced step outputs must exist
+- **Circular Dependencies**: Flow must not contain circular references
+
+### Validation Errors
+
+If validation fails, you'll receive a `400 Bad Request` response:
+
+```json
+{
+  "error": {
+    "type": "validation_error",
+    "message": "Flow validation failed",
+    "details": [
+      {
+        "field": "steps[1].inputs.data",
+        "message": "Referenced step 'nonexistent_step' not found"
+      }
+    ]
+  }
+}
+```
+
+## Step Reference
+
+Steps are the building blocks of flows. Each step represents a single action to be executed.
+
+### Step Object
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `key` | string | Unique identifier for the step within the flow |
+| `action` | string | The action to execute (e.g., `http_request`, `email`) |
+| `inputs` | object | Input parameters for the action |
+| `condition` | string | Optional condition for conditional execution |
+| `retry` | object | Optional retry configuration |
+
+### Variable References
+
+Steps can reference outputs from previous steps using the `{{steps.step_key.output}}` syntax:
+
+```json
+{
+  "key": "send_notification",
+  "action": "email",
+  "inputs": {
+    "to": "{{steps.fetch_user.outputs.email}}",
+    "subject": "Processing Complete",
+    "body": "Your data processing is complete. Results: {{steps.process_data.outputs.summary}}"
+  }
+}
+```
+
+## Examples
+
+### Basic Data Processing Flow
+
+```json
+{
+  "name": "User Data Processing",
+  "description": "Fetches user data, processes it, and sends a summary email",
+  "steps": [
+    {
+      "key": "fetch_user",
+      "action": "http_request",
+      "inputs": {
+        "url": "https://api.example.com/users/{{inputs.user_id}}",
+        "method": "GET",
+        "headers": {
+          "Authorization": "Bearer {{secrets.api_token}}"
+        }
+      }
+    },
+    {
+      "key": "process_data",
+      "action": "transform",
+      "inputs": {
+        "data": "{{steps.fetch_user.outputs.body}}",
+        "transformation": "user_summary"
+      }
+    },
+    {
+      "key": "send_email",
+      "action": "email",
+      "inputs": {
+        "to": "{{steps.fetch_user.outputs.email}}",
+        "subject": "Your Data Summary",
+        "template": "user_summary",
+        "data": "{{steps.process_data.outputs}}"
+      }
+    }
+  ]
+}
+```
+
+### Conditional Flow with Error Handling
+
+```json
+{
+  "name": "Conditional Notification Flow",
+  "steps": [
+    {
+      "key": "check_conditions",
+      "action": "evaluate",
+      "inputs": {
+        "expression": "{{inputs.priority}} == 'high'"
+      }
+    },
+    {
+      "key": "send_urgent_notification",
+      "action": "slack",
+      "condition": "{{steps.check_conditions.outputs.result}} == true",
+      "inputs": {
+        "channel": "#urgent",
+        "message": "High priority alert: {{inputs.message}}"
+      },
+      "retry": {
+        "max_attempts": 3,
+        "delay": 5000
+      }
+    },
+    {
+      "key": "send_normal_notification",
+      "action": "email",
+      "condition": "{{steps.check_conditions.outputs.result}} == false",
+      "inputs": {
+        "to": "team@example.com",
+        "subject": "Notification",
+        "body": "{{inputs.message}}"
+      }
+    }
+  ]
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Actions API" icon="play" href="/api-reference/actions">
+    Explore available actions for your workflows
+  </Card>
+  <Card title="Executions API" icon="chart-line" href="/api-reference/executions">
+    Monitor and manage flow executions
+  </Card>
+  <Card title="SDK Examples" icon="code" href="/sdk/examples">
+    See complete examples using our SDKs
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/api-reference/tools">
+    Learn about tools and integrations
+  </Card>
+</CardGroup>

@@ -1,0 +1,667 @@
+---
+title: "Users and Roles"
+description: "Understand user management and role-based access control in Tolstoy"
+---
+
+# Users and Roles
+
+Tolstoy implements a comprehensive user management system with role-based access control (RBAC) to ensure secure, organized access to workflow automation capabilities across your organization.
+
+## User Management Overview
+
+Users in Tolstoy are authenticated individuals who can access and interact with the platform within the context of one or more organizations. Each user has specific roles and permissions that determine their level of access.
+
+<CardGroup cols={2}>
+  <Card title="Multi-Organization Support" icon="building">
+    Users can belong to multiple organizations with different roles in each
+  </Card>
+  <Card title="OAuth Integration" icon="key">
+    Seamless authentication with GitHub, Google, Microsoft, Slack, and more
+  </Card>
+  <Card title="Role-Based Access" icon="users-gear">
+    Granular permissions system with predefined and custom roles
+  </Card>
+  <Card title="Audit Logging" icon="list-check">
+    Complete audit trail of user actions and permission changes
+  </Card>
+</CardGroup>
+
+## User Types
+
+### Platform Users
+
+Standard users who interact with Tolstoy through the web interface, API, or CLI:
+
+```json
+{
+  "id": "user_123",
+  "email": "jane@company.com",
+  "name": "Jane Smith",
+  "avatar": "https://avatar.url/jane.jpg",
+  "status": "active",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "lastLoginAt": "2024-01-20T14:22:00Z",
+  "organizations": [
+    {
+      "organizationId": "org_456",
+      "role": "admin",
+      "joinedAt": "2024-01-15T10:30:00Z"
+    },
+    {
+      "organizationId": "org_789",
+      "role": "developer",
+      "joinedAt": "2024-01-18T09:15:00Z"
+    }
+  ]
+}
+```
+
+### System Users
+
+Service accounts and automated users for programmatic access:
+
+```json
+{
+  "id": "system_123",
+  "type": "service_account",
+  "name": "CI/CD Pipeline",
+  "description": "Automated deployment workflows",
+  "organizationId": "org_456",
+  "role": "automation",
+  "apiKeyId": "ak_789",
+  "permissions": [
+    "flows:execute",
+    "execution-logs:read"
+  ],
+  "createdAt": "2024-01-15T10:30:00Z"
+}
+```
+
+## Role-Based Access Control
+
+### Built-in Roles
+
+Tolstoy includes several predefined roles with specific permission sets:
+
+<Tabs>
+  <Tab title="Owner">
+    **Highest level of access** - Full control over the organization
+    
+    **Permissions:**
+    - Complete access to all resources and settings
+    - User and role management
+    - Billing and subscription management
+    - Organization settings and configuration
+    - Audit log access
+    - API key management
+    
+    **Use Cases:**
+    - Organization founders
+    - Primary administrators
+    - Executive stakeholders
+  </Tab>
+  
+  <Tab title="Admin">
+    **Administrative access** - Manage users, resources, and configurations
+    
+    **Permissions:**
+    - User management (invite, remove, modify roles)
+    - Flow and action management
+    - Tool configuration
+    - Webhook management
+    - Execution log access
+    - Organization settings (limited)
+    
+    **Use Cases:**
+    - IT administrators
+    - Team leads
+    - Technical managers
+  </Tab>
+  
+  <Tab title="Developer">
+    **Development access** - Create and manage workflows
+    
+    **Permissions:**
+    - Create, edit, and delete flows
+    - Create and manage actions
+    - Execute workflows
+    - Access execution logs for own flows
+    - Configure integrations
+    - Use API and CLI tools
+    
+    **Use Cases:**
+    - Software developers
+    - DevOps engineers
+    - Integration specialists
+  </Tab>
+  
+  <Tab title="Operator">
+    **Operational access** - Execute and monitor workflows
+    
+    **Permissions:**
+    - Execute existing workflows
+    - View execution logs and status
+    - Monitor workflow performance
+    - Access basic reporting
+    - Use webhooks (limited)
+    
+    **Use Cases:**
+    - Operations team members
+    - Support staff
+    - Business users
+  </Tab>
+  
+  <Tab title="Viewer">
+    **Read-only access** - View workflows and execution data
+    
+    **Permissions:**
+    - View flows and actions (read-only)
+    - View execution logs and status
+    - Access basic metrics and reports
+    - View organization information
+    
+    **Use Cases:**
+    - Stakeholders
+    - Auditors
+    - Business analysts
+  </Tab>
+</Tabs>
+
+### Permission Matrix
+
+| Resource | Owner | Admin | Developer | Operator | Viewer |
+|----------|--------|-------|-----------|----------|---------|
+| **Users** | ||||
+| Invite Users | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Manage Roles | ✅ | ✅ | ❌ | ❌ | ❌ |
+| Remove Users | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Flows** | ||||
+| Create/Edit Flows | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Execute Flows | ✅ | ✅ | ✅ | ✅ | ❌ |
+| Delete Flows | ✅ | ✅ | ✅ | ❌ | ❌ |
+| View Flows | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Actions** | ||||
+| Create Actions | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Edit Actions | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Delete Actions | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Tools** | ||||
+| Configure Tools | ✅ | ✅ | ✅ | ❌ | ❌ |
+| Manage OAuth | ✅ | ✅ | ✅ | ❌ | ❌ |
+| **Execution Logs** | ||||
+| View All Logs | ✅ | ✅ | ❌* | ❌* | ❌* |
+| Export Logs | ✅ | ✅ | ❌ | ❌ | ❌ |
+| **Organization** | ||||
+| Edit Settings | ✅ | ✅** | ❌ | ❌ | ❌ |
+| Billing | ✅ | ❌ | ❌ | ❌ | ❌ |
+| API Keys | ✅ | ✅ | ❌ | ❌ | ❌ |
+
+*Can only view logs for resources they have access to  
+**Limited organization settings access
+
+## User Management
+
+### User Registration and Invitation
+
+<CodeGroup>
+```bash CLI - Invite User
+# Invite a new user to your organization
+tolstoy users invite jane@company.com --role developer --message "Welcome to our automation team!"
+
+# List pending invitations
+tolstoy users invitations list
+
+# Resend invitation
+tolstoy users invitations resend jane@company.com
+```
+
+```typescript TypeScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const client = new TolstoyClient({
+  apiKey: 'your-api-key',
+  organizationId: 'org_123'
+});
+
+// Invite a user
+const invitation = await client.users.invite({
+  email: 'jane@company.com',
+  role: 'developer',
+  message: 'Welcome to our automation team!'
+});
+
+// Get user details
+const user = await client.users.get('user_123');
+
+// Update user role
+await client.users.updateRole('user_123', 'admin');
+```
+
+```bash cURL - REST API
+# Invite a new user
+curl -X POST "https://api.tolstoy.dev/users/invite" \
+  -H "Authorization: Bearer your-api-key" \
+  -H "X-Organization-ID: org_123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "jane@company.com",
+    "role": "developer",
+    "message": "Welcome to our automation team!"
+  }'
+
+# List organization users
+curl -X GET "https://api.tolstoy.dev/users" \
+  -H "Authorization: Bearer your-api-key" \
+  -H "X-Organization-ID: org_123"
+```
+</CodeGroup>
+
+### User Profile Management
+
+Users can manage their own profiles and organization memberships:
+
+<CodeGroup>
+```typescript User Profile Update
+// Update user profile
+const updatedUser = await client.users.updateProfile({
+  name: 'Jane Smith',
+  avatar: 'https://avatar.url/new-jane.jpg',
+  preferences: {
+    notifications: {
+      email: true,
+      slack: false,
+      webhook: true
+    },
+    timezone: 'America/New_York',
+    language: 'en'
+  }
+});
+
+// Change password (for non-OAuth users)
+await client.users.changePassword({
+  currentPassword: 'current-password',
+  newPassword: 'new-secure-password'
+});
+```
+
+```json User Preferences Schema
+{
+  "notifications": {
+    "email": true,
+    "slack": false,
+    "webhook": true,
+    "types": {
+      "flowComplete": true,
+      "flowError": true,
+      "systemMaintenance": false
+    }
+  },
+  "dashboard": {
+    "defaultView": "flows",
+    "itemsPerPage": 25,
+    "showMetrics": true
+  },
+  "editor": {
+    "theme": "dark",
+    "autoSave": true,
+    "showMinimap": false
+  }
+}
+```
+</CodeGroup>
+
+## Authentication Methods
+
+### OAuth Providers
+
+<Tabs>
+  <Tab title="GitHub">
+    ```typescript
+    // GitHub OAuth configuration
+    const githubConfig = {
+      clientId: process.env.GITHUB_CLIENT_ID,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET,
+      scope: ['user:email', 'read:user'],
+      redirectUri: 'https://app.tolstoy.dev/auth/callback/github'
+    };
+    
+    // Initiate GitHub OAuth
+    window.location.href = `https://api.tolstoy.dev/auth/oauth/github?redirect=${encodeURIComponent(window.location.origin)}`;
+    ```
+  </Tab>
+  
+  <Tab title="Google">
+    ```typescript
+    // Google OAuth configuration
+    const googleConfig = {
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      scope: ['openid', 'profile', 'email'],
+      redirectUri: 'https://app.tolstoy.dev/auth/callback/google'
+    };
+    
+    // Initiate Google OAuth
+    window.location.href = `https://api.tolstoy.dev/auth/oauth/google?redirect=${encodeURIComponent(window.location.origin)}`;
+    ```
+  </Tab>
+  
+  <Tab title="Microsoft">
+    ```typescript
+    // Microsoft OAuth configuration
+    const microsoftConfig = {
+      clientId: process.env.MICROSOFT_CLIENT_ID,
+      tenant: 'common', // or specific tenant ID
+      scope: ['openid', 'profile', 'email'],
+      redirectUri: 'https://app.tolstoy.dev/auth/callback/microsoft'
+    };
+    
+    // Initiate Microsoft OAuth
+    window.location.href = `https://api.tolstoy.dev/auth/oauth/microsoft?redirect=${encodeURIComponent(window.location.origin)}`;
+    ```
+  </Tab>
+  
+  <Tab title="Slack">
+    ```typescript
+    // Slack OAuth configuration
+    const slackConfig = {
+      clientId: process.env.SLACK_CLIENT_ID,
+      scope: ['users:read', 'users:read.email'],
+      redirectUri: 'https://app.tolstoy.dev/auth/callback/slack'
+    };
+    
+    // Initiate Slack OAuth
+    window.location.href = `https://api.tolstoy.dev/auth/oauth/slack?redirect=${encodeURIComponent(window.location.origin)}`;
+    ```
+  </Tab>
+</Tabs>
+
+### API Key Authentication
+
+For programmatic access, users can generate API keys:
+
+<CodeGroup>
+```bash Generate API Key
+# Generate a new API key
+tolstoy auth generate-key --name "CI/CD Pipeline" --permissions flows:execute,execution-logs:read
+
+# List existing API keys
+tolstoy auth list-keys
+
+# Revoke an API key
+tolstoy auth revoke-key ak_123456789
+```
+
+```typescript API Key Usage
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const client = new TolstoyClient({
+  apiKey: 'ak_123456789abcdef', // Your API key
+  organizationId: 'org_123'
+});
+
+// API key automatically handles authentication
+const flows = await client.flows.list();
+```
+
+```bash API Key in cURL
+curl -X GET "https://api.tolstoy.dev/flows" \
+  -H "Authorization: Bearer ak_123456789abcdef" \
+  -H "X-Organization-ID: org_123"
+```
+</CodeGroup>
+
+## Custom Roles
+
+For advanced use cases, you can create custom roles with specific permission sets:
+
+<CodeGroup>
+```typescript Create Custom Role
+const customRole = await client.roles.create({
+  name: 'workflow_designer',
+  displayName: 'Workflow Designer',
+  description: 'Can design workflows but not execute them',
+  permissions: [
+    'flows:read',
+    'flows:create',
+    'flows:edit',
+    'actions:read',
+    'actions:create',
+    'tools:read',
+    'execution-logs:read:own'
+  ],
+  organizationId: 'org_123'
+});
+
+// Assign custom role to user
+await client.users.assignRole('user_123', 'workflow_designer');
+```
+
+```json Custom Role Schema
+{
+  "id": "role_custom_123",
+  "name": "workflow_designer",
+  "displayName": "Workflow Designer",
+  "description": "Can design workflows but not execute them",
+  "type": "custom",
+  "permissions": [
+    "flows:read",
+    "flows:create", 
+    "flows:edit",
+    "actions:read",
+    "actions:create",
+    "tools:read",
+    "execution-logs:read:own"
+  ],
+  "organizationId": "org_123",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z"
+}
+```
+</CodeGroup>
+
+### Available Permissions
+
+<Accordion>
+  <AccordionItem title="Flow Permissions">
+    - `flows:read` - View flows
+    - `flows:create` - Create new flows
+    - `flows:edit` - Edit existing flows
+    - `flows:delete` - Delete flows
+    - `flows:execute` - Execute flows
+    - `flows:share` - Share flows with other users
+  </AccordionItem>
+  
+  <AccordionItem title="Action Permissions">
+    - `actions:read` - View actions
+    - `actions:create` - Create new actions
+    - `actions:edit` - Edit existing actions
+    - `actions:delete` - Delete actions
+    - `actions:execute` - Execute individual actions
+  </AccordionItem>
+  
+  <AccordionItem title="Tool Permissions">
+    - `tools:read` - View available tools
+    - `tools:configure` - Configure tool integrations
+    - `tools:oauth` - Manage OAuth connections
+    - `tools:delete` - Remove tool configurations
+  </AccordionItem>
+  
+  <AccordionItem title="Execution Log Permissions">
+    - `execution-logs:read` - View all execution logs
+    - `execution-logs:read:own` - View logs for own resources
+    - `execution-logs:export` - Export execution logs
+    - `execution-logs:delete` - Delete execution logs
+  </AccordionItem>
+  
+  <AccordionItem title="User Management Permissions">
+    - `users:read` - View organization users
+    - `users:invite` - Invite new users
+    - `users:edit` - Edit user information
+    - `users:delete` - Remove users
+    - `users:roles` - Manage user roles
+  </AccordionItem>
+  
+  <AccordionItem title="Organization Permissions">
+    - `organization:read` - View organization information
+    - `organization:edit` - Edit organization settings
+    - `organization:billing` - Manage billing and subscriptions
+    - `organization:audit` - Access audit logs
+  </AccordionItem>
+</Accordion>
+
+## Security Considerations
+
+### Access Control Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Principle of Least Privilege" icon="lock">
+    Grant users the minimum permissions necessary for their role
+  </Card>
+  
+  <Card title="Regular Access Reviews" icon="magnifying-glass">
+    Periodically review and audit user permissions and roles
+  </Card>
+  
+  <Card title="Role Segregation" icon="users">
+    Separate administrative and operational roles appropriately
+  </Card>
+  
+  <Card title="API Key Security" icon="key">
+    Regularly rotate API keys and monitor their usage
+  </Card>
+</CardGroup>
+
+### Multi-Factor Authentication
+
+<Note>
+Multi-factor authentication (MFA) is supported through OAuth providers. When using GitHub, Google, or Microsoft authentication, users can enable MFA through their respective provider settings.
+</Note>
+
+### Session Management
+
+```typescript
+// Session configuration
+{
+  "sessions": {
+    "maxAge": "24h",           // Session expiration
+    "renewalThreshold": "2h",  // Auto-renewal threshold
+    "maxConcurrent": 5,        // Max concurrent sessions per user
+    "requireReauth": [         // Actions requiring re-authentication
+      "users:delete",
+      "organization:billing",
+      "api-keys:create"
+    ]
+  }
+}
+```
+
+## Audit and Compliance
+
+### User Activity Logging
+
+All user actions are automatically logged for audit purposes:
+
+```json
+{
+  "id": "audit_123",
+  "userId": "user_123", 
+  "organizationId": "org_456",
+  "action": "flow.execute",
+  "resource": "flow_789",
+  "metadata": {
+    "flowName": "Data Processing Pipeline",
+    "executionId": "exec_456",
+    "userAgent": "Mozilla/5.0...",
+    "ipAddress": "192.168.1.100"
+  },
+  "timestamp": "2024-01-20T14:30:00Z"
+}
+```
+
+### Compliance Features
+
+<Tabs>
+  <Tab title="GDPR">
+    - Right to data portability
+    - Right to be forgotten
+    - Data processing consent
+    - Privacy by design
+  </Tab>
+  
+  <Tab title="SOC 2">
+    - Access logging and monitoring
+    - Segregation of duties
+    - Regular access reviews
+    - Incident response procedures
+  </Tab>
+  
+  <Tab title="HIPAA">
+    - Data encryption at rest and in transit
+    - Access controls and audit trails
+    - Business associate agreements
+    - Risk assessments
+  </Tab>
+</Tabs>
+
+## User Management APIs
+
+### Complete API Reference
+
+<CodeGroup>
+```typescript List Users
+// Get all users in organization
+const users = await client.users.list({
+  page: 1,
+  limit: 25,
+  filter: {
+    role: 'developer',
+    status: 'active'
+  },
+  sort: 'lastLoginAt:desc'
+});
+```
+
+```typescript User Details
+// Get specific user
+const user = await client.users.get('user_123');
+
+// Update user
+const updatedUser = await client.users.update('user_123', {
+  name: 'Jane Smith',
+  role: 'admin'
+});
+
+// Deactivate user
+await client.users.deactivate('user_123');
+```
+
+```typescript Bulk Operations
+// Bulk role assignment
+await client.users.bulkAssignRole([
+  'user_123',
+  'user_456',
+  'user_789'
+], 'developer');
+
+// Export user data
+const userData = await client.users.export('user_123');
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication Setup" icon="key" href="/security/authentication">
+    Learn how to configure authentication methods and OAuth providers
+  </Card>
+  
+  <Card title="Organization Management" icon="building" href="/concepts/organizations">
+    Understand how organizations work and multi-tenant features
+  </Card>
+  
+  <Card title="API Reference" icon="code" href="/api-reference/users">
+    Explore the complete Users API documentation
+  </Card>
+  
+  <Card title="Security Guide" icon="shield" href="/security/authorization">
+    Deep dive into security and authorization features
+  </Card>
+</CardGroup>

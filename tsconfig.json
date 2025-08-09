@@ -12,23 +12,21 @@
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
-    // Balanced TypeScript settings for quality and practicality
-    "strict": false, // Temporarily disabled for incremental migration
+    "strict": false,
     "strictFunctionTypes": true,
     "strictBindCallApply": true,
-    "strictPropertyInitialization": false, // Keep false for NestJS decorators
+    "strictPropertyInitialization": false,
     "noImplicitReturns": true,
     "noImplicitThis": true,
     "noImplicitOverride": true,
-    "noUncheckedIndexedAccess": false, // Too strict for process.env access
-    "exactOptionalPropertyTypes": false, // Too strict for practical use
-    "noPropertyAccessFromIndexSignature": false, // Too strict for process.env
-    "noUnusedLocals": false, // Temporarily disabled for migration
-    "noUnusedParameters": false, // Temporarily disabled for migration
+    "noUncheckedIndexedAccess": false,
+    "exactOptionalPropertyTypes": false,
+    "noPropertyAccessFromIndexSignature": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
-    // Additional checks
     "useUnknownInCatchVariables": false,
     "allowUnusedLabels": false,
     "allowUnreachableCode": false

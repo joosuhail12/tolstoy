@@ -1,0 +1,435 @@
+---
+title: Best Practices
+description: Guidelines and best practices for building robust Tolstoy workflows
+---
+
+# Best Practices
+
+This guide covers best practices for designing, implementing, and maintaining robust Tolstoy workflows in production environments.
+
+## Workflow Design
+
+### Keep Workflows Simple and Focused
+
+Design workflows with a single, clear purpose. Avoid creating overly complex workflows that try to handle multiple unrelated tasks.
+
+**Good Example:**
+```json
+{
+  "name": "User Onboarding Email",
+  "description": "Send welcome email to new users",
+  "steps": [
+    {
+      "key": "send_welcome",
+      "action": "email",
+      "inputs": {
+        "to": "{{inputs.user_email}}",
+        "template": "welcome",
+        "data": "{{inputs.user_data}}"
+      }
+    }
+  ]
+}
+```
+
+**Avoid:**
+```json
+{
+  "name": "User Management and Billing and Notifications",
+  "description": "Handle everything for users",
+  // ... overly complex workflow
+}
+```
+
+### Use Descriptive Names and Keys
+
+Choose clear, descriptive names for flows and step keys that make the workflow self-documenting.
+
+```json
+{
+  "steps": [
+    {
+      "key": "fetch_user_profile",     // ✅ Clear and descriptive
+      "action": "http_request"
+    },
+    {
+      "key": "validate_user_data",     // ✅ Purpose is obvious
+      "action": "evaluate"
+    }
+  ]
+}
+```
+
+### Plan Your Data Flow
+
+Map out how data flows between steps before implementing. Use meaningful variable names and document complex transformations.
+
+```json
+{
+  "key": "transform_user_data",
+  "action": "transform",
+  "inputs": {
+    "data": "{{steps.fetch_user_profile.outputs.body}}",
+    "operations": [
+      {
+        "type": "map",
+        "expression": "{ id: user_id, name: full_name, email: email_address }"
+      }
+    ]
+  }
+}
+```
+
+## Error Handling
+
+### Implement Proper Error Handling
+
+Always include error handling for critical workflow steps.
+
+```json
+{
+  "key": "process_payment",
+  "action": "http_request",
+  "inputs": {
+    "url": "https://api.payments.com/charge",
+    "method": "POST",
+    "body": {
+      "amount": "{{inputs.amount}}"
+    }
+  },
+  "retry": {
+    "max_attempts": 3,
+    "delay": 5000,
+    "exponential_backoff": true
+  },
+  "on_error": {
+    "action": "email",
+    "inputs": {
+      "to": "admin@company.com",
+      "subject": "Payment Processing Failed",
+      "body": "Payment failed for amount {{inputs.amount}}: {{error.message}}"
+    }
+  }
+}
+```
+
+### Use Conditional Logic for Graceful Degradation
+
+Implement fallback mechanisms for non-critical failures.
+
+```json
+{
+  "key": "send_sms_notification",
+  "action": "sms",
+  "condition": "{{steps.validate_phone.outputs.valid}} === true",
+  "inputs": {
+    "to": "{{inputs.phone}}",
+    "message": "Your order is ready!"
+  }
+},
+{
+  "key": "fallback_email",
+  "action": "email",
+  "condition": "{{steps.send_sms_notification.status}} !== 'completed'",
+  "inputs": {
+    "to": "{{inputs.email}}",
+    "subject": "Your order is ready!"
+  }
+}
+```
+
+## Security
+
+### Protect Sensitive Data
+
+Never hardcode credentials or sensitive data in workflows. Always use secrets management.
+
+```json
+{
+  "key": "api_call",
+  "action": "http_request",
+  "inputs": {
+    "url": "https://api.external.com/data",
+    "headers": {
+      "Authorization": "Bearer {{secrets.api_token}}"  // ✅ Use secrets
+    }
+  }
+}
+```
+
+### Validate Input Data
+
+Always validate and sanitize input data, especially from external sources.
+
+```json
+{
+  "key": "validate_inputs",
+  "action": "evaluate",
+  "inputs": {
+    "expression": "{{inputs.email}} !== null AND {{inputs.email}}.includes('@')"
+  }
+},
+{
+  "key": "process_user",
+  "condition": "{{steps.validate_inputs.outputs.result}} === true",
+  "action": "database",
+  "inputs": {
+    "operation": "insert",
+    "table": "users",
+    "data": "{{inputs}}"
+  }
+}
+```
+
+### Use Least Privilege Access
+
+Configure tool credentials with minimal required permissions.
+
+## Performance
+
+### Optimize for Efficiency
+
+- Use parallel execution where possible
+- Cache frequently used data
+- Minimize external API calls
+- Use appropriate timeouts
+
+```json
+{
+  "steps": [
+    {
+      "key": "parallel_data_fetch",
+      "action": "parallel",
+      "inputs": {
+        "tasks": [
+          {
+            "key": "fetch_user",
+            "action": "http_request",
+            "inputs": { "url": "https://api.users.com/{{inputs.user_id}}" }
+          },
+          {
+            "key": "fetch_orders",
+            "action": "http_request", 
+            "inputs": { "url": "https://api.orders.com/user/{{inputs.user_id}}" }
+          }
+        ]
+      }
+    }
+  ]
+}
+```
+
+### Set Appropriate Timeouts
+
+Configure timeouts based on expected execution times.
+
+```json
+{
+  "key": "external_api_call",
+  "action": "http_request",
+  "inputs": {
+    "url": "https://slow-api.example.com/data",
+    "timeout": 30000  // 30 seconds for slow API
+  }
+}
+```
+
+## Testing and Monitoring
+
+### Test Workflows Thoroughly
+
+- Test with various input scenarios
+- Test error conditions
+- Use test environment for validation
+
+```javascript
+// SDK Testing Example
+const testFlow = await client.flows.create({
+  name: 'Test: User Onboarding',
+  // ... flow definition
+});
+
+// Test various scenarios
+await client.flows.execute(testFlow.id, { 
+  inputs: { email: 'test@example.com' } 
+});
+
+await client.flows.execute(testFlow.id, { 
+  inputs: { email: 'invalid-email' }  // Test validation
+});
+```
+
+### Implement Comprehensive Monitoring
+
+Set up monitoring and alerting for critical workflows.
+
+```json
+{
+  "key": "monitor_execution",
+  "action": "custom_metric",
+  "inputs": {
+    "metric_name": "workflow_completion_time",
+    "value": "{{execution.duration}}",
+    "tags": {
+      "workflow": "{{flow.name}}",
+      "status": "{{execution.status}}"
+    }
+  }
+}
+```
+
+### Use Structured Logging
+
+Include meaningful log messages for debugging.
+
+```json
+{
+  "key": "log_processing_start",
+  "action": "log",
+  "inputs": {
+    "level": "info",
+    "message": "Starting user processing",
+    "data": {
+      "user_id": "{{inputs.user_id}}",
+      "timestamp": "{{Date.now()}}"
+    }
+  }
+}
+```
+
+## SDK Best Practices
+
+### Use Environment Variables
+
+Store configuration in environment variables.
+
+```javascript
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  environment: process.env.NODE_ENV || 'development',
+  timeout: parseInt(process.env.TOLSTOY_TIMEOUT) || 30000
+});
+```
+
+### Implement Proper Error Handling
+
+Handle different types of errors appropriately.
+
+```javascript
+try {
+  const execution = await client.flows.execute(flowId, inputs);
+  const result = await client.executions.waitForCompletion(execution.id);
+  return result;
+} catch (error) {
+  if (error instanceof TolstoyError) {
+    switch (error.type) {
+      case 'validation_error':
+        console.error('Invalid input:', error.details);
+        break;
+      case 'rate_limit_error':
+        console.error('Rate limited, retrying after:', error.retryAfter);
+        break;
+      default:
+        console.error('Tolstoy error:', error.message);
+    }
+  } else {
+    console.error('Unexpected error:', error);
+  }
+  throw error;
+}
+```
+
+### Use Connection Pooling
+
+Reuse client instances and connections.
+
+```javascript
+// Good: Single client instance
+const client = new Client({ apiKey: process.env.TOLSTOY_API_KEY });
+
+class WorkflowService {
+  constructor() {
+    this.client = client;  // Reuse client
+  }
+  
+  async executeFlow(flowId, inputs) {
+    return await this.client.flows.execute(flowId, inputs);
+  }
+}
+```
+
+## Deployment
+
+### Use Version Control
+
+- Store workflow definitions in version control
+- Use infrastructure as code for deployment
+- Tag releases and maintain changelog
+
+### Implement Blue/Green Deployments
+
+Test workflows in staging before production deployment.
+
+```javascript
+// Deploy to staging first
+const stagingExecution = await stagingClient.flows.execute(flowId, testInputs);
+await stagingClient.executions.waitForCompletion(stagingExecution.id);
+
+// If successful, deploy to production
+const productionFlow = await productionClient.flows.create(flowDefinition);
+```
+
+### Monitor Deployment Health
+
+Implement health checks and rollback procedures.
+
+```javascript
+async function deploymentHealthCheck() {
+  try {
+    const status = await client.health.getStatus();
+    const testExecution = await client.flows.execute('health_check_flow', {});
+    return status.healthy && testExecution.status === 'completed';
+  } catch (error) {
+    console.error('Health check failed:', error);
+    return false;
+  }
+}
+```
+
+## Maintenance
+
+### Regular Reviews
+
+- Review workflow performance metrics
+- Update dependencies and SDKs
+- Remove unused workflows and tools
+- Audit security configurations
+
+### Documentation
+
+- Keep workflow documentation up to date
+- Document any custom actions or integrations
+- Maintain runbooks for troubleshooting
+
+### Backup and Recovery
+
+- Backup workflow definitions regularly
+- Test recovery procedures
+- Document disaster recovery plans
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Security Guide" icon="shield" href="/security">
+    Learn security best practices and compliance
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting">
+    Common issues and debugging techniques
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/authentication">
+    Detailed API documentation
+  </Card>
+  <Card title="SDK Examples" icon="code" href="/sdk/examples">
+    Real-world implementation examples
+  </Card>
+</CardGroup>

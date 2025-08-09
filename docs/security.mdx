@@ -1,0 +1,428 @@
+---
+title: Security Guide
+description: Security best practices and compliance guidelines for Tolstoy
+---
+
+# Security Guide
+
+Tolstoy is designed with security as a fundamental principle. This guide covers security best practices, compliance considerations, and how to implement secure workflows.
+
+## Authentication and Authorization
+
+### API Key Management
+
+API keys are your primary method of authentication with Tolstoy. Treat them with the same care as passwords.
+
+**Best Practices:**
+- Store API keys in environment variables or secure key management systems
+- Use different API keys for different environments (development, staging, production)
+- Rotate API keys regularly (recommended: every 90 days)
+- Monitor API key usage and revoke unused keys immediately
+
+```bash
+# Good: Environment variable
+export TOLSTOY_API_KEY="sk_live_..."
+
+# Bad: Hardcoded in source
+const apiKey = "sk_live_1234567890abcdef";  // ❌ Never do this
+```
+
+### Access Control
+
+Implement role-based access control (RBAC) for team members:
+
+- **Admin:** Full access to all resources and settings
+- **Developer:** Can create and modify workflows, limited admin access
+- **Operator:** Can execute workflows and view results, no modification rights
+- **Viewer:** Read-only access to workflows and execution history
+
+### Multi-Factor Authentication (MFA)
+
+Enable MFA for all team member accounts, especially those with admin privileges.
+
+## Data Protection
+
+### Secrets Management
+
+Never store sensitive information directly in workflow definitions. Use Tolstoy's built-in secrets management or integrate with external secret managers.
+
+```json
+{
+  "key": "secure_api_call",
+  "action": "http_request",
+  "inputs": {
+    "url": "https://api.external.com/data",
+    "headers": {
+      "Authorization": "Bearer {{secrets.external_api_token}}",
+      "X-API-Key": "{{secrets.external_api_key}}"
+    }
+  }
+}
+```
+
+**Supported Secret Sources:**
+- Tolstoy Secrets Manager (built-in)
+- AWS Secrets Manager
+- Azure Key Vault
+- HashiCorp Vault
+- Environment variables
+
+### Data Encryption
+
+**In Transit:**
+- All API communications use TLS 1.3
+- SDK connections are encrypted by default
+- Webhook payloads are signed and encrypted
+
+**At Rest:**
+- Workflow definitions are encrypted using AES-256
+- Execution logs are encrypted and retention policies applied
+- Secrets are encrypted with customer-managed keys (CMKs)
+
+### Data Retention and Deletion
+
+Configure appropriate retention policies:
+
+```json
+{
+  "data_retention": {
+    "execution_logs": "90 days",
+    "audit_logs": "1 year", 
+    "workflow_history": "indefinite",
+    "sensitive_data": "30 days"
+  }
+}
+```
+
+Implement data deletion procedures:
+- Right to deletion (GDPR compliance)
+- Automatic purging of expired data
+- Secure deletion of decommissioned workflows
+
+## Network Security
+
+### IP Whitelisting
+
+Restrict API access to specific IP ranges:
+
+```json
+{
+  "network_security": {
+    "allowed_ips": [
+      "192.168.1.0/24",
+      "10.0.0.0/16"
+    ],
+    "webhook_sources": [
+      "github.com",
+      "gitlab.com"
+    ]
+  }
+}
+```
+
+### VPC Integration
+
+For enterprise customers, Tolstoy supports VPC peering and private endpoints:
+
+- Private API endpoints within your VPC
+- Secure communication without internet routing
+- Network-level access controls
+
+### Rate Limiting and DDoS Protection
+
+Built-in protections against abuse:
+- API rate limiting per key and IP
+- Automatic DDoS detection and mitigation
+- Request size limits and timeout controls
+
+## Workflow Security
+
+### Input Validation
+
+Always validate and sanitize inputs, especially from external sources:
+
+```json
+{
+  "key": "validate_user_input",
+  "action": "evaluate",
+  "inputs": {
+    "expression": "{{inputs.email}} !== null AND {{inputs.email}}.match(/^[^@]+@[^@]+\\.[^@]+$/)"
+  }
+},
+{
+  "key": "sanitize_input",
+  "action": "transform",
+  "condition": "{{steps.validate_user_input.outputs.result}} === true",
+  "inputs": {
+    "data": "{{inputs}}",
+    "operations": [
+      {
+        "type": "sanitize",
+        "fields": ["name", "description"],
+        "remove_html": true,
+        "escape_special_chars": true
+      }
+    ]
+  }
+}
+```
+
+### Principle of Least Privilege
+
+Grant minimal necessary permissions:
+- Tools should have only required API permissions
+- Database connections with limited scope
+- File system access restrictions
+
+### Secure Integrations
+
+When integrating with external services:
+
+```json
+{
+  "key": "secure_webhook",
+  "action": "http_request",
+  "inputs": {
+    "url": "{{secrets.webhook_url}}",
+    "method": "POST",
+    "headers": {
+      "Authorization": "Bearer {{secrets.webhook_token}}",
+      "X-Signature": "{{hmac_sha256(body, secrets.webhook_secret)}}"
+    },
+    "body": {
+      "timestamp": "{{Date.now()}}",
+      "data": "{{steps.process_data.outputs}}"
+    }
+  },
+  "verify_ssl": true,
+  "timeout": 30000
+}
+```
+
+## Audit and Monitoring
+
+### Audit Logging
+
+Comprehensive audit trails for all activities:
+
+- API requests and responses
+- Workflow executions and modifications
+- User authentication and authorization events
+- Administrative actions
+
+### Security Monitoring
+
+Real-time security monitoring:
+
+```json
+{
+  "security_alerts": {
+    "failed_authentication": {
+      "threshold": 5,
+      "window": "5 minutes",
+      "action": "block_ip"
+    },
+    "unusual_api_usage": {
+      "threshold": "200% of baseline",
+      "window": "1 hour", 
+      "action": "alert_admins"
+    }
+  }
+}
+```
+
+### Incident Response
+
+Automated incident response workflows:
+
+```json
+{
+  "name": "Security Incident Response",
+  "trigger": "security_alert",
+  "steps": [
+    {
+      "key": "assess_threat",
+      "action": "evaluate_security_event",
+      "inputs": {
+        "event": "{{trigger.event}}",
+        "severity": "{{trigger.severity}}"
+      }
+    },
+    {
+      "key": "notify_security_team",
+      "condition": "{{steps.assess_threat.outputs.severity}} >= 'medium'",
+      "action": "slack",
+      "inputs": {
+        "channel": "#security-alerts",
+        "message": "🚨 Security Alert: {{trigger.description}}"
+      }
+    },
+    {
+      "key": "auto_remediate",
+      "condition": "{{steps.assess_threat.outputs.auto_remediate}} === true",
+      "action": "security_action",
+      "inputs": {
+        "action": "{{steps.assess_threat.outputs.recommended_action}}"
+      }
+    }
+  ]
+}
+```
+
+## Compliance
+
+### SOC 2 Type II
+
+Tolstoy maintains SOC 2 Type II compliance:
+- Security controls and monitoring
+- Availability and performance standards
+- Processing integrity verification
+- Confidentiality protections
+
+### GDPR Compliance
+
+Features for GDPR compliance:
+- Data portability and export
+- Right to deletion implementation
+- Privacy by design principles
+- Data processing agreements (DPAs)
+
+### HIPAA Compliance
+
+For healthcare workflows:
+- Business Associate Agreements (BAAs)
+- End-to-end encryption
+- Access logging and monitoring
+- Secure data retention policies
+
+### ISO 27001
+
+Information security management system:
+- Risk assessment and management
+- Security policies and procedures
+- Regular security audits and reviews
+- Continuous improvement processes
+
+## Vulnerability Management
+
+### Security Updates
+
+- Regular security patches and updates
+- Automated dependency vulnerability scanning
+- Zero-day vulnerability response procedures
+- Security advisory notifications
+
+### Penetration Testing
+
+Regular security assessments:
+- Annual third-party penetration testing
+- Quarterly internal security assessments
+- Bug bounty program for responsible disclosure
+- Automated vulnerability scanning
+
+### Responsible Disclosure
+
+Report security vulnerabilities to: security@tolstoy.dev
+
+**Process:**
+1. Report received and acknowledged within 24 hours
+2. Initial assessment within 48 hours
+3. Fix developed and tested
+4. Coordinated disclosure timeline established
+5. Recognition in security hall of fame
+
+## Development Security
+
+### Secure Development Lifecycle
+
+- Security requirements in design phase
+- Code review with security focus
+- Static and dynamic security testing
+- Security-focused QA processes
+
+### SDK Security
+
+Security features in official SDKs:
+- Automatic credential management
+- TLS/SSL enforcement
+- Request signing and verification
+- Secure error handling
+
+```javascript
+const client = new Client({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  enforceHttps: true,
+  validateCertificates: true,
+  requestSigning: true
+});
+```
+
+## Emergency Procedures
+
+### Security Incident Response
+
+1. **Immediate containment**
+2. **Impact assessment** 
+3. **Evidence preservation**
+4. **Notification procedures**
+5. **Recovery and restoration**
+6. **Post-incident review**
+
+### API Key Compromise
+
+If an API key is compromised:
+
+```bash
+# Immediately revoke the compromised key
+curl -X DELETE https://api.tolstoy.dev/v1/keys/sk_live_compromised \
+  -H "Authorization: Bearer admin_key"
+
+# Generate new key
+curl -X POST https://api.tolstoy.dev/v1/keys \
+  -H "Authorization: Bearer admin_key" \
+  -d '{"name": "replacement_key"}'
+
+# Update applications with new key
+# Monitor for suspicious activity
+```
+
+## Security Checklist
+
+### Pre-Production
+
+- [ ] API keys stored securely (not in code)
+- [ ] Input validation implemented
+- [ ] Secrets management configured
+- [ ] Network security rules applied
+- [ ] Audit logging enabled
+- [ ] Security monitoring configured
+- [ ] Compliance requirements verified
+- [ ] Incident response plan documented
+
+### Regular Maintenance
+
+- [ ] API key rotation completed
+- [ ] Security patches applied
+- [ ] Access permissions reviewed
+- [ ] Audit logs analyzed
+- [ ] Security metrics monitored
+- [ ] Penetration test results reviewed
+- [ ] Compliance certification current
+- [ ] Team security training completed
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Best Practices" icon="star" href="/best-practices">
+    Learn workflow design best practices
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/troubleshooting">
+    Security-related troubleshooting
+  </Card>
+  <Card title="API Reference" icon="book" href="/api-reference/authentication">
+    Detailed authentication documentation
+  </Card>
+  <Card title="Compliance" icon="certificate" href="/compliance">
+    Detailed compliance information
+  </Card>
+</CardGroup>

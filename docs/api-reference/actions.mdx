@@ -1,0 +1,528 @@
+---
+title: Actions API
+description: Discover and use actions in your Tolstoy workflows
+---
+
+# Actions API
+
+Actions are the building blocks of Tolstoy workflows. Each action represents a specific task that can be executed, such as sending an email, making an HTTP request, or transforming data.
+
+## What are Actions?
+
+Actions are pre-built, reusable components that perform specific tasks within your workflows. They abstract away the complexity of integrating with external services and performing common operations.
+
+### Action Categories
+
+- **Communication** - Email, Slack, SMS, webhooks
+- **Data** - Transform, filter, validate, format data
+- **HTTP** - Make REST API calls, handle responses
+- **Storage** - Database operations, file storage
+- **Utilities** - Date/time, math, string operations
+- **Integrations** - Third-party service integrations
+
+## List Available Actions
+
+Retrieve a list of all available actions in your Tolstoy instance.
+
+<CodeGroup>
+```bash cURL
+curl https://api.tolstoy.dev/v1/actions \
+  -H "Authorization: Bearer sk_live_..."
+```
+
+```javascript Node.js
+const actions = await client.actions.list({
+  category: 'communication',
+  limit: 50
+});
+```
+
+```python Python
+actions = client.actions.list(
+    category='communication',
+    limit=50
+)
+```
+</CodeGroup>
+
+### Query Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `category` | string | Filter by action category |
+| `search` | string | Search actions by name or description |
+| `limit` | integer | Number of actions to return (max 100, default 50) |
+| `offset` | integer | Number of actions to skip |
+
+### Response
+
+```json
+{
+  "data": [
+    {
+      "key": "email",
+      "name": "Send Email",
+      "description": "Send an email message",
+      "category": "communication",
+      "inputs": [
+        {
+          "key": "to",
+          "name": "Recipient",
+          "type": "string",
+          "required": true,
+          "description": "Email address of the recipient"
+        },
+        {
+          "key": "subject",
+          "name": "Subject",
+          "type": "string",
+          "required": true,
+          "description": "Email subject line"
+        }
+      ],
+      "outputs": [
+        {
+          "key": "message_id",
+          "name": "Message ID",
+          "type": "string",
+          "description": "Unique identifier for the sent message"
+        }
+      ]
+    }
+  ],
+  "total": 156,
+  "has_more": true
+}
+```
+
+## Get Action Details
+
+Retrieve detailed information about a specific action, including its inputs, outputs, and configuration options.
+
+<CodeGroup>
+```bash cURL
+curl https://api.tolstoy.dev/v1/actions/email \
+  -H "Authorization: Bearer sk_live_..."
+```
+
+```javascript Node.js
+const action = await client.actions.get('email');
+```
+
+```python Python
+action = client.actions.get('email')
+```
+</CodeGroup>
+
+### Response
+
+```json
+{
+  "key": "email",
+  "name": "Send Email",
+  "description": "Send an email message using your configured email provider",
+  "category": "communication",
+  "version": "1.2.0",
+  "inputs": [
+    {
+      "key": "to",
+      "name": "Recipient",
+      "type": "string",
+      "required": true,
+      "description": "Email address of the recipient",
+      "validation": {
+        "format": "email"
+      }
+    },
+    {
+      "key": "subject",
+      "name": "Subject",
+      "type": "string",
+      "required": true,
+      "description": "Email subject line",
+      "validation": {
+        "max_length": 200
+      }
+    },
+    {
+      "key": "body",
+      "name": "Email Body",
+      "type": "string",
+      "required": true,
+      "description": "HTML or plain text email content"
+    },
+    {
+      "key": "from",
+      "name": "Sender",
+      "type": "string",
+      "required": false,
+      "description": "Sender email address (uses default if not provided)"
+    }
+  ],
+  "outputs": [
+    {
+      "key": "message_id",
+      "name": "Message ID",
+      "type": "string",
+      "description": "Unique identifier for the sent message"
+    },
+    {
+      "key": "status",
+      "name": "Status",
+      "type": "string",
+      "description": "Delivery status (sent, queued, failed)"
+    }
+  ],
+  "examples": [
+    {
+      "name": "Basic Email",
+      "inputs": {
+        "to": "user@example.com",
+        "subject": "Welcome!",
+        "body": "Welcome to our service!"
+      }
+    }
+  ]
+}
+```
+
+## Common Actions
+
+### HTTP Request
+
+Make HTTP requests to external APIs.
+
+```json
+{
+  "key": "api_call",
+  "action": "http_request",
+  "inputs": {
+    "url": "https://api.example.com/data",
+    "method": "POST",
+    "headers": {
+      "Authorization": "Bearer {{secrets.api_token}}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "user_id": "{{inputs.user_id}}",
+      "action": "update_profile"
+    }
+  }
+}
+```
+
+**Outputs:**
+- `status_code` - HTTP status code
+- `body` - Response body
+- `headers` - Response headers
+
+### Send Email
+
+Send emails using your configured email provider.
+
+```json
+{
+  "key": "notify_user",
+  "action": "email",
+  "inputs": {
+    "to": "{{steps.fetch_user.outputs.email}}",
+    "subject": "Your order is ready",
+    "body": "Hello {{steps.fetch_user.outputs.name}}, your order #{{inputs.order_id}} is ready for pickup.",
+    "from": "orders@company.com"
+  }
+}
+```
+
+**Outputs:**
+- `message_id` - Unique message identifier
+- `status` - Delivery status
+
+### Data Transform
+
+Transform and manipulate data.
+
+```json
+{
+  "key": "format_data",
+  "action": "transform",
+  "inputs": {
+    "data": "{{steps.api_call.outputs.body}}",
+    "operations": [
+      {
+        "type": "filter",
+        "condition": "status == 'active'"
+      },
+      {
+        "type": "map",
+        "expression": "{ id: id, name: full_name, email: email_address }"
+      },
+      {
+        "type": "sort",
+        "field": "name",
+        "order": "asc"
+      }
+    ]
+  }
+}
+```
+
+**Outputs:**
+- `result` - Transformed data
+- `count` - Number of items processed
+
+### Slack Notification
+
+Send messages to Slack channels.
+
+```json
+{
+  "key": "slack_alert",
+  "action": "slack",
+  "inputs": {
+    "channel": "#alerts",
+    "message": "🚨 High priority alert: {{inputs.alert_message}}",
+    "username": "Tolstoy Bot",
+    "icon_emoji": ":robot_face:"
+  }
+}
+```
+
+**Outputs:**
+- `message_ts` - Slack message timestamp
+- `channel_id` - Channel where message was sent
+
+### Conditional Logic
+
+Execute actions based on conditions.
+
+```json
+{
+  "key": "check_priority",
+  "action": "evaluate",
+  "inputs": {
+    "expression": "{{inputs.priority}} == 'high' AND {{inputs.severity}} > 7"
+  }
+}
+```
+
+**Outputs:**
+- `result` - Boolean result of the evaluation
+- `expression` - The evaluated expression
+
+### Wait/Delay
+
+Add delays to your workflow.
+
+```json
+{
+  "key": "wait_before_retry",
+  "action": "delay",
+  "inputs": {
+    "duration": 30,
+    "unit": "seconds"
+  }
+}
+```
+
+**Outputs:**
+- `waited_duration` - Actual time waited
+- `completed_at` - Timestamp when delay completed
+
+## Variable References
+
+Actions can reference data from previous steps, flow inputs, and secrets:
+
+### Step Outputs
+```json
+{
+  "inputs": {
+    "message": "User {{steps.fetch_user.outputs.name}} completed action"
+  }
+}
+```
+
+### Flow Inputs
+```json
+{
+  "inputs": {
+    "user_id": "{{inputs.user_id}}",
+    "operation": "{{inputs.requested_operation}}"
+  }
+}
+```
+
+### Secrets
+```json
+{
+  "inputs": {
+    "api_key": "{{secrets.third_party_api_key}}",
+    "database_url": "{{secrets.database_connection_string}}"
+  }
+}
+```
+
+### Environment Variables
+```json
+{
+  "inputs": {
+    "environment": "{{env.NODE_ENV}}",
+    "region": "{{env.AWS_REGION}}"
+  }
+}
+```
+
+## Error Handling
+
+Actions can fail for various reasons. Common error types include:
+
+### Input Validation Errors
+```json
+{
+  "error": {
+    "type": "validation_error",
+    "message": "Invalid input parameters",
+    "details": [
+      {
+        "field": "to",
+        "message": "Invalid email address format"
+      }
+    ]
+  }
+}
+```
+
+### External Service Errors
+```json
+{
+  "error": {
+    "type": "external_service_error",
+    "message": "Failed to send email",
+    "details": {
+      "service": "sendgrid",
+      "error_code": "invalid_api_key",
+      "retry_after": 300
+    }
+  }
+}
+```
+
+### Timeout Errors
+```json
+{
+  "error": {
+    "type": "timeout_error",
+    "message": "Action execution timed out",
+    "timeout_duration": 30000
+  }
+}
+```
+
+## Retry Configuration
+
+Configure automatic retries for actions that might fail temporarily:
+
+```json
+{
+  "key": "api_call_with_retry",
+  "action": "http_request",
+  "inputs": {
+    "url": "https://api.example.com/data",
+    "method": "GET"
+  },
+  "retry": {
+    "max_attempts": 3,
+    "delay": 5000,
+    "exponential_backoff": true,
+    "retry_on": ["timeout_error", "external_service_error"]
+  }
+}
+```
+
+### Retry Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `max_attempts` | integer | Maximum number of retry attempts (default: 3) |
+| `delay` | integer | Initial delay between retries in milliseconds |
+| `exponential_backoff` | boolean | Use exponential backoff for delays |
+| `retry_on` | array | Error types to retry on |
+| `max_delay` | integer | Maximum delay between retries |
+
+## Custom Actions
+
+Organizations on Pro and Enterprise plans can create custom actions:
+
+### Creating Custom Actions
+1. Define your action logic in a supported runtime (Node.js, Python, Go)
+2. Package your code with dependencies
+3. Upload to Tolstoy using the CLI or API
+4. Configure inputs, outputs, and validation
+
+### Custom Action Example
+```javascript
+// custom-action.js
+module.exports = async function(inputs, context) {
+  const { user_id, operation } = inputs;
+  
+  // Your custom logic here
+  const result = await performCustomOperation(user_id, operation);
+  
+  return {
+    success: true,
+    result: result,
+    processed_at: new Date().toISOString()
+  };
+};
+```
+
+## Action Testing
+
+Test actions in isolation before using them in flows:
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://api.tolstoy.dev/v1/actions/email/test \
+  -H "Authorization: Bearer sk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputs": {
+      "to": "test@example.com",
+      "subject": "Test Email",
+      "body": "This is a test message"
+    }
+  }'
+```
+
+```javascript Node.js
+const result = await client.actions.test('email', {
+  to: 'test@example.com',
+  subject: 'Test Email',
+  body: 'This is a test message'
+});
+```
+
+```python Python
+result = client.actions.test('email', {
+    'to': 'test@example.com',
+    'subject': 'Test Email',
+    'body': 'This is a test message'
+})
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Flow Examples" icon="diagram-project" href="/sdk/examples">
+    See complete workflow examples using actions
+  </Card>
+  <Card title="Tools API" icon="wrench" href="/api-reference/tools">
+    Learn about tools and integrations
+  </Card>
+  <Card title="Executions API" icon="play" href="/api-reference/executions">
+    Monitor action execution and results
+  </Card>
+  <Card title="SDK Overview" icon="code" href="/sdk/overview">
+    Use actions with our official SDKs
+  </Card>
+</CardGroup>

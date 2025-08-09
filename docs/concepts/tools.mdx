@@ -1,0 +1,1134 @@
+---
+title: "Tools"
+description: "External service integrations and tool management in Tolstoy"
+---
+
+# Tools
+
+Tools in Tolstoy represent external services and APIs that your workflows can integrate with. They provide standardized ways to authenticate, configure, and interact with third-party services, making it easy to build powerful automation workflows.
+
+## What are Tools?
+
+Tools are reusable integration components that abstract the complexity of working with external services. Each tool defines:
+
+- **Authentication methods** - How to securely connect to the service
+- **Configuration parameters** - Service-specific settings and options  
+- **Available actions** - Operations that can be performed with the service
+- **Data schemas** - Input/output formats for seamless integration
+
+<CardGroup cols={2}>
+  <Card title="OAuth Integration" icon="key">
+    Seamless OAuth2 authentication with major service providers
+  </Card>
+  <Card title="API Key Management" icon="lock">
+    Secure storage and management of API keys and secrets
+  </Card>
+  <Card title="Pre-built Actions" icon="puzzle-piece">
+    Extensive library of ready-to-use actions for popular services
+  </Card>
+  <Card title="Custom Extensions" icon="wrench">
+    Build custom tools for proprietary or specialized services
+  </Card>
+</CardGroup>
+
+## Built-in Tools
+
+Tolstoy includes comprehensive integrations for popular services:
+
+### Developer Tools
+
+<Tabs>
+  <Tab title="GitHub">
+    **Repository management, CI/CD, and code collaboration**
+    
+    **Authentication:** OAuth2 with GitHub Apps support
+    
+    **Key Actions:**
+    - Repository operations (create, clone, fork)
+    - Pull request management
+    - Issue tracking and project management
+    - Release and deployment automation
+    - Webhook event handling
+    - GitHub Actions integration
+    
+    **Configuration:**
+    ```json
+    {
+      "toolType": "github",
+      "name": "Company GitHub",
+      "config": {
+        "baseUrl": "https://api.github.com",
+        "organization": "your-org",
+        "defaultRepo": "main-project",
+        "webhookSecret": "webhook-secret-key"
+      },
+      "oauth": {
+        "clientId": "github-client-id",
+        "scopes": ["repo", "admin:org", "admin:repo_hook"]
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="GitLab">
+    **GitLab repository and CI/CD integration**
+    
+    **Authentication:** OAuth2 or Personal Access Tokens
+    
+    **Key Actions:**
+    - Project and group management
+    - Merge request automation
+    - CI/CD pipeline triggers
+    - Issue and milestone tracking
+    - Container registry operations
+    
+    **Configuration:**
+    ```json
+    {
+      "toolType": "gitlab",
+      "name": "Company GitLab",
+      "config": {
+        "baseUrl": "https://gitlab.company.com",
+        "groupId": "main-group",
+        "defaultProject": "core-platform"
+      },
+      "oauth": {
+        "clientId": "gitlab-client-id",
+        "scopes": ["api", "read_user", "read_repository"]
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Docker">
+    **Container registry and deployment management**
+    
+    **Authentication:** Registry credentials or token-based
+    
+    **Key Actions:**
+    - Image building and pushing
+    - Container deployment
+    - Registry management
+    - Security scanning
+    
+    **Configuration:**
+    ```json
+    {
+      "toolType": "docker",
+      "name": "Docker Hub",
+      "config": {
+        "registry": "docker.io",
+        "namespace": "your-org",
+        "defaultTag": "latest"
+      },
+      "credentials": {
+        "username": "docker-username",
+        "password": "docker-password"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Communication Tools
+
+<Tabs>
+  <Tab title="Slack">
+    **Team communication and notification automation**
+    
+    **Authentication:** OAuth2 with Slack Apps
+    
+    **Key Actions:**
+    - Send messages and notifications
+    - Channel and user management
+    - File sharing and uploads
+    - Interactive message components
+    - Slack workflow integration
+    
+    **Configuration:**
+    ```json
+    {
+      "toolType": "slack",
+      "name": "Company Slack",
+      "config": {
+        "workspace": "your-workspace",
+        "defaultChannel": "#automation",
+        "botName": "Tolstoy Bot"
+      },
+      "oauth": {
+        "clientId": "slack-client-id",
+        "scopes": [
+          "channels:write",
+          "chat:write",
+          "files:write",
+          "users:read"
+        ]
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Microsoft Teams">
+    **Microsoft Teams integration for enterprise communication**
+    
+    **Authentication:** Microsoft Graph OAuth2
+    
+    **Key Actions:**
+    - Post messages to channels
+    - Schedule and manage meetings
+    - File collaboration
+    - Adaptive card notifications
+    
+    **Configuration:**
+    ```json
+    {
+      "toolType": "microsoft-teams",
+      "name": "Corporate Teams",
+      "config": {
+        "tenantId": "tenant-id",
+        "defaultTeamId": "team-id",
+        "appId": "teams-app-id"
+      },
+      "oauth": {
+        "clientId": "microsoft-client-id",
+        "scopes": [
+          "https://graph.microsoft.com/ChannelMessage.Send",
+          "https://graph.microsoft.com/Team.ReadBasic.All"
+        ]
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Email (SMTP)">
+    **Email automation and notification system**
+    
+    **Authentication:** SMTP credentials or OAuth (Gmail, Outlook)
+    
+    **Key Actions:**
+    - Send transactional emails
+    - Template-based messaging
+    - Attachment handling
+    - Delivery status tracking
+    
+    **Configuration:**
+    ```json
+    {
+      "toolType": "email-smtp",
+      "name": "Company Email",
+      "config": {
+        "host": "smtp.company.com",
+        "port": 587,
+        "secure": true,
+        "fromAddress": "automation@company.com",
+        "fromName": "Tolstoy Automation"
+      },
+      "credentials": {
+        "username": "smtp-username",
+        "password": "smtp-password"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Cloud Platforms
+
+<Tabs>
+  <Tab title="AWS">
+    **Amazon Web Services integration**
+    
+    **Authentication:** IAM credentials, roles, or temporary tokens
+    
+    **Key Actions:**
+    - S3 file operations
+    - Lambda function invocation
+    - EC2 instance management
+    - RDS database operations
+    - SQS/SNS messaging
+    - CloudFormation deployment
+    
+    **Configuration:**
+    ```json
+    {
+      "toolType": "aws",
+      "name": "Production AWS",
+      "config": {
+        "region": "us-east-1",
+        "profile": "production",
+        "roleArn": "arn:aws:iam::123456789:role/TolstoyRole"
+      },
+      "credentials": {
+        "accessKeyId": "aws-access-key",
+        "secretAccessKey": "aws-secret-key",
+        "sessionToken": "temporary-token"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Google Cloud">
+    **Google Cloud Platform integration**
+    
+    **Authentication:** Service accounts or OAuth2
+    
+    **Key Actions:**
+    - Compute Engine management
+    - Cloud Storage operations
+    - BigQuery data processing
+    - Pub/Sub messaging
+    - Cloud Functions deployment
+    
+    **Configuration:**
+    ```json
+    {
+      "toolType": "google-cloud",
+      "name": "GCP Production",
+      "config": {
+        "projectId": "your-gcp-project",
+        "region": "us-central1",
+        "serviceAccountPath": "/path/to/service-account.json"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Azure">
+    **Microsoft Azure cloud services**
+    
+    **Authentication:** Service principals or managed identity
+    
+    **Key Actions:**
+    - Resource management
+    - Azure Functions deployment
+    - Storage account operations
+    - Key Vault integration
+    - Service Bus messaging
+    
+    **Configuration:**
+    ```json
+    {
+      "toolType": "azure",
+      "name": "Azure Production", 
+      "config": {
+        "subscriptionId": "azure-subscription-id",
+        "resourceGroup": "production-rg",
+        "region": "eastus"
+      },
+      "credentials": {
+        "clientId": "service-principal-id",
+        "clientSecret": "service-principal-secret",
+        "tenantId": "azure-tenant-id"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Database & Storage
+
+<Tabs>
+  <Tab title="PostgreSQL">
+    **PostgreSQL database operations**
+    
+    **Authentication:** Username/password or connection strings
+    
+    **Key Actions:**
+    - Execute queries and stored procedures
+    - Database schema operations
+    - Data migration and synchronization
+    - Backup and restore operations
+    
+    **Configuration:**
+    ```json
+    {
+      "toolType": "postgresql",
+      "name": "Production Database",
+      "config": {
+        "host": "db.company.com",
+        "port": 5432,
+        "database": "production",
+        "ssl": true,
+        "poolSize": 10
+      },
+      "credentials": {
+        "username": "db-user",
+        "password": "db-password"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="MongoDB">
+    **MongoDB database integration**
+    
+    **Authentication:** Username/password or connection URI
+    
+    **Key Actions:**
+    - Document CRUD operations
+    - Aggregation pipelines
+    - Index management
+    - Collection operations
+    
+    **Configuration:**
+    ```json
+    {
+      "toolType": "mongodb",
+      "name": "App Database",
+      "config": {
+        "uri": "mongodb://cluster.mongodb.net/",
+        "database": "application",
+        "authSource": "admin"
+      },
+      "credentials": {
+        "username": "mongo-user",
+        "password": "mongo-password"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Redis">
+    **Redis cache and data structure operations**
+    
+    **Authentication:** Password or Redis ACL
+    
+    **Key Actions:**
+    - Key-value operations
+    - List, set, hash operations
+    - Pub/Sub messaging
+    - Stream processing
+    - Cache management
+    
+    **Configuration:**
+    ```json
+    {
+      "toolType": "redis",
+      "name": "Cache Cluster",
+      "config": {
+        "host": "redis.company.com",
+        "port": 6379,
+        "database": 0,
+        "keyPrefix": "app:"
+      },
+      "credentials": {
+        "password": "redis-password"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Tool Configuration
+
+### Setting Up a New Tool
+
+<CodeGroup>
+```bash CLI - Add Tool
+# Add a new GitHub tool with OAuth
+tolstoy tools add github \
+  --name "Company GitHub" \
+  --oauth-client-id "$GITHUB_CLIENT_ID" \
+  --oauth-client-secret "$GITHUB_CLIENT_SECRET" \
+  --config organization="your-org"
+
+# List available tools
+tolstoy tools list
+
+# Test tool connectivity
+tolstoy tools test github-company
+```
+
+```typescript TypeScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const client = new TolstoyClient({
+  apiKey: 'your-api-key',
+  organizationId: 'org_123'
+});
+
+// Add a new tool
+const tool = await client.tools.create({
+  type: 'github',
+  name: 'Company GitHub',
+  config: {
+    baseUrl: 'https://api.github.com',
+    organization: 'your-org',
+    webhookSecret: 'webhook-secret'
+  },
+  oauth: {
+    clientId: process.env.GITHUB_CLIENT_ID,
+    clientSecret: process.env.GITHUB_CLIENT_SECRET,
+    scopes: ['repo', 'admin:org']
+  }
+});
+
+// Test tool connection
+const testResult = await client.tools.test(tool.id);
+```
+
+```bash cURL - REST API
+# Create a new tool
+curl -X POST "https://api.tolstoy.dev/tools" \
+  -H "Authorization: Bearer your-api-key" \
+  -H "X-Organization-ID: org_123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "github",
+    "name": "Company GitHub",
+    "config": {
+      "baseUrl": "https://api.github.com",
+      "organization": "your-org"
+    },
+    "oauth": {
+      "clientId": "'$GITHUB_CLIENT_ID'",
+      "clientSecret": "'$GITHUB_CLIENT_SECRET'",
+      "scopes": ["repo", "admin:org"]
+    }
+  }'
+```
+</CodeGroup>
+
+### OAuth Configuration
+
+Setting up OAuth authentication for tools:
+
+<CodeGroup>
+```typescript OAuth Setup
+// Configure OAuth for Slack
+const slackTool = await client.tools.create({
+  type: 'slack',
+  name: 'Team Slack',
+  oauth: {
+    clientId: process.env.SLACK_CLIENT_ID,
+    clientSecret: process.env.SLACK_CLIENT_SECRET,
+    scopes: [
+      'channels:write',
+      'chat:write',
+      'files:write',
+      'users:read'
+    ],
+    redirectUri: 'https://app.tolstoy.dev/tools/oauth/callback'
+  }
+});
+
+// Initiate OAuth flow
+const oauthUrl = await client.tools.getOAuthUrl(slackTool.id, {
+  state: 'user-session-state',
+  redirectUri: 'https://app.tolstoy.dev/tools/callback'
+});
+
+// Complete OAuth flow (typically handled by frontend)
+const tokens = await client.tools.completeOAuth(slackTool.id, {
+  code: 'authorization-code',
+  state: 'user-session-state'
+});
+```
+
+```json OAuth Response
+{
+  "toolId": "tool_123",
+  "tokens": {
+    "accessToken": "oauth-access-token",
+    "refreshToken": "oauth-refresh-token",
+    "expiresAt": "2024-01-21T10:30:00Z",
+    "scope": "channels:write,chat:write,files:write,users:read"
+  },
+  "profile": {
+    "id": "U1234567890",
+    "name": "John Doe",
+    "team": "T0987654321",
+    "teamName": "Acme Corp"
+  },
+  "status": "connected"
+}
+```
+</CodeGroup>
+
+### API Key Authentication
+
+For services that use API keys instead of OAuth:
+
+<CodeGroup>
+```typescript API Key Setup
+// Configure a tool with API key authentication
+const openaiTool = await client.tools.create({
+  type: 'openai',
+  name: 'OpenAI GPT',
+  config: {
+    baseUrl: 'https://api.openai.com/v1',
+    model: 'gpt-4',
+    maxTokens: 2048
+  },
+  credentials: {
+    apiKey: process.env.OPENAI_API_KEY
+  }
+});
+
+// Update API key
+await client.tools.updateCredentials(openaiTool.id, {
+  apiKey: 'new-api-key'
+});
+```
+
+```bash Environment Variables
+# Store sensitive credentials as environment variables
+export OPENAI_API_KEY="sk-your-openai-api-key"
+export STRIPE_SECRET_KEY="sk_test_your-stripe-key"
+export SENDGRID_API_KEY="SG.your-sendgrid-key"
+
+# Reference in tool configuration
+tolstoy tools add openai \
+  --name "OpenAI GPT" \
+  --api-key "$OPENAI_API_KEY" \
+  --config model="gpt-4"
+```
+</CodeGroup>
+
+## Tool Actions
+
+### Using Tool Actions in Workflows
+
+Tools provide actions that can be used in your workflows:
+
+<CodeGroup>
+```typescript GitHub Actions Example
+// Create a pull request using GitHub tool
+const pullRequestAction = {
+  id: 'create-pr',
+  type: 'github.pull-request.create',
+  name: 'Create Pull Request',
+  config: {
+    toolId: 'github-company',
+    repository: 'main-project',
+    title: 'Automated update from workflow',
+    head: 'feature-branch',
+    base: 'main',
+    body: `
+      ## Changes
+      - Automated updates from Tolstoy workflow
+      - Updated configuration files
+      
+      ## Testing
+      - All tests passing
+      - No breaking changes
+    `
+  }
+};
+
+// Execute the action
+const result = await client.flows.executeStep(pullRequestAction);
+```
+
+```typescript Slack Notification Example
+// Send Slack notification
+const slackAction = {
+  id: 'notify-team',
+  type: 'slack.message.send',
+  name: 'Notify Team',
+  config: {
+    toolId: 'team-slack',
+    channel: '#deployments',
+    text: 'Deployment completed successfully!',
+    blocks: [
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: '*Deployment Status: Success* :white_check_mark:'
+        }
+      },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: `Environment: ${context.variables.environment}`
+          }
+        ]
+      }
+    ]
+  }
+};
+```
+
+```typescript Database Query Example
+// Execute PostgreSQL query
+const dbAction = {
+  id: 'update-records',
+  type: 'postgresql.query.execute',
+  name: 'Update User Records',
+  config: {
+    toolId: 'production-db',
+    query: `
+      UPDATE users 
+      SET last_login = NOW(), 
+          login_count = login_count + 1 
+      WHERE email = $1
+    `,
+    parameters: ['{{ context.user.email }}'],
+    returnRows: true
+  }
+};
+```
+</CodeGroup>
+
+### Dynamic Tool Configuration
+
+Tools can be configured dynamically using workflow variables:
+
+```typescript
+// Dynamic tool configuration
+const dynamicAction = {
+  id: 'conditional-notification',
+  type: 'slack.message.send',
+  name: 'Conditional Notification',
+  config: {
+    toolId: 'team-slack',
+    channel: '{{ context.variables.notificationChannel }}',
+    text: '{{ context.variables.message }}',
+    // Conditional configuration based on workflow context
+    username: '{{ context.environment === "production" ? "Production Bot" : "Dev Bot" }}',
+    icon_emoji: '{{ context.success ? ":white_check_mark:" : ":x:" }}'
+  },
+  executeIf: 'context.variables.sendNotification === true'
+};
+```
+
+## Custom Tools
+
+### Building Custom Tool Integrations
+
+For services not covered by built-in tools, you can create custom integrations:
+
+<CodeGroup>
+```typescript Custom Tool Definition
+interface CustomToolConfig {
+  baseUrl: string;
+  apiVersion: string;
+  timeout: number;
+  retries: number;
+}
+
+interface CustomToolCredentials {
+  apiKey: string;
+  secretKey?: string;
+}
+
+const customTool = await client.tools.createCustom({
+  type: 'custom-api',
+  name: 'Internal CRM API',
+  description: 'Integration with our internal CRM system',
+  config: {
+    baseUrl: 'https://crm.company.com/api',
+    apiVersion: 'v2',
+    timeout: 30000,
+    retries: 3
+  } as CustomToolConfig,
+  credentials: {
+    apiKey: process.env.CRM_API_KEY,
+    secretKey: process.env.CRM_SECRET_KEY
+  } as CustomToolCredentials,
+  actions: [
+    {
+      name: 'create-contact',
+      description: 'Create a new contact in CRM',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', required: true },
+          email: { type: 'string', format: 'email', required: true },
+          phone: { type: 'string' },
+          company: { type: 'string' }
+        }
+      },
+      outputSchema: {
+        type: 'object',
+        properties: {
+          id: { type: 'string' },
+          status: { type: 'string' }
+        }
+      }
+    }
+  ]
+});
+```
+
+```typescript Custom Action Implementation
+// Custom action execution logic
+const customActionHandler = async (config: any, context: any) => {
+  const { baseUrl, apiVersion } = config.tool.config;
+  const { apiKey } = config.tool.credentials;
+  const { name, email, phone, company } = config.input;
+
+  const response = await fetch(`${baseUrl}/${apiVersion}/contacts`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      name,
+      email,
+      phone,
+      company,
+      source: 'tolstoy-automation'
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`CRM API error: ${response.statusText}`);
+  }
+
+  return await response.json();
+};
+```
+</CodeGroup>
+
+### Tool Testing and Validation
+
+<CodeGroup>
+```typescript Tool Testing
+// Test tool connectivity and authentication
+const testResult = await client.tools.test('custom-crm', {
+  action: 'health-check',
+  timeout: 10000
+});
+
+console.log('Test Result:', testResult);
+// {
+//   "status": "success",
+//   "responseTime": 245,
+//   "details": {
+//     "authentication": "valid",
+//     "apiVersion": "v2.1.0",
+//     "rateLimit": {
+//       "remaining": 4950,
+//       "resetAt": "2024-01-20T15:00:00Z"
+//     }
+//   }
+// }
+
+// Validate tool configuration
+const validation = await client.tools.validate('custom-crm');
+```
+
+```bash CLI Testing
+# Test all tools
+tolstoy tools test --all
+
+# Test specific tool
+tolstoy tools test custom-crm
+
+# Test with verbose output
+tolstoy tools test custom-crm --verbose
+
+# Validate tool configuration
+tolstoy tools validate custom-crm
+```
+</CodeGroup>
+
+## Tool Management
+
+### Organization-Level Tool Management
+
+<CodeGroup>
+```typescript Tool Administration
+// List all organization tools
+const tools = await client.tools.list({
+  status: 'active',
+  type: 'github',
+  sort: 'name:asc'
+});
+
+// Get tool usage statistics
+const usage = await client.tools.getUsage('github-company', {
+  period: '30d',
+  granularity: 'daily'
+});
+
+// Update tool configuration
+await client.tools.update('github-company', {
+  config: {
+    organization: 'new-org',
+    webhookSecret: 'new-webhook-secret'
+  }
+});
+
+// Disable tool
+await client.tools.disable('github-company');
+```
+
+```json Tool Usage Statistics
+{
+  "toolId": "github-company",
+  "period": "30d",
+  "statistics": {
+    "totalRequests": 1250,
+    "successfulRequests": 1198,
+    "failedRequests": 52,
+    "averageResponseTime": 285,
+    "rateLimitHits": 3,
+    "mostUsedActions": [
+      {
+        "action": "repository.create",
+        "count": 45
+      },
+      {
+        "action": "pull-request.create", 
+        "count": 38
+      }
+    ],
+    "dailyUsage": [
+      {
+        "date": "2024-01-01",
+        "requests": 42,
+        "errors": 2
+      }
+    ]
+  }
+}
+```
+</CodeGroup>
+
+### Tool Permissions and Access Control
+
+<CodeGroup>
+```typescript Tool Access Management
+// Grant tool access to specific users/roles
+await client.tools.grantAccess('github-company', {
+  users: ['user_123', 'user_456'],
+  roles: ['developer', 'admin']
+});
+
+// Revoke tool access
+await client.tools.revokeAccess('github-company', {
+  users: ['user_789']
+});
+
+// Check tool permissions
+const permissions = await client.tools.getPermissions('github-company');
+```
+
+```json Tool Permissions
+{
+  "toolId": "github-company",
+  "permissions": {
+    "users": [
+      {
+        "userId": "user_123",
+        "permissions": ["use", "configure"],
+        "grantedAt": "2024-01-15T10:30:00Z"
+      }
+    ],
+    "roles": [
+      {
+        "role": "developer",
+        "permissions": ["use"],
+        "inheritedFrom": "organization"
+      },
+      {
+        "role": "admin", 
+        "permissions": ["use", "configure", "delete"],
+        "inheritedFrom": "organization"
+      }
+    ]
+  }
+}
+```
+</CodeGroup>
+
+## Security and Best Practices
+
+### Credential Management
+
+<CardGroup cols={2}>
+  <Card title="Secure Storage" icon="vault">
+    All credentials are encrypted at rest using AWS KMS and stored securely in AWS Secrets Manager
+  </Card>
+  
+  <Card title="Rotation" icon="rotate">
+    Implement regular credential rotation for API keys and OAuth token refresh
+  </Card>
+  
+  <Card title="Least Privilege" icon="lock">
+    Configure tools with minimal required permissions and scopes
+  </Card>
+  
+  <Card title="Audit Trail" icon="list-check">
+    All tool usage is logged for security and compliance purposes
+  </Card>
+</CardGroup>
+
+### OAuth Security
+
+```typescript
+// OAuth best practices
+const oauthConfig = {
+  // Use PKCE for public clients
+  usePkce: true,
+  
+  // Validate state parameter
+  validateState: true,
+  
+  // Minimal required scopes
+  scopes: ['read:user', 'user:email'], // Not 'admin:org' unless needed
+  
+  // Secure redirect URI
+  redirectUri: 'https://app.tolstoy.dev/tools/oauth/callback',
+  
+  // Token refresh settings
+  refreshThreshold: 300, // Refresh 5 minutes before expiry
+  maxRefreshAttempts: 3
+};
+```
+
+### API Rate Limiting
+
+```typescript
+// Handle API rate limits gracefully
+const rateLimitConfig = {
+  // Respect service rate limits
+  respectRateLimit: true,
+  
+  // Exponential backoff
+  backoffMultiplier: 2,
+  maxBackoffDelay: 30000,
+  
+  // Circuit breaker
+  circuitBreakerThreshold: 10,
+  circuitBreakerTimeout: 60000,
+  
+  // Request queuing
+  enableQueuing: true,
+  maxQueueSize: 100
+};
+```
+
+## Monitoring and Troubleshooting
+
+### Tool Health Monitoring
+
+<CodeGroup>
+```typescript Health Checks
+// Monitor tool health
+const healthCheck = await client.tools.healthCheck('github-company');
+
+// Set up automated health monitoring
+await client.tools.configureMonitoring('github-company', {
+  interval: 300, // Check every 5 minutes
+  timeout: 10000,
+  retries: 3,
+  alertOnFailure: true,
+  notificationChannels: ['#ops-alerts']
+});
+```
+
+```json Health Check Response
+{
+  "toolId": "github-company",
+  "status": "healthy",
+  "checks": [
+    {
+      "name": "authentication",
+      "status": "pass",
+      "responseTime": 123,
+      "details": "OAuth token valid, expires in 4 hours"
+    },
+    {
+      "name": "api-connectivity",
+      "status": "pass", 
+      "responseTime": 245,
+      "details": "API reachable, rate limit: 4950/5000"
+    },
+    {
+      "name": "webhook-endpoint",
+      "status": "warn",
+      "responseTime": 890,
+      "details": "Webhook endpoint slow to respond"
+    }
+  ],
+  "lastCheck": "2024-01-20T14:30:00Z"
+}
+```
+</CodeGroup>
+
+### Common Issues and Solutions
+
+<Accordion>
+  <AccordionItem title="OAuth Token Expired">
+    **Symptoms:** Authentication errors, 401 responses
+    
+    **Solutions:**
+    - Enable automatic token refresh
+    - Check token expiry and refresh manually
+    - Verify OAuth configuration and scopes
+    
+    ```bash
+    # Refresh OAuth token
+    tolstoy tools refresh-oauth github-company
+    ```
+  </AccordionItem>
+  
+  <AccordionItem title="Rate Limit Exceeded">
+    **Symptoms:** 429 responses, throttling errors
+    
+    **Solutions:**
+    - Implement exponential backoff
+    - Reduce request frequency
+    - Use request queuing
+    - Consider upgrading API plan
+    
+    ```typescript
+    // Configure rate limiting
+    await client.tools.update('github-company', {
+      rateLimiting: {
+        enabled: true,
+        requestsPerMinute: 60,
+        burstLimit: 10
+      }
+    });
+    ```
+  </AccordionItem>
+  
+  <AccordionItem title="Connection Timeouts">
+    **Symptoms:** Timeout errors, slow responses
+    
+    **Solutions:**
+    - Increase timeout settings
+    - Check network connectivity
+    - Use connection pooling
+    - Implement circuit breakers
+    
+    ```typescript
+    // Update timeout configuration
+    await client.tools.update('api-service', {
+      config: {
+        timeout: 30000,
+        retries: 3,
+        retryDelay: 1000
+      }
+    });
+    ```
+  </AccordionItem>
+</Accordion>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Actions Overview" icon="play" href="/concepts/actions">
+    Learn how to use tool actions in your workflows
+  </Card>
+  
+  <Card title="OAuth Setup Guide" icon="key" href="/integrations/oauth-setup">
+    Detailed OAuth configuration for popular services
+  </Card>
+  
+  <Card title="Custom Actions" icon="code" href="/integrations/custom-actions">
+    Build custom integrations for your specific needs
+  </Card>
+  
+  <Card title="Security Guide" icon="shield" href="/security/secrets-management">
+    Best practices for secure credential management
+  </Card>
+</CardGroup>

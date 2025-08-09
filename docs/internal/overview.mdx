@@ -1,0 +1,3250 @@
+---
+title: "Internal Overview"
+description: "Comprehensive engineering documentation for Tolstoy platform development, architecture, and operations"
+---
+
+# Internal Engineering Overview
+
+Welcome to the Tolstoy engineering documentation. This comprehensive guide covers the internal architecture, development workflows, operational procedures, and engineering best practices for the Tolstoy workflow automation platform. This documentation is designed for engineers joining the team and existing team members who need detailed technical information.
+
+<img
+  className="block dark:hidden"
+  src="/images/internal-hero-light.png"
+  alt="Tolstoy Internal Overview Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/internal-hero-dark.png"
+  alt="Tolstoy Internal Overview Dark"
+/>
+
+## Platform Architecture Overview
+
+<CardGroup cols={2}>
+  <Card title="Microservices Architecture" icon="layer-group">
+    Distributed system with specialized services for authentication, workflow execution, integrations, and monitoring.
+  </Card>
+  <Card title="Event-Driven Design" icon="bolt">
+    Asynchronous communication using message queues, event streams, and webhook systems for scalability.
+  </Card>
+  <Card title="Multi-Tenant Security" icon="shield">
+    Complete data isolation with organization-scoped resources and comprehensive audit trails.
+  </Card>
+  <Card title="Cloud-Native Stack" icon="cloud">
+    Containerized deployment on Kubernetes with auto-scaling, service mesh, and observability.
+  </Card>
+</CardGroup>
+
+## High-Level System Architecture
+
+```mermaid
+graph TB
+    subgraph "External Systems"
+        EXT1[Third-party APIs]
+        EXT2[OAuth Providers]
+        EXT3[Webhook Recipients]
+        EXT4[Monitoring Systems]
+    end
+    
+    subgraph "Load Balancer & CDN"
+        LB[Load Balancer]
+        CDN[CloudFront CDN]
+    end
+    
+    subgraph "API Gateway"
+        GW[Kong API Gateway]
+        AUTH[Auth Middleware]
+        RATE[Rate Limiting]
+        CORS[CORS Handler]
+    end
+    
+    subgraph "Core Services"
+        API[API Service]
+        EXEC[Execution Engine]
+        ACTIONS[Action Registry]
+        TOOLS[Tool Manager]
+        WEBHOOKS[Webhook Service]
+        SCHEDULER[Scheduler Service]
+    end
+    
+    subgraph "Data Layer"
+        PG[(PostgreSQL)]
+        REDIS[(Redis Cache)]
+        S3[(S3 Storage)]
+        SEARCH[(Elasticsearch)]
+    end
+    
+    subgraph "Message Queue"
+        RABBITMQ[RabbitMQ]
+        KAFKA[Apache Kafka]
+    end
+    
+    subgraph "Monitoring & Logging"
+        PROM[Prometheus]
+        GRAF[Grafana]
+        ELK[ELK Stack]
+        JAEGER[Jaeger Tracing]
+    end
+    
+    EXT1 --> LB
+    EXT2 --> LB
+    LB --> CDN
+    CDN --> GW
+    
+    GW --> AUTH
+    AUTH --> RATE
+    RATE --> CORS
+    CORS --> API
+    
+    API --> EXEC
+    API --> ACTIONS
+    API --> TOOLS
+    API --> WEBHOOKS
+    API --> SCHEDULER
+    
+    EXEC --> RABBITMQ
+    EXEC --> KAFKA
+    SCHEDULER --> RABBITMQ
+    
+    API --> PG
+    API --> REDIS
+    API --> S3
+    API --> SEARCH
+    
+    EXEC --> PG
+    EXEC --> REDIS
+    
+    WEBHOOKS --> EXT3
+    
+    API --> PROM
+    EXEC --> PROM
+    PROM --> GRAF
+    
+    API --> ELK
+    EXEC --> ELK
+    ELK --> JAEGER
+    
+    PROM --> EXT4
+```
+
+## Core Technology Stack
+
+### **Backend Services**
+
+<Tabs>
+  <Tab title="Runtime & Frameworks">
+    **Node.js & NestJS**
+    - **Runtime:** Node.js 18+ LTS
+    - **Framework:** NestJS (Express-based)
+    - **Language:** TypeScript 4.9+
+    - **Architecture:** Modular microservices
+    
+    **Key Benefits:**
+    - Strong typing with TypeScript
+    - Dependency injection and modularity
+    - Built-in validation and serialization
+    - Comprehensive testing framework
+    - Excellent ecosystem integration
+    
+    ```typescript
+    // Example service structure
+    @Injectable()
+    export class FlowExecutionService {
+      constructor(
+        private readonly executionEngine: ExecutionEngine,
+        private readonly metricsService: MetricsService,
+        private readonly auditLogger: AuditLogger
+      ) {}
+      
+      async executeFlow(flowId: string, inputs: Record<string, any>): Promise<Execution> {
+        const startTime = Date.now();
+        
+        try {
+          const execution = await this.executionEngine.start(flowId, inputs);
+          this.metricsService.incrementCounter('flow_executions_started');
+          return execution;
+        } catch (error) {
+          this.auditLogger.logError('flow_execution_failed', { flowId, error });
+          throw error;
+        } finally {
+          this.metricsService.recordDuration('flow_execution_start_time', Date.now() - startTime);
+        }
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Databases & Storage">
+    **PostgreSQL (Primary Database)**
+    - **Version:** PostgreSQL 15+
+    - **ORM:** Prisma with type-safe queries
+    - **Connection Pooling:** PgBouncer
+    - **Replication:** Master-slave with read replicas
+    - **Backup:** Automated daily backups with point-in-time recovery
+    
+    **Redis (Caching & Sessions)**
+    - **Version:** Redis 7+
+    - **Clustering:** Redis Cluster for high availability
+    - **Usage:** Session storage, caching, rate limiting, queue management
+    - **Persistence:** AOF + RDB for durability
+    
+    **Amazon S3 (Object Storage)**
+    - **Usage:** File uploads, execution logs, backup storage
+    - **CDN:** CloudFront for global distribution
+    - **Security:** Server-side encryption, IAM policies
+    
+    **Elasticsearch (Search & Analytics)**
+    - **Version:** Elasticsearch 8+
+    - **Usage:** Full-text search, log analytics, metrics aggregation
+    - **Clustering:** Multi-node cluster with replicas
+  </Tab>
+  
+  <Tab title="Message Queues & Events">
+    **RabbitMQ (Task Queues)**
+    - **Version:** RabbitMQ 3.11+
+    - **Usage:** Workflow execution tasks, background jobs
+    - **Clustering:** Multi-node cluster with mirroring
+    - **Durability:** Persistent queues with acknowledgments
+    
+    **Apache Kafka (Event Streaming)**
+    - **Version:** Kafka 3.4+
+    - **Usage:** Event sourcing, real-time analytics, audit logs
+    - **Partitioning:** Topic partitioning for scalability
+    - **Retention:** Configurable retention policies
+    
+    **Inngest (Workflow Orchestration)**
+    - **Usage:** Durable workflow execution with retries
+    - **Features:** Event-driven functions, automatic retries, observability
+    - **Integration:** Deep integration with our execution engine
+  </Tab>
+  
+  <Tab title="Authentication & Security">
+    **OAuth2 & JWT**
+    - **Providers:** GitHub, Google, Microsoft, Slack, custom SAML
+    - **Token Management:** JWT with refresh tokens
+    - **Security:** PKCE flow, state parameter validation
+    
+    **API Key Management**
+    - **Format:** Prefixed keys (sk_live_, sk_test_)
+    - **Storage:** Encrypted in database with bcrypt
+    - **Permissions:** Role-based access control (RBAC)
+    - **Monitoring:** Usage tracking and anomaly detection
+    
+    **Secret Management**
+    - **Provider:** AWS Secrets Manager
+    - **Rotation:** Automatic key rotation
+    - **Encryption:** AES-256 encryption at rest
+    - **Access Control:** IAM-based access policies
+  </Tab>
+</Tabs>
+
+### **Infrastructure & DevOps**
+
+<Tabs>
+  <Tab title="Container Platform">
+    **Kubernetes (Orchestration)**
+    - **Distribution:** Amazon EKS
+    - **Version:** Kubernetes 1.28+
+    - **Ingress:** NGINX Ingress Controller
+    - **Service Mesh:** Istio for traffic management
+    - **Auto-scaling:** Horizontal Pod Autoscaler (HPA)
+    
+    **Docker (Containerization)**
+    - **Base Images:** Alpine Linux for security and size
+    - **Multi-stage Builds:** Optimized production images
+    - **Security Scanning:** Integrated vulnerability scanning
+    - **Registry:** Amazon ECR with image signing
+    
+    ```dockerfile
+    # Example multi-stage Dockerfile
+    FROM node:18-alpine AS builder
+    WORKDIR /app
+    COPY package*.json ./
+    RUN npm ci --only=production && npm cache clean --force
+    
+    FROM node:18-alpine AS runtime
+    RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -u 1001
+    WORKDIR /app
+    COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+    COPY --chown=nextjs:nodejs . .
+    USER nextjs
+    EXPOSE 3000
+    CMD ["npm", "start"]
+    ```
+  </Tab>
+  
+  <Tab title="CI/CD Pipeline">
+    **GitHub Actions (CI/CD)**
+    - **Build:** Automated builds on PR and main branch
+    - **Testing:** Unit, integration, and e2e tests
+    - **Security:** SAST, DAST, and dependency scanning
+    - **Deployment:** Blue-green deployments with rollback
+    
+    **Infrastructure as Code**
+    - **Terraform:** Infrastructure provisioning
+    - **Helm Charts:** Kubernetes application deployment
+    - **ArgoCD:** GitOps continuous deployment
+    - **Secrets:** External Secrets Operator for secret injection
+    
+    ```yaml
+    # Example GitHub Actions workflow
+    name: Deploy to Production
+    on:
+      push:
+        branches: [main]
+        
+    jobs:
+      test:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+          - uses: actions/setup-node@v3
+          - run: npm ci
+          - run: npm run test:coverage
+          - run: npm run test:e2e
+          
+      security:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+          - uses: github/super-linter@v4
+          - uses: securecodewarrior/github-action-add@v1
+            
+      deploy:
+        needs: [test, security]
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+          - uses: azure/k8s-deploy@v1
+            with:
+              manifests: |
+                k8s/deployment.yaml
+                k8s/service.yaml
+    ```
+  </Tab>
+  
+  <Tab title="Monitoring & Observability">
+    **Prometheus (Metrics)**
+    - **Metrics Collection:** Application and system metrics
+    - **Alerting:** AlertManager for intelligent alerting
+    - **Service Discovery:** Kubernetes service discovery
+    - **Retention:** Long-term storage with Thanos
+    
+    **Grafana (Visualization)**
+    - **Dashboards:** Business and technical metrics
+    - **Alerting:** Multi-channel notification system
+    - **User Management:** Team-based access control
+    - **Plugins:** Extended functionality with community plugins
+    
+    **ELK Stack (Logging)**
+    - **Elasticsearch:** Log storage and search
+    - **Logstash:** Log processing and enrichment
+    - **Kibana:** Log visualization and analysis
+    - **Filebeat:** Log shipping from containers
+    
+    **Jaeger (Distributed Tracing)**
+    - **Trace Collection:** End-to-end request tracing
+    - **Performance:** Bottleneck identification
+    - **Dependencies:** Service dependency mapping
+    - **Sampling:** Configurable sampling strategies
+  </Tab>
+</Tabs>
+
+## Service Architecture Deep Dive
+
+### **API Service**
+
+The central API service handles all external HTTP requests and coordinates with other services:
+
+<CodeGroup>
+```typescript Service Structure
+// src/api/api.module.ts
+@Module({
+  imports: [
+    ConfigModule.forRoot(),
+    DatabaseModule,
+    AuthModule,
+    FlowsModule,
+    ActionsModule,
+    ToolsModule,
+    WebhooksModule,
+    UsersModule,
+    OrganizationsModule,
+    MonitoringModule
+  ],
+  controllers: [HealthController],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: AuthGuard
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor
+    },
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter
+    }
+  ]
+})
+export class ApiModule {}
+```
+
+```typescript Authentication Middleware
+// src/auth/auth.guard.ts
+@Injectable()
+export class AuthGuard implements CanActivate {
+  constructor(
+    private reflector: Reflector,
+    private authService: AuthService,
+    private metricsService: MetricsService
+  ) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const request = context.switchToHttp().getRequest();
+    const requiredPermissions = this.reflector.get<string[]>(
+      'permissions',
+      context.getHandler()
+    );
+
+    try {
+      const token = this.extractTokenFromHeader(request);
+      if (!token) {
+        throw new UnauthorizedException('Missing authentication token');
+      }
+
+      const user = await this.authService.validateToken(token);
+      if (!user) {
+        throw new UnauthorizedException('Invalid token');
+      }
+
+      if (requiredPermissions) {
+        const hasPermission = await this.authService.checkPermissions(
+          user,
+          requiredPermissions
+        );
+        if (!hasPermission) {
+          throw new ForbiddenException('Insufficient permissions');
+        }
+      }
+
+      request.user = user;
+      this.metricsService.incrementCounter('auth_success');
+      return true;
+      
+    } catch (error) {
+      this.metricsService.incrementCounter('auth_failure');
+      throw error;
+    }
+  }
+}
+```
+
+```typescript Error Handling
+// src/common/filters/global-exception.filter.ts
+@Catch()
+export class GlobalExceptionFilter implements ExceptionFilter {
+  private readonly logger = new Logger(GlobalExceptionFilter.name);
+
+  constructor(
+    private readonly metricsService: MetricsService,
+    private readonly auditLogger: AuditLogger
+  ) {}
+
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+
+    const errorInfo = this.getErrorInfo(exception);
+    const errorResponse = {
+      error: {
+        type: errorInfo.type,
+        message: errorInfo.message,
+        code: errorInfo.code,
+        details: errorInfo.details,
+        request_id: request.headers['x-request-id'],
+        timestamp: new Date().toISOString()
+      }
+    };
+
+    // Log error
+    this.logger.error(
+      `${errorInfo.status} ${request.method} ${request.url}`,
+      exception instanceof Error ? exception.stack : exception
+    );
+
+    // Record metrics
+    this.metricsService.incrementCounter('api_errors', {
+      status: errorInfo.status.toString(),
+      endpoint: request.route?.path || request.url,
+      error_type: errorInfo.type
+    });
+
+    // Audit log for security-related errors
+    if (errorInfo.status === 401 || errorInfo.status === 403) {
+      this.auditLogger.logSecurityEvent('auth_failure', {
+        ip: request.ip,
+        user_agent: request.headers['user-agent'],
+        endpoint: request.url,
+        error: errorInfo.message
+      });
+    }
+
+    response.status(errorInfo.status).json(errorResponse);
+  }
+}
+```
+</CodeGroup>
+
+### **Execution Engine**
+
+The heart of the workflow automation system, responsible for executing flows and managing their lifecycle:
+
+<CodeGroup>
+```typescript Execution Engine
+// src/flows/execution-engine.service.ts
+@Injectable()
+export class ExecutionEngine {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly actionRegistry: ActionRegistryService,
+    private readonly variableResolver: VariableResolverService,
+    private readonly eventEmitter: EventEmitter2,
+    private readonly metricsService: MetricsService,
+    private readonly logger: Logger
+  ) {}
+
+  async executeFlow(
+    flowId: string, 
+    inputs: Record<string, any>, 
+    metadata?: ExecutionMetadata
+  ): Promise<Execution> {
+    const executionId = generateId('exec');
+    const startTime = Date.now();
+    
+    try {
+      // Create execution record
+      const execution = await this.createExecution(flowId, inputs, metadata);
+      
+      // Load flow definition
+      const flow = await this.loadFlow(flowId);
+      if (!flow) {
+        throw new FlowNotFoundError(`Flow ${flowId} not found`);
+      }
+      
+      // Initialize execution context
+      const context = this.createExecutionContext(execution, inputs);
+      
+      // Start execution
+      await this.executeSteps(flow, context);
+      
+      // Record metrics
+      this.metricsService.recordDuration(
+        'flow_execution_total_time',
+        Date.now() - startTime,
+        { flow_id: flowId }
+      );
+      
+      return execution;
+      
+    } catch (error) {
+      await this.handleExecutionError(executionId, error);
+      throw error;
+    }
+  }
+
+  private async executeSteps(
+    flow: Flow, 
+    context: ExecutionContext
+  ): Promise<void> {
+    const steps = this.buildExecutionGraph(flow.steps);
+    
+    for (const stepGroup of steps) {
+      if (stepGroup.length === 1) {
+        // Sequential execution
+        await this.executeStep(stepGroup[0], context);
+      } else {
+        // Parallel execution
+        await Promise.all(
+          stepGroup.map(step => this.executeStep(step, context))
+        );
+      }
+    }
+  }
+
+  private async executeStep(
+    step: FlowStep, 
+    context: ExecutionContext
+  ): Promise<void> {
+    const stepStartTime = Date.now();
+    
+    try {
+      // Check conditions
+      if (step.conditions) {
+        const conditionsMet = await this.evaluateConditions(
+          step.conditions, 
+          context
+        );
+        if (!conditionsMet) {
+          this.logger.debug(`Skipping step ${step.key} - conditions not met`);
+          return;
+        }
+      }
+      
+      // Resolve inputs
+      const resolvedInputs = await this.variableResolver.resolve(
+        step.inputs,
+        context
+      );
+      
+      // Get action implementation
+      const action = await this.actionRegistry.getAction(step.action);
+      if (!action) {
+        throw new ActionNotFoundError(`Action ${step.action} not found`);
+      }
+      
+      // Execute action with timeout and retries
+      const result = await this.executeWithRetries(
+        () => action.execute(resolvedInputs, context),
+        step.retry_policy || context.flow.default_retry_policy
+      );
+      
+      // Store step result in context
+      context.stepResults[step.key] = result;
+      
+      // Emit step completed event
+      this.eventEmitter.emit('step.completed', {
+        execution_id: context.execution.id,
+        step_key: step.key,
+        result: result,
+        duration: Date.now() - stepStartTime
+      });
+      
+    } catch (error) {
+      // Handle step error
+      await this.handleStepError(step, context, error);
+      throw error;
+    }
+  }
+}
+```
+
+```typescript Action Registry
+// src/actions/action-registry.service.ts
+@Injectable()
+export class ActionRegistryService {
+  private readonly actions = new Map<string, ActionImplementation>();
+  private readonly actionSchemas = new Map<string, JSONSchema>();
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly validationService: ValidationService,
+    private readonly metricsService: MetricsService
+  ) {
+    this.loadBuiltInActions();
+  }
+
+  async getAction(actionId: string): Promise<ActionImplementation> {
+    // Check cache first
+    if (this.actions.has(actionId)) {
+      return this.actions.get(actionId);
+    }
+
+    // Load from database
+    const actionDef = await this.prisma.action.findUnique({
+      where: { id: actionId }
+    });
+
+    if (!actionDef) {
+      throw new ActionNotFoundError(`Action ${actionId} not found`);
+    }
+
+    // Create action implementation
+    const action = await this.createActionImplementation(actionDef);
+    
+    // Cache for future use
+    this.actions.set(actionId, action);
+    
+    return action;
+  }
+
+  async validateActionInputs(
+    actionId: string, 
+    inputs: Record<string, any>
+  ): Promise<ValidationResult> {
+    const schema = this.actionSchemas.get(actionId);
+    if (!schema) {
+      throw new ActionNotFoundError(`Schema for action ${actionId} not found`);
+    }
+
+    return this.validationService.validate(inputs, schema);
+  }
+
+  private async createActionImplementation(
+    actionDef: ActionDefinition
+  ): Promise<ActionImplementation> {
+    switch (actionDef.type) {
+      case 'http':
+        return new HttpActionImplementation(actionDef);
+      case 'javascript':
+        return new JavaScriptActionImplementation(actionDef);
+      case 'builtin':
+        return this.getBuiltInAction(actionDef.implementation_id);
+      default:
+        throw new UnsupportedActionTypeError(
+          `Action type ${actionDef.type} not supported`
+        );
+    }
+  }
+}
+```
+
+```typescript Variable Resolution
+// src/common/services/variable-resolver.service.ts
+@Injectable()
+export class VariableResolverService {
+  constructor(
+    private readonly secretsService: SecretsService,
+    private readonly organizationService: OrganizationService
+  ) {}
+
+  async resolve(
+    template: any,
+    context: ExecutionContext
+  ): Promise<any> {
+    if (typeof template === 'string') {
+      return this.resolveString(template, context);
+    } else if (Array.isArray(template)) {
+      return Promise.all(
+        template.map(item => this.resolve(item, context))
+      );
+    } else if (template && typeof template === 'object') {
+      const resolved: Record<string, any> = {};
+      for (const [key, value] of Object.entries(template)) {
+        resolved[key] = await this.resolve(value, context);
+      }
+      return resolved;
+    }
+    
+    return template;
+  }
+
+  private async resolveString(
+    template: string,
+    context: ExecutionContext
+  ): Promise<string> {
+    // Match template variables like {{variable}}
+    const variableRegex = /\{\{([^}]+)\}\}/g;
+    let result = template;
+    
+    const matches = template.match(variableRegex);
+    if (!matches) return template;
+
+    for (const match of matches) {
+      const variablePath = match.slice(2, -2).trim();
+      const value = await this.resolveVariable(variablePath, context);
+      result = result.replace(match, String(value));
+    }
+
+    return result;
+  }
+
+  private async resolveVariable(
+    path: string,
+    context: ExecutionContext
+  ): Promise<any> {
+    const parts = path.split('.');
+    const root = parts[0];
+
+    switch (root) {
+      case 'inputs':
+        return this.getNestedValue(context.inputs, parts.slice(1));
+      case 'outputs':
+        return this.getNestedValue(context.outputs, parts.slice(1));
+      case 'steps':
+        const stepKey = parts[1];
+        const stepResult = context.stepResults[stepKey];
+        return this.getNestedValue(stepResult, parts.slice(2));
+      case 'env':
+        const secretKey = parts[1];
+        return this.secretsService.getSecret(
+          context.organization.id,
+          secretKey
+        );
+      case 'organization':
+        return this.getNestedValue(context.organization, parts.slice(1));
+      case 'now':
+        return new Date().toISOString();
+      default:
+        throw new VariableResolutionError(`Unknown variable root: ${root}`);
+    }
+  }
+}
+```
+</CodeGroup>
+
+### **Tool Integration System**
+
+Manages connections to external services and provides a unified interface for workflow actions:
+
+<CodeGroup>
+```typescript Tool Manager
+// src/tools/tool-manager.service.ts
+@Injectable()
+export class ToolManagerService {
+  private readonly toolConnections = new Map<string, ToolConnection>();
+  
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly oauthService: OAuthService,
+    private readonly secretsService: SecretsService,
+    private readonly healthCheckService: HealthCheckService
+  ) {}
+
+  async getConnection(
+    organizationId: string,
+    toolId: string
+  ): Promise<ToolConnection> {
+    const cacheKey = `${organizationId}:${toolId}`;
+    
+    // Check cache first
+    if (this.toolConnections.has(cacheKey)) {
+      return this.toolConnections.get(cacheKey);
+    }
+
+    // Load tool configuration
+    const toolConfig = await this.prisma.tool.findUnique({
+      where: {
+        id: toolId,
+        organization_id: organizationId
+      }
+    });
+
+    if (!toolConfig) {
+      throw new ToolNotFoundError(`Tool ${toolId} not found`);
+    }
+
+    // Create connection
+    const connection = await this.createConnection(toolConfig);
+    
+    // Cache connection
+    this.toolConnections.set(cacheKey, connection);
+    
+    return connection;
+  }
+
+  async testConnection(toolId: string): Promise<HealthCheckResult> {
+    try {
+      const connection = await this.getConnection(toolId);
+      return await connection.healthCheck();
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        error: error.message,
+        checked_at: new Date()
+      };
+    }
+  }
+
+  private async createConnection(
+    toolConfig: ToolConfiguration
+  ): Promise<ToolConnection> {
+    const factory = this.getToolFactory(toolConfig.type);
+    const credentials = await this.resolveCredentials(toolConfig);
+    
+    return factory.create({
+      configuration: toolConfig.configuration,
+      credentials: credentials,
+      organizationId: toolConfig.organization_id
+    });
+  }
+
+  private async resolveCredentials(
+    toolConfig: ToolConfiguration
+  ): Promise<ToolCredentials> {
+    switch (toolConfig.auth_type) {
+      case 'oauth2':
+        return this.resolveOAuth2Credentials(toolConfig);
+      case 'api_key':
+        return this.resolveApiKeyCredentials(toolConfig);
+      case 'basic':
+        return this.resolveBasicAuthCredentials(toolConfig);
+      default:
+        throw new UnsupportedAuthTypeError(
+          `Auth type ${toolConfig.auth_type} not supported`
+        );
+    }
+  }
+}
+```
+
+```typescript GitHub Integration
+// src/tools/implementations/github.tool.ts
+@Injectable()
+export class GitHubTool implements ToolConnection {
+  private readonly client: Octokit;
+
+  constructor(
+    private readonly credentials: OAuth2Credentials,
+    private readonly configuration: GitHubConfiguration
+  ) {
+    this.client = new Octokit({
+      auth: credentials.access_token,
+      baseUrl: configuration.base_url || 'https://api.github.com'
+    });
+  }
+
+  async healthCheck(): Promise<HealthCheckResult> {
+    try {
+      const startTime = Date.now();
+      const { data: user } = await this.client.rest.users.getAuthenticated();
+      
+      return {
+        status: 'healthy',
+        response_time: Date.now() - startTime,
+        details: {
+          user: user.login,
+          scopes: user.permissions,
+          rate_limit: user.rate_limit
+        },
+        checked_at: new Date()
+      };
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        error: error.message,
+        checked_at: new Date()
+      };
+    }
+  }
+
+  async createIssue(params: CreateIssueParams): Promise<GitHubIssue> {
+    try {
+      const { data } = await this.client.rest.issues.create({
+        owner: params.owner || this.configuration.default_owner,
+        repo: params.repo,
+        title: params.title,
+        body: params.body,
+        assignees: params.assignees,
+        labels: params.labels,
+        milestone: params.milestone
+      });
+
+      return {
+        id: data.id,
+        number: data.number,
+        title: data.title,
+        body: data.body,
+        state: data.state,
+        url: data.html_url,
+        created_at: data.created_at,
+        updated_at: data.updated_at
+      };
+    } catch (error) {
+      throw new GitHubApiError(`Failed to create issue: ${error.message}`);
+    }
+  }
+
+  async updatePullRequest(params: UpdatePullRequestParams): Promise<GitHubPullRequest> {
+    try {
+      const { data } = await this.client.rest.pulls.update({
+        owner: params.owner || this.configuration.default_owner,
+        repo: params.repo,
+        pull_number: params.pull_number,
+        title: params.title,
+        body: params.body,
+        state: params.state
+      });
+
+      return {
+        id: data.id,
+        number: data.number,
+        title: data.title,
+        body: data.body,
+        state: data.state,
+        url: data.html_url,
+        merge_commit_sha: data.merge_commit_sha,
+        created_at: data.created_at,
+        updated_at: data.updated_at
+      };
+    } catch (error) {
+      throw new GitHubApiError(`Failed to update PR: ${error.message}`);
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Development Environment Setup
+
+### **Local Development**
+
+<Steps>
+  <Step title="Prerequisites">
+    Install required development tools
+    ```bash
+    # Node.js and npm
+    nvm install 18
+    nvm use 18
+    
+    # Docker and Docker Compose
+    brew install docker docker-compose
+    
+    # PostgreSQL client
+    brew install postgresql
+    
+    # Redis client
+    brew install redis
+    
+    # Development tools
+    npm install -g @nestjs/cli prisma typescript
+    ```
+  </Step>
+  <Step title="Repository Setup">
+    Clone and configure the repository
+    ```bash
+    # Clone repository
+    git clone git@github.com:company/tolstoy-platform.git
+    cd tolstoy-platform
+    
+    # Install dependencies
+    npm install
+    
+    # Copy environment template
+    cp .env.example .env.local
+    
+    # Generate Prisma client
+    npx prisma generate
+    ```
+  </Step>
+  <Step title="Database Setup">
+    Initialize local database
+    ```bash
+    # Start local services
+    docker-compose up -d postgres redis elasticsearch
+    
+    # Run database migrations
+    npx prisma migrate dev
+    
+    # Seed development data
+    npm run db:seed
+    ```
+  </Step>
+  <Step title="Start Development Server">
+    Launch the development environment
+    ```bash
+    # Start the API server
+    npm run start:dev
+    
+    # Run tests (in another terminal)
+    npm run test:watch
+    
+    # View logs
+    npm run logs:dev
+    ```
+  </Step>
+</Steps>
+
+### **Development Configuration**
+
+<CodeGroup>
+```bash Environment Variables
+# .env.local
+NODE_ENV=development
+PORT=3000
+LOG_LEVEL=debug
+
+# Database
+DATABASE_URL=postgresql://tolstoy:password@localhost:5432/tolstoy_dev
+REDIS_URL=redis://localhost:6379/0
+
+# Authentication
+JWT_SECRET=dev_jwt_secret_change_in_production
+JWT_EXPIRES_IN=24h
+REFRESH_TOKEN_EXPIRES_IN=7d
+
+# OAuth2 Providers
+GITHUB_CLIENT_ID=your_github_client_id
+GITHUB_CLIENT_SECRET=your_github_client_secret
+GOOGLE_CLIENT_ID=your_google_client_id
+GOOGLE_CLIENT_SECRET=your_google_client_secret
+
+# AWS Services (LocalStack for development)
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=test
+AWS_SECRET_ACCESS_KEY=test
+AWS_ENDPOINT_URL=http://localhost:4566
+S3_BUCKET=tolstoy-dev-storage
+
+# External Services
+SENDGRID_API_KEY=your_sendgrid_api_key
+SLACK_CLIENT_ID=your_slack_client_id
+SLACK_CLIENT_SECRET=your_slack_client_secret
+
+# Monitoring
+PROMETHEUS_ENABLED=true
+PROMETHEUS_PORT=9090
+JAEGER_ENDPOINT=http://localhost:14268/api/traces
+```
+
+```yaml Docker Compose
+# docker-compose.dev.yml
+version: '3.8'
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: tolstoy_dev
+      POSTGRES_USER: tolstoy
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.8.0
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: tolstoy
+      RABBITMQ_DEFAULT_PASS: password
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  localstack:
+    image: localstack/localstack:2.0
+    environment:
+      - SERVICES=s3,secretsmanager,lambda
+      - DEFAULT_REGION=us-east-1
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/tmp/localstack
+
+volumes:
+  postgres_data:
+  redis_data:
+  es_data:
+  rabbitmq_data:
+  localstack_data:
+```
+
+```typescript Development Configuration
+// src/config/development.config.ts
+export const developmentConfig = {
+  database: {
+    host: 'localhost',
+    port: 5432,
+    username: 'tolstoy',
+    password: 'password',
+    database: 'tolstoy_dev',
+    synchronize: false,
+    logging: ['query', 'error'],
+    maxConnections: 10,
+    connectionTimeoutMillis: 10000
+  },
+  
+  redis: {
+    host: 'localhost',
+    port: 6379,
+    db: 0,
+    keyPrefix: 'tolstoy:dev:',
+    retryDelayOnFailover: 100,
+    maxRetriesPerRequest: 3
+  },
+  
+  logging: {
+    level: 'debug',
+    format: 'pretty',
+    colorize: true,
+    includeStack: true
+  },
+  
+  monitoring: {
+    prometheus: {
+      enabled: true,
+      port: 9090,
+      path: '/metrics'
+    },
+    jaeger: {
+      enabled: true,
+      endpoint: 'http://localhost:14268/api/traces',
+      serviceName: 'tolstoy-api-dev'
+    }
+  },
+  
+  security: {
+    cors: {
+      origin: ['http://localhost:3000', 'http://localhost:3001'],
+      credentials: true
+    },
+    rateLimit: {
+      windowMs: 60 * 1000, // 1 minute
+      max: 1000, // Much higher for development
+      skipSuccessfulRequests: true
+    }
+  }
+};
+```
+</CodeGroup>
+
+### **Testing Framework**
+
+<Tabs>
+  <Tab title="Unit Testing">
+    **Jest Configuration**
+    ```typescript
+    // jest.config.js
+    module.exports = {
+      moduleFileExtensions: ['js', 'json', 'ts'],
+      rootDir: 'src',
+      testRegex: '.*\\.spec\\.ts$',
+      transform: {
+        '^.+\\.(t|j)s$': 'ts-jest',
+      },
+      collectCoverageFrom: [
+        '**/*.(t|j)s',
+        '!**/*.spec.ts',
+        '!**/node_modules/**',
+      ],
+      coverageDirectory: '../coverage',
+      testEnvironment: 'node',
+      setupFilesAfterEnv: ['<rootDir>/../test/setup.ts'],
+      moduleNameMapping: {
+        '^@/(.*)$': '<rootDir>/$1',
+      },
+    };
+    ```
+    
+    **Example Unit Test**
+    ```typescript
+    // src/flows/flow-execution.service.spec.ts
+    describe('FlowExecutionService', () => {
+      let service: FlowExecutionService;
+      let mockPrisma: jest.Mocked<PrismaService>;
+      let mockActionRegistry: jest.Mocked<ActionRegistryService>;
+
+      beforeEach(async () => {
+        const module: TestingModule = await Test.createTestingModule({
+          providers: [
+            FlowExecutionService,
+            {
+              provide: PrismaService,
+              useValue: createMockPrisma()
+            },
+            {
+              provide: ActionRegistryService,
+              useValue: createMockActionRegistry()
+            }
+          ],
+        }).compile();
+
+        service = module.get<FlowExecutionService>(FlowExecutionService);
+        mockPrisma = module.get(PrismaService);
+        mockActionRegistry = module.get(ActionRegistryService);
+      });
+
+      it('should execute a simple flow successfully', async () => {
+        const flowId = 'flow_test_123';
+        const inputs = { email: 'test@example.com' };
+        
+        const mockFlow = {
+          id: flowId,
+          name: 'Test Flow',
+          steps: [
+            {
+              key: 'step1',
+              action: 'email',
+              inputs: { to: '{{inputs.email}}' }
+            }
+          ]
+        };
+
+        mockPrisma.flow.findUnique.mockResolvedValue(mockFlow);
+        mockActionRegistry.getAction.mockResolvedValue(
+          new MockEmailAction()
+        );
+
+        const execution = await service.executeFlow(flowId, inputs);
+
+        expect(execution).toBeDefined();
+        expect(execution.status).toBe('running');
+        expect(mockActionRegistry.getAction).toHaveBeenCalledWith('email');
+      });
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Integration Testing">
+    **Database Testing**
+    ```typescript
+    // test/integration/flows.e2e-spec.ts
+    describe('Flows (e2e)', () => {
+      let app: INestApplication;
+      let prisma: PrismaService;
+      let authToken: string;
+
+      beforeAll(async () => {
+        const moduleFixture: TestingModule = await Test.createTestingModule({
+          imports: [AppModule],
+        })
+        .overrideProvider(ConfigService)
+        .useValue(testConfigService)
+        .compile();
+
+        app = moduleFixture.createNestApplication();
+        prisma = app.get<PrismaService>(PrismaService);
+        
+        await app.init();
+        
+        // Create test user and get auth token
+        const testUser = await createTestUser(prisma);
+        authToken = generateTestToken(testUser);
+      });
+
+      beforeEach(async () => {
+        // Clean up database before each test
+        await prisma.execution.deleteMany();
+        await prisma.flow.deleteMany();
+      });
+
+      it('/flows (POST) should create a new flow', async () => {
+        const flowData = {
+          name: 'Test Flow',
+          steps: [
+            {
+              key: 'test_step',
+              action: 'delay',
+              inputs: { duration: '1s' }
+            }
+          ]
+        };
+
+        const response = await request(app.getHttpServer())
+          .post('/v1/flows')
+          .set('Authorization', `Bearer ${authToken}`)
+          .send(flowData)
+          .expect(201);
+
+        expect(response.body).toMatchObject({
+          name: 'Test Flow',
+          status: 'active'
+        });
+
+        // Verify database state
+        const flow = await prisma.flow.findUnique({
+          where: { id: response.body.id }
+        });
+        expect(flow).toBeDefined();
+        expect(flow.name).toBe('Test Flow');
+      });
+
+      it('/flows/:id/executions (POST) should execute a flow', async () => {
+        // Create test flow
+        const flow = await prisma.flow.create({
+          data: {
+            name: 'Execution Test Flow',
+            organization_id: testUser.organization_id,
+            steps: [
+              {
+                key: 'delay_step',
+                action: 'delay',
+                inputs: { duration: '100ms' }
+              }
+            ]
+          }
+        });
+
+        const response = await request(app.getHttpServer())
+          .post(`/v1/flows/${flow.id}/executions`)
+          .set('Authorization', `Bearer ${authToken}`)
+          .send({
+            inputs: { test: true }
+          })
+          .expect(201);
+
+        expect(response.body).toMatchObject({
+          flow_id: flow.id,
+          status: 'running'
+        });
+
+        // Wait for execution to complete
+        await waitForExecution(response.body.id, 'completed', 5000);
+      });
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Performance Testing">
+    **Load Testing with Artillery**
+    ```yaml
+    # test/load/api-load-test.yml
+    config:
+      target: 'http://localhost:3000'
+      phases:
+        - duration: 60
+          arrivalRate: 10
+          name: "Warm up"
+        - duration: 300
+          arrivalRate: 50
+          name: "Sustained load"
+        - duration: 60
+          arrivalRate: 100
+          name: "Peak load"
+      http:
+        timeout: 30
+      variables:
+        authToken: "Bearer test_token_here"
+    
+    scenarios:
+      - name: "List flows"
+        weight: 40
+        flow:
+          - get:
+              url: "/v1/flows?limit=20"
+              headers:
+                Authorization: "{{ authToken }}"
+              expect:
+                - statusCode: 200
+    
+      - name: "Execute flow"
+        weight: 30
+        flow:
+          - post:
+              url: "/v1/flows/{{ $randomString() }}/executions"
+              headers:
+                Authorization: "{{ authToken }}"
+              json:
+                inputs:
+                  test: true
+                  timestamp: "{{ $timestamp }}"
+              expect:
+                - statusCode: 201
+    
+      - name: "Get execution status"
+        weight: 30
+        flow:
+          - get:
+              url: "/v1/executions/{{ $randomString() }}"
+              headers:
+                Authorization: "{{ authToken }}"
+              expect:
+                - statusCode: [200, 404]
+    ```
+  </Tab>
+</Tabs>
+
+## Operational Procedures
+
+### **Deployment Process**
+
+<Tabs>
+  <Tab title="CI/CD Pipeline">
+    **GitHub Actions Workflow**
+    ```yaml
+    # .github/workflows/deploy-production.yml
+    name: Deploy to Production
+    
+    on:
+      push:
+        branches: [main]
+        tags: ['v*']
+    
+    env:
+      NODE_VERSION: '18'
+      REGISTRY: ghcr.io
+      IMAGE_NAME: ${{ github.repository }}
+    
+    jobs:
+      test:
+        runs-on: ubuntu-latest
+        services:
+          postgres:
+            image: postgres:15
+            env:
+              POSTGRES_PASSWORD: postgres
+            options: >-
+              --health-cmd pg_isready
+              --health-interval 10s
+              --health-timeout 5s
+              --health-retries 5
+          redis:
+            image: redis:7
+            options: >-
+              --health-cmd "redis-cli ping"
+              --health-interval 10s
+              --health-timeout 5s
+              --health-retries 5
+              
+        steps:
+          - uses: actions/checkout@v4
+          
+          - uses: actions/setup-node@v4
+            with:
+              node-version: ${{ env.NODE_VERSION }}
+              cache: 'npm'
+              
+          - name: Install dependencies
+            run: npm ci
+            
+          - name: Generate Prisma client
+            run: npx prisma generate
+            
+          - name: Run linting
+            run: npm run lint
+            
+          - name: Run type checking
+            run: npm run type-check
+            
+          - name: Run unit tests
+            run: npm run test:unit -- --coverage
+            
+          - name: Run integration tests
+            run: npm run test:integration
+            env:
+              DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test
+              REDIS_URL: redis://localhost:6379/0
+              
+          - name: Upload coverage reports
+            uses: codecov/codecov-action@v3
+            
+      security:
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v4
+          
+          - name: Run security audit
+            run: npm audit --audit-level high
+            
+          - name: Run SAST scan
+            uses: github/super-linter@v4
+            env:
+              DEFAULT_BRANCH: main
+              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              
+          - name: Run container security scan
+            uses: aquasec/trivy-action@master
+            with:
+              scan-type: 'fs'
+              format: 'sarif'
+              output: 'trivy-results.sarif'
+              
+      build:
+        needs: [test, security]
+        runs-on: ubuntu-latest
+        outputs:
+          image-digest: ${{ steps.build.outputs.digest }}
+        steps:
+          - uses: actions/checkout@v4
+          
+          - name: Set up Docker Buildx
+            uses: docker/setup-buildx-action@v3
+            
+          - name: Log in to Container Registry
+            uses: docker/login-action@v3
+            with:
+              registry: ${{ env.REGISTRY }}
+              username: ${{ github.actor }}
+              password: ${{ secrets.GITHUB_TOKEN }}
+              
+          - name: Extract metadata
+            id: meta
+            uses: docker/metadata-action@v5
+            with:
+              images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+              tags: |
+                type=ref,event=branch
+                type=ref,event=pr
+                type=semver,pattern={{version}}
+                type=semver,pattern={{major}}.{{minor}}
+                type=sha
+                
+          - name: Build and push Docker image
+            id: build
+            uses: docker/build-push-action@v5
+            with:
+              context: .
+              platforms: linux/amd64,linux/arm64
+              push: true
+              tags: ${{ steps.meta.outputs.tags }}
+              labels: ${{ steps.meta.outputs.labels }}
+              cache-from: type=gha
+              cache-to: type=gha,mode=max
+              
+      deploy-staging:
+        needs: build
+        if: github.ref == 'refs/heads/main'
+        runs-on: ubuntu-latest
+        environment: staging
+        steps:
+          - uses: actions/checkout@v4
+          
+          - name: Configure kubectl
+            uses: azure/k8s-set-context@v3
+            with:
+              method: kubeconfig
+              kubeconfig: ${{ secrets.KUBECONFIG_STAGING }}
+              
+          - name: Deploy to staging
+            uses: azure/k8s-deploy@v4
+            with:
+              manifests: |
+                k8s/namespace.yaml
+                k8s/deployment.yaml
+                k8s/service.yaml
+                k8s/ingress.yaml
+              images: |
+                ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.image-digest }}
+              namespace: tolstoy-staging
+              
+          - name: Verify deployment
+            run: |
+              kubectl rollout status deployment/tolstoy-api -n tolstoy-staging --timeout=300s
+              kubectl get pods -n tolstoy-staging
+              
+          - name: Run smoke tests
+            run: npm run test:smoke -- --env staging
+            
+      deploy-production:
+        needs: [build, deploy-staging]
+        if: startsWith(github.ref, 'refs/tags/v')
+        runs-on: ubuntu-latest
+        environment: production
+        steps:
+          - uses: actions/checkout@v4
+          
+          - name: Configure kubectl
+            uses: azure/k8s-set-context@v3
+            with:
+              method: kubeconfig
+              kubeconfig: ${{ secrets.KUBECONFIG_PRODUCTION }}
+              
+          - name: Deploy to production
+            uses: azure/k8s-deploy@v4
+            with:
+              manifests: |
+                k8s/namespace.yaml
+                k8s/deployment.yaml
+                k8s/service.yaml
+                k8s/ingress.yaml
+              images: |
+                ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ needs.build.outputs.image-digest }}
+              namespace: tolstoy-production
+              strategy: blue-green
+              
+          - name: Verify production deployment
+            run: |
+              kubectl rollout status deployment/tolstoy-api -n tolstoy-production --timeout=600s
+              
+          - name: Run production health checks
+            run: npm run test:health -- --env production
+            
+          - name: Send deployment notification
+            uses: 8398a7/action-slack@v3
+            with:
+              status: ${{ job.status }}
+              text: 'Production deployment completed successfully'
+            env:
+              SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+    ```
+  </Tab>
+  
+  <Tab title="Database Migrations">
+    **Migration Process**
+    ```typescript
+    // prisma/migrations/deploy.ts
+    import { PrismaClient } from '@prisma/client';
+    
+    const prisma = new PrismaClient();
+    
+    async function deployMigrations() {
+      try {
+        console.log('Starting database migration...');
+        
+        // Check current migration status
+        const pendingMigrations = await prisma.$queryRaw`
+          SELECT migration_name 
+          FROM _prisma_migrations 
+          WHERE finished_at IS NULL
+        `;
+        
+        if (pendingMigrations.length > 0) {
+          throw new Error(`Pending migrations found: ${pendingMigrations.map(m => m.migration_name).join(', ')}`);
+        }
+        
+        // Run migrations
+        await prisma.$executeRaw`SET statement_timeout = '10min'`;
+        console.log('Deploying migrations...');
+        
+        // This would typically be done via Prisma CLI
+        // prisma migrate deploy
+        
+        console.log('Migrations completed successfully');
+        
+        // Verify database health
+        await prisma.$queryRaw`SELECT 1`;
+        console.log('Database health check passed');
+        
+      } catch (error) {
+        console.error('Migration failed:', error);
+        process.exit(1);
+      } finally {
+        await prisma.$disconnect();
+      }
+    }
+    
+    if (require.main === module) {
+      deployMigrations();
+    }
+    ```
+    
+    **Migration Best Practices**
+    ```bash
+    # Pre-deployment migration check
+    npm run migration:check
+    
+    # Deploy migrations with rollback capability
+    npm run migration:deploy -- --rollback-on-failure
+    
+    # Verify migration success
+    npm run migration:verify
+    
+    # Post-deployment cleanup
+    npm run migration:cleanup
+    ```
+  </Tab>
+  
+  <Tab title="Blue-Green Deployment">
+    **Kubernetes Blue-Green Strategy**
+    ```yaml
+    # k8s/deployment-blue-green.yaml
+    apiVersion: argoproj.io/v1alpha1
+    kind: Rollout
+    metadata:
+      name: tolstoy-api
+      namespace: tolstoy-production
+    spec:
+      replicas: 6
+      strategy:
+        blueGreen:
+          activeService: tolstoy-api-active
+          previewService: tolstoy-api-preview
+          prePromotionAnalysis:
+            templates:
+            - templateName: success-rate
+            args:
+            - name: service-name
+              value: tolstoy-api-preview
+          postPromotionAnalysis:
+            templates:
+            - templateName: success-rate
+            - templateName: avg-response-time
+            args:
+            - name: service-name
+              value: tolstoy-api-active
+          scaleDownDelaySeconds: 300
+          previewReplicaCount: 3
+      selector:
+        matchLabels:
+          app: tolstoy-api
+      template:
+        metadata:
+          labels:
+            app: tolstoy-api
+        spec:
+          containers:
+          - name: tolstoy-api
+            image: ghcr.io/company/tolstoy:latest
+            ports:
+            - containerPort: 3000
+            env:
+            - name: NODE_ENV
+              value: "production"
+            livenessProbe:
+              httpGet:
+                path: /health
+                port: 3000
+              initialDelaySeconds: 30
+              periodSeconds: 10
+            readinessProbe:
+              httpGet:
+                path: /health/ready
+                port: 3000
+              initialDelaySeconds: 5
+              periodSeconds: 5
+    ```
+  </Tab>
+</Tabs>
+
+### **Monitoring & Alerting**
+
+<Tabs>
+  <Tab title="Prometheus Metrics">
+    **Custom Metrics Implementation**
+    ```typescript
+    // src/monitoring/metrics.service.ts
+    @Injectable()
+    export class MetricsService {
+      private readonly httpRequestDuration: prometheus.Histogram;
+      private readonly httpRequestsTotal: prometheus.Counter;
+      private readonly activeConnections: prometheus.Gauge;
+      private readonly flowExecutions: prometheus.Counter;
+      private readonly flowExecutionDuration: prometheus.Histogram;
+      
+      constructor() {
+        this.httpRequestDuration = new prometheus.Histogram({
+          name: 'http_request_duration_seconds',
+          help: 'Duration of HTTP requests in seconds',
+          labelNames: ['method', 'route', 'status_code'],
+          buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+        });
+        
+        this.httpRequestsTotal = new prometheus.Counter({
+          name: 'http_requests_total',
+          help: 'Total number of HTTP requests',
+          labelNames: ['method', 'route', 'status_code']
+        });
+        
+        this.activeConnections = new prometheus.Gauge({
+          name: 'active_connections',
+          help: 'Number of active connections'
+        });
+        
+        this.flowExecutions = new prometheus.Counter({
+          name: 'flow_executions_total',
+          help: 'Total number of flow executions',
+          labelNames: ['flow_id', 'status', 'organization_id']
+        });
+        
+        this.flowExecutionDuration = new prometheus.Histogram({
+          name: 'flow_execution_duration_seconds',
+          help: 'Duration of flow executions in seconds',
+          labelNames: ['flow_id', 'status'],
+          buckets: [1, 5, 10, 30, 60, 120, 300, 600, 1800, 3600]
+        });
+      }
+      
+      recordHttpRequest(method: string, route: string, statusCode: number, duration: number) {
+        this.httpRequestsTotal.inc({ method, route, status_code: statusCode.toString() });
+        this.httpRequestDuration.observe(
+          { method, route, status_code: statusCode.toString() },
+          duration / 1000
+        );
+      }
+      
+      recordFlowExecution(flowId: string, status: string, duration: number, orgId: string) {
+        this.flowExecutions.inc({ flow_id: flowId, status, organization_id: orgId });
+        this.flowExecutionDuration.observe(
+          { flow_id: flowId, status },
+          duration / 1000
+        );
+      }
+      
+      setActiveConnections(count: number) {
+        this.activeConnections.set(count);
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Alert Rules">
+    **Prometheus Alert Rules**
+    ```yaml
+    # monitoring/alerts/api-alerts.yml
+    groups:
+      - name: tolstoy-api
+        rules:
+          - alert: HighErrorRate
+            expr: |
+              (
+                rate(http_requests_total{status_code=~"5.."}[5m]) /
+                rate(http_requests_total[5m])
+              ) > 0.05
+            for: 5m
+            labels:
+              severity: critical
+              service: tolstoy-api
+            annotations:
+              summary: "High error rate detected"
+              description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+              
+          - alert: HighResponseTime
+            expr: |
+              histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+            for: 5m
+            labels:
+              severity: warning
+              service: tolstoy-api
+            annotations:
+              summary: "High response time detected"
+              description: "95th percentile response time is {{ $value }}s"
+              
+          - alert: FlowExecutionFailureSpike
+            expr: |
+              (
+                rate(flow_executions_total{status="failed"}[5m]) /
+                rate(flow_executions_total[5m])
+              ) > 0.1
+            for: 2m
+            labels:
+              severity: warning
+              service: tolstoy-execution
+            annotations:
+              summary: "Flow execution failure spike"
+              description: "Flow failure rate is {{ $value | humanizePercentage }}"
+              
+          - alert: DatabaseConnectionsHigh
+            expr: |
+              active_connections > 80
+            for: 5m
+            labels:
+              severity: warning
+              service: tolstoy-api
+            annotations:
+              summary: "High database connection count"
+              description: "Active connections: {{ $value }}"
+              
+          - alert: ServiceDown
+            expr: up == 0
+            for: 1m
+            labels:
+              severity: critical
+              service: tolstoy-api
+            annotations:
+              summary: "Service is down"
+              description: "{{ $labels.instance }} has been down for more than 1 minute"
+    ```
+  </Tab>
+  
+  <Tab title="Grafana Dashboards">
+    **API Performance Dashboard**
+    ```json
+    {
+      "dashboard": {
+        "title": "Tolstoy API Performance",
+        "panels": [
+          {
+            "title": "Request Rate",
+            "type": "stat",
+            "targets": [
+              {
+                "expr": "sum(rate(http_requests_total[5m]))",
+                "legendFormat": "Requests/sec"
+              }
+            ]
+          },
+          {
+            "title": "Response Time",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "histogram_quantile(0.50, rate(http_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "50th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "95th percentile"
+              },
+              {
+                "expr": "histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))",
+                "legendFormat": "99th percentile"
+              }
+            ]
+          },
+          {
+            "title": "Error Rate by Endpoint",
+            "type": "heatmap",
+            "targets": [
+              {
+                "expr": "rate(http_requests_total{status_code=~\"5..\"}[5m]) by (route)",
+                "legendFormat": "{{ route }}"
+              }
+            ]
+          },
+          {
+            "title": "Flow Execution Metrics",
+            "type": "graph",
+            "targets": [
+              {
+                "expr": "rate(flow_executions_total{status=\"completed\"}[5m])",
+                "legendFormat": "Completed"
+              },
+              {
+                "expr": "rate(flow_executions_total{status=\"failed\"}[5m])",
+                "legendFormat": "Failed"
+              }
+            ]
+          }
+        ]
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### **Incident Response**
+
+<Tabs>
+  <Tab title="Runbooks">
+    **High Error Rate Runbook**
+    ```markdown
+    # High Error Rate Incident Response
+    
+    ## Symptoms
+    - Error rate > 5% for 5+ minutes
+    - Customer reports of failed requests
+    - Increased error logs in monitoring
+    
+    ## Immediate Actions (First 10 minutes)
+    
+    1. **Check Service Status**
+       ```bash
+       kubectl get pods -n tolstoy-production
+       kubectl describe deployment tolstoy-api -n tolstoy-production
+       ```
+    
+    2. **Review Recent Changes**
+       - Check recent deployments
+       - Review configuration changes
+       - Check for database migrations
+    
+    3. **Analyze Error Logs**
+       ```bash
+       kubectl logs -l app=tolstoy-api -n tolstoy-production --tail=100
+       ```
+    
+    4. **Check Dependencies**
+       - Database connectivity
+       - Redis availability
+       - External service status
+    
+    ## Investigation Steps
+    
+    1. **Database Issues**
+       - Check connection pool saturation
+       - Look for slow queries
+       - Verify migration status
+    
+    2. **External Service Issues**
+       - Check third-party service status
+       - Verify API key validity
+       - Review rate limiting
+    
+    3. **Resource Issues**
+       - CPU/Memory utilization
+       - Network connectivity
+       - Disk space
+    
+    ## Escalation
+    
+    - **5 minutes**: Page on-call engineer
+    - **15 minutes**: Escalate to team lead
+    - **30 minutes**: Escalate to engineering manager
+    
+    ## Recovery Actions
+    
+    1. **Immediate Relief**
+       - Scale up pods if resource constrained
+       - Restart unhealthy pods
+       - Enable circuit breakers
+    
+    2. **Rollback** (if deployment related)
+       ```bash
+       kubectl rollout undo deployment/tolstoy-api -n tolstoy-production
+       ```
+    
+    3. **Database Recovery**
+       - Restart problematic connections
+       - Kill long-running queries
+       - Failover to read replica if needed
+    
+    ## Post-Incident
+    
+    1. Document timeline and actions taken
+    2. Schedule post-mortem meeting
+    3. Update runbook with lessons learned
+    4. Implement preventive measures
+    ```
+  </Tab>
+  
+  <Tab title="On-Call Procedures">
+    **On-Call Rotation**
+    ```yaml
+    # .pagerduty/schedules.yml
+    schedules:
+      - name: "Tolstoy Engineering Primary"
+        timezone: "UTC"
+        layers:
+          - name: "Weekly Rotation"
+            start: "2024-01-01T00:00:00"
+            rotation_virtual_start: "2024-01-01T00:00:00"
+            rotation_type: "weekly"
+            users:
+              - alice@company.com
+              - bob@company.com
+              - charlie@company.com
+            restrictions:
+              - type: "daily_restriction"
+                start_time_of_day: "09:00:00"
+                duration: "PT8H"
+                start_day_of_week: 1
+                
+      - name: "Tolstoy Engineering Backup"
+        timezone: "UTC"
+        layers:
+          - name: "Weekly Backup"
+            start: "2024-01-01T00:00:00"
+            rotation_virtual_start: "2024-01-01T00:00:00"
+            rotation_type: "weekly"
+            users:
+              - david@company.com
+              - eve@company.com
+            
+    escalation_policies:
+      - name: "Tolstoy Engineering"
+        rules:
+          - escalation_delay_in_minutes: 0
+            targets:
+              - type: "schedule_reference"
+                id: "primary_schedule"
+          - escalation_delay_in_minutes: 15
+            targets:
+              - type: "schedule_reference"
+                id: "backup_schedule"
+          - escalation_delay_in_minutes: 30
+            targets:
+              - type: "user_reference"
+                id: "engineering_manager"
+    ```
+  </Tab>
+  
+  <Tab title="Communication Templates">
+    **Incident Communication**
+    ```typescript
+    // tools/incident-comms.ts
+    export class IncidentCommunication {
+      static readonly templates = {
+        initial: `
+    🚨 **INCIDENT DETECTED** 🚨
+    
+    **Service**: Tolstoy API
+    **Severity**: {severity}
+    **Started**: {start_time}
+    **Status**: Investigating
+    
+    **Impact**: {impact_description}
+    
+    **Actions Taken**:
+    - On-call engineer paged
+    - Investigation started
+    
+    **Next Update**: In 15 minutes
+    
+    Incident Commander: {commander}
+    `,
+        
+        update: `
+    📋 **INCIDENT UPDATE** 
+    
+    **Status**: {status}
+    **Duration**: {duration}
+    
+    **Progress**:
+    {progress_details}
+    
+    **Next Steps**:
+    {next_steps}
+    
+    **Next Update**: {next_update_time}
+    `,
+        
+        resolved: `
+    ✅ **INCIDENT RESOLVED**
+    
+    **Duration**: {total_duration}
+    **Root Cause**: {root_cause}
+    
+    **Resolution**:
+    {resolution_details}
+    
+    **Follow-up Actions**:
+    {follow_up_actions}
+    
+    Post-mortem scheduled for: {postmortem_date}
+    `
+      };
+      
+      static async notifySlack(template: string, variables: Record<string, any>) {
+        const message = this.interpolate(template, variables);
+        // Send to Slack incident channel
+        await slackClient.chat.postMessage({
+          channel: '#incidents',
+          text: message,
+          username: 'Incident Bot'
+        });
+      }
+      
+      static async notifyStatusPage(incident: IncidentDetails) {
+        // Update status page
+        await statusPageClient.incidents.create({
+          name: incident.title,
+          status: incident.status,
+          impact: incident.impact,
+          components: incident.affected_components,
+          body: incident.description
+        });
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Security Architecture
+
+### **Authentication & Authorization**
+
+<CodeGroup>
+```typescript JWT Token Service
+// src/auth/jwt.service.ts
+@Injectable()
+export class JwtService {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly cacheService: CacheService,
+    private readonly auditLogger: AuditLogger
+  ) {}
+
+  async generateTokens(user: User): Promise<TokenPair> {
+    const payload = {
+      sub: user.id,
+      email: user.email,
+      org: user.organization_id,
+      role: user.role,
+      permissions: user.permissions,
+      iat: Math.floor(Date.now() / 1000),
+      jti: randomUUID()
+    };
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.signToken(payload, { expiresIn: '15m' }),
+      this.signToken(
+        { ...payload, type: 'refresh' },
+        { expiresIn: '7d' }
+      )
+    ]);
+
+    // Store refresh token in cache
+    await this.cacheService.set(
+      `refresh_token:${payload.jti}`,
+      refreshToken,
+      60 * 60 * 24 * 7 // 7 days
+    );
+
+    this.auditLogger.log('token_generated', {
+      user_id: user.id,
+      organization_id: user.organization_id,
+      token_id: payload.jti
+    });
+
+    return { accessToken, refreshToken };
+  }
+
+  async validateToken(token: string): Promise<JwtPayload | null> {
+    try {
+      const payload = jwt.verify(token, this.getSecret()) as JwtPayload;
+      
+      // Check if token is revoked
+      const isRevoked = await this.cacheService.get(`revoked_token:${payload.jti}`);
+      if (isRevoked) {
+        throw new Error('Token revoked');
+      }
+
+      return payload;
+    } catch (error) {
+      this.auditLogger.log('token_validation_failed', {
+        error: error.message,
+        token_hash: createHash('sha256').update(token).digest('hex').substring(0, 16)
+      });
+      return null;
+    }
+  }
+
+  async revokeToken(tokenId: string): Promise<void> {
+    await this.cacheService.set(
+      `revoked_token:${tokenId}`,
+      true,
+      60 * 60 * 24 * 7 // Same as max token lifetime
+    );
+
+    this.auditLogger.log('token_revoked', { token_id: tokenId });
+  }
+
+  private getSecret(): string {
+    return this.configService.get<string>('JWT_SECRET');
+  }
+
+  private async signToken(payload: any, options: any): Promise<string> {
+    return jwt.sign(payload, this.getSecret(), {
+      issuer: 'tolstoy-api',
+      audience: 'tolstoy-platform',
+      algorithm: 'HS256',
+      ...options
+    });
+  }
+}
+```
+
+```typescript Permission System
+// src/auth/permissions.service.ts
+@Injectable()
+export class PermissionsService {
+  private readonly permissionHierarchy = {
+    'org:admin': ['org:*'],
+    'org:*': [
+      'users:*', 'flows:*', 'actions:*', 
+      'tools:*', 'webhooks:*', 'executions:*'
+    ],
+    'flows:*': ['flows:create', 'flows:read', 'flows:update', 'flows:delete', 'flows:execute'],
+    'users:*': ['users:create', 'users:read', 'users:update', 'users:delete'],
+    'tools:*': ['tools:create', 'tools:read', 'tools:update', 'tools:delete', 'tools:configure']
+  };
+
+  async checkPermission(
+    user: User,
+    requiredPermission: string,
+    resourceContext?: ResourceContext
+  ): Promise<boolean> {
+    // Super admin can do everything
+    if (user.role === 'super_admin') {
+      return true;
+    }
+
+    // Check organization context
+    if (resourceContext?.organizationId && resourceContext.organizationId !== user.organization_id) {
+      return false;
+    }
+
+    // Check direct permissions
+    if (user.permissions.includes(requiredPermission)) {
+      return true;
+    }
+
+    // Check expanded permissions
+    const expandedPermissions = this.expandPermissions(user.permissions);
+    if (expandedPermissions.includes(requiredPermission)) {
+      return true;
+    }
+
+    // Check resource-specific permissions
+    if (resourceContext) {
+      return this.checkResourcePermission(user, requiredPermission, resourceContext);
+    }
+
+    return false;
+  }
+
+  private expandPermissions(permissions: string[]): string[] {
+    const expanded = new Set<string>();
+    
+    for (const permission of permissions) {
+      expanded.add(permission);
+      
+      // Add hierarchical permissions
+      const childPermissions = this.permissionHierarchy[permission] || [];
+      for (const child of childPermissions) {
+        if (child.endsWith(':*')) {
+          // Recursively expand wildcard permissions
+          expanded.add(...this.expandPermissions([child]));
+        } else {
+          expanded.add(child);
+        }
+      }
+    }
+    
+    return Array.from(expanded);
+  }
+
+  private async checkResourcePermission(
+    user: User,
+    permission: string,
+    context: ResourceContext
+  ): Promise<boolean> {
+    // Check if user is resource owner
+    if (context.ownerId === user.id) {
+      const ownerPermissions = ['read', 'update'];
+      const [, action] = permission.split(':');
+      return ownerPermissions.includes(action);
+    }
+
+    // Check team-based permissions
+    if (context.teamId) {
+      const userTeams = await this.getUserTeams(user.id);
+      return userTeams.includes(context.teamId);
+    }
+
+    return false;
+  }
+}
+```
+</CodeGroup>
+
+### **Data Encryption & Secrets Management**
+
+<CodeGroup>
+```typescript Secrets Service
+// src/security/secrets.service.ts
+@Injectable()
+export class SecretsService {
+  constructor(
+    private readonly awsSecretsManager: SecretsManagerClient,
+    private readonly cacheService: CacheService,
+    private readonly encryptionService: EncryptionService,
+    private readonly auditLogger: AuditLogger
+  ) {}
+
+  async getSecret(organizationId: string, key: string): Promise<string> {
+    const cacheKey = `secret:${organizationId}:${key}`;
+    
+    // Try cache first
+    const cachedSecret = await this.cacheService.get(cacheKey);
+    if (cachedSecret) {
+      return this.encryptionService.decrypt(cachedSecret);
+    }
+
+    try {
+      // Fetch from AWS Secrets Manager
+      const secretName = `tolstoy/${organizationId}/${key}`;
+      const response = await this.awsSecretsManager.getSecretValue({
+        SecretId: secretName
+      });
+
+      if (!response.SecretString) {
+        throw new SecretNotFoundError(`Secret ${key} not found`);
+      }
+
+      const secretValue = response.SecretString;
+      
+      // Cache encrypted version
+      const encryptedValue = this.encryptionService.encrypt(secretValue);
+      await this.cacheService.set(cacheKey, encryptedValue, 300); // 5 minutes
+
+      this.auditLogger.log('secret_accessed', {
+        organization_id: organizationId,
+        secret_key: key,
+        accessed_by: 'system'
+      });
+
+      return secretValue;
+    } catch (error) {
+      this.auditLogger.log('secret_access_failed', {
+        organization_id: organizationId,
+        secret_key: key,
+        error: error.message
+      });
+      throw error;
+    }
+  }
+
+  async setSecret(
+    organizationId: string,
+    key: string,
+    value: string,
+    userId: string
+  ): Promise<void> {
+    const secretName = `tolstoy/${organizationId}/${key}`;
+    
+    try {
+      await this.awsSecretsManager.createSecret({
+        Name: secretName,
+        SecretString: value,
+        Description: `Tolstoy secret for organization ${organizationId}`,
+        Tags: [
+          { Key: 'Organization', Value: organizationId },
+          { Key: 'ManagedBy', Value: 'Tolstoy' }
+        ]
+      });
+
+      // Invalidate cache
+      await this.cacheService.delete(`secret:${organizationId}:${key}`);
+
+      this.auditLogger.log('secret_created', {
+        organization_id: organizationId,
+        secret_key: key,
+        created_by: userId
+      });
+    } catch (error) {
+      if (error.name === 'ResourceExistsException') {
+        // Update existing secret
+        await this.updateSecret(organizationId, key, value, userId);
+      } else {
+        throw error;
+      }
+    }
+  }
+
+  async rotateSecret(
+    organizationId: string,
+    key: string,
+    userId: string
+  ): Promise<void> {
+    // Generate new secret value based on type
+    const newValue = await this.generateSecretValue(key);
+    await this.setSecret(organizationId, key, newValue, userId);
+
+    this.auditLogger.log('secret_rotated', {
+      organization_id: organizationId,
+      secret_key: key,
+      rotated_by: userId
+    });
+  }
+
+  private async generateSecretValue(key: string): Promise<string> {
+    if (key.includes('api_key')) {
+      return `sk_${randomBytes(32).toString('hex')}`;
+    } else if (key.includes('webhook_secret')) {
+      return randomBytes(64).toString('hex');
+    } else {
+      return randomBytes(32).toString('base64');
+    }
+  }
+}
+```
+
+```typescript Encryption Service
+// src/security/encryption.service.ts
+@Injectable()
+export class EncryptionService {
+  private readonly algorithm = 'aes-256-gcm';
+  private readonly keyLength = 32;
+  private readonly ivLength = 16;
+  private readonly tagLength = 16;
+
+  constructor(
+    private readonly configService: ConfigService
+  ) {}
+
+  encrypt(plaintext: string): EncryptedData {
+    const key = this.getEncryptionKey();
+    const iv = randomBytes(this.ivLength);
+    
+    const cipher = createCipher(this.algorithm, key);
+    cipher.setAAD(Buffer.from('tolstoy-encryption'));
+    
+    let encrypted = cipher.update(plaintext, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    
+    const tag = cipher.getAuthTag();
+    
+    return {
+      encrypted,
+      iv: iv.toString('hex'),
+      tag: tag.toString('hex'),
+      algorithm: this.algorithm
+    };
+  }
+
+  decrypt(encryptedData: EncryptedData): string {
+    const key = this.getEncryptionKey();
+    const iv = Buffer.from(encryptedData.iv, 'hex');
+    const tag = Buffer.from(encryptedData.tag, 'hex');
+    
+    const decipher = createDecipher(this.algorithm, key);
+    decipher.setAAD(Buffer.from('tolstoy-encryption'));
+    decipher.setAuthTag(tag);
+    
+    let decrypted = decipher.update(encryptedData.encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  }
+
+  hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, 12);
+  }
+
+  verifyPassword(password: string, hash: string): Promise<boolean> {
+    return bcrypt.compare(password, hash);
+  }
+
+  private getEncryptionKey(): Buffer {
+    const key = this.configService.get<string>('ENCRYPTION_KEY');
+    if (!key) {
+      throw new Error('Encryption key not configured');
+    }
+    return Buffer.from(key, 'base64');
+  }
+}
+```
+</CodeGroup>
+
+## Performance Optimization
+
+### **Database Optimization**
+
+<CodeGroup>
+```typescript Database Connection Pool
+// src/database/database.service.ts
+@Injectable()
+export class DatabaseService {
+  private readonly pool: Pool;
+  private readonly readReplicas: Pool[];
+
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly metricsService: MetricsService
+  ) {
+    this.pool = this.createConnectionPool('primary');
+    this.readReplicas = this.createReadReplicaPools();
+  }
+
+  private createConnectionPool(type: 'primary' | 'replica'): Pool {
+    const config = this.configService.get(`database.${type}`);
+    
+    return new Pool({
+      host: config.host,
+      port: config.port,
+      user: config.username,
+      password: config.password,
+      database: config.database,
+      min: config.minConnections || 5,
+      max: config.maxConnections || 20,
+      idleTimeoutMillis: config.idleTimeout || 30000,
+      connectionTimeoutMillis: config.connectionTimeout || 10000,
+      allowExitOnIdle: false
+    });
+  }
+
+  async query(text: string, params?: any[]): Promise<QueryResult> {
+    const startTime = Date.now();
+    let client: PoolClient;
+    
+    try {
+      client = await this.pool.connect();
+      const result = await client.query(text, params);
+      
+      this.metricsService.recordDuration(
+        'database_query_duration',
+        Date.now() - startTime,
+        { operation: 'write' }
+      );
+      
+      return result;
+    } catch (error) {
+      this.metricsService.incrementCounter('database_errors', {
+        error_type: error.code || 'unknown'
+      });
+      throw error;
+    } finally {
+      if (client!) client.release();
+    }
+  }
+
+  async queryRead(text: string, params?: any[]): Promise<QueryResult> {
+    const replica = this.selectReadReplica();
+    const startTime = Date.now();
+    let client: PoolClient;
+    
+    try {
+      client = await replica.connect();
+      const result = await client.query(text, params);
+      
+      this.metricsService.recordDuration(
+        'database_query_duration',
+        Date.now() - startTime,
+        { operation: 'read' }
+      );
+      
+      return result;
+    } catch (error) {
+      // Fallback to primary if replica fails
+      return this.query(text, params);
+    } finally {
+      if (client!) client.release();
+    }
+  }
+
+  private selectReadReplica(): Pool {
+    // Simple round-robin selection
+    const index = Math.floor(Math.random() * this.readReplicas.length);
+    return this.readReplicas[index];
+  }
+}
+```
+
+```sql Database Indexing Strategy
+-- Core indexes for performance
+-- src/database/migrations/001_add_performance_indexes.sql
+
+-- Flow queries
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_flows_org_status_created 
+ON flows (organization_id, status, created_at DESC);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_flows_name_search 
+ON flows USING gin(to_tsvector('english', name || ' ' || description));
+
+-- Execution queries  
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_executions_flow_status_started
+ON executions (flow_id, status, started_at DESC);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_executions_org_started
+ON executions (organization_id, started_at DESC);
+
+-- User queries
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_org_role_status
+ON users (organization_id, role, status);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_email_lower
+ON users (lower(email));
+
+-- Tool queries
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tools_org_type_status
+ON tools (organization_id, type, status);
+
+-- Webhook queries
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_webhooks_org_events
+ON webhooks (organization_id) WHERE events IS NOT NULL;
+
+-- Audit log queries (partitioned by date)
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_logs_org_action_timestamp
+ON audit_logs (organization_id, action, timestamp DESC);
+
+-- Composite indexes for complex queries
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_executions_complex_query
+ON executions (organization_id, flow_id, status, started_at DESC)
+WHERE status IN ('running', 'completed', 'failed');
+
+-- Partial indexes for active resources
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_flows_active
+ON flows (organization_id, updated_at DESC)
+WHERE status = 'active';
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_tools_connected
+ON tools (organization_id, last_health_check DESC)
+WHERE status = 'connected';
+```
+
+```typescript Query Optimization
+// src/flows/flows.repository.ts
+@Injectable()
+export class FlowsRepository {
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly cacheService: CacheService
+  ) {}
+
+  async findFlows(
+    organizationId: string,
+    filters: FlowFilters,
+    pagination: PaginationParams
+  ): Promise<PaginatedResult<Flow>> {
+    const cacheKey = this.buildCacheKey(organizationId, filters, pagination);
+    
+    // Try cache first for read-heavy operations
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached && filters.includeCache !== false) {
+      return cached;
+    }
+
+    const queryBuilder = new QueryBuilder()
+      .select('f.*, COUNT(*) OVER() as total_count')
+      .from('flows f')
+      .where('f.organization_id = $1', organizationId);
+
+    let paramIndex = 2;
+
+    // Dynamic filtering with indexed columns first
+    if (filters.status) {
+      queryBuilder.and(`f.status = $${paramIndex}`, filters.status);
+      paramIndex++;
+    }
+
+    if (filters.tags?.length) {
+      queryBuilder.and(`f.tags && $${paramIndex}::text[]`, filters.tags);
+      paramIndex++;
+    }
+
+    if (filters.search) {
+      // Use full-text search index
+      queryBuilder.and(
+        `to_tsvector('english', f.name || ' ' || f.description) @@ plainto_tsquery('english', $${paramIndex})`,
+        filters.search
+      );
+      paramIndex++;
+    }
+
+    if (filters.createdAfter) {
+      queryBuilder.and(`f.created_at >= $${paramIndex}`, filters.createdAfter);
+      paramIndex++;
+    }
+
+    // Optimized sorting
+    const sortColumn = filters.sortBy || 'created_at';
+    const sortDirection = filters.sortOrder || 'DESC';
+    queryBuilder.orderBy(`f.${sortColumn} ${sortDirection}`);
+
+    // Efficient pagination
+    queryBuilder
+      .limit(pagination.limit)
+      .offset(pagination.offset);
+
+    const query = queryBuilder.build();
+    const result = await this.databaseService.queryRead(query.sql, query.params);
+
+    const flows = result.rows.map(row => this.mapRowToFlow(row));
+    const totalCount = result.rows[0]?.total_count || 0;
+
+    const paginatedResult = {
+      data: flows,
+      pagination: {
+        offset: pagination.offset,
+        limit: pagination.limit,
+        total: parseInt(totalCount),
+        hasMore: pagination.offset + flows.length < totalCount
+      }
+    };
+
+    // Cache for 5 minutes
+    await this.cacheService.set(cacheKey, paginatedResult, 300);
+
+    return paginatedResult;
+  }
+
+  async getFlowWithExecutionStats(
+    flowId: string,
+    organizationId: string
+  ): Promise<FlowWithStats> {
+    // Use a single query to get flow and stats
+    const query = `
+      SELECT 
+        f.*,
+        COALESCE(stats.total_executions, 0) as total_executions,
+        COALESCE(stats.successful_executions, 0) as successful_executions,
+        COALESCE(stats.failed_executions, 0) as failed_executions,
+        COALESCE(stats.avg_duration, 0) as avg_duration
+      FROM flows f
+      LEFT JOIN (
+        SELECT 
+          flow_id,
+          COUNT(*) as total_executions,
+          COUNT(*) FILTER (WHERE status = 'completed') as successful_executions,
+          COUNT(*) FILTER (WHERE status = 'failed') as failed_executions,
+          AVG(EXTRACT(EPOCH FROM (completed_at - started_at))) as avg_duration
+        FROM executions
+        WHERE flow_id = $1 AND started_at >= NOW() - INTERVAL '30 days'
+        GROUP BY flow_id
+      ) stats ON f.id = stats.flow_id
+      WHERE f.id = $1 AND f.organization_id = $2
+    `;
+
+    const result = await this.databaseService.queryRead(query, [flowId, organizationId]);
+    
+    if (result.rows.length === 0) {
+      throw new FlowNotFoundError(`Flow ${flowId} not found`);
+    }
+
+    return this.mapRowToFlowWithStats(result.rows[0]);
+  }
+}
+```
+</CodeGroup>
+
+### **Caching Strategy**
+
+<CodeGroup>
+```typescript Multi-Level Cache
+// src/cache/cache.service.ts
+@Injectable()
+export class CacheService {
+  private readonly memoryCache: LRUCache<string, any>;
+  private readonly redisClient: Redis;
+
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly metricsService: MetricsService
+  ) {
+    // L1 Cache - In-memory LRU cache
+    this.memoryCache = new LRUCache({
+      max: this.configService.get('cache.memory.maxItems', 1000),
+      ttl: this.configService.get('cache.memory.ttl', 60000), // 1 minute
+      updateAgeOnGet: true,
+      allowStale: false
+    });
+
+    // L2 Cache - Redis distributed cache
+    this.redisClient = new Redis({
+      host: this.configService.get('redis.host'),
+      port: this.configService.get('redis.port'),
+      password: this.configService.get('redis.password'),
+      keyPrefix: this.configService.get('redis.keyPrefix', 'tolstoy:'),
+      retryDelayOnFailover: 100,
+      maxRetriesPerRequest: 3,
+      lazyConnect: true
+    });
+  }
+
+  async get<T>(key: string): Promise<T | null> {
+    const startTime = Date.now();
+    
+    try {
+      // Try L1 cache first
+      const memoryValue = this.memoryCache.get(key);
+      if (memoryValue !== undefined) {
+        this.metricsService.incrementCounter('cache_hit', { level: 'memory' });
+        return memoryValue;
+      }
+
+      // Try L2 cache (Redis)
+      const redisValue = await this.redisClient.get(key);
+      if (redisValue !== null) {
+        const parsed = JSON.parse(redisValue);
+        
+        // Populate L1 cache for next access
+        this.memoryCache.set(key, parsed);
+        
+        this.metricsService.incrementCounter('cache_hit', { level: 'redis' });
+        return parsed;
+      }
+
+      this.metricsService.incrementCounter('cache_miss');
+      return null;
+      
+    } catch (error) {
+      this.metricsService.incrementCounter('cache_error', {
+        operation: 'get',
+        error_type: error.constructor.name
+      });
+      return null;
+    } finally {
+      this.metricsService.recordDuration(
+        'cache_operation_duration',
+        Date.now() - startTime,
+        { operation: 'get' }
+      );
+    }
+  }
+
+  async set<T>(key: string, value: T, ttlSeconds?: number): Promise<void> {
+    const startTime = Date.now();
+    
+    try {
+      // Set in L1 cache
+      this.memoryCache.set(key, value);
+
+      // Set in L2 cache (Redis)
+      const serialized = JSON.stringify(value);
+      if (ttlSeconds) {
+        await this.redisClient.setex(key, ttlSeconds, serialized);
+      } else {
+        await this.redisClient.set(key, serialized);
+      }
+
+      this.metricsService.incrementCounter('cache_set');
+      
+    } catch (error) {
+      this.metricsService.incrementCounter('cache_error', {
+        operation: 'set',
+        error_type: error.constructor.name
+      });
+      throw error;
+    } finally {
+      this.metricsService.recordDuration(
+        'cache_operation_duration',
+        Date.now() - startTime,
+        { operation: 'set' }
+      );
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    try {
+      // Remove from both caches
+      this.memoryCache.delete(key);
+      await this.redisClient.del(key);
+      
+      this.metricsService.incrementCounter('cache_delete');
+    } catch (error) {
+      this.metricsService.incrementCounter('cache_error', {
+        operation: 'delete',
+        error_type: error.constructor.name
+      });
+      throw error;
+    }
+  }
+
+  async mget<T>(keys: string[]): Promise<(T | null)[]> {
+    if (keys.length === 0) return [];
+
+    const results = new Array(keys.length).fill(null);
+    const redisKeys: string[] = [];
+    const redisIndexes: number[] = [];
+
+    // Check L1 cache for all keys
+    keys.forEach((key, index) => {
+      const memoryValue = this.memoryCache.get(key);
+      if (memoryValue !== undefined) {
+        results[index] = memoryValue;
+        this.metricsService.incrementCounter('cache_hit', { level: 'memory' });
+      } else {
+        redisKeys.push(key);
+        redisIndexes.push(index);
+      }
+    });
+
+    // Fetch missing keys from Redis
+    if (redisKeys.length > 0) {
+      try {
+        const redisValues = await this.redisClient.mget(...redisKeys);
+        
+        redisValues.forEach((value, redisIndex) => {
+          const originalIndex = redisIndexes[redisIndex];
+          const key = keys[originalIndex];
+          
+          if (value !== null) {
+            const parsed = JSON.parse(value);
+            results[originalIndex] = parsed;
+            
+            // Populate L1 cache
+            this.memoryCache.set(key, parsed);
+            
+            this.metricsService.incrementCounter('cache_hit', { level: 'redis' });
+          } else {
+            this.metricsService.incrementCounter('cache_miss');
+          }
+        });
+      } catch (error) {
+        this.metricsService.incrementCounter('cache_error', {
+          operation: 'mget',
+          error_type: error.constructor.name
+        });
+      }
+    }
+
+    return results;
+  }
+}
+```
+
+```typescript Cache Patterns
+// src/flows/flows.service.ts
+@Injectable()
+export class FlowsService {
+  constructor(
+    private readonly flowsRepository: FlowsRepository,
+    private readonly cacheService: CacheService
+  ) {}
+
+  @Cacheable('flow', { ttl: 300 }) // 5 minutes
+  async getFlow(flowId: string, organizationId: string): Promise<Flow> {
+    return this.flowsRepository.findById(flowId, organizationId);
+  }
+
+  @CacheEvict(['flow', 'flows_list'])
+  async updateFlow(
+    flowId: string,
+    organizationId: string,
+    updates: Partial<Flow>
+  ): Promise<Flow> {
+    const updatedFlow = await this.flowsRepository.update(flowId, organizationId, updates);
+    
+    // Warm cache with updated data
+    const cacheKey = this.buildFlowCacheKey(flowId, organizationId);
+    await this.cacheService.set(cacheKey, updatedFlow, 300);
+    
+    return updatedFlow;
+  }
+
+  async getFlowsWithCache(
+    organizationId: string,
+    filters: FlowFilters
+  ): Promise<Flow[]> {
+    // Use write-through pattern for frequently accessed data
+    const cacheKey = `flows_list:${organizationId}:${hashObject(filters)}`;
+    
+    let flows = await this.cacheService.get<Flow[]>(cacheKey);
+    if (flows === null) {
+      flows = await this.flowsRepository.findFlows(organizationId, filters);
+      await this.cacheService.set(cacheKey, flows, 180); // 3 minutes
+    }
+    
+    return flows;
+  }
+
+  private buildFlowCacheKey(flowId: string, organizationId: string): string {
+    return `flow:${organizationId}:${flowId}`;
+  }
+}
+```
+
+```typescript Cache Decorators
+// src/common/decorators/cache.decorator.ts
+export function Cacheable(
+  keyPrefix: string,
+  options: CacheOptions = {}
+): MethodDecorator {
+  return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value;
+    
+    descriptor.value = async function (...args: any[]) {
+      const cacheService = this.cacheService as CacheService;
+      
+      // Build cache key from method arguments
+      const cacheKey = buildCacheKey(keyPrefix, args, options.keyBuilder);
+      
+      // Try to get from cache
+      let result = await cacheService.get(cacheKey);
+      if (result !== null) {
+        return result;
+      }
+      
+      // Execute original method
+      result = await originalMethod.apply(this, args);
+      
+      // Cache the result
+      if (result !== null && result !== undefined) {
+        await cacheService.set(cacheKey, result, options.ttl);
+      }
+      
+      return result;
+    };
+    
+    return descriptor;
+  };
+}
+
+export function CacheEvict(keyPatterns: string[]): MethodDecorator {
+  return function (target: any, propertyName: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value;
+    
+    descriptor.value = async function (...args: any[]) {
+      const result = await originalMethod.apply(this, args);
+      
+      const cacheService = this.cacheService as CacheService;
+      
+      // Invalidate cache patterns
+      for (const pattern of keyPatterns) {
+        const keys = await cacheService.getKeysByPattern(pattern);
+        if (keys.length > 0) {
+          await Promise.all(keys.map(key => cacheService.delete(key)));
+        }
+      }
+      
+      return result;
+    };
+    
+    return descriptor;
+  };
+}
+```
+</CodeGroup>
+
+## Team Resources & Next Steps
+
+### **Onboarding Checklist**
+
+<Steps>
+  <Step title="Account Setup">
+    - [ ] Create GitHub account and request access to repositories
+    - [ ] Set up development environment (Node.js, Docker, etc.)
+    - [ ] Install and configure required tools (VSCode, Postman, etc.)
+    - [ ] Get AWS access for development resources
+  </Step>
+  <Step title="Code Access">
+    - [ ] Clone main repositories
+    - [ ] Set up local development environment
+    - [ ] Run test suite successfully
+    - [ ] Complete first local deployment
+  </Step>
+  <Step title="Architecture Understanding">
+    - [ ] Review system architecture documentation
+    - [ ] Understand data flow and service interactions
+    - [ ] Learn about security and compliance requirements
+    - [ ] Study monitoring and observability setup
+  </Step>
+  <Step title="First Contribution">
+    - [ ] Complete onboarding exercises
+    - [ ] Fix a "good first issue"
+    - [ ] Submit first pull request
+    - [ ] Participate in code review process
+  </Step>
+</Steps>
+
+### **Key Documentation Sections**
+
+<CardGroup cols={2}>
+  <Card title="Service Architecture" icon="sitemap" href="/internal/architecture/services">
+    Detailed documentation of each microservice, their responsibilities, and interactions
+  </Card>
+  <Card title="Development Guide" icon="code" href="/internal/development/setup">
+    Complete development environment setup and workflow guidelines
+  </Card>
+  <Card title="Deployment Procedures" icon="rocket" href="/internal/operations/deployment">
+    Step-by-step deployment processes and troubleshooting guides
+  </Card>
+  <Card title="Monitoring & Observability" icon="chart-line" href="/internal/operations/monitoring-observability">
+    Comprehensive monitoring setup, metrics, and alerting configurations
+  </Card>
+</CardGroup>
+
+### **Engineering Contacts**
+
+**Team Structure:**
+- **Engineering Manager:** [manager@company.com](mailto:manager@company.com)
+- **Tech Lead:** [techlead@company.com](mailto:techlead@company.com)
+- **Senior Engineers:** [senior1@company.com](mailto:senior1@company.com), [senior2@company.com](mailto:senior2@company.com)
+- **DevOps Lead:** [devops@company.com](mailto:devops@company.com)
+- **Security Engineer:** [security@company.com](mailto:security@company.com)
+
+**Communication Channels:**
+- **Slack:** #engineering, #infrastructure, #security
+- **Email Lists:** engineering-team@company.com, oncall@company.com
+- **Wiki:** [wiki.company.com/engineering](https://wiki.company.com/engineering)
+
+### **Additional Resources**
+
+<CardGroup cols={3}>
+  <Card title="Architecture Decision Records" icon="book">
+    Historical decisions and their rationale for understanding system evolution
+  </Card>
+  <Card title="Runbooks & Procedures" icon="list-check">
+    Operational procedures for common tasks and incident response
+  </Card>
+  <Card title="Performance Benchmarks" icon="gauge">
+    Performance baselines and optimization targets for system components
+  </Card>
+</CardGroup>
+
+---
+
+*This internal documentation is maintained by the Engineering Team. For questions or updates, please reach out to [engineering-team@company.com](mailto:engineering-team@company.com) or create an issue in the internal documentation repository.*

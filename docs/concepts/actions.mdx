@@ -1,0 +1,1181 @@
+---
+title: "Actions"
+description: "Reusable workflow components and building blocks in Tolstoy"
+---
+
+# Actions
+
+Actions are the fundamental building blocks of workflows in Tolstoy. They represent individual operations or tasks that can be executed as part of a larger automation flow. Actions are reusable, configurable, and can integrate with external tools and services.
+
+## What are Actions?
+
+Actions encapsulate specific functionality that can be executed within a workflow. Each action defines:
+
+- **Input parameters** - What data the action needs to operate
+- **Output data** - What information the action produces
+- **Configuration** - How the action should behave
+- **Error handling** - How failures should be managed
+- **Dependencies** - What conditions must be met before execution
+
+<CardGroup cols={2}>
+  <Card title="Reusable Components" icon="puzzle-piece">
+    Create once, use across multiple workflows with different configurations
+  </Card>
+  <Card title="Type Safety" icon="shield-check">
+    Strong typing ensures data integrity and prevents runtime errors
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation">
+    Built-in retry policies and error management capabilities
+  </Card>
+  <Card title="Tool Integration" icon="plug">
+    Seamlessly integrate with external services and APIs
+  </Card>
+</CardGroup>
+
+## Action Types
+
+### Built-in Actions
+
+Tolstoy provides a comprehensive library of pre-built actions for common operations:
+
+<Tabs>
+  <Tab title="HTTP & API">
+    **Make HTTP requests and interact with REST APIs**
+    
+    ```typescript
+    {
+      "id": "api-call",
+      "type": "http.request",
+      "name": "Fetch User Data",
+      "config": {
+        "method": "GET",
+        "url": "https://api.example.com/users/{{ context.userId }}",
+        "headers": {
+          "Authorization": "Bearer {{ secrets.API_TOKEN }}",
+          "Content-Type": "application/json"
+        },
+        "timeout": 30000,
+        "retryPolicy": {
+          "maxRetries": 3,
+          "backoffMs": 1000,
+          "retryOn": [408, 429, 500, 502, 503, 504]
+        }
+      }
+    }
+    ```
+    
+    **Available HTTP Actions:**
+    - `http.request` - Generic HTTP requests
+    - `http.get` - GET requests with response parsing
+    - `http.post` - POST requests with body serialization
+    - `http.put` - PUT requests for updates
+    - `http.delete` - DELETE requests
+    - `http.webhook` - Webhook endpoint creation
+  </Tab>
+  
+  <Tab title="Data Processing">
+    **Transform and manipulate data between workflow steps**
+    
+    ```typescript
+    {
+      "id": "transform-data",
+      "type": "data.transform",
+      "name": "Process User Records",
+      "config": {
+        "transformation": {
+          "users": "{{ steps.apiCall.output.data | map(user => ({
+            id: user.id,
+            fullName: user.firstName + ' ' + user.lastName,
+            email: user.email.toLowerCase(),
+            isActive: user.status === 'active',
+            tags: user.tags | filter(tag => tag.startsWith('important'))
+          })) }}"
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "users": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string" },
+                  "fullName": { "type": "string" },
+                  "email": { "type": "string" },
+                  "isActive": { "type": "boolean" },
+                  "tags": { "type": "array" }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    ```
+    
+    **Available Data Actions:**
+    - `data.transform` - JSONata-based data transformation
+    - `data.filter` - Filter arrays and objects
+    - `data.aggregate` - Aggregate and group data
+    - `data.validate` - Schema validation
+    - `data.merge` - Combine multiple data sources
+  </Tab>
+  
+  <Tab title="Control Flow">
+    **Control the execution flow of your workflows**
+    
+    ```typescript
+    {
+      "id": "conditional-branch",
+      "type": "flow.condition",
+      "name": "Check User Status",
+      "config": {
+        "condition": "{{ steps.fetchUser.output.status === 'premium' }}",
+        "truePath": [
+          {
+            "id": "premium-processing",
+            "type": "custom.premium-handler",
+            "config": { "priority": "high" }
+          }
+        ],
+        "falsePath": [
+          {
+            "id": "standard-processing", 
+            "type": "custom.standard-handler",
+            "config": { "priority": "normal" }
+          }
+        ]
+      }
+    }
+    ```
+    
+    **Available Control Flow Actions:**
+    - `flow.condition` - Conditional branching
+    - `flow.loop` - Iterate over collections
+    - `flow.parallel` - Execute actions in parallel
+    - `flow.delay` - Add delays or scheduling
+    - `flow.switch` - Multi-branch conditions
+  </Tab>
+  
+  <Tab title="Notifications">
+    **Send notifications and alerts through various channels**
+    
+    ```typescript
+    {
+      "id": "send-alert",
+      "type": "notification.multi-channel",
+      "name": "Send Deployment Alert",
+      "config": {
+        "channels": [
+          {
+            "type": "slack",
+            "toolId": "team-slack",
+            "config": {
+              "channel": "#deployments",
+              "template": "deployment-success",
+              "data": {
+                "environment": "{{ context.environment }}",
+                "version": "{{ context.version }}",
+                "duration": "{{ context.duration }}"
+              }
+            }
+          },
+          {
+            "type": "email",
+            "toolId": "company-email",
+            "config": {
+              "to": ["team@company.com"],
+              "subject": "Deployment Complete: {{ context.environment }}",
+              "template": "deployment-notification",
+              "data": "{{ context }}"
+            }
+          }
+        ],
+        "failurePolicy": "continue" // Continue if one channel fails
+      }
+    }
+    ```
+    
+    **Available Notification Actions:**
+    - `notification.email` - Email notifications
+    - `notification.slack` - Slack messages
+    - `notification.webhook` - HTTP webhook notifications
+    - `notification.multi-channel` - Multiple notification channels
+    - `notification.template` - Template-based messaging
+  </Tab>
+</Tabs>
+
+### Tool-Specific Actions
+
+Actions that integrate with configured tools in your organization:
+
+<Tabs>
+  <Tab title="GitHub Actions">
+    ```typescript
+    // Create a pull request
+    {
+      "id": "create-pr",
+      "type": "github.pull-request.create",
+      "name": "Create Release PR",
+      "config": {
+        "toolId": "company-github",
+        "repository": "main-project",
+        "title": "Release {{ context.version }}",
+        "head": "release/{{ context.version }}",
+        "base": "main",
+        "body": "{{ templates.pullRequestBody }}",
+        "assignees": ["{{ context.assignee }}"],
+        "reviewers": ["team-leads"],
+        "labels": ["release", "automated"]
+      }
+    }
+    
+    // Merge pull request
+    {
+      "id": "merge-pr",
+      "type": "github.pull-request.merge",
+      "name": "Merge Release PR",
+      "config": {
+        "toolId": "company-github",
+        "repository": "main-project",
+        "pullRequestNumber": "{{ steps.createPr.output.number }}",
+        "mergeMethod": "squash",
+        "commitTitle": "Release {{ context.version }}",
+        "deleteBranch": true
+      },
+      "dependsOn": ["create-pr"]
+    }
+    ```
+  </Tab>
+  
+  <Tab title="AWS Actions">
+    ```typescript
+    // Deploy to S3
+    {
+      "id": "deploy-s3",
+      "type": "aws.s3.sync",
+      "name": "Deploy to S3",
+      "config": {
+        "toolId": "production-aws",
+        "source": "./dist",
+        "bucket": "app-production-{{ context.environment }}",
+        "prefix": "releases/{{ context.version }}/",
+        "options": {
+          "delete": true,
+          "cache-control": "public, max-age=31536000",
+          "metadata": {
+            "version": "{{ context.version }}",
+            "buildId": "{{ context.buildId }}"
+          }
+        }
+      }
+    }
+    
+    // Invalidate CloudFront
+    {
+      "id": "invalidate-cdn",
+      "type": "aws.cloudfront.invalidate",
+      "name": "Invalidate CDN Cache",
+      "config": {
+        "toolId": "production-aws",
+        "distributionId": "{{ secrets.CLOUDFRONT_DISTRIBUTION_ID }}",
+        "paths": ["/*"],
+        "callerReference": "{{ context.buildId }}"
+      },
+      "dependsOn": ["deploy-s3"]
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Database Actions">
+    ```typescript
+    // Execute database migration
+    {
+      "id": "run-migration",
+      "type": "postgresql.migration.run",
+      "name": "Run Database Migration",
+      "config": {
+        "toolId": "production-db",
+        "migrationFile": "migrations/{{ context.migrationVersion }}.sql",
+        "rollbackFile": "migrations/{{ context.migrationVersion }}-rollback.sql",
+        "timeout": 300000,
+        "validateSchema": true
+      }
+    }
+    
+    // Backup database
+    {
+      "id": "backup-db",
+      "type": "postgresql.backup.create",
+      "name": "Create Database Backup",
+      "config": {
+        "toolId": "production-db",
+        "backupName": "pre-migration-{{ context.timestamp }}",
+        "format": "custom",
+        "compression": 9,
+        "uploadToS3": {
+          "bucket": "database-backups",
+          "key": "backups/{{ context.date }}/pre-migration.backup"
+        }
+      },
+      "executeIf": "{{ context.environment === 'production' }}"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Custom Actions
+
+Create custom actions for your specific business logic:
+
+<CodeGroup>
+```typescript Custom Action Definition
+interface CustomActionConfig {
+  apiEndpoint: string;
+  timeout: number;
+  validateResponse: boolean;
+}
+
+interface CustomActionInput {
+  userId: string;
+  operation: 'create' | 'update' | 'delete';
+  data: Record<string, any>;
+}
+
+interface CustomActionOutput {
+  success: boolean;
+  recordId?: string;
+  errors?: string[];
+}
+
+const customAction = await client.actions.createCustom({
+  type: 'custom.user-management',
+  name: 'User Management Action',
+  description: 'Custom action for user management operations',
+  
+  // Input schema validation
+  inputSchema: {
+    type: 'object',
+    properties: {
+      userId: { type: 'string', pattern: '^[a-zA-Z0-9]+$' },
+      operation: { type: 'string', enum: ['create', 'update', 'delete'] },
+      data: { type: 'object' }
+    },
+    required: ['userId', 'operation']
+  },
+  
+  // Output schema
+  outputSchema: {
+    type: 'object', 
+    properties: {
+      success: { type: 'boolean' },
+      recordId: { type: 'string' },
+      errors: { type: 'array', items: { type: 'string' } }
+    },
+    required: ['success']
+  },
+  
+  // Configuration schema
+  configSchema: {
+    type: 'object',
+    properties: {
+      apiEndpoint: { type: 'string', format: 'uri' },
+      timeout: { type: 'number', minimum: 1000, maximum: 300000 },
+      validateResponse: { type: 'boolean', default: true }
+    },
+    required: ['apiEndpoint']
+  },
+  
+  // Implementation
+  handler: async (input: CustomActionInput, config: CustomActionConfig, context: any) => {
+    const { userId, operation, data } = input;
+    const { apiEndpoint, timeout, validateResponse } = config;
+    
+    try {
+      const response = await fetch(`${apiEndpoint}/users/${userId}`, {
+        method: operation.toUpperCase(),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${context.secrets.API_TOKEN}`
+        },
+        body: operation !== 'delete' ? JSON.stringify(data) : undefined,
+        signal: AbortSignal.timeout(timeout)
+      });
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          errors: [`HTTP ${response.status}: ${response.statusText}`]
+        };
+      }
+      
+      const result = await response.json();
+      
+      if (validateResponse && !result.id) {
+        return {
+          success: false,
+          errors: ['Invalid response: missing record ID']
+        };
+      }
+      
+      return {
+        success: true,
+        recordId: result.id,
+        metadata: {
+          operation,
+          timestamp: new Date().toISOString(),
+          responseTime: response.headers.get('x-response-time')
+        }
+      } as CustomActionOutput;
+      
+    } catch (error) {
+      return {
+        success: false,
+        errors: [error.message]
+      };
+    }
+  }
+});
+```
+
+```typescript Using Custom Actions
+// Use the custom action in a workflow
+const workflowStep = {
+  id: 'update-user-profile',
+  type: 'custom.user-management',
+  name: 'Update User Profile',
+  config: {
+    apiEndpoint: 'https://api.company.com/v1',
+    timeout: 30000,
+    validateResponse: true
+  },
+  input: {
+    userId: '{{ context.userId }}',
+    operation: 'update',
+    data: {
+      profile: {
+        name: '{{ context.user.name }}',
+        email: '{{ context.user.email }}',
+        preferences: '{{ context.user.preferences }}'
+      },
+      updatedBy: '{{ context.actor.id }}',
+      updatedAt: '{{ now() }}'
+    }
+  }
+};
+```
+</CodeGroup>
+
+## Action Configuration
+
+### Input Parameters and Data Types
+
+Actions support various data types and validation rules:
+
+<CodeGroup>
+```typescript Input Schema Types
+{
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      // String types
+      "name": { 
+        "type": "string", 
+        "minLength": 1,
+        "maxLength": 100,
+        "pattern": "^[a-zA-Z0-9\\s]+$"
+      },
+      
+      // Numeric types
+      "timeout": {
+        "type": "integer",
+        "minimum": 1000,
+        "maximum": 300000,
+        "default": 30000
+      },
+      
+      // Boolean types
+      "enabled": {
+        "type": "boolean",
+        "default": true
+      },
+      
+      // Array types
+      "tags": {
+        "type": "array",
+        "items": { "type": "string" },
+        "minItems": 1,
+        "uniqueItems": true
+      },
+      
+      // Object types
+      "metadata": {
+        "type": "object",
+        "properties": {
+          "version": { "type": "string" },
+          "author": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      
+      // Enum types
+      "priority": {
+        "type": "string",
+        "enum": ["low", "medium", "high", "critical"],
+        "default": "medium"
+      },
+      
+      // Union types
+      "target": {
+        "oneOf": [
+          { "type": "string", "format": "uri" },
+          { "type": "object", "properties": { "id": { "type": "string" } } }
+        ]
+      }
+    },
+    "required": ["name", "timeout"],
+    "additionalProperties": false
+  }
+}
+```
+
+```typescript Dynamic Input Values
+// Using template expressions for dynamic values
+{
+  "id": "send-notification",
+  "type": "notification.slack",
+  "config": {
+    "channel": "{{ context.environment === 'production' ? '#alerts' : '#dev-alerts' }}",
+    "message": "Deployment {{ context.status }} for {{ context.service }}",
+    "mentions": "{{ context.status === 'failed' ? ['@channel'] : [] }}",
+    "attachments": [
+      {
+        "title": "Deployment Details",
+        "fields": [
+          {
+            "title": "Environment", 
+            "value": "{{ context.environment }}",
+            "short": true
+          },
+          {
+            "title": "Version",
+            "value": "{{ context.version }}",
+            "short": true
+          },
+          {
+            "title": "Duration",
+            "value": "{{ context.duration | formatDuration }}",
+            "short": true
+          }
+        ],
+        "color": "{{ context.status === 'success' ? 'good' : 'danger' }}"
+      }
+    ]
+  }
+}
+```
+</CodeGroup>
+
+### Conditional Execution
+
+Actions can be conditionally executed based on workflow state:
+
+<CodeGroup>
+```typescript Simple Conditions
+{
+  "id": "production-deployment",
+  "type": "aws.ecs.deploy",
+  "name": "Deploy to Production",
+  "config": {
+    "cluster": "production",
+    "service": "web-app",
+    "image": "{{ context.dockerImage }}"
+  },
+  // Only execute in production environment
+  "executeIf": "{{ context.environment === 'production' }}"
+}
+```
+
+```typescript Complex Conditions
+{
+  "id": "conditional-processing",
+  "type": "data.transform",
+  "name": "Process High Priority Items",
+  "config": {
+    "transformation": "{{ context.items | filter(item => item.priority === 'high') }}"
+  },
+  // Multiple conditions with logical operators
+  "executeIf": "{{ 
+    context.items.length > 0 && 
+    context.processHighPriority === true &&
+    (context.environment === 'production' || context.forceProcess === true)
+  }}"
+}
+```
+
+```typescript Time-based Conditions
+{
+  "id": "maintenance-task",
+  "type": "system.maintenance",
+  "name": "Run Maintenance Task",
+  "config": {
+    "operation": "cleanup-logs"
+  },
+  // Only run during maintenance hours
+  "executeIf": "{{ 
+    now() | format('HH') >= 02 && 
+    now() | format('HH') <= 04 &&
+    now() | format('E') <= 5
+  }}"
+}
+```
+</CodeGroup>
+
+### Error Handling and Retries
+
+Configure how actions handle failures and retry logic:
+
+<CodeGroup>
+```typescript Retry Policies
+{
+  "id": "api-call-with-retry",
+  "type": "http.request",
+  "name": "Resilient API Call",
+  "config": {
+    "url": "https://api.example.com/data",
+    "method": "GET"
+  },
+  "retryPolicy": {
+    "maxRetries": 5,
+    "initialDelayMs": 1000,
+    "backoffMultiplier": 2,
+    "maxDelayMs": 30000,
+    "jitterMs": 500,
+    
+    // Retry on specific conditions
+    "retryOn": {
+      "httpStatusCodes": [408, 429, 500, 502, 503, 504],
+      "errorTypes": ["TIMEOUT", "CONNECTION_RESET"],
+      "customCondition": "{{ error.type === 'RATE_LIMITED' }}"
+    },
+    
+    // Don't retry on certain errors
+    "doNotRetryOn": {
+      "httpStatusCodes": [400, 401, 403, 404],
+      "errorTypes": ["AUTHENTICATION_FAILED"]
+    }
+  },
+  
+  "errorHandling": {
+    "onFailure": "continue", // continue, fail, retry
+    "captureError": true,
+    "errorOutput": "detailed" // minimal, detailed, full
+  }
+}
+```
+
+```typescript Circuit Breaker Pattern
+{
+  "id": "external-service-call",
+  "type": "http.request",
+  "name": "External Service Call",
+  "config": {
+    "url": "https://external-api.com/endpoint"
+  },
+  "circuitBreaker": {
+    "enabled": true,
+    "failureThreshold": 10,      // Open after 10 failures
+    "successThreshold": 5,       // Close after 5 successes
+    "timeout": 60000,            // Stay open for 1 minute
+    "halfOpenMaxCalls": 3,       // Allow 3 calls when half-open
+    
+    "fallback": {
+      "type": "static-response",
+      "value": {
+        "status": "unavailable",
+        "message": "Service temporarily unavailable"
+      }
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Data Flow and Context
+
+### Using Action Outputs
+
+Actions can reference outputs from previous steps:
+
+<CodeGroup>
+```typescript Output References
+{
+  "steps": [
+    {
+      "id": "fetch-users",
+      "type": "http.request",
+      "name": "Fetch Users",
+      "config": {
+        "url": "https://api.example.com/users",
+        "method": "GET"
+      }
+    },
+    {
+      "id": "process-users",
+      "type": "data.transform", 
+      "name": "Process User Data",
+      "config": {
+        "input": "{{ steps.fetchUsers.output.data }}",
+        "transformation": {
+          "activeUsers": "{{ input | filter(user => user.status === 'active') }}",
+          "userCount": "{{ activeUsers.length }}",
+          "adminUsers": "{{ activeUsers | filter(user => user.role === 'admin') }}"
+        }
+      },
+      "dependsOn": ["fetch-users"]
+    },
+    {
+      "id": "send-report",
+      "type": "notification.email",
+      "name": "Send User Report",
+      "config": {
+        "to": ["admin@company.com"],
+        "subject": "User Report - {{ steps.processUsers.output.userCount }} active users",
+        "body": "Found {{ steps.processUsers.output.adminUsers.length }} admin users"
+      },
+      "dependsOn": ["process-users"]
+    }
+  ]
+}
+```
+
+```typescript Complex Data Transformation
+{
+  "id": "aggregate-metrics",
+  "type": "data.transform",
+  "name": "Aggregate Performance Metrics",
+  "config": {
+    "transformation": {
+      "summary": {
+        "totalRequests": "{{ steps.fetchLogs.output | sum(log => log.requestCount) }}",
+        "avgResponseTime": "{{ steps.fetchLogs.output | avg(log => log.responseTime) }}",
+        "errorRate": "{{ 
+          (steps.fetchLogs.output | sum(log => log.errorCount)) / 
+          (steps.fetchLogs.output | sum(log => log.requestCount)) * 100 
+        }}",
+        "topErrors": "{{ 
+          steps.fetchLogs.output 
+          | flatMap(log => log.errors) 
+          | groupBy(error => error.type)
+          | map(group => ({ type: group.key, count: group.value.length }))
+          | sortBy(item => -item.count)
+          | slice(0, 5)
+        }}"
+      },
+      "alerts": "{{ 
+        summary.errorRate > 5 ? [{
+          level: 'critical',
+          message: 'High error rate detected: ' + summary.errorRate + '%'
+        }] : []
+      }}"
+    }
+  }
+}
+```
+</CodeGroup>
+
+### Variable Scope and Context
+
+Understanding how data flows through actions:
+
+```typescript
+// Global context available to all actions
+{
+  "context": {
+    // Workflow-level variables
+    "workflowId": "flow_123",
+    "executionId": "exec_456", 
+    "startTime": "2024-01-20T10:30:00Z",
+    "environment": "production",
+    
+    // User context
+    "user": {
+      "id": "user_789",
+      "email": "user@company.com",
+      "role": "developer"
+    },
+    
+    // Organization context
+    "organization": {
+      "id": "org_123",
+      "name": "Acme Corp"
+    },
+    
+    // Custom variables from flow input
+    "variables": {
+      "deploymentVersion": "v2.1.0",
+      "targetEnvironment": "staging",
+      "notifyTeam": true
+    }
+  },
+  
+  // Step outputs (populated as workflow executes)
+  "steps": {
+    "stepId": {
+      "output": { /* action output */ },
+      "status": "completed",
+      "startTime": "2024-01-20T10:31:00Z",
+      "duration": 1500,
+      "retryCount": 0
+    }
+  },
+  
+  // Secrets (securely injected)
+  "secrets": {
+    "API_TOKEN": "encrypted-value",
+    "DATABASE_PASSWORD": "encrypted-value"
+  }
+}
+```
+
+## Action Library Management
+
+### Creating and Managing Actions
+
+<CodeGroup>
+```bash CLI - Action Management
+# Create a new custom action
+tolstoy actions create \
+  --type "custom.data-processor" \
+  --name "Custom Data Processor" \
+  --description "Process and validate customer data" \
+  --input-schema ./schemas/input.json \
+  --output-schema ./schemas/output.json
+
+# List available actions
+tolstoy actions list --filter type=http
+
+# Test an action
+tolstoy actions test custom.data-processor \
+  --input '{"data": [{"id": 1, "name": "test"}]}' \
+  --config '{"validation": true}'
+
+# Update action
+tolstoy actions update custom.data-processor \
+  --description "Updated description" \
+  --config-schema ./schemas/config-v2.json
+```
+
+```typescript TypeScript SDK
+// Create a custom action
+const action = await client.actions.create({
+  type: 'custom.data-validator',
+  name: 'Data Validator',
+  description: 'Validate data against custom business rules',
+  category: 'data-processing',
+  
+  inputSchema: {
+    type: 'object',
+    properties: {
+      data: { type: 'array' },
+      rules: { type: 'object' }
+    },
+    required: ['data', 'rules']
+  },
+  
+  outputSchema: {
+    type: 'object',
+    properties: {
+      validRecords: { type: 'array' },
+      invalidRecords: { type: 'array' },
+      validationSummary: { type: 'object' }
+    }
+  },
+  
+  configSchema: {
+    type: 'object',
+    properties: {
+      strictMode: { type: 'boolean', default: false },
+      maxErrors: { type: 'integer', default: 100 }
+    }
+  }
+});
+
+// Get action details
+const actionDetails = await client.actions.get('custom.data-validator');
+
+// Test action
+const testResult = await client.actions.test('custom.data-validator', {
+  input: { data: [{ id: 1, name: 'Test' }], rules: {} },
+  config: { strictMode: true }
+});
+```
+
+```bash cURL - REST API
+# Create custom action
+curl -X POST "https://api.tolstoy.dev/actions" \
+  -H "Authorization: Bearer your-api-key" \
+  -H "X-Organization-ID: org_123" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "custom.notification-manager",
+    "name": "Smart Notification Manager",
+    "description": "Intelligent notification routing and throttling",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "message": {"type": "string"},
+        "priority": {"type": "string", "enum": ["low", "medium", "high"]},
+        "channels": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }'
+
+# List actions with filtering
+curl -X GET "https://api.tolstoy.dev/actions?category=notifications&type=custom" \
+  -H "Authorization: Bearer your-api-key" \
+  -H "X-Organization-ID: org_123"
+```
+</CodeGroup>
+
+### Action Versioning
+
+Manage different versions of actions:
+
+```typescript
+// Create a new version of an action
+const newVersion = await client.actions.createVersion('custom.data-processor', {
+  version: '2.0.0',
+  changes: [
+    'Added support for nested object validation',
+    'Improved error reporting',
+    'Performance optimizations'
+  ],
+  
+  // Updated schemas
+  inputSchema: {
+    type: 'object',
+    properties: {
+      data: { type: 'array' },
+      rules: { 
+        type: 'object',
+        properties: {
+          nested: { type: 'boolean', default: false } // New property
+        }
+      }
+    }
+  },
+  
+  // Backward compatibility
+  compatibleVersions: ['1.x'],
+  migrationGuide: 'Set rules.nested=false to maintain v1 behavior'
+});
+
+// Use specific version in workflow
+const workflowStep = {
+  id: 'process-data',
+  type: 'custom.data-processor@2.0.0', // Specify version
+  config: {
+    rules: { nested: true }
+  }
+};
+```
+
+## Performance and Optimization
+
+### Action Performance Monitoring
+
+<CodeGroup>
+```typescript Performance Metrics
+// Configure action performance monitoring
+await client.actions.configureMonitoring('custom.data-processor', {
+  metrics: {
+    executionTime: true,
+    memoryUsage: true,
+    errorRate: true,
+    throughput: true
+  },
+  alerts: {
+    slowExecution: {
+      threshold: 30000, // 30 seconds
+      channels: ['#ops-alerts']
+    },
+    highErrorRate: {
+      threshold: 0.05, // 5%
+      window: '5m',
+      channels: ['#dev-alerts']
+    }
+  }
+});
+
+// Get performance statistics
+const stats = await client.actions.getPerformanceStats('custom.data-processor', {
+  period: '7d',
+  groupBy: 'day'
+});
+```
+
+```json Performance Statistics
+{
+  "actionType": "custom.data-processor",
+  "period": "7d",
+  "statistics": {
+    "totalExecutions": 1547,
+    "successfulExecutions": 1523,
+    "failedExecutions": 24,
+    "averageExecutionTime": 2341,
+    "p50ExecutionTime": 1876,
+    "p95ExecutionTime": 4512,
+    "p99ExecutionTime": 8901,
+    "errorRate": 0.0155,
+    "throughputPerMinute": 15.3,
+    "memoryUsage": {
+      "average": "45MB",
+      "peak": "128MB"
+    }
+  },
+  "dailyBreakdown": [
+    {
+      "date": "2024-01-20",
+      "executions": 234,
+      "avgTime": 2156,
+      "errorRate": 0.013
+    }
+  ]
+}
+```
+</CodeGroup>
+
+### Optimization Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Input Validation" icon="check-circle">
+    Validate inputs early to prevent unnecessary processing and improve error messages
+  </Card>
+  
+  <Card title="Caching" icon="database">
+    Cache expensive computations and API responses when possible
+  </Card>
+  
+  <Card title="Parallel Execution" icon="bolt">
+    Design actions to support parallel execution when dependencies allow
+  </Card>
+  
+  <Card title="Resource Management" icon="gauge">
+    Monitor memory usage and execution time to identify bottlenecks
+  </Card>
+</CardGroup>
+
+## Testing Actions
+
+### Unit Testing
+
+<CodeGroup>
+```typescript Action Unit Tests
+import { ActionTester } from '@tolstoy/testing';
+
+describe('Custom Data Processor Action', () => {
+  let actionTester: ActionTester;
+  
+  beforeEach(() => {
+    actionTester = new ActionTester('custom.data-processor');
+  });
+  
+  it('should process valid data correctly', async () => {
+    const input = {
+      data: [
+        { id: 1, name: 'John', email: 'john@example.com' },
+        { id: 2, name: 'Jane', email: 'jane@example.com' }
+      ],
+      rules: {
+        required: ['id', 'name', 'email'],
+        emailFormat: true
+      }
+    };
+    
+    const config = {
+      strictMode: false,
+      maxErrors: 10
+    };
+    
+    const result = await actionTester.execute(input, config);
+    
+    expect(result.validRecords).toHaveLength(2);
+    expect(result.invalidRecords).toHaveLength(0);
+    expect(result.validationSummary.errorCount).toBe(0);
+  });
+  
+  it('should handle invalid data appropriately', async () => {
+    const input = {
+      data: [
+        { id: 1, name: 'John' }, // Missing email
+        { id: 2, name: 'Jane', email: 'invalid-email' }
+      ],
+      rules: {
+        required: ['id', 'name', 'email'],
+        emailFormat: true
+      }
+    };
+    
+    const result = await actionTester.execute(input, { strictMode: true });
+    
+    expect(result.validRecords).toHaveLength(0);
+    expect(result.invalidRecords).toHaveLength(2);
+    expect(result.validationSummary.errorCount).toBe(3); // 2 missing email + 1 invalid format
+  });
+  
+  it('should respect configuration options', async () => {
+    const input = {
+      data: Array.from({ length: 200 }, (_, i) => ({ id: i })), // 200 invalid records
+      rules: { required: ['name'] }
+    };
+    
+    const config = { maxErrors: 50 };
+    
+    const result = await actionTester.execute(input, config);
+    
+    expect(result.validationSummary.errorCount).toBe(50); // Should stop at maxErrors
+    expect(result.validationSummary.truncated).toBe(true);
+  });
+});
+```
+
+```bash Integration Testing
+# Test action in isolation
+tolstoy actions test custom.data-processor \
+  --input ./test-data/valid-input.json \
+  --config ./test-data/test-config.json \
+  --assert-output ./test-data/expected-output.json
+
+# Test action with mock dependencies  
+tolstoy actions test custom.api-caller \
+  --input ./test-data/api-input.json \
+  --mock-http-responses ./test-data/mock-responses.json
+
+# Performance testing
+tolstoy actions benchmark custom.data-processor \
+  --input ./test-data/large-dataset.json \
+  --iterations 100 \
+  --concurrent 10
+```
+</CodeGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Workflow Flows" icon="diagram-project" href="/concepts/flows">
+    Learn how to combine actions into complete workflows
+  </Card>
+  
+  <Card title="Building Workflows" icon="hammer" href="/workflows/creating-flows">
+    Step-by-step guide to creating your first workflow
+  </Card>
+  
+  <Card title="Custom Actions" icon="code" href="/integrations/custom-actions">
+    Deep dive into building custom actions for your needs
+  </Card>
+  
+  <Card title="Action Library" icon="books" href="/api-reference/actions">
+    Browse the complete library of available actions
+  </Card>
+</CardGroup>

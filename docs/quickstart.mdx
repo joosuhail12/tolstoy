@@ -1,171 +1,310 @@
 ---
-title: Quickstart
-description: "Get up and running with Tolstoy in under 5 minutes"
+title: "Quickstart Guide"
+description: "Get started with Tolstoy in under 5 minutes"
 ---
 
 # Quickstart Guide
 
-Get Tolstoy up and running in under 5 minutes and create your first automated workflow.
+This guide will help you create your first workflow in Tolstoy in under 5 minutes. We'll walk through creating a simple workflow that fetches data from an API and processes it.
 
 <Info>
-This guide assumes you have Node.js (v18+) and npm installed on your machine.
+**Prerequisites:** You'll need a Tolstoy account and access to the API. If you don't have an account yet, [contact our team](mailto:support@tolstoy.dev) for access.
 </Info>
 
-## Prerequisites
+## Step 1: Set Up Your Organization
 
-Before we begin, make sure you have:
-- Node.js 18 or higher
-- npm or yarn package manager
-- A code editor (VS Code recommended)
+Every workflow in Tolstoy belongs to an organization. Let's create your organization first:
 
-## Step 1: Set Up Your Environment
+<CodeGroup>
 
-First, let's set up the necessary environment variables:
-
-```bash
-# Clone or access your Tolstoy workspace
-export TOLSTOY_ORG_ID="your-org-id"
-export TOLSTOY_API_KEY="your-api-key"
-```
-
-<Warning>
-Keep your API keys secure and never commit them to version control. Use environment variables or a secure secret management system.
-</Warning>
-
-## Step 2: Create Your First Flow
-
-Create a new file called `hello-world.yaml` with a simple workflow:
-
-```yaml hello-world.yaml
-version: 1
-name: "Hello World Flow"
-description: "A simple workflow to get started"
-
-steps:
-  - key: "greeting"
-    name: "Send Greeting"
-    action: "http.post"
-    inputs:
-      url: "https://httpbin.org/post"
-      headers:
-        Content-Type: "application/json"
-      body:
-        message: "Hello from Tolstoy!"
-        timestamp: "{{now()}}"
-    
-  - key: "log-result"
-    name: "Log the Result"
-    action: "console.log"
-    inputs:
-      message: "Workflow completed successfully!"
-      data: "{{steps.greeting.output}}"
-```
-
-## Step 3: Deploy Your Flow
-
-Use the Tolstoy CLI to deploy your flow:
-
-```bash
-# Install the Tolstoy CLI
-npm install -g @tolstoy/cli
-
-# Login to your Tolstoy account
-tolstoy auth login
-
-# Deploy your flow
-tolstoy deploy hello-world.yaml
-```
-
-## Step 4: Execute Your Flow
-
-Now let's run your first workflow:
-
-```bash
-# Execute the flow
-tolstoy run hello-world --org=$TOLSTOY_ORG_ID
-
-# Monitor execution
-tolstoy logs hello-world --follow
-```
-
-## Step 5: View Results
-
-Your workflow will execute and you should see output similar to this:
-
-```json
-{
-  "executionId": "exec-12345",
-  "status": "completed",
-  "duration": 1240,
-  "steps": {
-    "greeting": {
-      "status": "completed",
-      "output": {
-        "statusCode": 200,
-        "data": {
-          "message": "Hello from Tolstoy!",
-          "timestamp": "2024-01-15T10:30:00Z"
-        }
+```bash cURL
+curl -X POST 'https://api.tolstoy.dev/organizations' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "My Company",
+    "settings": {
+      "timezone": "America/New_York",
+      "defaultRetryPolicy": {
+        "maxRetries": 3,
+        "backoffMultiplier": 2
       }
-    },
-    "log-result": {
-      "status": "completed",
-      "output": "Workflow completed successfully!"
+    }
+  }'
+```
+
+```javascript TypeScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const client = new TolstoyClient({
+  apiKey: 'YOUR_API_KEY',
+  baseURL: 'https://api.tolstoy.dev'
+});
+
+const organization = await client.organizations.create({
+  name: 'My Company',
+  settings: {
+    timezone: 'America/New_York',
+    defaultRetryPolicy: {
+      maxRetries: 3,
+      backoffMultiplier: 2
     }
   }
-}
+});
+
+console.log('Organization created:', organization.id);
 ```
 
-## Next Steps
+```bash CLI
+tolstoy orgs create \
+  --name "My Company" \
+  --timezone "America/New_York"
+```
 
-Congratulations! 🎉 You've successfully created and executed your first Tolstoy workflow. Here's what to explore next:
+</CodeGroup>
+
+## Step 2: Create Your First Tool
+
+Tools in Tolstoy represent external services you want to integrate with. Let's create a tool for a REST API:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST 'https://api.tolstoy.dev/tools' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "JSONPlaceholder API",
+    "type": "api",
+    "baseUrl": "https://jsonplaceholder.typicode.com",
+    "authType": "none",
+    "description": "Demo REST API for testing"
+  }'
+```
+
+```javascript TypeScript SDK
+const tool = await client.tools.create({
+  name: 'JSONPlaceholder API',
+  type: 'api',
+  baseUrl: 'https://jsonplaceholder.typicode.com',
+  authType: 'none',
+  description: 'Demo REST API for testing'
+});
+
+console.log('Tool created:', tool.id);
+```
+
+</CodeGroup>
+
+## Step 3: Create an Action
+
+Actions are reusable workflow components. Let's create an action that fetches user data:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST 'https://api.tolstoy.dev/actions' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "key": "fetch_user",
+    "name": "Fetch User",
+    "description": "Fetch user data from JSONPlaceholder",
+    "toolId": "TOOL_ID_FROM_STEP_2",
+    "method": "GET",
+    "endpoint": "/users/{{userId}}",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "integer",
+          "description": "User ID to fetch",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "required": ["userId"]
+    }
+  }'
+```
+
+```javascript TypeScript SDK
+const action = await client.actions.create({
+  key: 'fetch_user',
+  name: 'Fetch User',
+  description: 'Fetch user data from JSONPlaceholder',
+  toolId: tool.id,
+  method: 'GET',
+  endpoint: '/users/{{userId}}',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      userId: {
+        type: 'integer',
+        description: 'User ID to fetch',
+        minimum: 1,
+        maximum: 10
+      }
+    },
+    required: ['userId']
+  }
+});
+
+console.log('Action created:', action.key);
+```
+
+</CodeGroup>
+
+## Step 4: Test Your Action
+
+Before creating a workflow, let's test the action:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST 'https://api.tolstoy.dev/actions/fetch_user/execute' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "inputs": {
+      "userId": 1
+    }
+  }'
+```
+
+```javascript TypeScript SDK
+const result = await client.actions.execute('fetch_user', {
+  inputs: {
+    userId: 1
+  }
+});
+
+console.log('User data:', result.outputs);
+```
+
+</CodeGroup>
+
+## Step 5: Create Your First Flow
+
+Now let's create a flow (workflow) that uses our action:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST 'https://api.tolstoy.dev/flows' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "User Info Workflow",
+    "description": "Fetch and process user information",
+    "steps": [
+      {
+        "id": "fetch_user",
+        "name": "Fetch User Data", 
+        "actionKey": "fetch_user",
+        "inputs": {
+          "userId": "{{ workflow.inputs.userId }}"
+        }
+      }
+    ],
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "integer",
+          "description": "User ID to fetch",
+          "default": 1
+        }
+      },
+      "required": ["userId"]
+    }
+  }'
+```
+
+```javascript TypeScript SDK
+const flow = await client.flows.create({
+  name: 'User Info Workflow',
+  description: 'Fetch and process user information',
+  steps: [
+    {
+      id: 'fetch_user',
+      name: 'Fetch User Data',
+      actionKey: 'fetch_user',
+      inputs: {
+        userId: '{{ workflow.inputs.userId }}'
+      }
+    }
+  ],
+  inputSchema: {
+    type: 'object',
+    properties: {
+      userId: {
+        type: 'integer',
+        description: 'User ID to fetch',
+        default: 1
+      }
+    },
+    required: ['userId']
+  }
+});
+
+console.log('Flow created:', flow.id);
+```
+
+</CodeGroup>
+
+## Step 6: Execute Your Flow
+
+Now let's execute the workflow:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST 'https://api.tolstoy.dev/flows/FLOW_ID/execute' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "inputs": {
+      "userId": 2
+    }
+  }'
+```
+
+```javascript TypeScript SDK
+const execution = await client.flows.execute(flow.id, {
+  inputs: {
+    userId: 2
+  }
+});
+
+console.log('Execution started:', execution.id);
+
+// Poll for completion
+const result = await client.flows.waitForExecution(flow.id, execution.id);
+console.log('Execution completed:', result.status);
+```
+
+</CodeGroup>
+
+## What's Next?
+
+Congratulations! 🎉 You've successfully created and executed your first Tolstoy workflow. Here are some next steps:
 
 <CardGroup cols={2}>
-  <Card title="Flow Definition Guide" icon="book" href="/flows">
-    Learn advanced flow patterns, conditional logic, and error handling
+  <Card title="Core Concepts" icon="book-open" href="/concepts/organizations">
+    Learn about organizations, tools, actions, and flows
   </Card>
-  <Card title="Actions Reference" icon="code" href="/actions">
-    Explore available actions and how to create custom ones
+  <Card title="Building Workflows" icon="diagram-project" href="/workflows/creating-flows">
+    Dive deeper into workflow creation
   </Card>
-  <Card title="Integrations" icon="plug" href="/integrations">
-    Connect with popular tools like Slack, GitHub, AWS, and more
+  <Card title="Integrations" icon="plug" href="/integrations/overview">
+    Connect with popular services
   </Card>
-  <Card title="API Reference" icon="terminal" href="/api">
-    Dive into the complete Tolstoy API documentation
+  <Card title="Monitoring" icon="chart-line" href="/monitoring/execution-tracking">
+    Set up monitoring and alerting
   </Card>
 </CardGroup>
 
-## Troubleshooting
-
-Having issues? Here are common solutions:
-
-<AccordionGroup>
-  <Accordion title="Authentication Failed">
-    Make sure your API key is valid and has the correct permissions:
-    ```bash
-    tolstoy auth verify
-    ```
-  </Accordion>
-
-  <Accordion title="Flow Deployment Failed">
-    Check your YAML syntax and ensure all required fields are present:
-    ```bash
-    tolstoy validate hello-world.yaml
-    ```
-  </Accordion>
-
-  <Accordion title="Step Execution Failed">
-    Review the execution logs for detailed error information:
-    ```bash
-    tolstoy logs hello-world --level=error
-    ```
-  </Accordion>
-</AccordionGroup>
-
-## Community & Support
-
-- **Discord**: Join our [community Discord](https://discord.gg/tolstoy) for real-time help
-- **GitHub**: Browse examples and contribute at [github.com/tolstoy-dev/examples](https://github.com/tolstoy-dev/examples)
-- **Documentation**: Explore our full documentation for advanced features
-
-Ready to build more complex workflows? Let's dive into the [Flow Definition Guide](/flows)!
+<Info>
+**Need help?** Reach out to [support@tolstoy.dev](mailto:support@tolstoy.dev) - we're here to help!
+</Info>
