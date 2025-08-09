@@ -39,18 +39,61 @@ jobs:
       - name: Deploy to server
         run: |
           ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" << 'EOF'
+            set -e
             cd /home/ubuntu/tolstoy
+            
+            echo "📥 Pulling latest code..."
             git pull origin main
-            npm ci
+            
+            echo "📦 Installing dependencies..."
+            npm ci --production=false
+            
+            echo "⚙️ Generating Prisma client..."
+            npm run db:generate || echo "Prisma generate skipped"
+            
+            echo "🔨 Building application..."
             npm run build
-            pm2 restart tolstoy-api || pm2 start dist/main.js --name tolstoy-api
+            
+            echo "🔄 Restarting PM2..."
+            pm2 stop tolstoy-api 2>/dev/null || true
+            pm2 delete tolstoy-api 2>/dev/null || true
+            
+            # Start with proper environment
+            pm2 start dist/main.js --name tolstoy-api \
+              --env NODE_ENV=production \
+              --env PORT=3000 \
+              --env AWS_REGION=us-east-1 \
+              --env AWS_SECRET_NAME=tolstoy/env \
+              --env USE_AWS_SECRETS=true
+            
             pm2 save
+            
+            echo "✅ Deployment completed!"
           EOF
 
       - name: Health check
         run: |
-          sleep 10
-          curl -f http://${{ secrets.EC2_HOST }}/health && echo "✅ Deployment successful!"
+          echo "⏳ Waiting for application to start..."
+          sleep 20
+          
+          echo "🏥 Health check..."
+          for i in {1..6}; do
+            echo "Attempt $i/6..."
+            if curl -f --connect-timeout 10 --max-time 30 http://${{ secrets.EC2_HOST }}/health; then
+              echo "✅ Health check passed!"
+              exit 0
+            fi
+            
+            if [ $i -lt 6 ]; then
+              echo "⏳ Waiting 10 seconds before retry..."
+              sleep 10
+            fi
+          done
+          
+          echo "❌ Health check failed after 6 attempts"
+          echo "🔍 Checking server status..."
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" "pm2 status && pm2 logs tolstoy-api --lines 20" || true
+          exit 1
 
       - name: Cleanup
         if: always()
