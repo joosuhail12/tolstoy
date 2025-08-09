@@ -3,12 +3,12 @@
   "paths": {
     "/health": {
       "get": {
-        "description": "Simple health check endpoint (deprecated - use /status instead)",
-        "operationId": "AppController_getHealth",
+        "description": "Simple health check endpoint for load balancers and monitoring systems",
+        "operationId": "HealthController_getSimpleHealth",
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Basic health status",
+            "description": "Application is healthy",
             "content": {
               "application/json": {
                 "schema": {
@@ -17,10 +17,6 @@
                     "status": {
                       "type": "string",
                       "example": "ok"
-                    },
-                    "timestamp": {
-                      "type": "string",
-                      "example": "2025-08-08T10:30:00.000Z"
                     }
                   }
                 }
@@ -28,9 +24,9 @@
             }
           }
         },
-        "summary": "Basic Health Check",
+        "summary": "Load Balancer Health Check",
         "tags": [
-          "App"
+          "Health"
         ]
       }
     },
@@ -4276,18 +4272,18 @@
         ]
       }
     },
-    "/auth/{toolKey}/login": {
+    "/auth/{toolId}/login": {
       "get": {
         "description": "Redirects the user to the OAuth provider authorization page. The user must grant permission, after which they will be redirected back to the callback endpoint.",
         "operationId": "OAuthController_initiateLogin",
         "parameters": [
           {
-            "name": "toolKey",
+            "name": "toolId",
             "required": true,
             "in": "path",
-            "description": "Tool identifier (e.g., \"github\", \"google\")",
+            "description": "Tool unique identifier (database ID)",
             "schema": {
-              "example": "github",
+              "example": "cme3zjbwc0000uppplgvx1hse",
               "type": "string"
             }
           },
@@ -4347,21 +4343,11 @@
         ]
       }
     },
-    "/auth/{toolKey}/callback": {
+    "/auth/callback": {
       "get": {
         "description": "Processes the authorization code returned by the OAuth provider, exchanges it for access tokens, and stores the user credentials.",
         "operationId": "OAuthController_handleCallback",
         "parameters": [
-          {
-            "name": "toolKey",
-            "required": true,
-            "in": "path",
-            "description": "Tool identifier that matches the login request",
-            "schema": {
-              "example": "github",
-              "type": "string"
-            }
-          },
           {
             "name": "code",
             "required": true,
@@ -4520,8 +4506,8 @@
   "tags": [],
   "servers": [
     {
-      "url": "https://tolstoy.getpullse.com",
-      "description": "Production"
+      "url": "http://localhost:3000",
+      "description": "Development"
     },
     {
       "url": "https://tolstoy.getpullse.com",
