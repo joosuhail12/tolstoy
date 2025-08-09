@@ -4,14 +4,13 @@ This repository uses a streamlined CI/CD pipeline with automatic deployment to p
 
 ## Workflows
 
-### 1. `main.yml` - Primary CI/CD Pipeline
+### 1. `simple-ci.yml` - Primary CI/CD Pipeline
 **Triggers:** Push to `main` branch, Pull Requests
 **Features:**
 - ✅ Code quality checks (linting, formatting, type checking)
-- ✅ Security audit
-- ✅ Automated testing with PostgreSQL and Redis
 - ✅ Build verification
 - 🚀 **Automatic deployment to production** (main branch only)
+- ✅ Health check verification after deployment
 
 **Flow:**
 1. **Pull Request:** Runs tests and quality checks only
