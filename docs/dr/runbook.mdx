@@ -63,7 +63,7 @@ sidebar_position: 6
 
 ### Prerequisites
 - AWS CLI configured with appropriate permissions
-- Access to AWS Secrets Manager (`tolstoy/env`, `conductor-db-secret`)
+- Access to AWS Secrets Manager (`tolstoy/env`)
 - Neon PostgreSQL access credentials
 
 ### 1.1 List Available Backups
@@ -99,7 +99,7 @@ gunzip backup.sql.gz
 
 # Get database connection string
 DATABASE_URL=$(aws secretsmanager get-secret-value \
-  --secret-id "conductor-db-secret" \
+  --secret-id "tolstoy/env" \
   --region us-east-1 \
   --query 'SecretString' \
   --output text | jq -r '.DATABASE_URL')
@@ -230,7 +230,7 @@ sudo journalctl -u tolstoy -f
 ```bash
 # Verify secrets are accessible
 aws secretsmanager get-secret-value --secret-id "tolstoy/env" --region us-east-1
-aws secretsmanager get-secret-value --secret-id "conductor-db-secret" --region us-east-1
+aws secretsmanager get-secret-value --secret-id "tolstoy/env" --region us-east-1
 
 # Update application environment if needed
 sudo systemctl restart tolstoy

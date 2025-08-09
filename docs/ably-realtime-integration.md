@@ -285,9 +285,9 @@ AWS_REGION=us-east-1
 Store your Ably API key securely in the main database secret:
 
 ```bash
-# Add Ably API key to conductor-db-secret
+# Add Ably API key to tolstoy/env
 aws secretsmanager update-secret \
-  --secret-id "conductor-db-secret" \
+  --secret-id "tolstoy/env" \
   --secret-string '{
     "DATABASE_URL": "your-database-url",
     "DIRECT_URL": "your-direct-database-url", 
@@ -297,7 +297,7 @@ aws secretsmanager update-secret \
   --region us-east-1
 ```
 
-**Note**: The Ably API key is now stored in the `conductor-db-secret` alongside database credentials for centralized secret management.
+**Note**: The Ably API key is now stored in the `tolstoy/env` alongside database credentials for centralized secret management.
 
 ### Ably Dashboard Configuration
 

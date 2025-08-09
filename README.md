@@ -1345,7 +1345,7 @@ USE_AWS_SECRETS=false
 Complete secrets management solution using AWS Secrets Manager for database credentials, OAuth tokens, API keys, and webhook secrets with multi-tenant organization isolation.
 
 ### Key Features
-- Database credentials stored in `conductor-db-secret`
+- Database credentials stored in `tolstoy/env`
 - Tool-specific OAuth tokens and API keys (`tolstoy/{tool}/{orgId}`)
 - Automatic token refresh for OAuth providers
 - Organization-based secret isolation
@@ -1373,7 +1373,7 @@ Live monitoring and debugging of workflow executions using Ably WebSocket integr
 
 **Technical Implementation:**
 - Automatic retry logic with exponential backoff
-- AWS Secrets Manager integration (Ably API key stored in `conductor-db-secret`)
+- AWS Secrets Manager integration (Ably API key stored in `tolstoy/env`)
 - Comprehensive error handling and connection management
 - Built-in rate limiting and performance optimization
 
@@ -1850,7 +1850,7 @@ DAYTONA_ASYNC_TIMEOUT=300000   # 5 minutes for async execution
 ```
 
 #### AWS Secrets Manager Integration
-When `USE_AWS_SECRETS=true` is set, Daytona configuration will be automatically loaded from AWS Secrets Manager instead of environment variables. The secrets are stored in the main application secret (`conductor-db-secret`) with the following keys:
+When `USE_AWS_SECRETS=true` is set, Daytona configuration will be automatically loaded from AWS Secrets Manager instead of environment variables. The secrets are stored in the main application secret (`tolstoy/env`) with the following keys:
 - `DAYTONA_API_KEY`
 - `DAYTONA_BASE_URL` 
 - `DAYTONA_SYNC_TIMEOUT`

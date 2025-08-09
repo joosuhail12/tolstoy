@@ -83,7 +83,7 @@ jobs:
             echo '      NODE_ENV: "production",' >> ecosystem.config.js
             echo '      PORT: 3000,' >> ecosystem.config.js
             echo '      AWS_REGION: "us-east-1",' >> ecosystem.config.js
-            echo '      AWS_SECRET_NAME: "conductor-db-secret",' >> ecosystem.config.js
+            echo '      AWS_SECRET_NAME: "tolstoy/env",' >> ecosystem.config.js
             echo '      USE_AWS_SECRETS: "true"' >> ecosystem.config.js
             echo '    },' >> ecosystem.config.js
             echo '    instances: 1,' >> ecosystem.config.js
@@ -130,7 +130,7 @@ jobs:
             
             echo "🗃️ Running Prisma migrations..."
             # Fetch database URLs from AWS Secrets Manager for Prisma CLI
-            SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id conductor-db-secret --region us-east-1 --query 'SecretString' --output text)
+            SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id tolstoy/env --region us-east-1 --query 'SecretString' --output text)
             export DATABASE_URL=$(echo $SECRET_JSON | grep -o '"DATABASE_URL":"[^"]*' | cut -d'"' -f4)
             export DIRECT_URL=$(echo $SECRET_JSON | grep -o '"DIRECT_URL":"[^"]*' | cut -d'"' -f4 || echo $DATABASE_URL)
             

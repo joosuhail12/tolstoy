@@ -4,7 +4,7 @@ This document outlines the configuration needed to properly serve the Tolstoy ap
 
 ## AWS Secrets Manager Configuration
 
-The following environment variables should be added to your AWS Secrets Manager secret (typically `conductor-db-secret`):
+The following environment variables should be added to your AWS Secrets Manager secret `tolstoy/env`:
 
 ### Required Production Configuration
 

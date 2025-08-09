@@ -49,10 +49,10 @@ Core service providing direct AWS Secrets Manager integration.
 **Usage:**
 ```typescript
 // Get entire secret
-const secret = await awsSecretsService.getSecret('conductor-db-secret');
+const secret = await awsSecretsService.getSecret('tolstoy/env');
 
 // Get specific key from JSON secret
-const dbUrl = await awsSecretsService.getSecret('conductor-db-secret', 'DATABASE_URL');
+const dbUrl = await awsSecretsService.getSecret('tolstoy/env', 'DATABASE_URL');
 
 // Update secret
 await awsSecretsService.updateSecret('my-secret', { key: 'value' });
@@ -122,7 +122,7 @@ const isHealthy = await oauthService.validateTokenHealth('google', 'org789');
 ### Naming Convention
 
 ```
-conductor-db-secret              # Database credentials (existing)
+tolstoy/env                      # Database credentials and environment variables
 tolstoy/{tool}/{orgId}          # Tool-specific credentials
 ```
 
@@ -136,7 +136,7 @@ tolstoy/openai/org-ghi789       # OpenAI API key for organization ghi789
 
 ### Secret Structure
 
-**Database Secret (conductor-db-secret):**
+**Database Secret (tolstoy/env):**
 ```json
 {
   "DATABASE_URL": "postgresql://user:pass@host:5432/db?connection_limit=5",
@@ -243,7 +243,7 @@ try {
 ```env
 # Required for AWS Secrets Manager
 AWS_REGION=us-east-1
-AWS_SECRET_NAME=conductor-db-secret
+AWS_SECRET_NAME=tolstoy/env
 USE_AWS_SECRETS=true
 
 # Optional: Override default caching

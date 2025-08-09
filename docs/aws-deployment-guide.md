@@ -63,7 +63,7 @@ docker push $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/tolstoy-api:latest
      NODE_ENV=production
      PORT=3000
      AWS_REGION=us-east-1
-     AWS_SECRET_NAME=conductor-db-secret
+     AWS_SECRET_NAME=tolstoy/env
      USE_AWS_SECRETS=true
      ```
 
@@ -96,7 +96,7 @@ cat > apprunner-config.json << EOF
         "RuntimeEnvironmentVariables": {
           "NODE_ENV": "production",
           "AWS_REGION": "us-east-1",
-          "AWS_SECRET_NAME": "conductor-db-secret",
+          "AWS_SECRET_NAME": "tolstoy/env",
           "USE_AWS_SECRETS": "true"
         }
       },
@@ -190,7 +190,7 @@ Ensure your App Runner service has the necessary permissions:
       "Action": [
         "secretsmanager:GetSecretValue"
       ],
-      "Resource": "arn:aws:secretsmanager:us-east-1:*:secret:conductor-db-secret*"
+      "Resource": "arn:aws:secretsmanager:us-east-1:*:secret:tolstoy/env*"
     }
   ]
 }

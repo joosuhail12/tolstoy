@@ -17,7 +17,7 @@ Create the following IAM policy and attach it to your EC2 instance role or user:
         "secretsmanager:DescribeSecret"
       ],
       "Resource": [
-        "arn:aws:secretsmanager:us-east-1:*:secret:conductor-db-secret-*",
+        "arn:aws:secretsmanager:us-east-1:*:secret:tolstoy/env-*",
         "arn:aws:secretsmanager:us-east-1:*:secret:tolstoy/*"
       ],
       "Condition": {
@@ -66,7 +66,7 @@ Create the following IAM policy and attach it to your EC2 instance role or user:
 - `secretsmanager:DescribeSecret` - Check if secrets exist
 
 **Resources:**
-- `conductor-db-secret` - Database connection credentials
+- `tolstoy/env` - Application environment variables and database credentials
 - `tolstoy/*` - All tool-specific secrets
 
 ### Write Permissions (Required for OAuth token refresh)
@@ -137,7 +137,7 @@ Test the permissions with these commands on your EC2 instance:
 ```bash
 # Test read access (should work)
 aws secretsmanager get-secret-value \
-  --secret-id conductor-db-secret \
+  --secret-id tolstoy/env \
   --region us-east-1
 
 # Test write access (should work for root user)

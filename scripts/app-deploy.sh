@@ -45,7 +45,7 @@ cat > .env.production << 'EOF'
 NODE_ENV=production
 PORT=3000
 AWS_REGION=us-east-1
-AWS_SECRET_NAME=conductor-db-secret
+AWS_SECRET_NAME=tolstoy/env
 USE_AWS_SECRETS=true
 EOF
 
@@ -61,7 +61,7 @@ module.exports = {
       NODE_ENV: 'production',
       PORT: 3000,
       AWS_REGION: 'us-east-1',
-      AWS_SECRET_NAME: 'conductor-db-secret',
+      AWS_SECRET_NAME: 'tolstoy/env',
       USE_AWS_SECRETS: 'true'
     },
     instances: 1,

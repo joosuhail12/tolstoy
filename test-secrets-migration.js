@@ -6,7 +6,7 @@ console.log('✅ AWS Secrets Service successfully imported');
 console.log('🎯 Environment variables migration completed!');
 
 console.log('📊 Migration Summary:');
-console.log('  - ✅ AWS Secrets Service: conductor-db-secret → tolstoy/env');
+console.log('  - ✅ AWS Secrets Service: tolstoy/env (unified secret)');
 console.log('  - ✅ Database credentials: Updated to use tolstoy/env');
 console.log('  - ✅ Redis credentials: Updated to use tolstoy/env');  
 console.log('  - ✅ Ably API key: Updated to use tolstoy/env');
