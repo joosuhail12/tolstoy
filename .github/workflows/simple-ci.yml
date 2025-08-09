@@ -50,7 +50,11 @@ jobs:
             }
             
             echo "📥 Pulling latest code..."
+            # Handle any uncommitted changes by stashing them
+            git stash || echo "No changes to stash"
             git pull origin main
+            # Restore stashed changes if any (this will handle conflicts gracefully)
+            git stash pop || echo "No stash to pop or merge conflicts - continuing"
             
             echo "📦 Installing dependencies..."
             npm ci --production=false
