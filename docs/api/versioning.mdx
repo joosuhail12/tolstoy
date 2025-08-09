@@ -1,0 +1,953 @@
+---
+title: "API Versioning"
+description: "Understanding API versions, backwards compatibility, and migration strategies"
+---
+
+# API Versioning
+
+The Tolstoy API uses semantic versioning to ensure backwards compatibility while enabling continuous improvement and new feature development.
+
+## Current Version
+
+<Badge variant="success">v2.1.0</Badge>
+
+The current API version is **v2.1.0**. All endpoints use this version unless explicitly specified otherwise.
+
+### **Version Information**
+
+```json
+{
+  "version": "2.1.0",
+  "api_level": "2024-01-15",
+  "deprecation_policy": "12_months",
+  "breaking_changes": false,
+  "next_major": "v3.0.0",
+  "estimated_release": "2024-Q3"
+}
+```
+
+## Versioning Strategy
+
+### **Semantic Versioning**
+
+We follow [semantic versioning](https://semver.org) principles:
+
+| Version Type | Format | Changes | Backwards Compatible |
+|--------------|--------|---------|---------------------|
+| **Major** | v2.0.0 → v3.0.0 | Breaking changes | ❌ No |
+| **Minor** | v2.0.0 → v2.1.0 | New features | ✅ Yes |
+| **Patch** | v2.1.0 → v2.1.1 | Bug fixes | ✅ Yes |
+
+### **API Level Dating**
+
+Each API version has an associated API level date that represents the feature set:
+
+```
+v2.1.0 → API Level 2024-01-15
+v2.0.0 → API Level 2023-12-01
+v1.9.0 → API Level 2023-10-15
+```
+
+## Version Specification
+
+### **Default Behavior**
+
+All requests use the latest stable version by default:
+
+<CodeGroup>
+
+```bash cURL - Default Version
+curl -X GET 'https://api.tolstoy.dev/actions' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+```bash cURL - Explicit Version
+curl -X GET 'https://api.tolstoy.dev/actions' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -H 'Tolstoy-Version: 2024-01-15'
+```
+
+</CodeGroup>
+
+### **Version Header**
+
+Specify API version using the `Tolstoy-Version` header:
+
+<CodeGroup>
+
+```javascript JavaScript
+const response = await fetch('https://api.tolstoy.dev/actions', {
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'Tolstoy-Version': '2024-01-15'
+  }
+});
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    'https://api.tolstoy.dev/actions',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+        'Tolstoy-Version': '2024-01-15'
+    }
+)
+```
+
+```go Go
+req, _ := http.NewRequest("GET", "https://api.tolstoy.dev/actions", nil)
+req.Header.Set("Authorization", "Bearer "+apiKey)
+req.Header.Set("Content-Type", "application/json")
+req.Header.Set("Tolstoy-Version", "2024-01-15")
+
+resp, err := client.Do(req)
+```
+
+</CodeGroup>
+
+### **URL-Based Versioning (Beta Features)**
+
+For beta features and experimental endpoints:
+
+```
+https://api.tolstoy.dev/v3/beta/ai-workflows
+https://api.tolstoy.dev/v2.1/preview/advanced-analytics
+```
+
+## Version History
+
+### **v2.1.0 (Current)** - January 15, 2024
+
+<Badge variant="success">Current</Badge>
+
+**New Features:**
+- Enhanced workflow execution analytics
+- Improved error handling with detailed error codes
+- New webhook signature verification methods
+- Organization usage dashboards
+- Advanced rate limiting controls
+
+**Improvements:**
+- 40% faster response times for flow executions
+- Better pagination performance
+- Enhanced input validation
+- Improved API documentation
+
+**Deprecations:**
+- None
+
+---
+
+### **v2.0.0** - December 1, 2023
+
+<Badge variant="warning">Supported</Badge>
+
+**Breaking Changes:**
+- Renamed `workflow` to `flow` throughout API
+- Changed pagination format from offset-based to cursor-based
+- Updated authentication token format
+- Modified webhook payload structure
+
+**New Features:**
+- Flow versioning and rollback
+- Advanced conditional logic
+- Multi-step workflows
+- Real-time execution monitoring
+
+**Migration Guide:** [v1 to v2 Migration](/api/migration/v1-to-v2)
+
+---
+
+### **v1.9.0** - October 15, 2023
+
+<Badge variant="danger">Deprecated</Badge> **End of Life: April 15, 2024**
+
+**Final Features:**
+- Legacy workflow compatibility mode
+- Migration tools to v2.0
+- Extended deprecation timeline
+
+## Supported Versions
+
+| Version | Status | Support Until | Breaking Changes |
+|---------|--------|---------------|------------------|
+| **v2.1.x** | Current | Ongoing | None |
+| **v2.0.x** | Supported | Dec 1, 2024 | None |
+| **v1.9.x** | Deprecated | Apr 15, 2024 | Migration required |
+| **v1.8.x** | End of Life | - | No longer supported |
+
+<Warning>
+**Deprecation Notice:** v1.9.x will reach end of life on April 15, 2024. Please migrate to v2.0+ before this date.
+</Warning>
+
+## Version Selection Best Practices
+
+### **Production Applications**
+
+<CodeGroup>
+
+```javascript Pin to Specific Version
+// ✅ Good: Pin to specific API level
+const client = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  apiVersion: '2024-01-15', // Pin to specific date
+  baseURL: 'https://api.tolstoy.dev'
+});
+
+// ❌ Avoid: Using "latest" in production
+const client = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  // No version specified = latest
+  baseURL: 'https://api.tolstoy.dev'
+});
+```
+
+```python Python Version Pinning
+# ✅ Good: Explicit version
+client = TolstoyClient(
+    api_key=os.environ['TOLSTOY_API_KEY'],
+    api_version='2024-01-15',  # Pin to specific version
+    base_url='https://api.tolstoy.dev'
+)
+
+# ❌ Avoid: No version specified
+client = TolstoyClient(
+    api_key=os.environ['TOLSTOY_API_KEY'],
+    base_url='https://api.tolstoy.dev'
+)
+```
+
+</CodeGroup>
+
+### **Development and Testing**
+
+<CodeGroup>
+
+```javascript Development Setup
+// Development: Use latest for testing new features
+const devClient = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_DEV_API_KEY,
+  baseURL: 'https://api-dev.tolstoy.dev'
+  // Latest version for development
+});
+
+// Staging: Pin to intended production version
+const stagingClient = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_STAGING_API_KEY,
+  apiVersion: '2024-01-15',
+  baseURL: 'https://api-staging.tolstoy.dev'
+});
+```
+
+</CodeGroup>
+
+## Breaking Changes Policy
+
+### **What Constitutes a Breaking Change**
+
+Breaking changes include:
+- Removing endpoints or fields
+- Changing response formats
+- Modifying required parameters
+- Changing authentication methods
+- Altering error code meanings
+
+### **Non-Breaking Changes**
+
+These changes are made within minor versions:
+- Adding new endpoints
+- Adding optional parameters
+- Adding response fields
+- Improving performance
+- Enhanced error messages
+
+### **Deprecation Timeline**
+
+1. **Announcement** (T-12 months): Deprecation announced in API documentation and via email
+2. **Warning Headers** (T-6 months): API responses include deprecation warnings
+3. **Migration Tools** (T-3 months): Automated migration tools released
+4. **End of Life** (T-0): Version no longer supported
+
+## Version Detection
+
+### **Runtime Version Detection**
+
+<CodeGroup>
+
+```javascript Check Current Version
+async function getCurrentAPIVersion(apiKey) {
+  const response = await fetch('https://api.tolstoy.dev/health', {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  
+  const health = await response.json();
+  
+  console.log('Current API Version:', health.version);
+  console.log('API Level:', health.api_level);
+  console.log('Your client is using:', response.headers.get('tolstoy-version-used'));
+  
+  return {
+    version: health.version,
+    apiLevel: health.api_level,
+    clientVersion: response.headers.get('tolstoy-version-used')
+  };
+}
+
+// Check version compatibility
+const versionInfo = await getCurrentAPIVersion(apiKey);
+if (versionInfo.clientVersion !== versionInfo.version) {
+  console.warn('⚠️ Version mismatch detected');
+  console.log(`API supports: ${versionInfo.version}`);
+  console.log(`Your client uses: ${versionInfo.clientVersion}`);
+}
+```
+
+```python Python Version Check
+def check_api_version(api_key):
+    response = requests.get(
+        'https://api.tolstoy.dev/health',
+        headers={
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+    )
+    
+    health = response.json()
+    client_version = response.headers.get('tolstoy-version-used')
+    
+    print(f"Current API Version: {health['version']}")
+    print(f"API Level: {health['api_level']}")
+    print(f"Your client version: {client_version}")
+    
+    if client_version != health['version']:
+        print("⚠️ Version mismatch detected")
+        print("Consider updating your API version")
+    
+    return {
+        'version': health['version'],
+        'api_level': health['api_level'],
+        'client_version': client_version
+    }
+
+version_info = check_api_version(api_key)
+```
+
+</CodeGroup>
+
+## Migration Strategies
+
+### **Gradual Migration**
+
+<CodeGroup>
+
+```javascript Gradual Migration Pattern
+class TolstoyClientManager {
+  constructor() {
+    // Use different versions for different features
+    this.legacyClient = new TolstoyClient({
+      apiKey: process.env.TOLSTOY_API_KEY,
+      apiVersion: '2023-12-01', // Legacy workflows
+      baseURL: 'https://api.tolstoy.dev'
+    });
+    
+    this.modernClient = new TolstoyClient({
+      apiKey: process.env.TOLSTOY_API_KEY,
+      apiVersion: '2024-01-15', // New features
+      baseURL: 'https://api.tolstoy.dev'
+    });
+  }
+  
+  async getActions() {
+    // Use modern client for new features
+    return this.modernClient.actions.list();
+  }
+  
+  async getLegacyWorkflows() {
+    // Keep using legacy client for old workflows
+    return this.legacyClient.workflows.list();
+  }
+  
+  async migrateWorkflowToFlow(workflowId) {
+    // Get workflow from legacy API
+    const workflow = await this.legacyClient.workflows.get(workflowId);
+    
+    // Transform to new flow format
+    const flow = this.transformWorkflowToFlow(workflow);
+    
+    // Create using modern API
+    const newFlow = await this.modernClient.flows.create(flow);
+    
+    console.log(`Migrated workflow ${workflowId} to flow ${newFlow.id}`);
+    
+    return newFlow;
+  }
+  
+  transformWorkflowToFlow(workflow) {
+    // Handle breaking changes in data structure
+    return {
+      name: workflow.name,
+      display_name: workflow.display_name,
+      description: workflow.description,
+      trigger: {
+        type: workflow.trigger_type,
+        config: workflow.trigger_config
+      },
+      steps: workflow.actions.map(action => ({
+        id: action.id,
+        name: action.name,
+        action_id: action.action_id,
+        type: 'action',
+        input_mapping: action.input_mapping
+      })),
+      variables: workflow.inputs || {}
+    };
+  }
+}
+
+// Usage
+const clientManager = new TolstoyClientManager();
+
+// Use appropriate client for each operation
+const actions = await clientManager.getActions();
+const legacyWorkflows = await clientManager.getLegacyWorkflows();
+
+// Migrate one workflow at a time
+for (const workflow of legacyWorkflows) {
+  await clientManager.migrateWorkflowToFlow(workflow.id);
+}
+```
+
+</CodeGroup>
+
+### **Feature Flag Migration**
+
+<CodeGroup>
+
+```javascript Feature Flag Pattern
+class VersionedTolstoyClient {
+  constructor(apiKey, features = {}) {
+    this.apiKey = apiKey;
+    this.features = {
+      useNewPagination: false,
+      useEnhancedWebhooks: false,
+      useAdvancedAnalytics: false,
+      ...features
+    };
+  }
+  
+  async listActions(options = {}) {
+    if (this.features.useNewPagination) {
+      // Use v2.1 cursor-based pagination
+      return this.listActionsV21(options);
+    } else {
+      // Use v2.0 offset-based pagination
+      return this.listActionsV20(options);
+    }
+  }
+  
+  async listActionsV21(options) {
+    const params = new URLSearchParams();
+    if (options.limit) params.set('limit', options.limit);
+    if (options.cursor) params.set('cursor', options.cursor);
+    
+    const response = await fetch(`https://api.tolstoy.dev/actions?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Tolstoy-Version': '2024-01-15'
+      }
+    });
+    
+    return response.json();
+  }
+  
+  async listActionsV20(options) {
+    const params = new URLSearchParams();
+    if (options.limit) params.set('limit', options.limit);
+    if (options.offset) params.set('offset', options.offset);
+    
+    const response = await fetch(`https://api.tolstoy.dev/actions?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Tolstoy-Version': '2023-12-01'
+      }
+    });
+    
+    return response.json();
+  }
+}
+
+// Gradual feature adoption
+const client = new VersionedTolstoyClient(apiKey, {
+  useNewPagination: process.env.NODE_ENV === 'development',
+  useEnhancedWebhooks: true
+});
+```
+
+</CodeGroup>
+
+## Version Compatibility
+
+### **Cross-Version Compatibility Matrix**
+
+| Client Version | API v2.1 | API v2.0 | API v1.9 |
+|----------------|----------|----------|----------|
+| **SDK v2.1.x** | ✅ Full | ✅ Full | ⚠️ Limited |
+| **SDK v2.0.x** | ✅ Full | ✅ Full | ✅ Full |
+| **SDK v1.9.x** | ❌ No | ⚠️ Limited | ✅ Full |
+
+### **Deprecation Warnings**
+
+API responses include deprecation warnings when using older versions:
+
+```json
+{
+  "data": { ... },
+  "warnings": [
+    {
+      "code": "DEPRECATED_VERSION",
+      "message": "API version 2023-12-01 is deprecated",
+      "details": "Please upgrade to 2024-01-15 before April 15, 2024",
+      "migration_guide": "https://docs.tolstoy.dev/api/migration/v2.0-to-v2.1",
+      "end_of_life": "2024-04-15T00:00:00Z"
+    }
+  ]
+}
+```
+
+## Version-Specific Features
+
+### **v2.1.0 Features**
+
+<Tabs>
+  <Tab title="Enhanced Analytics">
+    ```json
+    {
+      "execution": {
+        "id": "exec_123",
+        "analytics": {
+          "duration_breakdown": {
+            "queue_time_ms": 45,
+            "execution_time_ms": 1200,
+            "network_time_ms": 800
+          },
+          "resource_usage": {
+            "memory_peak_mb": 128,
+            "cpu_time_ms": 340
+          },
+          "dependencies": [
+            {
+              "service": "external-api",
+              "response_time_ms": 450,
+              "status": "success"
+            }
+          ]
+        }
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Improved Error Codes">
+    ```json
+    {
+      "error": {
+        "code": "VALIDATION_FAILED",
+        "message": "Input validation failed",
+        "type": "validation",
+        "details": {
+          "field": "configuration.timeout",
+          "reason": "Must be between 1000 and 300000",
+          "provided_value": 500000,
+          "valid_range": [1000, 300000]
+        },
+        "suggestion": "Set timeout between 1 and 300 seconds",
+        "documentation": "https://docs.tolstoy.dev/api/validation-rules"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Advanced Webhooks">
+    ```json
+    {
+      "webhook": {
+        "id": "webhook_123",
+        "events": ["flow.started", "flow.completed", "flow.failed"],
+        "signature": {
+          "algorithm": "sha256",
+          "header": "X-Tolstoy-Signature",
+          "include_timestamp": true
+        },
+        "retry_policy": {
+          "max_attempts": 5,
+          "backoff_strategy": "exponential",
+          "retry_codes": [500, 502, 503, 504, 408]
+        },
+        "filtering": {
+          "flow_tags": ["production", "critical"],
+          "organization_ids": ["org_123", "org_456"]
+        }
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### **v2.0.0 Features**
+
+- Flow-based workflow management
+- Cursor-based pagination
+- Enhanced authentication
+- Real-time execution monitoring
+
+### **Legacy v1.9.0 Features**
+
+- Workflow-based automation (deprecated)
+- Offset-based pagination (deprecated)
+- Basic webhook support (limited)
+
+## Migration Guides
+
+### **v2.0 to v2.1 Migration**
+
+<CodeGroup>
+
+```javascript Pagination Migration
+// Old v2.0 pagination
+const oldPagination = {
+  offset: 20,
+  limit: 20
+};
+
+// New v2.1 pagination
+const newPagination = {
+  cursor: 'eyJjcmVhdGVkX2F0IjoiMjAyNC...',
+  limit: 20
+};
+
+// Migration helper
+function convertPaginationParams(oldParams) {
+  const newParams = { limit: oldParams.limit };
+  
+  if (oldParams.offset && oldParams.offset > 0) {
+    // For initial migration, start from beginning
+    console.warn('Offset-based pagination deprecated. Starting from beginning.');
+  }
+  
+  return newParams;
+}
+```
+
+```javascript Error Handling Migration
+// Old v2.0 error handling
+try {
+  const response = await fetch('/actions');
+  const data = await response.json();
+  
+  if (!response.ok) {
+    console.error('Error:', data.error);
+  }
+} catch (error) {
+  console.error('Network error:', error);
+}
+
+// New v2.1 enhanced error handling
+try {
+  const response = await fetch('/actions');
+  const data = await response.json();
+  
+  if (!response.ok) {
+    const error = data.error;
+    console.error(`Error ${error.code}: ${error.message}`);
+    
+    if (error.suggestion) {
+      console.log('Suggestion:', error.suggestion);
+    }
+    
+    if (error.documentation) {
+      console.log('More info:', error.documentation);
+    }
+  }
+} catch (error) {
+  console.error('Network error:', error);
+}
+```
+
+</CodeGroup>
+
+### **Automated Migration Tools**
+
+<CodeGroup>
+
+```bash Migration CLI
+# Install migration CLI
+npm install -g @tolstoy/migration-tools
+
+# Analyze compatibility
+tolstoy-migrate analyze --from=2023-12-01 --to=2024-01-15 --project=./
+
+# Generate migration plan
+tolstoy-migrate plan --target=2024-01-15 --output=migration-plan.json
+
+# Execute migration
+tolstoy-migrate execute --plan=migration-plan.json --dry-run
+tolstoy-migrate execute --plan=migration-plan.json
+```
+
+```javascript Migration Script
+const { TolstoyMigration } = require('@tolstoy/migration-tools');
+
+const migration = new TolstoyMigration({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  fromVersion: '2023-12-01',
+  toVersion: '2024-01-15'
+});
+
+// Analyze current usage
+const analysis = await migration.analyze();
+console.log('Breaking changes found:', analysis.breakingChanges);
+console.log('Recommended actions:', analysis.recommendations);
+
+// Execute migration
+if (analysis.canAutoMigrate) {
+  const result = await migration.execute({ dryRun: false });
+  console.log('Migration completed:', result.summary);
+} else {
+  console.log('Manual migration required');
+  console.log('See:', analysis.manualSteps);
+}
+```
+
+</CodeGroup>
+
+## Version Negotiation
+
+### **Client Version Negotiation**
+
+<CodeGroup>
+
+```javascript Smart Version Selection
+class SmartTolstoyClient {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.supportedVersions = ['2024-01-15', '2023-12-01'];
+    this.negotiatedVersion = null;
+  }
+  
+  async initialize() {
+    // Negotiate best version
+    this.negotiatedVersion = await this.negotiateVersion();
+    console.log(`Using API version: ${this.negotiatedVersion}`);
+  }
+  
+  async negotiateVersion() {
+    // Try versions in order of preference
+    for (const version of this.supportedVersions) {
+      try {
+        const response = await fetch('https://api.tolstoy.dev/health', {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Tolstoy-Version': version
+          }
+        });
+        
+        if (response.ok) {
+          const health = await response.json();
+          
+          // Check if version is supported and not deprecated
+          const versionInfo = response.headers.get('tolstoy-version-info');
+          const info = JSON.parse(versionInfo || '{}');
+          
+          if (!info.deprecated || info.end_of_life > Date.now()) {
+            return version;
+          }
+        }
+      } catch (error) {
+        console.warn(`Version ${version} not available:`, error.message);
+      }
+    }
+    
+    // Fallback to latest
+    console.warn('No compatible version found, using latest');
+    return null;
+  }
+  
+  async request(endpoint, options = {}) {
+    if (!this.negotiatedVersion) {
+      await this.initialize();
+    }
+    
+    const headers = {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+      ...options.headers
+    };
+    
+    if (this.negotiatedVersion) {
+      headers['Tolstoy-Version'] = this.negotiatedVersion;
+    }
+    
+    return fetch(`https://api.tolstoy.dev${endpoint}`, {
+      ...options,
+      headers
+    });
+  }
+}
+
+// Usage
+const client = new SmartTolstoyClient(apiKey);
+const actions = await client.request('/actions');
+```
+
+</CodeGroup>
+
+## Beta and Preview Features
+
+### **Accessing Beta Features**
+
+<CodeGroup>
+
+```javascript Beta Feature Access
+// Access beta AI workflows
+const response = await fetch('https://api.tolstoy.dev/v3/beta/ai-workflows', {
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+    'Tolstoy-Beta': 'ai-workflows,advanced-analytics'
+  }
+});
+
+// Preview features in current version
+const previewResponse = await fetch('https://api.tolstoy.dev/flows', {
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Tolstoy-Version': '2024-01-15',
+    'Tolstoy-Preview': 'flow-templates,batch-operations'
+  }
+});
+```
+
+```python Python Beta Access
+# Beta features
+response = requests.get(
+    'https://api.tolstoy.dev/v3/beta/ai-workflows',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json',
+        'Tolstoy-Beta': 'ai-workflows,advanced-analytics'
+    }
+)
+
+# Preview features
+preview_response = requests.get(
+    'https://api.tolstoy.dev/flows',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Tolstoy-Version': '2024-01-15',
+        'Tolstoy-Preview': 'flow-templates,batch-operations'
+    }
+)
+```
+
+</CodeGroup>
+
+<Warning>
+**Beta Features:** Beta and preview features are unstable and may change without notice. Don't use them in production applications.
+</Warning>
+
+## API Playground
+
+Test version compatibility:
+
+<ApiPlayground
+  method="GET"
+  endpoint="/health"
+  baseUrl="https://api.tolstoy.dev"
+  auth={{
+    type: "bearer",
+    placeholder: "Your API Key"
+  }}
+  headers={[
+    {
+      name: "Tolstoy-Version",
+      value: "2024-01-15",
+      description: "Specify API version",
+      required: false
+    }
+  ]}
+  sampleResponse={{
+    "status": "healthy",
+    "version": "2.1.0",
+    "api_level": "2024-01-15",
+    "compatibility": {
+      "min_supported": "2023-12-01",
+      "max_supported": "2024-01-15",
+      "deprecation_warnings": []
+    }
+  }}
+/>
+
+## Monitoring Version Usage
+
+### **Version Analytics Dashboard**
+
+Track your API version usage:
+
+<CodeGroup>
+
+```javascript Version Usage Analytics
+async function getVersionUsageAnalytics(apiKey) {
+  const response = await fetch('https://api.tolstoy.dev/analytics/api-usage', {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  
+  const analytics = await response.json();
+  
+  console.log('Version Usage Breakdown:');
+  analytics.version_usage.forEach(usage => {
+    console.log(`${usage.version}: ${usage.percentage}% (${usage.request_count} requests)`);
+  });
+  
+  // Identify deprecation risks
+  const deprecatedUsage = analytics.version_usage.filter(v => v.deprecated);
+  if (deprecatedUsage.length > 0) {
+    console.warn('⚠️ Using deprecated versions:');
+    deprecatedUsage.forEach(usage => {
+      console.warn(`- ${usage.version}: ${usage.percentage}% (EOL: ${usage.end_of_life})`);
+    });
+  }
+  
+  return analytics;
+}
+```
+
+</CodeGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Migration Guides" icon="arrow-right" href="/api/migration">
+    Step-by-step migration guides
+  </Card>
+  <Card title="Breaking Changes" icon="triangle-exclamation" href="/api/breaking-changes">
+    Complete breaking changes log
+  </Card>
+  <Card title="SDK Versions" icon="code" href="/sdk/versions">
+    SDK version compatibility
+  </Card>
+  <Card title="Changelog" icon="list" href="/api/changelog">
+    Complete API changelog
+  </Card>
+</CardGroup>

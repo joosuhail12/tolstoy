@@ -1,0 +1,1150 @@
+---
+title: "Status Codes"
+description: "Complete reference for HTTP status codes used by the Tolstoy API"
+---
+
+# Status Codes
+
+The Tolstoy API uses standard HTTP status codes to indicate the success or failure of API requests. This reference covers all status codes you may encounter.
+
+## Success Codes (2xx)
+
+### **200 OK**
+
+<Badge variant="success">Success</Badge>
+
+Request succeeded. The response body contains the requested data.
+
+**Common endpoints:**
+- `GET /actions` - List actions
+- `GET /flows/{id}` - Get flow details
+- `POST /actions/{id}/execute` - Execute action
+
+**Example response:**
+```json
+{
+  "action": {
+    "id": "action_123456789",
+    "name": "my_action",
+    "status": "active"
+  }
+}
+```
+
+---
+
+### **201 Created**
+
+<Badge variant="success">Created</Badge>
+
+Resource was successfully created. The response body contains the created resource.
+
+**Common endpoints:**
+- `POST /actions` - Create action
+- `POST /flows` - Create flow
+- `POST /organizations` - Create organization
+
+**Example response:**
+```json
+{
+  "action": {
+    "id": "action_new123456",
+    "name": "my_new_action",
+    "created_at": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+---
+
+### **202 Accepted**
+
+<Badge variant="info">Accepted</Badge>
+
+Request accepted for processing. Used for asynchronous operations.
+
+**Common endpoints:**
+- `POST /flows/{id}/execute` - Execute flow (async mode)
+- `POST /actions/{id}/execute` - Execute action (async mode)
+- `DELETE /organizations/{id}` - Delete organization (async)
+
+**Example response:**
+```json
+{
+  "execution": {
+    "id": "exec_async123456",
+    "status": "queued",
+    "estimated_completion": "2024-01-15T10:35:00Z"
+  }
+}
+```
+
+---
+
+### **204 No Content**
+
+<Badge variant="success">Success</Badge>
+
+Request succeeded but there's no content to return.
+
+**Common endpoints:**
+- `DELETE /actions/{id}` - Delete action
+- `DELETE /flows/{id}` - Delete flow
+- `POST /auth/logout` - Logout
+
+---
+
+## Client Error Codes (4xx)
+
+### **400 Bad Request**
+
+<Badge variant="danger">Client Error</Badge>
+
+The request was malformed or contains invalid parameters.
+
+**Common causes:**
+- Invalid JSON in request body
+- Missing required parameters
+- Invalid parameter values
+- Malformed request structure
+
+<CodeGroup>
+
+```json Missing Required Field
+{
+  "error": {
+    "code": "MISSING_REQUIRED_FIELD",
+    "message": "Required field is missing",
+    "type": "validation",
+    "field": "name",
+    "details": "Action name is required and cannot be empty",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Invalid Parameter Value
+{
+  "error": {
+    "code": "INVALID_PARAMETER_VALUE",
+    "message": "Parameter value is invalid",
+    "type": "validation",
+    "field": "timeout",
+    "details": "Timeout must be between 1000 and 300000 milliseconds",
+    "provided_value": 500000,
+    "valid_range": [1000, 300000],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Malformed JSON
+{
+  "error": {
+    "code": "MALFORMED_REQUEST",
+    "message": "Request body contains invalid JSON",
+    "type": "parsing",
+    "details": "Unexpected token '}' at position 45",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+---
+
+### **401 Unauthorized**
+
+<Badge variant="danger">Auth Error</Badge>
+
+Authentication failed or missing credentials.
+
+**Common causes:**
+- Missing Authorization header
+- Invalid API key
+- Expired access token
+- Malformed Bearer token
+
+<CodeGroup>
+
+```json Missing Authorization
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Authentication required",
+    "type": "authentication",
+    "details": "Authorization header is missing",
+    "required_header": "Authorization: Bearer <your-api-key>",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Invalid API Key
+{
+  "error": {
+    "code": "INVALID_API_KEY",
+    "message": "The provided API key is invalid",
+    "type": "authentication",
+    "details": "API key format is incorrect or key does not exist",
+    "hint": "Check your API key in the dashboard at https://app.tolstoy.dev/settings/api-keys",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Expired Token
+{
+  "error": {
+    "code": "EXPIRED_TOKEN",
+    "message": "Access token has expired",
+    "type": "authentication",
+    "details": "Token expired at 2024-01-15T09:30:00Z",
+    "expires_at": "2024-01-15T09:30:00Z",
+    "suggestion": "Use your refresh token to obtain a new access token",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+---
+
+### **403 Forbidden**
+
+<Badge variant="danger">Access Denied</Badge>
+
+Authentication succeeded but access is denied due to insufficient permissions.
+
+**Common causes:**
+- API key lacks required permissions
+- Organization access restrictions
+- Resource-level permissions
+- Plan limitations
+
+<CodeGroup>
+
+```json Insufficient Permissions
+{
+  "error": {
+    "code": "INSUFFICIENT_PERMISSIONS",
+    "message": "Your API key doesn't have the required permissions",
+    "type": "authorization",
+    "details": "This endpoint requires 'admin' permissions",
+    "required_permissions": ["admin"],
+    "current_permissions": ["read", "write"],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Plan Limitation
+{
+  "error": {
+    "code": "PLAN_LIMITATION",
+    "message": "Feature not available on your current plan",
+    "type": "authorization",
+    "details": "Advanced analytics requires Professional plan or higher",
+    "current_plan": "starter",
+    "required_plan": "professional",
+    "upgrade_url": "https://app.tolstoy.dev/billing/upgrade",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Resource Access Denied
+{
+  "error": {
+    "code": "RESOURCE_ACCESS_DENIED",
+    "message": "Access denied to the requested resource",
+    "type": "authorization",
+    "details": "You don't have access to organization 'org_987654321'",
+    "resource_type": "organization",
+    "resource_id": "org_987654321",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+---
+
+### **404 Not Found**
+
+<Badge variant="warning">Not Found</Badge>
+
+The requested resource doesn't exist or has been deleted.
+
+**Common causes:**
+- Invalid resource ID
+- Resource was deleted
+- Typo in endpoint URL
+- Resource moved or renamed
+
+<CodeGroup>
+
+```json Resource Not Found
+{
+  "error": {
+    "code": "RESOURCE_NOT_FOUND",
+    "message": "The requested resource was not found",
+    "type": "not_found",
+    "details": "Action with ID 'action_invalid123' does not exist",
+    "resource_type": "action",
+    "resource_id": "action_invalid123",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Endpoint Not Found
+{
+  "error": {
+    "code": "ENDPOINT_NOT_FOUND",
+    "message": "The requested endpoint does not exist",
+    "type": "not_found",
+    "details": "No route matches GET /invalid-endpoint",
+    "path": "/invalid-endpoint",
+    "method": "GET",
+    "suggestion": "Check the API documentation for correct endpoints",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+---
+
+### **409 Conflict**
+
+<Badge variant="warning">Conflict</Badge>
+
+Request conflicts with the current state of the resource.
+
+**Common causes:**
+- Duplicate resource names
+- Concurrent modifications
+- Resource state conflicts
+- Unique constraint violations
+
+<CodeGroup>
+
+```json Duplicate Resource
+{
+  "error": {
+    "code": "RESOURCE_CONFLICT",
+    "message": "Resource with this name already exists",
+    "type": "conflict",
+    "details": "An action with name 'my_action' already exists",
+    "field": "name",
+    "conflicting_value": "my_action",
+    "existing_resource_id": "action_existing123",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json State Conflict
+{
+  "error": {
+    "code": "RESOURCE_STATE_CONFLICT",
+    "message": "Resource is in an invalid state for this operation",
+    "type": "conflict",
+    "details": "Cannot delete a flow that is currently executing",
+    "resource_type": "flow",
+    "resource_id": "flow_123456789",
+    "current_state": "executing",
+    "required_state": "idle",
+    "suggestion": "Wait for execution to complete or cancel it first",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+---
+
+### **422 Unprocessable Entity**
+
+<Badge variant="warning">Validation Error</Badge>
+
+Request was well-formed but contains semantic errors.
+
+**Common causes:**
+- Business logic validation failures
+- Complex field validation errors
+- Cross-field validation issues
+- Data integrity constraints
+
+<CodeGroup>
+
+```json Validation Failed
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Multiple validation errors",
+    "type": "validation",
+    "errors": [
+      {
+        "field": "configuration.timeout",
+        "code": "INVALID_RANGE",
+        "message": "Timeout must be between 1000 and 300000",
+        "provided_value": 500000,
+        "valid_range": [1000, 300000]
+      },
+      {
+        "field": "configuration.inputs[0].name",
+        "code": "INVALID_FORMAT",
+        "message": "Input name must be alphanumeric with underscores only",
+        "provided_value": "user-name",
+        "pattern": "^[a-zA-Z0-9_]+$"
+      }
+    ],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Business Logic Error
+{
+  "error": {
+    "code": "BUSINESS_LOGIC_VIOLATION",
+    "message": "Operation violates business rules",
+    "type": "validation",
+    "details": "Cannot create more than 100 actions on starter plan",
+    "current_count": 100,
+    "plan_limit": 100,
+    "current_plan": "starter",
+    "suggestion": "Upgrade to professional plan for unlimited actions",
+    "upgrade_url": "https://app.tolstoy.dev/billing/upgrade",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+---
+
+### **429 Too Many Requests**
+
+<Badge variant="warning">Rate Limited</Badge>
+
+Rate limit exceeded. Client should wait before making more requests.
+
+**Rate limit types:**
+- API requests per minute
+- Action executions per hour
+- Webhook dispatches per minute
+- Concurrent executions
+
+<CodeGroup>
+
+```json API Rate Limit
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Rate limit exceeded",
+    "type": "rate_limit",
+    "details": "API request limit exceeded",
+    "limit": 2000,
+    "window_seconds": 60,
+    "retry_after_seconds": 30,
+    "reset_at": "2024-01-15T10:31:00Z",
+    "current_usage": 2000,
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Execution Rate Limit
+{
+  "error": {
+    "code": "EXECUTION_RATE_LIMIT_EXCEEDED",
+    "message": "Execution rate limit exceeded",
+    "type": "rate_limit",
+    "details": "Maximum concurrent executions reached",
+    "limit": 50,
+    "current_executions": 50,
+    "estimated_slot_available": "2024-01-15T10:32:00Z",
+    "queue_position": 15,
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+## Server Error Codes (5xx)
+
+### **500 Internal Server Error**
+
+<Badge variant="danger">Server Error</Badge>
+
+An unexpected error occurred on the server.
+
+<CodeGroup>
+
+```json Generic Server Error
+{
+  "error": {
+    "code": "INTERNAL_SERVER_ERROR",
+    "message": "An internal server error occurred",
+    "type": "server_error",
+    "details": "Please try again later. If the problem persists, contact support",
+    "incident_id": "inc_123456789",
+    "support_contact": "support@tolstoy.dev",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+---
+
+### **502 Bad Gateway**
+
+<Badge variant="danger">Gateway Error</Badge>
+
+Error from upstream service or dependency.
+
+<CodeGroup>
+
+```json Upstream Service Error
+{
+  "error": {
+    "code": "UPSTREAM_SERVICE_ERROR",
+    "message": "Upstream service is unavailable",
+    "type": "gateway_error",
+    "details": "External integration service is temporarily unavailable",
+    "service": "external-webhook-service",
+    "retry_recommended": true,
+    "estimated_recovery": "2024-01-15T10:35:00Z",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+---
+
+### **503 Service Unavailable**
+
+<Badge variant="danger">Service Down</Badge>
+
+Service is temporarily unavailable, usually due to maintenance.
+
+<CodeGroup>
+
+```json Maintenance Mode
+{
+  "error": {
+    "code": "SERVICE_UNAVAILABLE",
+    "message": "Service is temporarily unavailable",
+    "type": "service_error",
+    "details": "Scheduled maintenance in progress",
+    "maintenance_window": {
+      "start": "2024-01-15T10:00:00Z",
+      "end": "2024-01-15T11:00:00Z"
+    },
+    "retry_after_seconds": 1800,
+    "status_page": "https://status.tolstoy.dev",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Overload Protection
+{
+  "error": {
+    "code": "SERVICE_OVERLOADED",
+    "message": "Service is temporarily overloaded",
+    "type": "service_error",
+    "details": "High traffic detected, please retry with exponential backoff",
+    "retry_after_seconds": 60,
+    "backoff_strategy": "exponential",
+    "max_retry_attempts": 5,
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+---
+
+### **504 Gateway Timeout**
+
+<Badge variant="danger">Timeout</Badge>
+
+Request timed out waiting for upstream service.
+
+<CodeGroup>
+
+```json Gateway Timeout
+{
+  "error": {
+    "code": "GATEWAY_TIMEOUT",
+    "message": "Request timeout while processing",
+    "type": "timeout_error",
+    "details": "Request took longer than 30 seconds to process",
+    "timeout_seconds": 30,
+    "operation": "action_execution",
+    "suggestion": "Reduce action timeout or optimize external dependencies",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+## Error Handling Best Practices
+
+### **Response Structure**
+
+All error responses follow a consistent structure:
+
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",           // Machine-readable error code
+    "message": "Human message",     // Human-readable error message
+    "type": "error_category",       // Error category
+    "details": "Additional info",   // Detailed explanation
+    "field": "problematic_field",   // Field that caused error (if applicable)
+    "timestamp": "ISO8601",         // When error occurred
+    "request_id": "req_xxx"         // Unique request identifier
+  }
+}
+```
+
+### **Error Handling Implementation**
+
+<CodeGroup>
+
+```javascript JavaScript Error Handler
+class TolstoyErrorHandler {
+  static async handleResponse(response) {
+    if (response.ok) {
+      return response.json();
+    }
+    
+    const errorData = await response.json();
+    const error = errorData.error;
+    
+    switch (response.status) {
+      case 400:
+        throw new ValidationError(error);
+      case 401:
+        throw new AuthenticationError(error);
+      case 403:
+        throw new AuthorizationError(error);
+      case 404:
+        throw new NotFoundError(error);
+      case 409:
+        throw new ConflictError(error);
+      case 422:
+        throw new ValidationError(error);
+      case 429:
+        throw new RateLimitError(error);
+      case 500:
+      case 502:
+      case 503:
+      case 504:
+        throw new ServerError(error);
+      default:
+        throw new TolstoyAPIError(error);
+    }
+  }
+}
+
+class TolstoyAPIError extends Error {
+  constructor(errorData) {
+    super(errorData.message);
+    this.name = 'TolstoyAPIError';
+    this.code = errorData.code;
+    this.type = errorData.type;
+    this.details = errorData.details;
+    this.requestId = errorData.request_id;
+    this.timestamp = errorData.timestamp;
+  }
+}
+
+class RateLimitError extends TolstoyAPIError {
+  constructor(errorData) {
+    super(errorData);
+    this.name = 'RateLimitError';
+    this.retryAfter = errorData.retry_after_seconds;
+    this.limit = errorData.limit;
+    this.resetAt = errorData.reset_at;
+  }
+}
+
+// Usage
+try {
+  const response = await fetch('https://api.tolstoy.dev/actions');
+  const data = await TolstoyErrorHandler.handleResponse(response);
+  console.log('Success:', data);
+} catch (error) {
+  if (error instanceof RateLimitError) {
+    console.log(`Rate limited, retry in ${error.retryAfter} seconds`);
+  } else if (error instanceof AuthenticationError) {
+    console.log('Authentication failed, check your API key');
+  } else {
+    console.error('API Error:', error.message);
+  }
+}
+```
+
+```python Python Error Handler
+import requests
+from datetime import datetime, timedelta
+import time
+
+class TolstoyAPIError(Exception):
+    def __init__(self, error_data):
+        super().__init__(error_data['message'])
+        self.code = error_data['code']
+        self.type = error_data['type']
+        self.details = error_data.get('details')
+        self.request_id = error_data.get('request_id')
+        self.timestamp = error_data.get('timestamp')
+
+class RateLimitError(TolstoyAPIError):
+    def __init__(self, error_data):
+        super().__init__(error_data)
+        self.retry_after = error_data.get('retry_after_seconds', 60)
+        self.limit = error_data.get('limit')
+        self.reset_at = error_data.get('reset_at')
+
+class TolstoyClient:
+    def __init__(self, api_key):
+        self.api_key = api_key
+        self.base_url = 'https://api.tolstoy.dev'
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        })
+    
+    def handle_response(self, response):
+        if response.ok:
+            return response.json()
+        
+        try:
+            error_data = response.json()['error']
+        except:
+            error_data = {
+                'code': 'UNKNOWN_ERROR',
+                'message': f'HTTP {response.status_code}',
+                'type': 'unknown'
+            }
+        
+        if response.status_code == 429:
+            raise RateLimitError(error_data)
+        elif response.status_code in [401, 403]:
+            raise TolstoyAPIError(error_data)
+        elif response.status_code >= 500:
+            raise TolstoyAPIError(error_data)
+        else:
+            raise TolstoyAPIError(error_data)
+    
+    def request_with_retry(self, method, endpoint, max_retries=3, **kwargs):
+        for attempt in range(max_retries + 1):
+            try:
+                response = self.session.request(
+                    method, 
+                    f'{self.base_url}{endpoint}',
+                    **kwargs
+                )
+                return self.handle_response(response)
+                
+            except RateLimitError as e:
+                if attempt < max_retries:
+                    print(f"Rate limited, waiting {e.retry_after} seconds...")
+                    time.sleep(e.retry_after)
+                    continue
+                raise
+            except TolstoyAPIError as e:
+                if e.code in ['INTERNAL_SERVER_ERROR', 'GATEWAY_TIMEOUT'] and attempt < max_retries:
+                    backoff = min(2 ** attempt, 60)
+                    print(f"Server error, retrying in {backoff} seconds...")
+                    time.sleep(backoff)
+                    continue
+                raise
+
+# Usage
+client = TolstoyClient(api_key)
+
+try:
+    actions = client.request_with_retry('GET', '/actions')
+    print(f"Found {len(actions['actions'])} actions")
+except RateLimitError as e:
+    print(f"Rate limited: {e.message}")
+except TolstoyAPIError as e:
+    print(f"API Error [{e.code}]: {e.message}")
+```
+
+</CodeGroup>
+
+### **Retry Strategies**
+
+<CodeGroup>
+
+```javascript Exponential Backoff
+class RetryHandler {
+  static async withRetry(fn, maxAttempts = 3) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await fn();
+      } catch (error) {
+        if (this.shouldRetry(error, attempt, maxAttempts)) {
+          const delay = this.calculateBackoff(attempt);
+          console.log(`Attempt ${attempt} failed, retrying in ${delay}ms...`);
+          await this.delay(delay);
+          continue;
+        }
+        throw error;
+      }
+    }
+  }
+  
+  static shouldRetry(error, attempt, maxAttempts) {
+    if (attempt >= maxAttempts) return false;
+    
+    // Retry server errors and specific client errors
+    if (error instanceof ServerError) return true;
+    if (error instanceof RateLimitError) return true;
+    if (error.code === 'GATEWAY_TIMEOUT') return true;
+    
+    return false;
+  }
+  
+  static calculateBackoff(attempt) {
+    // Exponential backoff with jitter
+    const baseDelay = 1000; // 1 second
+    const exponentialDelay = baseDelay * Math.pow(2, attempt - 1);
+    const jitter = Math.random() * 1000; // 0-1 second jitter
+    
+    return Math.min(exponentialDelay + jitter, 30000); // Max 30 seconds
+  }
+  
+  static delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// Usage
+const actions = await RetryHandler.withRetry(async () => {
+  const response = await fetch('https://api.tolstoy.dev/actions');
+  return TolstoyErrorHandler.handleResponse(response);
+});
+```
+
+</CodeGroup>
+
+## Status Code Quick Reference
+
+### **By Category**
+
+<Tabs>
+  <Tab title="Success (2xx)">
+    | Code | Name | Description |
+    |------|------|-------------|
+    | 200 | OK | Request successful |
+    | 201 | Created | Resource created |
+    | 202 | Accepted | Async request accepted |
+    | 204 | No Content | Success, no response body |
+  </Tab>
+  
+  <Tab title="Client Errors (4xx)">
+    | Code | Name | Common Cause |
+    |------|------|--------------|
+    | 400 | Bad Request | Invalid parameters |
+    | 401 | Unauthorized | Invalid API key |
+    | 403 | Forbidden | Insufficient permissions |
+    | 404 | Not Found | Resource doesn't exist |
+    | 409 | Conflict | Duplicate resource |
+    | 422 | Unprocessable Entity | Validation failed |
+    | 429 | Too Many Requests | Rate limit exceeded |
+  </Tab>
+  
+  <Tab title="Server Errors (5xx)">
+    | Code | Name | Action |
+    |------|------|--------|
+    | 500 | Internal Server Error | Retry with backoff |
+    | 502 | Bad Gateway | Check status page |
+    | 503 | Service Unavailable | Wait and retry |
+    | 504 | Gateway Timeout | Reduce timeout or retry |
+  </Tab>
+</Tabs>
+
+### **Response Headers**
+
+Important headers included in API responses:
+
+| Header | Description | Example |
+|--------|-------------|---------|
+| `Tolstoy-Request-ID` | Unique request identifier | `req_123456789` |
+| `Tolstoy-Version` | API version used | `2024-01-15` |
+| `Tolstoy-Rate-Limit-Remaining` | Requests remaining | `1995` |
+| `Tolstoy-Rate-Limit-Reset` | Rate limit reset time | `1705401060` |
+| `Retry-After` | Seconds to wait before retry | `60` |
+
+## Testing Status Codes
+
+### **Simulating Error Conditions**
+
+<CodeGroup>
+
+```javascript Test Error Scenarios
+// Force different status codes for testing
+const testScenarios = {
+  async test400() {
+    // Send invalid JSON to trigger 400
+    return fetch('https://api.tolstoy.dev/actions', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}` },
+      body: 'invalid json'
+    });
+  },
+  
+  async test401() {
+    // Use invalid API key to trigger 401
+    return fetch('https://api.tolstoy.dev/actions', {
+      headers: { 'Authorization': 'Bearer invalid_key' }
+    });
+  },
+  
+  async test404() {
+    // Request non-existent resource to trigger 404
+    return fetch('https://api.tolstoy.dev/actions/nonexistent', {
+      headers: { 'Authorization': `Bearer ${apiKey}` }
+    });
+  },
+  
+  async test429() {
+    // Make rapid requests to trigger rate limit
+    const promises = Array(100).fill().map(() =>
+      fetch('https://api.tolstoy.dev/actions', {
+        headers: { 'Authorization': `Bearer ${apiKey}` }
+      })
+    );
+    
+    return Promise.all(promises);
+  }
+};
+
+// Run tests
+for (const [testName, testFn] of Object.entries(testScenarios)) {
+  try {
+    console.log(`Running ${testName}...`);
+    const response = await testFn();
+    console.log(`${testName}: ${response.status}`);
+  } catch (error) {
+    console.log(`${testName}: ${error.message}`);
+  }
+}
+```
+
+</CodeGroup>
+
+### **Development Environment Testing**
+
+Use the development environment to test error scenarios safely:
+
+<CodeGroup>
+
+```bash Test Development Endpoints
+# Test 400 errors
+curl -X POST 'https://api-dev.tolstoy.dev/actions' \
+  -H 'Authorization: Bearer YOUR_DEV_KEY' \
+  -d 'invalid json'
+
+# Test 404 errors  
+curl -X GET 'https://api-dev.tolstoy.dev/actions/fake_id' \
+  -H 'Authorization: Bearer YOUR_DEV_KEY'
+
+# Test 401 errors
+curl -X GET 'https://api-dev.tolstoy.dev/actions' \
+  -H 'Authorization: Bearer invalid_key'
+```
+
+</CodeGroup>
+
+## API Playground
+
+Test status code scenarios:
+
+<ApiPlayground
+  method="GET"
+  endpoint="/actions/{action_id}"
+  baseUrl="https://api-dev.tolstoy.dev"
+  auth={{
+    type: "bearer",
+    placeholder: "Your Development API Key"
+  }}
+  pathParams={[
+    {
+      name: "action_id",
+      placeholder: "action_123456789",
+      description: "Action ID (use 'nonexistent' to test 404)",
+      required: true
+    }
+  ]}
+  testScenarios={[
+    {
+      name: "Success (200)",
+      description: "Valid action ID",
+      pathParams: { action_id: "action_123456789" }
+    },
+    {
+      name: "Not Found (404)",
+      description: "Invalid action ID",
+      pathParams: { action_id: "nonexistent" }
+    },
+    {
+      name: "Unauthorized (401)",
+      description: "Invalid API key",
+      auth: { type: "bearer", value: "invalid_key" }
+    }
+  ]}
+  sampleResponse={{
+    "action": {
+      "id": "action_123456789",
+      "name": "test_action",
+      "status": "active"
+    }
+  }}
+/>
+
+## Monitoring Status Codes
+
+### **Status Code Analytics**
+
+<CodeGroup>
+
+```javascript Monitor Status Codes
+class StatusCodeMonitor {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.stats = new Map();
+  }
+  
+  async trackRequest(endpoint, options = {}) {
+    const start = Date.now();
+    
+    try {
+      const response = await fetch(`https://api.tolstoy.dev${endpoint}`, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          ...options.headers
+        }
+      });
+      
+      const duration = Date.now() - start;
+      this.recordStats(endpoint, response.status, duration, 'success');
+      
+      return response;
+      
+    } catch (error) {
+      const duration = Date.now() - start;
+      this.recordStats(endpoint, 0, duration, 'error');
+      throw error;
+    }
+  }
+  
+  recordStats(endpoint, statusCode, duration, outcome) {
+    const key = `${endpoint}:${statusCode}`;
+    
+    if (!this.stats.has(key)) {
+      this.stats.set(key, {
+        endpoint,
+        statusCode,
+        count: 0,
+        totalDuration: 0,
+        outcomes: { success: 0, error: 0 }
+      });
+    }
+    
+    const stat = this.stats.get(key);
+    stat.count++;
+    stat.totalDuration += duration;
+    stat.outcomes[outcome]++;
+  }
+  
+  getReport() {
+    const report = Array.from(this.stats.values()).map(stat => ({
+      endpoint: stat.endpoint,
+      statusCode: stat.statusCode,
+      count: stat.count,
+      avgDuration: Math.round(stat.totalDuration / stat.count),
+      successRate: (stat.outcomes.success / stat.count * 100).toFixed(1)
+    }));
+    
+    return report.sort((a, b) => b.count - a.count);
+  }
+}
+
+// Usage
+const monitor = new StatusCodeMonitor(apiKey);
+
+// Make tracked requests
+await monitor.trackRequest('/actions');
+await monitor.trackRequest('/flows');
+
+// Get analytics report
+const report = monitor.getReport();
+console.table(report);
+```
+
+</CodeGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Error Codes" icon="triangle-exclamation" href="/api/error-codes">
+    Detailed error code reference
+  </Card>
+  <Card title="Rate Limiting" icon="gauge" href="/api/rate-limiting">
+    Understanding rate limits
+  </Card>
+  <Card title="Error Handling Guide" icon="shield" href="/api/guides/error-handling">
+    Error handling best practices
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/api/guides/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>

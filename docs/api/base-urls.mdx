@@ -1,0 +1,683 @@
+---
+title: "Base URLs & Environments"
+description: "API base URLs for different environments and regions"
+---
+
+# Base URLs & Environments
+
+The Tolstoy API is available across multiple environments to support your development lifecycle from testing to production.
+
+## Environments
+
+### **Production**
+
+<Badge variant="success">Live</Badge>
+
+```
+https://api.tolstoy.dev
+```
+
+- **Purpose**: Live production environment
+- **Rate Limits**: Full production limits
+- **Uptime SLA**: 99.9%
+- **Data**: Real production data
+- **Authentication**: Production API keys required
+
+### **Staging**
+
+<Badge variant="warning">Testing</Badge>
+
+```
+https://api-staging.tolstoy.dev
+```
+
+- **Purpose**: Pre-production testing and integration testing
+- **Rate Limits**: Same as production
+- **Uptime SLA**: 99.5%
+- **Data**: Anonymized production-like data
+- **Authentication**: Staging API keys required
+
+### **Development**
+
+<Badge variant="info">Development</Badge>
+
+```
+https://api-dev.tolstoy.dev
+```
+
+- **Purpose**: Development and experimentation
+- **Rate Limits**: Relaxed limits for testing
+- **Uptime SLA**: Best effort
+- **Data**: Test data, reset nightly
+- **Authentication**: Development API keys required
+
+## Regional Endpoints
+
+### **Primary Region (US-East)**
+
+```
+https://api.tolstoy.dev
+https://us-east-1.api.tolstoy.dev
+```
+
+- **Location**: Northern Virginia
+- **Latency**: Optimized for North America
+- **Default**: Used when no region specified
+
+### **Europe (EU-West)**
+
+```
+https://eu-west-1.api.tolstoy.dev
+```
+
+- **Location**: Ireland
+- **Latency**: Optimized for Europe
+- **Compliance**: GDPR compliant data processing
+
+### **Asia Pacific (AP-Southeast)**
+
+```
+https://ap-southeast-1.api.tolstoy.dev
+```
+
+- **Location**: Singapore
+- **Latency**: Optimized for Asia Pacific
+- **Compliance**: Local data residency options
+
+## Environment Configuration
+
+### **Configuration Examples**
+
+<CodeGroup>
+
+```javascript JavaScript
+const config = {
+  production: {
+    baseUrl: 'https://api.tolstoy.dev',
+    apiKey: process.env.TOLSTOY_PROD_API_KEY,
+    timeout: 30000,
+    retries: 3
+  },
+  staging: {
+    baseUrl: 'https://api-staging.tolstoy.dev',
+    apiKey: process.env.TOLSTOY_STAGING_API_KEY,
+    timeout: 30000,
+    retries: 2
+  },
+  development: {
+    baseUrl: 'https://api-dev.tolstoy.dev',
+    apiKey: process.env.TOLSTOY_DEV_API_KEY,
+    timeout: 60000,
+    retries: 1
+  }
+};
+
+const environment = process.env.NODE_ENV || 'development';
+const apiConfig = config[environment];
+
+// Initialize API client
+const client = new TolstoyClient(apiConfig);
+```
+
+```python Python
+import os
+from tolstoy import TolstoyClient
+
+ENVIRONMENTS = {
+    'production': {
+        'base_url': 'https://api.tolstoy.dev',
+        'api_key': os.getenv('TOLSTOY_PROD_API_KEY'),
+        'timeout': 30,
+        'retries': 3
+    },
+    'staging': {
+        'base_url': 'https://api-staging.tolstoy.dev',
+        'api_key': os.getenv('TOLSTOY_STAGING_API_KEY'),
+        'timeout': 30,
+        'retries': 2
+    },
+    'development': {
+        'base_url': 'https://api-dev.tolstoy.dev',
+        'api_key': os.getenv('TOLSTOY_DEV_API_KEY'),
+        'timeout': 60,
+        'retries': 1
+    }
+}
+
+environment = os.getenv('ENVIRONMENT', 'development')
+config = ENVIRONMENTS[environment]
+
+client = TolstoyClient(**config)
+```
+
+```go Go
+package main
+
+import (
+    "os"
+    "github.com/tolstoy/go-sdk"
+)
+
+type Environment struct {
+    BaseURL string
+    APIKey  string
+    Timeout int
+    Retries int
+}
+
+var environments = map[string]Environment{
+    "production": {
+        BaseURL: "https://api.tolstoy.dev",
+        APIKey:  os.Getenv("TOLSTOY_PROD_API_KEY"),
+        Timeout: 30000,
+        Retries: 3,
+    },
+    "staging": {
+        BaseURL: "https://api-staging.tolstoy.dev",
+        APIKey:  os.Getenv("TOLSTOY_STAGING_API_KEY"),
+        Timeout: 30000,
+        Retries: 2,
+    },
+    "development": {
+        BaseURL: "https://api-dev.tolstoy.dev",
+        APIKey:  os.Getenv("TOLSTOY_DEV_API_KEY"),
+        Timeout: 60000,
+        Retries: 1,
+    },
+}
+
+func main() {
+    env := os.Getenv("ENVIRONMENT")
+    if env == "" {
+        env = "development"
+    }
+    
+    config := environments[env]
+    client := tolstoy.NewClient(config.BaseURL, config.APIKey)
+    client.SetTimeout(config.Timeout)
+    client.SetRetries(config.Retries)
+}
+```
+
+</CodeGroup>
+
+### **Environment Variables**
+
+Set these environment variables for each environment:
+
+```bash
+# Production
+export TOLSTOY_PROD_API_KEY="sk_live_..."
+export TOLSTOY_PROD_BASE_URL="https://api.tolstoy.dev"
+
+# Staging  
+export TOLSTOY_STAGING_API_KEY="sk_test_..."
+export TOLSTOY_STAGING_BASE_URL="https://api-staging.tolstoy.dev"
+
+# Development
+export TOLSTOY_DEV_API_KEY="sk_dev_..."
+export TOLSTOY_DEV_BASE_URL="https://api-dev.tolstoy.dev"
+
+# Current environment
+export TOLSTOY_ENVIRONMENT="production"
+```
+
+## Health Check Endpoints
+
+Each environment provides health check endpoints for monitoring:
+
+| Environment | Health Endpoint | Status Page |
+|-------------|----------------|-------------|
+| Production | `https://api.tolstoy.dev/health` | [status.tolstoy.dev](https://status.tolstoy.dev) |
+| Staging | `https://api-staging.tolstoy.dev/health` | [staging-status.tolstoy.dev](https://staging-status.tolstoy.dev) |
+| Development | `https://api-dev.tolstoy.dev/health` | N/A |
+
+## Rate Limits by Environment
+
+| Environment | Requests/Min | Executions/Hour | Concurrent |
+|-------------|--------------|-----------------|------------|
+| **Production** | 2,000 | 10,000 | 50 |
+| **Staging** | 2,000 | 10,000 | 50 |
+| **Development** | 5,000 | 50,000 | 100 |
+
+<Info>Development environment has higher limits to support testing and development workflows.</Info>
+
+## Data Policies
+
+### **Production Environment**
+- Real customer data
+- Full data retention
+- GDPR/CCPA compliance
+- Audit logging enabled
+- Backups every 6 hours
+
+### **Staging Environment**
+- Anonymized production data
+- 90-day retention
+- Compliance testing
+- Audit logging enabled
+- Daily backups
+
+### **Development Environment**
+- Synthetic test data
+- Data reset nightly at 2 AM UTC
+- No compliance requirements
+- Minimal logging
+- No backups
+
+## Best Practices
+
+### **Environment Separation**
+
+<CodeGroup>
+
+```javascript Environment Detection
+class TolstoyAPI {
+  constructor() {
+    this.environment = this.detectEnvironment();
+    this.config = this.getConfig(this.environment);
+    this.client = new TolstoyClient(this.config);
+  }
+  
+  detectEnvironment() {
+    // Auto-detect based on hostname
+    const hostname = window?.location?.hostname || '';
+    
+    if (hostname.includes('localhost') || hostname.includes('dev')) {
+      return 'development';
+    } else if (hostname.includes('staging') || hostname.includes('test')) {
+      return 'staging';
+    } else {
+      return 'production';
+    }
+  }
+  
+  getConfig(env) {
+    const configs = {
+      production: {
+        baseUrl: 'https://api.tolstoy.dev',
+        apiKey: process.env.REACT_APP_TOLSTOY_API_KEY,
+        timeout: 30000
+      },
+      staging: {
+        baseUrl: 'https://api-staging.tolstoy.dev',
+        apiKey: process.env.REACT_APP_TOLSTOY_STAGING_API_KEY,
+        timeout: 30000
+      },
+      development: {
+        baseUrl: 'https://api-dev.tolstoy.dev',
+        apiKey: process.env.REACT_APP_TOLSTOY_DEV_API_KEY,
+        timeout: 60000
+      }
+    };
+    
+    return configs[env];
+  }
+  
+  async makeRequest(endpoint, options = {}) {
+    const url = `${this.config.baseUrl}${endpoint}`;
+    
+    return fetch(url, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${this.config.apiKey}`,
+        'Content-Type': 'application/json',
+        ...options.headers
+      },
+      timeout: this.config.timeout
+    });
+  }
+}
+
+// Usage
+const api = new TolstoyAPI();
+const flows = await api.makeRequest('/flows');
+```
+
+```python Python Environment Manager
+import os
+from typing import Dict, Any
+from tolstoy import TolstoyClient
+
+class EnvironmentManager:
+    def __init__(self):
+        self.environment = self._detect_environment()
+        self.config = self._get_config()
+        self.client = TolstoyClient(**self.config)
+    
+    def _detect_environment(self) -> str:
+        """Auto-detect environment based on env vars or explicit setting"""
+        env = os.getenv('TOLSTOY_ENVIRONMENT')
+        if env:
+            return env
+        
+        # Fallback detection
+        if os.getenv('PRODUCTION'):
+            return 'production'
+        elif os.getenv('STAGING'):
+            return 'staging'
+        else:
+            return 'development'
+    
+    def _get_config(self) -> Dict[str, Any]:
+        configs = {
+            'production': {
+                'base_url': 'https://api.tolstoy.dev',
+                'api_key': os.getenv('TOLSTOY_PROD_API_KEY'),
+                'timeout': 30,
+                'retries': 3
+            },
+            'staging': {
+                'base_url': 'https://api-staging.tolstoy.dev',
+                'api_key': os.getenv('TOLSTOY_STAGING_API_KEY'),
+                'timeout': 30,
+                'retries': 2
+            },
+            'development': {
+                'base_url': 'https://api-dev.tolstoy.dev',
+                'api_key': os.getenv('TOLSTOY_DEV_API_KEY'),
+                'timeout': 60,
+                'retries': 1
+            }
+        }
+        
+        config = configs.get(self.environment)
+        if not config:
+            raise ValueError(f"Unknown environment: {self.environment}")
+        
+        if not config['api_key']:
+            raise ValueError(f"API key not found for {self.environment} environment")
+        
+        return config
+    
+    def is_production(self) -> bool:
+        return self.environment == 'production'
+    
+    def is_development(self) -> bool:
+        return self.environment == 'development'
+
+# Usage
+env_manager = EnvironmentManager()
+print(f"Using {env_manager.environment} environment")
+
+# Get flows
+flows = env_manager.client.flows.list()
+```
+
+</CodeGroup>
+
+### **CI/CD Environment Promotion**
+
+<CodeGroup>
+
+```yaml GitHub Actions
+name: Deploy API Integration
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-dev:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test against Development API
+        env:
+          TOLSTOY_DEV_API_KEY: ${{ secrets.TOLSTOY_DEV_API_KEY }}
+          TOLSTOY_BASE_URL: "https://api-dev.tolstoy.dev"
+        run: |
+          npm test -- --env=development
+  
+  test-staging:
+    needs: test-dev
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test against Staging API
+        env:
+          TOLSTOY_STAGING_API_KEY: ${{ secrets.TOLSTOY_STAGING_API_KEY }}
+          TOLSTOY_BASE_URL: "https://api-staging.tolstoy.dev"
+        run: |
+          npm test -- --env=staging
+  
+  deploy-production:
+    needs: test-staging
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to Production
+        env:
+          TOLSTOY_PROD_API_KEY: ${{ secrets.TOLSTOY_PROD_API_KEY }}
+          TOLSTOY_BASE_URL: "https://api.tolstoy.dev"
+        run: |
+          npm run deploy:production
+```
+
+</CodeGroup>
+
+## API Playground
+
+Test different environments:
+
+<ApiPlayground
+  method="GET"
+  endpoint="/health"
+  environments={[
+    {
+      name: "Production",
+      baseUrl: "https://api.tolstoy.dev",
+      description: "Live production environment"
+    },
+    {
+      name: "Staging", 
+      baseUrl: "https://api-staging.tolstoy.dev",
+      description: "Pre-production testing"
+    },
+    {
+      name: "Development",
+      baseUrl: "https://api-dev.tolstoy.dev", 
+      description: "Development environment"
+    }
+  ]}
+  sampleResponse={{
+    "status": "healthy",
+    "environment": "production",
+    "version": "2.1.0",
+    "uptime_seconds": 2592000
+  }}
+/>
+
+## Environment-Specific Features
+
+### **Development Environment**
+
+- **Higher Rate Limits**: 5000 requests/minute for testing
+- **Extended Timeouts**: 60-second default timeouts
+- **Debug Headers**: Additional debug information in responses
+- **Mock Providers**: Simulated external service responses
+- **Data Reset**: All data cleared nightly at 2 AM UTC
+
+### **Staging Environment**
+
+- **Production Parity**: Identical to production configuration
+- **Anonymized Data**: Real production patterns without sensitive data
+- **Performance Testing**: Load testing allowed
+- **Integration Testing**: Full webhook and integration testing
+
+### **Production Environment**
+
+- **High Availability**: Multi-AZ deployment with automatic failover
+- **Monitoring**: Full observability and alerting
+- **Compliance**: SOC 2, GDPR, HIPAA compliant
+- **Support**: 24/7 monitoring and support
+
+## Migration Guides
+
+### **Development to Staging**
+
+1. Update base URL to staging environment
+2. Replace development API key with staging key
+3. Test all integrations with anonymized data
+4. Verify webhook endpoints are accessible
+5. Run performance tests
+
+### **Staging to Production**
+
+1. Update base URL to production environment
+2. Replace staging API key with production key
+3. Update webhook URLs to production endpoints
+4. Enable production monitoring and alerts
+5. Verify compliance requirements
+6. Perform final integration tests
+
+## Troubleshooting
+
+### **Common Issues**
+
+<Accordion>
+  <AccordionItem title="Wrong Environment Responses">
+    **Problem**: Getting unexpected data or behavior
+    
+    **Solution**: 
+    - Verify you're using the correct base URL
+    - Check that your API key matches the environment
+    - Confirm environment-specific rate limits
+  </AccordionItem>
+  
+  <AccordionItem title="SSL Certificate Errors">
+    **Problem**: SSL/TLS handshake failures
+    
+    **Solution**:
+    - Ensure you're using HTTPS (not HTTP)
+    - Update your HTTP client's certificate store
+    - Verify your system's root certificates are current
+  </AccordionItem>
+  
+  <AccordionItem title="Regional Latency Issues">
+    **Problem**: High response times
+    
+    **Solution**:
+    - Use the regional endpoint closest to your users
+    - Consider caching strategies for frequently accessed data
+    - Implement connection pooling and keep-alive
+  </AccordionItem>
+</Accordion>
+
+### **Health Check Script**
+
+<CodeGroup>
+
+```bash Health Check All Environments
+#!/bin/bash
+
+environments=(
+  "production:https://api.tolstoy.dev"
+  "staging:https://api-staging.tolstoy.dev" 
+  "development:https://api-dev.tolstoy.dev"
+)
+
+for env_config in "${environments[@]}"; do
+  IFS=':' read -r env_name base_url <<< "$env_config"
+  
+  echo "Checking $env_name environment..."
+  
+  response=$(curl -s -w "%{http_code}" -o /tmp/health_response "$base_url/health")
+  
+  if [ "$response" = "200" ]; then
+    status=$(cat /tmp/health_response | jq -r '.status')
+    version=$(cat /tmp/health_response | jq -r '.version')
+    echo "✅ $env_name: $status (v$version)"
+  else
+    echo "❌ $env_name: HTTP $response"
+  fi
+  
+  echo ""
+done
+
+rm -f /tmp/health_response
+```
+
+```javascript Node.js Health Check
+async function checkAllEnvironments() {
+  const environments = [
+    { name: 'Production', url: 'https://api.tolstoy.dev' },
+    { name: 'Staging', url: 'https://api-staging.tolstoy.dev' },
+    { name: 'Development', url: 'https://api-dev.tolstoy.dev' }
+  ];
+  
+  console.log('Checking API Health Across Environments');
+  console.log('========================================');
+  
+  for (const env of environments) {
+    try {
+      const start = Date.now();
+      const response = await fetch(`${env.url}/health`, {
+        timeout: 10000
+      });
+      
+      const duration = Date.now() - start;
+      
+      if (response.ok) {
+        const health = await response.json();
+        console.log(`✅ ${env.name}: ${health.status} (${duration}ms)`);
+        console.log(`   Version: ${health.version}`);
+        console.log(`   Uptime: ${Math.round(health.uptime_seconds / 3600)}h`);
+      } else {
+        console.log(`❌ ${env.name}: HTTP ${response.status} (${duration}ms)`);
+      }
+    } catch (error) {
+      console.log(`❌ ${env.name}: ${error.message}`);
+    }
+    console.log('');
+  }
+}
+
+// Run health check
+await checkAllEnvironments();
+```
+
+</CodeGroup>
+
+## Security Considerations
+
+### **API Key Management**
+
+<Warning>
+Never use production API keys in non-production environments. Each environment should have its own dedicated API keys with appropriate permissions.
+</Warning>
+
+### **Environment Isolation**
+
+- Development keys cannot access staging or production data
+- Staging keys cannot access production data
+- Production keys should never be used in development or staging
+- Use separate webhook endpoints for each environment
+
+### **Data Protection**
+
+- Production data never flows to lower environments
+- Staging uses anonymized/synthetic data
+- Development environment data is regularly purged
+- All environments use encryption in transit and at rest
+
+## Related Pages
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    API key setup and authentication
+  </Card>
+  <Card title="Rate Limiting" icon="gauge" href="/api/rate-limiting">
+    Understanding rate limits
+  </Card>
+  <Card title="Getting Started" icon="rocket" href="/api/quickstart">
+    Your first API integration
+  </Card>
+  <Card title="Security" icon="shield" href="/api/security">
+    Security best practices
+  </Card>
+</CardGroup>

@@ -1,0 +1,1733 @@
+---
+title: 'Testing Your Integrations'
+description: 'Comprehensive guide to testing Tolstoy API integrations with practical examples and best practices'
+---
+
+# Testing Your Integrations
+
+Testing is crucial for building reliable integrations with the Tolstoy API. This guide covers testing strategies, tools, and patterns to ensure your integration works correctly across different scenarios.
+
+## Testing Strategy Overview
+
+### Test Pyramid Structure
+
+```
+    E2E Tests
+   ──────────
+  Integration Tests
+ ─────────────────────
+    Unit Tests
+```
+
+- **Unit Tests**: Test individual functions and components
+- **Integration Tests**: Test API interactions and data flow
+- **End-to-End Tests**: Test complete user workflows
+
+## API Testing Fundamentals
+
+### Setting Up Test Environment
+
+Create separate test configurations for different environments:
+
+<CodeGroup>
+```javascript Jest Setup
+// tests/setup.js
+import { jest } from '@jest/globals';
+
+const TEST_CONFIG = {
+  baseURL: process.env.TOLSTOY_TEST_URL || 'https://api-staging.tolstoy.com',
+  apiKey: process.env.TOLSTOY_TEST_API_KEY,
+  timeout: 10000
+};
+
+global.tolstoyClient = new TolstoyClient(TEST_CONFIG);
+
+// Mock external dependencies
+jest.mock('node-fetch');
+```
+
+```python pytest Setup
+# tests/conftest.py
+import pytest
+import os
+from tolstoy_client import TolstoyClient
+
+@pytest.fixture(scope="session")
+def client():
+    return TolstoyClient(
+        api_key=os.getenv("TOLSTOY_TEST_API_KEY"),
+        base_url=os.getenv("TOLSTOY_TEST_URL", "https://api-staging.tolstoy.com")
+    )
+
+@pytest.fixture
+def mock_webhook_data():
+    return {
+        "event": "workflow.completed",
+        "data": {"id": "wf_123", "status": "completed"}
+    }
+```
+
+```go Testing Setup
+// main_test.go
+package main
+
+import (
+    "os"
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "your-app/tolstoy"
+)
+
+var testClient *tolstoy.Client
+
+func TestMain(m *testing.M) {
+    testClient = tolstoy.NewClient(tolstoy.Config{
+        APIKey:  os.Getenv("TOLSTOY_TEST_API_KEY"),
+        BaseURL: getTestURL(),
+    })
+    
+    code := m.Run()
+    os.Exit(code)
+}
+
+func getTestURL() string {
+    if url := os.Getenv("TOLSTOY_TEST_URL"); url != "" {
+        return url
+    }
+    return "https://api-staging.tolstoy.com"
+}
+```
+</CodeGroup>
+
+## Unit Testing
+
+### Testing API Client Functions
+
+<CodeGroup>
+```javascript Unit Tests
+// tests/client.test.js
+describe('TolstoyClient', () => {
+  test('should format API URLs correctly', () => {
+    const client = new TolstoyClient({ baseURL: 'https://api.tolstoy.com' });
+    
+    expect(client.buildURL('/workflows')).toBe('https://api.tolstoy.com/v1/workflows');
+    expect(client.buildURL('/workflows', { active: true }))
+      .toBe('https://api.tolstoy.com/v1/workflows?active=true');
+  });
+
+  test('should handle authentication headers', () => {
+    const client = new TolstoyClient({ apiKey: 'test-key' });
+    const headers = client.getHeaders();
+    
+    expect(headers.Authorization).toBe('Bearer test-key');
+    expect(headers['Content-Type']).toBe('application/json');
+  });
+
+  test('should validate required parameters', () => {
+    const client = new TolstoyClient({ apiKey: 'test-key' });
+    
+    expect(() => client.createWorkflow()).toThrow('name is required');
+    expect(() => client.createWorkflow({ name: 'test' }))
+      .toThrow('trigger is required');
+  });
+});
+```
+
+```python Unit Tests
+# tests/test_client.py
+import pytest
+from tolstoy_client import TolstoyClient, ValidationError
+
+class TestTolstoyClient:
+    def test_url_formatting(self):
+        client = TolstoyClient(api_key="test-key")
+        
+        assert client.build_url("/workflows") == "https://api.tolstoy.com/v1/workflows"
+        assert client.build_url("/workflows", {"active": True}) == \
+               "https://api.tolstoy.com/v1/workflows?active=true"
+    
+    def test_authentication_headers(self):
+        client = TolstoyClient(api_key="test-key")
+        headers = client.get_headers()
+        
+        assert headers["Authorization"] == "Bearer test-key"
+        assert headers["Content-Type"] == "application/json"
+    
+    def test_parameter_validation(self):
+        client = TolstoyClient(api_key="test-key")
+        
+        with pytest.raises(ValidationError, match="name is required"):
+            client.create_workflow()
+        
+        with pytest.raises(ValidationError, match="trigger is required"):
+            client.create_workflow(name="test")
+```
+
+```go Unit Tests
+// client_test.go
+func TestTolstoyClient(t *testing.T) {
+    client := tolstoy.NewClient(tolstoy.Config{
+        APIKey: "test-key",
+    })
+
+    t.Run("URL formatting", func(t *testing.T) {
+        url := client.BuildURL("/workflows", nil)
+        assert.Equal(t, "https://api.tolstoy.com/v1/workflows", url)
+        
+        params := map[string]string{"active": "true"}
+        url = client.BuildURL("/workflows", params)
+        assert.Equal(t, "https://api.tolstoy.com/v1/workflows?active=true", url)
+    })
+
+    t.Run("authentication headers", func(t *testing.T) {
+        headers := client.GetHeaders()
+        assert.Equal(t, "Bearer test-key", headers.Get("Authorization"))
+        assert.Equal(t, "application/json", headers.Get("Content-Type"))
+    })
+
+    t.Run("parameter validation", func(t *testing.T) {
+        _, err := client.CreateWorkflow(tolstoy.WorkflowRequest{})
+        assert.Error(t, err)
+        assert.Contains(t, err.Error(), "name is required")
+    })
+}
+```
+</CodeGroup>
+
+## Integration Testing
+
+### Testing API Endpoints
+
+<CodeGroup>
+```javascript Integration Tests
+// tests/integration/workflows.test.js
+describe('Workflows API Integration', () => {
+  let workflowId;
+
+  afterEach(async () => {
+    if (workflowId) {
+      await tolstoyClient.deleteWorkflow(workflowId);
+    }
+  });
+
+  test('should create and retrieve workflow', async () => {
+    const workflowData = {
+      name: 'Test Workflow',
+      description: 'Integration test workflow',
+      trigger: {
+        type: 'webhook',
+        config: { endpoint: '/test-trigger' }
+      },
+      actions: [{
+        type: 'send_email',
+        config: {
+          to: 'test@example.com',
+          subject: 'Test Email'
+        }
+      }]
+    };
+
+    // Create workflow
+    const createResponse = await tolstoyClient.createWorkflow(workflowData);
+    expect(createResponse.status).toBe(201);
+    expect(createResponse.data).toHaveProperty('id');
+    
+    workflowId = createResponse.data.id;
+
+    // Retrieve workflow
+    const getResponse = await tolstoyClient.getWorkflow(workflowId);
+    expect(getResponse.status).toBe(200);
+    expect(getResponse.data.name).toBe(workflowData.name);
+  });
+
+  test('should handle workflow execution', async () => {
+    // Create test workflow
+    const workflow = await tolstoyClient.createWorkflow({
+      name: 'Execution Test',
+      trigger: { type: 'manual' },
+      actions: [{ type: 'log', config: { message: 'Test execution' } }]
+    });
+    
+    workflowId = workflow.data.id;
+
+    // Execute workflow
+    const execution = await tolstoyClient.executeWorkflow(workflowId, {
+      input: { testData: 'integration-test' }
+    });
+
+    expect(execution.status).toBe(200);
+    expect(execution.data).toHaveProperty('execution_id');
+
+    // Poll for completion
+    await waitForExecution(execution.data.execution_id);
+  });
+});
+
+async function waitForExecution(executionId, maxWait = 30000) {
+  const startTime = Date.now();
+  
+  while (Date.now() - startTime < maxWait) {
+    const status = await tolstoyClient.getExecution(executionId);
+    
+    if (status.data.status === 'completed') {
+      return status.data;
+    }
+    
+    if (status.data.status === 'failed') {
+      throw new Error(`Execution failed: ${status.data.error}`);
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  
+  throw new Error('Execution timeout');
+}
+```
+
+```python Integration Tests
+# tests/integration/test_workflows.py
+import pytest
+import asyncio
+from tolstoy_client import TolstoyClient
+
+class TestWorkflowsIntegration:
+    
+    @pytest.fixture(autouse=True)
+    def setup(self, client):
+        self.client = client
+        self.workflow_id = None
+        
+    def teardown_method(self):
+        if self.workflow_id:
+            self.client.delete_workflow(self.workflow_id)
+    
+    def test_create_and_retrieve_workflow(self):
+        workflow_data = {
+            "name": "Test Workflow",
+            "description": "Integration test workflow",
+            "trigger": {
+                "type": "webhook",
+                "config": {"endpoint": "/test-trigger"}
+            },
+            "actions": [{
+                "type": "send_email",
+                "config": {
+                    "to": "test@example.com",
+                    "subject": "Test Email"
+                }
+            }]
+        }
+        
+        # Create workflow
+        response = self.client.create_workflow(workflow_data)
+        assert response.status_code == 201
+        assert "id" in response.json()
+        
+        self.workflow_id = response.json()["id"]
+        
+        # Retrieve workflow
+        get_response = self.client.get_workflow(self.workflow_id)
+        assert get_response.status_code == 200
+        assert get_response.json()["name"] == workflow_data["name"]
+    
+    def test_workflow_execution(self):
+        # Create test workflow
+        workflow = self.client.create_workflow({
+            "name": "Execution Test",
+            "trigger": {"type": "manual"},
+            "actions": [{"type": "log", "config": {"message": "Test execution"}}]
+        })
+        
+        self.workflow_id = workflow.json()["id"]
+        
+        # Execute workflow
+        execution = self.client.execute_workflow(self.workflow_id, {
+            "input": {"test_data": "integration-test"}
+        })
+        
+        assert execution.status_code == 200
+        assert "execution_id" in execution.json()
+        
+        # Wait for completion
+        execution_result = self.wait_for_execution(execution.json()["execution_id"])
+        assert execution_result["status"] == "completed"
+    
+    def wait_for_execution(self, execution_id, max_wait=30):
+        import time
+        start_time = time.time()
+        
+        while time.time() - start_time < max_wait:
+            status = self.client.get_execution(execution_id)
+            data = status.json()
+            
+            if data["status"] == "completed":
+                return data
+            elif data["status"] == "failed":
+                raise Exception(f"Execution failed: {data.get('error')}")
+            
+            time.sleep(1)
+        
+        raise Exception("Execution timeout")
+```
+
+```go Integration Tests
+// workflows_integration_test.go
+func TestWorkflowsIntegration(t *testing.T) {
+    var workflowID string
+    
+    defer func() {
+        if workflowID != "" {
+            testClient.DeleteWorkflow(workflowID)
+        }
+    }()
+
+    t.Run("create and retrieve workflow", func(t *testing.T) {
+        workflowData := tolstoy.WorkflowRequest{
+            Name:        "Test Workflow",
+            Description: "Integration test workflow",
+            Trigger: tolstoy.Trigger{
+                Type: "webhook",
+                Config: map[string]interface{}{
+                    "endpoint": "/test-trigger",
+                },
+            },
+            Actions: []tolstoy.Action{{
+                Type: "send_email",
+                Config: map[string]interface{}{
+                    "to":      "test@example.com",
+                    "subject": "Test Email",
+                },
+            }},
+        }
+
+        // Create workflow
+        workflow, err := testClient.CreateWorkflow(workflowData)
+        assert.NoError(t, err)
+        assert.NotEmpty(t, workflow.ID)
+        
+        workflowID = workflow.ID
+
+        // Retrieve workflow
+        retrieved, err := testClient.GetWorkflow(workflowID)
+        assert.NoError(t, err)
+        assert.Equal(t, workflowData.Name, retrieved.Name)
+    })
+
+    t.Run("workflow execution", func(t *testing.T) {
+        // Create test workflow
+        workflow, err := testClient.CreateWorkflow(tolstoy.WorkflowRequest{
+            Name:    "Execution Test",
+            Trigger: tolstoy.Trigger{Type: "manual"},
+            Actions: []tolstoy.Action{{
+                Type: "log",
+                Config: map[string]interface{}{
+                    "message": "Test execution",
+                },
+            }},
+        })
+        assert.NoError(t, err)
+        
+        workflowID = workflow.ID
+
+        // Execute workflow
+        execution, err := testClient.ExecuteWorkflow(workflowID, map[string]interface{}{
+            "input": map[string]interface{}{"test_data": "integration-test"},
+        })
+        assert.NoError(t, err)
+        assert.NotEmpty(t, execution.ExecutionID)
+
+        // Wait for completion
+        result, err := waitForExecution(execution.ExecutionID)
+        assert.NoError(t, err)
+        assert.Equal(t, "completed", result.Status)
+    })
+}
+
+func waitForExecution(executionID string) (*tolstoy.Execution, error) {
+    timeout := time.After(30 * time.Second)
+    ticker := time.NewTicker(1 * time.Second)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case <-timeout:
+            return nil, fmt.Errorf("execution timeout")
+        case <-ticker.C:
+            execution, err := testClient.GetExecution(executionID)
+            if err != nil {
+                return nil, err
+            }
+            
+            if execution.Status == "completed" {
+                return execution, nil
+            } else if execution.Status == "failed" {
+                return nil, fmt.Errorf("execution failed: %s", execution.Error)
+            }
+        }
+    }
+}
+```
+</CodeGroup>
+
+## Mock Testing
+
+### Creating Mock Servers
+
+<CodeGroup>
+```javascript Mock Server
+// tests/mocks/tolstoy-mock.js
+import { rest } from 'msw';
+import { setupServer } from 'msw/node';
+
+const handlers = [
+  rest.post('*/v1/workflows', (req, res, ctx) => {
+    return res(
+      ctx.status(201),
+      ctx.json({
+        id: 'wf_mock_123',
+        name: req.body.name,
+        status: 'active',
+        created_at: new Date().toISOString()
+      })
+    );
+  }),
+  
+  rest.get('*/v1/workflows/:id', (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json({
+        id: req.params.id,
+        name: 'Mock Workflow',
+        status: 'active'
+      })
+    );
+  }),
+  
+  rest.post('*/v1/workflows/:id/execute', (req, res, ctx) => {
+    return res(
+      ctx.status(200),
+      ctx.json({
+        execution_id: 'exec_mock_456',
+        status: 'running'
+      })
+    );
+  })
+];
+
+export const server = setupServer(...handlers);
+```
+
+```python Mock Server
+# tests/mocks/tolstoy_mock.py
+import responses
+import json
+from datetime import datetime
+
+class TolstoyMockServer:
+    def __init__(self):
+        self.workflows = {}
+        self.executions = {}
+    
+    def setup(self):
+        responses.add(
+            responses.POST,
+            "https://api.tolstoy.com/v1/workflows",
+            callback=self.create_workflow,
+            content_type="application/json"
+        )
+        
+        responses.add(
+            responses.GET,
+            "https://api.tolstoy.com/v1/workflows/{workflow_id}",
+            callback=self.get_workflow,
+            content_type="application/json"
+        )
+        
+        responses.add(
+            responses.POST,
+            "https://api.tolstoy.com/v1/workflows/{workflow_id}/execute",
+            callback=self.execute_workflow,
+            content_type="application/json"
+        )
+    
+    def create_workflow(self, request):
+        data = json.loads(request.body)
+        workflow_id = f"wf_mock_{len(self.workflows) + 1}"
+        
+        workflow = {
+            "id": workflow_id,
+            "name": data["name"],
+            "status": "active",
+            "created_at": datetime.now().isoformat()
+        }
+        
+        self.workflows[workflow_id] = workflow
+        
+        return (201, {}, json.dumps(workflow))
+    
+    def get_workflow(self, request):
+        workflow_id = request.url.split("/")[-1]
+        
+        if workflow_id in self.workflows:
+            return (200, {}, json.dumps(self.workflows[workflow_id]))
+        else:
+            return (404, {}, json.dumps({"error": "Workflow not found"}))
+    
+    def execute_workflow(self, request):
+        workflow_id = request.url.split("/")[-2]
+        execution_id = f"exec_mock_{len(self.executions) + 1}"
+        
+        execution = {
+            "execution_id": execution_id,
+            "workflow_id": workflow_id,
+            "status": "running"
+        }
+        
+        self.executions[execution_id] = execution
+        
+        return (200, {}, json.dumps(execution))
+```
+</CodeGroup>
+
+### Testing with Mocks
+
+<CodeGroup>
+```javascript Mock Tests
+// tests/integration/workflows-mock.test.js
+import { server } from '../mocks/tolstoy-mock.js';
+
+beforeAll(() => server.listen());
+afterEach(() => server.resetHandlers());
+afterAll(() => server.close());
+
+test('should handle workflow creation flow', async () => {
+  const workflowData = {
+    name: 'Test Workflow',
+    trigger: { type: 'webhook' },
+    actions: [{ type: 'log', config: { message: 'test' } }]
+  };
+
+  // Test creation
+  const created = await tolstoyClient.createWorkflow(workflowData);
+  expect(created.status).toBe(201);
+  expect(created.data.id).toMatch(/^wf_mock_/);
+
+  // Test retrieval
+  const retrieved = await tolstoyClient.getWorkflow(created.data.id);
+  expect(retrieved.status).toBe(200);
+  expect(retrieved.data.name).toBe(workflowData.name);
+
+  // Test execution
+  const execution = await tolstoyClient.executeWorkflow(created.data.id, {
+    input: { test: true }
+  });
+  expect(execution.status).toBe(200);
+  expect(execution.data.execution_id).toMatch(/^exec_mock_/);
+});
+```
+
+```python Mock Tests
+# tests/integration/test_workflows_mock.py
+import responses
+from tests.mocks.tolstoy_mock import TolstoyMockServer
+
+class TestWorkflowsMock:
+    
+    @responses.activate
+    def test_workflow_creation_flow(self, client):
+        mock_server = TolstoyMockServer()
+        mock_server.setup()
+        
+        workflow_data = {
+            "name": "Test Workflow",
+            "trigger": {"type": "webhook"},
+            "actions": [{"type": "log", "config": {"message": "test"}}]
+        }
+        
+        # Test creation
+        created = client.create_workflow(workflow_data)
+        assert created.status_code == 201
+        assert created.json()["id"].startswith("wf_mock_")
+        
+        # Test retrieval
+        workflow_id = created.json()["id"]
+        retrieved = client.get_workflow(workflow_id)
+        assert retrieved.status_code == 200
+        assert retrieved.json()["name"] == workflow_data["name"]
+        
+        # Test execution
+        execution = client.execute_workflow(workflow_id, {
+            "input": {"test": True}
+        })
+        assert execution.status_code == 200
+        assert execution.json()["execution_id"].startswith("exec_mock_")
+```
+</CodeGroup>
+
+## Webhook Testing
+
+### Testing Webhook Reception
+
+<CodeGroup>
+```javascript Webhook Tests
+// tests/webhooks/receiver.test.js
+import crypto from 'crypto';
+import express from 'express';
+import request from 'supertest';
+
+describe('Webhook Receiver', () => {
+  let app;
+  let receivedEvents = [];
+
+  beforeEach(() => {
+    app = express();
+    app.use(express.json());
+    receivedEvents = [];
+
+    app.post('/webhooks/tolstoy', (req, res) => {
+      // Verify signature
+      const signature = req.headers['tolstoy-signature'];
+      const payload = JSON.stringify(req.body);
+      const expectedSignature = crypto
+        .createHmac('sha256', process.env.WEBHOOK_SECRET)
+        .update(payload)
+        .digest('hex');
+
+      if (signature !== `sha256=${expectedSignature}`) {
+        return res.status(401).json({ error: 'Invalid signature' });
+      }
+
+      receivedEvents.push(req.body);
+      res.status(200).json({ received: true });
+    });
+  });
+
+  test('should receive and verify webhook', async () => {
+    const payload = {
+      event: 'workflow.completed',
+      data: {
+        id: 'wf_123',
+        status: 'completed',
+        result: { success: true }
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    const signature = crypto
+      .createHmac('sha256', process.env.WEBHOOK_SECRET)
+      .update(JSON.stringify(payload))
+      .digest('hex');
+
+    const response = await request(app)
+      .post('/webhooks/tolstoy')
+      .set('tolstoy-signature', `sha256=${signature}`)
+      .send(payload);
+
+    expect(response.status).toBe(200);
+    expect(receivedEvents).toHaveLength(1);
+    expect(receivedEvents[0].event).toBe('workflow.completed');
+  });
+
+  test('should reject invalid signatures', async () => {
+    const payload = { event: 'test' };
+
+    const response = await request(app)
+      .post('/webhooks/tolstoy')
+      .set('tolstoy-signature', 'sha256=invalid')
+      .send(payload);
+
+    expect(response.status).toBe(401);
+    expect(receivedEvents).toHaveLength(0);
+  });
+});
+```
+
+```python Webhook Tests
+# tests/webhooks/test_receiver.py
+import hmac
+import hashlib
+import json
+from flask import Flask, request, jsonify
+
+class TestWebhookReceiver:
+    
+    def setup_method(self):
+        self.app = Flask(__name__)
+        self.received_events = []
+        
+        @self.app.route('/webhooks/tolstoy', methods=['POST'])
+        def webhook_handler():
+            # Verify signature
+            signature = request.headers.get('tolstoy-signature')
+            payload = request.get_data()
+            
+            expected_signature = hmac.new(
+                WEBHOOK_SECRET.encode(),
+                payload,
+                hashlib.sha256
+            ).hexdigest()
+            
+            if signature != f"sha256={expected_signature}":
+                return jsonify({"error": "Invalid signature"}), 401
+            
+            self.received_events.append(request.json)
+            return jsonify({"received": True})
+        
+        self.client = self.app.test_client()
+    
+    def test_receive_and_verify_webhook(self):
+        payload = {
+            "event": "workflow.completed",
+            "data": {
+                "id": "wf_123",
+                "status": "completed",
+                "result": {"success": True}
+            },
+            "timestamp": "2024-01-15T10:30:00Z"
+        }
+        
+        payload_bytes = json.dumps(payload).encode()
+        signature = hmac.new(
+            WEBHOOK_SECRET.encode(),
+            payload_bytes,
+            hashlib.sha256
+        ).hexdigest()
+        
+        response = self.client.post(
+            '/webhooks/tolstoy',
+            data=payload_bytes,
+            headers={'tolstoy-signature': f'sha256={signature}'},
+            content_type='application/json'
+        )
+        
+        assert response.status_code == 200
+        assert len(self.received_events) == 1
+        assert self.received_events[0]["event"] == "workflow.completed"
+    
+    def test_reject_invalid_signatures(self):
+        payload = {"event": "test"}
+        
+        response = self.client.post(
+            '/webhooks/tolstoy',
+            json=payload,
+            headers={'tolstoy-signature': 'sha256=invalid'}
+        )
+        
+        assert response.status_code == 401
+        assert len(self.received_events) == 0
+```
+</CodeGroup>
+
+## Test Data Management
+
+### Creating Test Fixtures
+
+<CodeGroup>
+```javascript Test Fixtures
+// tests/fixtures/workflows.js
+export const sampleWorkflows = {
+  simple: {
+    name: 'Simple Test Workflow',
+    description: 'A basic workflow for testing',
+    trigger: {
+      type: 'webhook',
+      config: { endpoint: '/simple-trigger' }
+    },
+    actions: [{
+      type: 'log',
+      config: { message: 'Simple action executed' }
+    }]
+  },
+  
+  complex: {
+    name: 'Complex Test Workflow',
+    description: 'Multi-step workflow with conditions',
+    trigger: {
+      type: 'scheduled',
+      config: { 
+        cron: '0 9 * * MON',
+        timezone: 'America/New_York'
+      }
+    },
+    actions: [
+      {
+        type: 'fetch_data',
+        config: {
+          url: 'https://api.example.com/data',
+          method: 'GET'
+        }
+      },
+      {
+        type: 'condition',
+        config: {
+          if: '{{ data.count > 100 }}',
+          then: [
+            {
+              type: 'send_email',
+              config: {
+                to: 'admin@example.com',
+                subject: 'High data count alert'
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+};
+
+export const sampleResponses = {
+  workflowCreated: {
+    id: 'wf_test_123',
+    name: 'Test Workflow',
+    status: 'active',
+    created_at: '2024-01-15T10:30:00Z'
+  },
+  
+  executionStarted: {
+    execution_id: 'exec_test_456',
+    workflow_id: 'wf_test_123',
+    status: 'running',
+    started_at: '2024-01-15T11:00:00Z'
+  }
+};
+```
+
+```python Test Fixtures
+# tests/fixtures/workflows.py
+from datetime import datetime
+from typing import Dict, Any
+
+class WorkflowFixtures:
+    
+    @staticmethod
+    def simple_workflow() -> Dict[str, Any]:
+        return {
+            "name": "Simple Test Workflow",
+            "description": "A basic workflow for testing",
+            "trigger": {
+                "type": "webhook",
+                "config": {"endpoint": "/simple-trigger"}
+            },
+            "actions": [{
+                "type": "log",
+                "config": {"message": "Simple action executed"}
+            }]
+        }
+    
+    @staticmethod
+    def complex_workflow() -> Dict[str, Any]:
+        return {
+            "name": "Complex Test Workflow",
+            "description": "Multi-step workflow with conditions",
+            "trigger": {
+                "type": "scheduled",
+                "config": {
+                    "cron": "0 9 * * MON",
+                    "timezone": "America/New_York"
+                }
+            },
+            "actions": [
+                {
+                    "type": "fetch_data",
+                    "config": {
+                        "url": "https://api.example.com/data",
+                        "method": "GET"
+                    }
+                },
+                {
+                    "type": "condition",
+                    "config": {
+                        "if": "{{ data.count > 100 }}",
+                        "then": [{
+                            "type": "send_email",
+                            "config": {
+                                "to": "admin@example.com",
+                                "subject": "High data count alert"
+                            }
+                        }]
+                    }
+                }
+            ]
+        }
+
+class ResponseFixtures:
+    
+    @staticmethod
+    def workflow_created() -> Dict[str, Any]:
+        return {
+            "id": "wf_test_123",
+            "name": "Test Workflow",
+            "status": "active",
+            "created_at": datetime.now().isoformat()
+        }
+    
+    @staticmethod
+    def execution_started() -> Dict[str, Any]:
+        return {
+            "execution_id": "exec_test_456",
+            "workflow_id": "wf_test_123",
+            "status": "running",
+            "started_at": datetime.now().isoformat()
+        }
+```
+</CodeGroup>
+
+## Performance Testing
+
+### Load Testing API Endpoints
+
+<CodeGroup>
+```javascript Load Testing
+// tests/performance/load-test.js
+import { check, sleep } from 'k6';
+import http from 'k6/http';
+
+export let options = {
+  stages: [
+    { duration: '2m', target: 10 },   // Ramp up
+    { duration: '5m', target: 10 },   // Stay at 10 users
+    { duration: '2m', target: 50 },   // Ramp up to 50 users
+    { duration: '5m', target: 50 },   // Stay at 50 users
+    { duration: '2m', target: 0 },    // Ramp down
+  ],
+  thresholds: {
+    http_req_duration: ['p(95)<500'], // 95% of requests under 500ms
+    http_req_failed: ['rate<0.1'],    // Error rate under 10%
+  },
+};
+
+export default function() {
+  const BASE_URL = 'https://api-staging.tolstoy.com';
+  const API_KEY = __ENV.TOLSTOY_TEST_API_KEY;
+  
+  const headers = {
+    'Authorization': `Bearer ${API_KEY}`,
+    'Content-Type': 'application/json',
+  };
+
+  // Test workflow listing
+  let response = http.get(`${BASE_URL}/v1/workflows`, { headers });
+  check(response, {
+    'status is 200': (r) => r.status === 200,
+    'response time < 500ms': (r) => r.timings.duration < 500,
+  });
+
+  // Test workflow creation
+  const workflowData = {
+    name: `Load Test Workflow ${__VU}-${__ITER}`,
+    trigger: { type: 'manual' },
+    actions: [{ type: 'log', config: { message: 'Load test' } }]
+  };
+
+  response = http.post(`${BASE_URL}/v1/workflows`, JSON.stringify(workflowData), { headers });
+  check(response, {
+    'creation status is 201': (r) => r.status === 201,
+    'creation time < 1s': (r) => r.timings.duration < 1000,
+  });
+
+  sleep(1);
+}
+```
+
+```python Load Testing
+# tests/performance/load_test.py
+import asyncio
+import aiohttp
+import time
+from concurrent.futures import ThreadPoolExecutor
+
+class LoadTester:
+    def __init__(self, base_url: str, api_key: str):
+        self.base_url = base_url
+        self.headers = {
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        }
+        self.results = []
+    
+    async def make_request(self, session, method, endpoint, data=None):
+        start_time = time.time()
+        url = f"{self.base_url}{endpoint}"
+        
+        try:
+            if method == 'GET':
+                async with session.get(url, headers=self.headers) as response:
+                    result = await response.json()
+                    duration = time.time() - start_time
+                    return {
+                        'status': response.status,
+                        'duration': duration,
+                        'success': response.status < 400
+                    }
+            elif method == 'POST':
+                async with session.post(url, headers=self.headers, json=data) as response:
+                    result = await response.json()
+                    duration = time.time() - start_time
+                    return {
+                        'status': response.status,
+                        'duration': duration,
+                        'success': response.status < 400
+                    }
+        except Exception as e:
+            duration = time.time() - start_time
+            return {
+                'status': 0,
+                'duration': duration,
+                'success': False,
+                'error': str(e)
+            }
+    
+    async def run_load_test(self, concurrent_users=10, duration_seconds=60):
+        async with aiohttp.ClientSession() as session:
+            tasks = []
+            end_time = time.time() + duration_seconds
+            
+            for user_id in range(concurrent_users):
+                task = asyncio.create_task(
+                    self.user_simulation(session, user_id, end_time)
+                )
+                tasks.append(task)
+            
+            await asyncio.gather(*tasks)
+            
+            return self.analyze_results()
+    
+    async def user_simulation(self, session, user_id, end_time):
+        while time.time() < end_time:
+            # List workflows
+            result = await self.make_request(session, 'GET', '/v1/workflows')
+            self.results.append(result)
+            
+            # Create workflow
+            workflow_data = {
+                "name": f"Load Test Workflow {user_id}-{int(time.time())}",
+                "trigger": {"type": "manual"},
+                "actions": [{"type": "log", "config": {"message": "Load test"}}]
+            }
+            
+            result = await self.make_request(session, 'POST', '/v1/workflows', workflow_data)
+            self.results.append(result)
+            
+            await asyncio.sleep(1)
+    
+    def analyze_results(self):
+        total_requests = len(self.results)
+        successful_requests = sum(1 for r in self.results if r['success'])
+        
+        durations = [r['duration'] for r in self.results if r['success']]
+        
+        return {
+            'total_requests': total_requests,
+            'successful_requests': successful_requests,
+            'success_rate': successful_requests / total_requests,
+            'avg_response_time': sum(durations) / len(durations) if durations else 0,
+            'p95_response_time': sorted(durations)[int(len(durations) * 0.95)] if durations else 0,
+            'p99_response_time': sorted(durations)[int(len(durations) * 0.99)] if durations else 0
+        }
+
+# Usage
+async def main():
+    tester = LoadTester(
+        base_url='https://api-staging.tolstoy.com',
+        api_key=os.getenv('TOLSTOY_TEST_API_KEY')
+    )
+    
+    results = await tester.run_load_test(concurrent_users=20, duration_seconds=120)
+    print(f"Load test results: {results}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+</CodeGroup>
+
+## End-to-End Testing
+
+### Complete User Journey Tests
+
+<CodeGroup>
+```javascript E2E Tests
+// tests/e2e/user-journey.test.js
+describe('Complete User Journey', () => {
+  test('should complete full workflow lifecycle', async () => {
+    // Step 1: Create organization
+    const org = await tolstoyClient.createOrganization({
+      name: 'E2E Test Organization'
+    });
+    expect(org.status).toBe(201);
+
+    // Step 2: Create workflow
+    const workflow = await tolstoyClient.createWorkflow({
+      name: 'E2E Test Workflow',
+      organization_id: org.data.id,
+      trigger: {
+        type: 'webhook',
+        config: { endpoint: '/e2e-test' }
+      },
+      actions: [{
+        type: 'send_notification',
+        config: {
+          message: 'E2E test completed successfully'
+        }
+      }]
+    });
+    expect(workflow.status).toBe(201);
+
+    // Step 3: Set up webhook endpoint
+    const webhookUrl = await setupTestWebhook();
+    
+    await tolstoyClient.updateWorkflow(workflow.data.id, {
+      trigger: {
+        type: 'webhook',
+        config: { 
+          endpoint: webhookUrl,
+          secret: 'test-secret-123'
+        }
+      }
+    });
+
+    // Step 4: Trigger workflow via webhook
+    const webhookPayload = {
+      customer_id: 'cust_test_789',
+      event_type: 'purchase_completed'
+    };
+
+    await triggerWebhook(webhookUrl, webhookPayload);
+
+    // Step 5: Verify execution
+    await waitForCondition(async () => {
+      const executions = await tolstoyClient.getWorkflowExecutions(workflow.data.id);
+      return executions.data.length > 0 && 
+             executions.data[0].status === 'completed';
+    }, 30000);
+
+    // Step 6: Verify results
+    const executions = await tolstoyClient.getWorkflowExecutions(workflow.data.id);
+    const execution = executions.data[0];
+    
+    expect(execution.status).toBe('completed');
+    expect(execution.input.customer_id).toBe('cust_test_789');
+
+    // Cleanup
+    await tolstoyClient.deleteWorkflow(workflow.data.id);
+    await tolstoyClient.deleteOrganization(org.data.id);
+  });
+});
+
+async function waitForCondition(condition, timeout = 30000) {
+  const startTime = Date.now();
+  
+  while (Date.now() - startTime < timeout) {
+    if (await condition()) {
+      return true;
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  
+  throw new Error('Condition not met within timeout');
+}
+```
+
+```python E2E Tests
+# tests/e2e/test_user_journey.py
+import pytest
+import asyncio
+from tests.utils.webhook_server import TestWebhookServer
+
+class TestCompleteUserJourney:
+    
+    @pytest.mark.asyncio
+    async def test_complete_workflow_lifecycle(self, client):
+        # Step 1: Create organization
+        org_response = client.create_organization({
+            "name": "E2E Test Organization"
+        })
+        assert org_response.status_code == 201
+        org_id = org_response.json()["id"]
+        
+        try:
+            # Step 2: Create workflow
+            workflow_response = client.create_workflow({
+                "name": "E2E Test Workflow",
+                "organization_id": org_id,
+                "trigger": {
+                    "type": "webhook",
+                    "config": {"endpoint": "/e2e-test"}
+                },
+                "actions": [{
+                    "type": "send_notification",
+                    "config": {
+                        "message": "E2E test completed successfully"
+                    }
+                }]
+            })
+            assert workflow_response.status_code == 201
+            workflow_id = workflow_response.json()["id"]
+            
+            # Step 3: Set up webhook endpoint
+            webhook_server = TestWebhookServer()
+            webhook_url = await webhook_server.start()
+            
+            client.update_workflow(workflow_id, {
+                "trigger": {
+                    "type": "webhook",
+                    "config": {
+                        "endpoint": webhook_url,
+                        "secret": "test-secret-123"
+                    }
+                }
+            })
+            
+            # Step 4: Trigger workflow via webhook
+            webhook_payload = {
+                "customer_id": "cust_test_789",
+                "event_type": "purchase_completed"
+            }
+            
+            await webhook_server.trigger_webhook(webhook_payload)
+            
+            # Step 5: Wait for execution completion
+            await self.wait_for_execution_completion(client, workflow_id)
+            
+            # Step 6: Verify results
+            executions = client.get_workflow_executions(workflow_id)
+            execution = executions.json()["data"][0]
+            
+            assert execution["status"] == "completed"
+            assert execution["input"]["customer_id"] == "cust_test_789"
+            
+        finally:
+            # Cleanup
+            client.delete_workflow(workflow_id)
+            client.delete_organization(org_id)
+    
+    async def wait_for_execution_completion(self, client, workflow_id, timeout=30):
+        start_time = time.time()
+        
+        while time.time() - start_time < timeout:
+            executions = client.get_workflow_executions(workflow_id)
+            data = executions.json()["data"]
+            
+            if data and data[0]["status"] == "completed":
+                return data[0]
+            elif data and data[0]["status"] == "failed":
+                raise Exception(f"Execution failed: {data[0].get('error')}")
+            
+            await asyncio.sleep(1)
+        
+        raise Exception("Execution timeout")
+```
+</CodeGroup>
+
+## Testing Best Practices
+
+### Test Organization
+
+```
+tests/
+├── unit/
+│   ├── client.test.js
+│   ├── validators.test.js
+│   └── utils.test.js
+├── integration/
+│   ├── workflows.test.js
+│   ├── organizations.test.js
+│   └── webhooks.test.js
+├── e2e/
+│   ├── user-journey.test.js
+│   └── admin-workflows.test.js
+├── performance/
+│   ├── load-test.js
+│   └── stress-test.js
+├── fixtures/
+│   ├── workflows.js
+│   ├── organizations.js
+│   └── responses.js
+└── utils/
+    ├── test-server.js
+    ├── webhook-helpers.js
+    └── wait-helpers.js
+```
+
+### Test Environment Variables
+
+Create a `.env.test` file for test-specific configuration:
+
+```bash
+# .env.test
+TOLSTOY_TEST_API_KEY=test_sk_1234567890abcdef
+TOLSTOY_TEST_URL=https://api-staging.tolstoy.com
+WEBHOOK_SECRET=test_webhook_secret_123
+DATABASE_URL=postgresql://test:test@localhost:5432/tolstoy_test
+REDIS_URL=redis://localhost:6379/1
+```
+
+### Continuous Integration
+
+<CodeGroup>
+```yaml GitHub Actions
+# .github/workflows/test.yml
+name: Test Suite
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: tolstoy_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run unit tests
+        run: npm run test:unit
+        env:
+          NODE_ENV: test
+      
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          TOLSTOY_TEST_API_KEY: ${{ secrets.TOLSTOY_TEST_API_KEY }}
+          TOLSTOY_TEST_URL: https://api-staging.tolstoy.com
+          DATABASE_URL: postgresql://test:test@localhost:5432/tolstoy_test
+          REDIS_URL: redis://localhost:6379/1
+      
+      - name: Run E2E tests
+        run: npm run test:e2e
+        env:
+          TOLSTOY_TEST_API_KEY: ${{ secrets.TOLSTOY_TEST_API_KEY }}
+          TOLSTOY_TEST_URL: https://api-staging.tolstoy.com
+      
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+```
+</CodeGroup>
+
+## Common Testing Patterns
+
+### Testing Rate Limits
+
+<CodeGroup>
+```javascript Rate Limit Tests
+test('should handle rate limiting gracefully', async () => {
+  const promises = Array.from({ length: 15 }, (_, i) => 
+    tolstoyClient.getWorkflows()
+  );
+
+  const results = await Promise.allSettled(promises);
+  
+  const rateLimitedResponses = results.filter(
+    result => result.status === 'fulfilled' && 
+              result.value.status === 429
+  );
+
+  expect(rateLimitedResponses.length).toBeGreaterThan(0);
+  
+  // Verify rate limit headers
+  const rateLimited = rateLimitedResponses[0].value;
+  expect(rateLimited.headers).toHaveProperty('x-ratelimit-remaining');
+  expect(rateLimited.headers).toHaveProperty('x-ratelimit-reset');
+});
+```
+
+```python Rate Limit Tests
+def test_rate_limiting_behavior(self, client):
+    import concurrent.futures
+    import time
+    
+    # Make concurrent requests to trigger rate limiting
+    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+        futures = [executor.submit(client.get_workflows) for _ in range(15)]
+        results = [future.result() for future in futures]
+    
+    # Check for rate limit responses
+    rate_limited = [r for r in results if r.status_code == 429]
+    assert len(rate_limited) > 0
+    
+    # Verify rate limit headers
+    rate_limit_response = rate_limited[0]
+    assert "x-ratelimit-remaining" in rate_limit_response.headers
+    assert "x-ratelimit-reset" in rate_limit_response.headers
+```
+</CodeGroup>
+
+### Testing Error Scenarios
+
+<CodeGroup>
+```javascript Error Scenario Tests
+describe('Error Scenarios', () => {
+  test('should handle network timeouts', async () => {
+    const slowClient = new TolstoyClient({
+      apiKey: 'test-key',
+      timeout: 100 // Very short timeout
+    });
+
+    await expect(slowClient.getWorkflows())
+      .rejects.toThrow('timeout');
+  });
+
+  test('should handle invalid API responses', async () => {
+    // Mock invalid JSON response
+    server.use(
+      rest.get('*/v1/workflows', (req, res, ctx) => {
+        return res(ctx.status(200), ctx.text('invalid json'));
+      })
+    );
+
+    await expect(tolstoyClient.getWorkflows())
+      .rejects.toThrow('Invalid JSON response');
+  });
+
+  test('should handle server errors with retry', async () => {
+    let attempts = 0;
+    
+    server.use(
+      rest.get('*/v1/workflows', (req, res, ctx) => {
+        attempts++;
+        if (attempts < 3) {
+          return res(ctx.status(500));
+        }
+        return res(ctx.status(200), ctx.json({ data: [] }));
+      })
+    );
+
+    const response = await tolstoyClient.getWorkflows();
+    expect(response.status).toBe(200);
+    expect(attempts).toBe(3);
+  });
+});
+```
+</CodeGroup>
+
+## Test Automation
+
+### Running Tests in CI/CD
+
+<CodeGroup>
+```json Package.json Scripts
+{
+  "scripts": {
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "jest tests/unit --coverage",
+    "test:integration": "jest tests/integration --runInBand",
+    "test:e2e": "jest tests/e2e --runInBand --detectOpenHandles",
+    "test:performance": "k6 run tests/performance/load-test.js",
+    "test:watch": "jest --watch",
+    "test:debug": "node --inspect-brk node_modules/.bin/jest --runInBand"
+  }
+}
+```
+
+```yaml Docker Test Environment
+# docker-compose.test.yml
+version: '3.8'
+
+services:
+  test-api:
+    build: .
+    environment:
+      - NODE_ENV=test
+      - DATABASE_URL=postgresql://test:test@postgres:5432/tolstoy_test
+      - REDIS_URL=redis://redis:6379/1
+    depends_on:
+      - postgres
+      - redis
+    command: npm run test:integration
+
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_PASSWORD: test
+      POSTGRES_DB: tolstoy_test
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+```
+</CodeGroup>
+
+## Monitoring Test Results
+
+### Test Metrics Collection
+
+<CodeGroup>
+```javascript Test Metrics
+// tests/utils/metrics.js
+class TestMetrics {
+  constructor() {
+    this.results = {
+      total: 0,
+      passed: 0,
+      failed: 0,
+      duration: 0,
+      coverage: 0
+    };
+  }
+
+  recordTest(testResult) {
+    this.results.total++;
+    
+    if (testResult.status === 'passed') {
+      this.results.passed++;
+    } else {
+      this.results.failed++;
+    }
+    
+    this.results.duration += testResult.duration;
+  }
+
+  generateReport() {
+    const successRate = (this.results.passed / this.results.total) * 100;
+    
+    return {
+      summary: {
+        total: this.results.total,
+        passed: this.results.passed,
+        failed: this.results.failed,
+        success_rate: `${successRate.toFixed(2)}%`,
+        avg_duration: `${(this.results.duration / this.results.total).toFixed(2)}ms`
+      },
+      coverage: `${this.results.coverage}%`
+    };
+  }
+}
+
+export default TestMetrics;
+```
+</CodeGroup>
+
+## Testing Checklist
+
+Before deploying your integration, ensure you've tested:
+
+### ✅ API Functionality
+- [ ] All CRUD operations work correctly
+- [ ] Authentication and authorization
+- [ ] Input validation and sanitization
+- [ ] Response format consistency
+
+### ✅ Error Handling
+- [ ] Network failures and timeouts
+- [ ] Invalid API responses
+- [ ] Rate limiting behavior
+- [ ] Server error recovery
+
+### ✅ Webhook Integration
+- [ ] Webhook signature verification
+- [ ] Event processing logic
+- [ ] Retry mechanism for failed deliveries
+- [ ] Duplicate event handling
+
+### ✅ Performance
+- [ ] Response times under normal load
+- [ ] Behavior under high concurrent usage
+- [ ] Memory usage and cleanup
+- [ ] Connection pooling efficiency
+
+### ✅ Security
+- [ ] API key protection
+- [ ] Request signing validation
+- [ ] Input sanitization
+- [ ] No sensitive data in logs
+
+### ✅ Reliability
+- [ ] Graceful degradation
+- [ ] Circuit breaker functionality
+- [ ] Data consistency
+- [ ] Rollback capabilities
+
+## Debugging Test Failures
+
+### Common Issues and Solutions
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Flaky tests | Race conditions, timing issues | Add proper waits, use deterministic data |
+| Slow tests | Too many API calls, no mocking | Use mocks for external dependencies |
+| Test isolation | Shared state between tests | Clean up resources, use fresh data |
+| Environment differences | Different configs between envs | Use environment-specific test configs |
+
+### Test Debugging Tools
+
+<CodeGroup>
+```javascript Debug Helpers
+// tests/utils/debug.js
+export function debugApiCall(response) {
+  console.log('API Call Debug Info:');
+  console.log(`Status: ${response.status}`);
+  console.log(`Headers:`, response.headers);
+  console.log(`Body:`, response.data);
+  console.log(`Duration: ${response.duration}ms`);
+}
+
+export function captureNetworkLogs() {
+  const originalFetch = global.fetch;
+  const logs = [];
+  
+  global.fetch = async (...args) => {
+    const start = Date.now();
+    const response = await originalFetch(...args);
+    const duration = Date.now() - start;
+    
+    logs.push({
+      url: args[0],
+      method: args[1]?.method || 'GET',
+      status: response.status,
+      duration
+    });
+    
+    return response;
+  };
+  
+  return () => {
+    global.fetch = originalFetch;
+    return logs;
+  };
+}
+```
+</CodeGroup>
+
+## Next Steps
+
+After setting up comprehensive testing:
+
+1. **Implement CI/CD Integration**: Automate test execution in your deployment pipeline
+2. **Set Up Monitoring**: Track test performance and failure rates over time
+3. **Create Test Documentation**: Document test scenarios and expected behaviors
+4. **Regular Test Maintenance**: Keep tests updated as APIs evolve
+
+For more information on specific testing scenarios, see our [Troubleshooting Guide](/api/guides/troubleshooting) and [Performance Optimization Guide](/api/guides/performance).

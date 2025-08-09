@@ -1,0 +1,948 @@
+---
+title: "Getting Started"
+description: "Your first Tolstoy API integration in 5 minutes"
+---
+
+# Getting Started
+
+Get up and running with the Tolstoy API in under 5 minutes. This guide walks you through creating your first action and workflow.
+
+## Prerequisites
+
+Before you begin, make sure you have:
+
+- A Tolstoy account with API access
+- Your API key from the [dashboard](https://app.tolstoy.dev/settings/api-keys)
+- A development environment (Node.js, Python, or cURL)
+
+## Step 1: Test Your API Key
+
+First, verify your API key works by checking the API health:
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET 'https://api.tolstoy.dev/health' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript
+const apiKey = 'YOUR_API_KEY';
+
+const response = await fetch('https://api.tolstoy.dev/health', {
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  }
+});
+
+const health = await response.json();
+console.log('API Status:', health.status);
+```
+
+```python Python
+import requests
+
+api_key = 'YOUR_API_KEY'
+
+response = requests.get(
+    'https://api.tolstoy.dev/health',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+)
+
+health = response.json()
+print(f"API Status: {health['status']}")
+```
+
+</CodeGroup>
+
+Expected response:
+```json
+{
+  "status": "healthy",
+  "version": "2.1.0",
+  "uptime_seconds": 2592000
+}
+```
+
+## Step 2: Create Your First Action
+
+Let's create a simple HTTP action that sends a webhook notification:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST 'https://api.tolstoy.dev/actions' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "my_first_webhook",
+    "display_name": "My First Webhook",
+    "description": "Send a test notification to a webhook",
+    "type": "http",
+    "configuration": {
+      "endpoint": {
+        "url": "https://httpbin.org/post",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json"
+        }
+      },
+      "inputs": [
+        {
+          "name": "message",
+          "type": "string",
+          "required": true,
+          "description": "Message to send"
+        },
+        {
+          "name": "priority",
+          "type": "string",
+          "required": false,
+          "default": "normal",
+          "validation": {
+            "enum": ["low", "normal", "high"]
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "status_code",
+          "type": "integer",
+          "description": "HTTP response status"
+        },
+        {
+          "name": "response_body",
+          "type": "object",
+          "description": "Response from webhook"
+        }
+      ],
+      "timeout": 10000
+    },
+    "tags": ["webhook", "notification", "getting-started"]
+  }'
+```
+
+```javascript JavaScript
+const newAction = {
+  name: "my_first_webhook",
+  display_name: "My First Webhook",
+  description: "Send a test notification to a webhook",
+  type: "http",
+  configuration: {
+    endpoint: {
+      url: "https://httpbin.org/post",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    },
+    inputs: [
+      {
+        name: "message",
+        type: "string",
+        required: true,
+        description: "Message to send"
+      },
+      {
+        name: "priority",
+        type: "string",
+        required: false,
+        default: "normal",
+        validation: {
+          enum: ["low", "normal", "high"]
+        }
+      }
+    ],
+    outputs: [
+      {
+        name: "status_code",
+        type: "integer",
+        description: "HTTP response status"
+      },
+      {
+        name: "response_body",
+        type: "object",
+        description: "Response from webhook"
+      }
+    ],
+    timeout: 10000
+  },
+  tags: ["webhook", "notification", "getting-started"]
+};
+
+const response = await fetch('https://api.tolstoy.dev/actions', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(newAction)
+});
+
+const data = await response.json();
+console.log('Created action:', data.action.id);
+
+// Save the action ID for next steps
+const actionId = data.action.id;
+```
+
+```python Python
+import requests
+
+new_action = {
+    "name": "my_first_webhook",
+    "display_name": "My First Webhook", 
+    "description": "Send a test notification to a webhook",
+    "type": "http",
+    "configuration": {
+        "endpoint": {
+            "url": "https://httpbin.org/post",
+            "method": "POST",
+            "headers": {
+                "Content-Type": "application/json"
+            }
+        },
+        "inputs": [
+            {
+                "name": "message",
+                "type": "string",
+                "required": True,
+                "description": "Message to send"
+            },
+            {
+                "name": "priority",
+                "type": "string", 
+                "required": False,
+                "default": "normal",
+                "validation": {
+                    "enum": ["low", "normal", "high"]
+                }
+            }
+        ],
+        "outputs": [
+            {
+                "name": "status_code",
+                "type": "integer",
+                "description": "HTTP response status"
+            },
+            {
+                "name": "response_body",
+                "type": "object",
+                "description": "Response from webhook"
+            }
+        ],
+        "timeout": 10000
+    },
+    "tags": ["webhook", "notification", "getting-started"]
+}
+
+response = requests.post(
+    'https://api.tolstoy.dev/actions',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    },
+    json=new_action
+)
+
+if response.status_code == 201:
+    action = response.json()['action']
+    print(f"Created action: {action['id']}")
+    action_id = action['id']
+else:
+    print(f"Error: {response.status_code}")
+    print(response.text)
+```
+
+</CodeGroup>
+
+## Step 3: Test Your Action
+
+Now let's execute the action to make sure it works:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST 'https://api.tolstoy.dev/actions/ACTION_ID/execute' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "inputs": {
+      "message": "Hello from Tolstoy!",
+      "priority": "high"
+    }
+  }'
+```
+
+```javascript JavaScript
+// Use the action ID from Step 2
+const executionResult = await fetch(
+  `https://api.tolstoy.dev/actions/${actionId}/execute`,
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      inputs: {
+        message: "Hello from Tolstoy!",
+        priority: "high"
+      }
+    })
+  }
+);
+
+const result = await executionResult.json();
+console.log('Execution status:', result.execution.status);
+console.log('Response code:', result.execution.outputs.status_code);
+console.log('Response body:', result.execution.outputs.response_body);
+```
+
+```python Python
+# Use the action_id from Step 2
+execution_request = {
+    "inputs": {
+        "message": "Hello from Tolstoy!",
+        "priority": "high"
+    }
+}
+
+response = requests.post(
+    f'https://api.tolstoy.dev/actions/{action_id}/execute',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    },
+    json=execution_request
+)
+
+if response.status_code == 200:
+    result = response.json()
+    execution = result['execution']
+    print(f"Execution status: {execution['status']}")
+    print(f"Duration: {execution['duration_ms']}ms")
+    print(f"Response code: {execution['outputs']['status_code']}")
+```
+
+</CodeGroup>
+
+Expected response:
+```json
+{
+  "execution": {
+    "id": "exec_abc123xyz",
+    "status": "success",
+    "duration_ms": 245,
+    "outputs": {
+      "status_code": 200,
+      "response_body": {
+        "json": {
+          "message": "Hello from Tolstoy!",
+          "priority": "high"
+        }
+      }
+    }
+  }
+}
+```
+
+## Step 4: Create Your First Flow
+
+Now let's create a flow that uses our action:
+
+<CodeGroup>
+
+```javascript JavaScript
+const newFlow = {
+  name: "my_first_flow",
+  display_name: "My First Flow",
+  description: "A simple workflow that sends a notification",
+  trigger: {
+    type: "manual"  // We'll trigger it manually for testing
+  },
+  steps: [
+    {
+      id: "step_1",
+      name: "send_notification",
+      action_id: actionId,  // Use the action we created
+      type: "action",
+      input_mapping: {
+        message: "{{inputs.user_message}}",
+        priority: "{{inputs.urgency_level}}"
+      }
+    }
+  ],
+  variables: {
+    user_message: {
+      type: "string",
+      required: true,
+      description: "Message from user"
+    },
+    urgency_level: {
+      type: "string",
+      default: "normal",
+      validation: {
+        enum: ["low", "normal", "high"]
+      }
+    }
+  }
+};
+
+const flowResponse = await fetch('https://api.tolstoy.dev/flows', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(newFlow)
+});
+
+const flowData = await flowResponse.json();
+console.log('Created flow:', flowData.flow.id);
+
+// Save flow ID for execution
+const flowId = flowData.flow.id;
+```
+
+```python Python
+new_flow = {
+    "name": "my_first_flow",
+    "display_name": "My First Flow",
+    "description": "A simple workflow that sends a notification",
+    "trigger": {
+        "type": "manual"
+    },
+    "steps": [
+        {
+            "id": "step_1", 
+            "name": "send_notification",
+            "action_id": action_id,
+            "type": "action",
+            "input_mapping": {
+                "message": "{{inputs.user_message}}",
+                "priority": "{{inputs.urgency_level}}"
+            }
+        }
+    ],
+    "variables": {
+        "user_message": {
+            "type": "string",
+            "required": True,
+            "description": "Message from user"
+        },
+        "urgency_level": {
+            "type": "string",
+            "default": "normal",
+            "validation": {
+                "enum": ["low", "normal", "high"]
+            }
+        }
+    }
+}
+
+response = requests.post(
+    'https://api.tolstoy.dev/flows',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    },
+    json=new_flow
+)
+
+if response.status_code == 201:
+    flow = response.json()['flow']
+    print(f"Created flow: {flow['id']}")
+    flow_id = flow['id']
+```
+
+</CodeGroup>
+
+## Step 5: Execute Your Flow
+
+Let's execute the flow we just created:
+
+<CodeGroup>
+
+```javascript JavaScript
+const flowExecution = await fetch(
+  `https://api.tolstoy.dev/flows/${flowId}/execute`,
+  {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      inputs: {
+        user_message: "My first successful workflow execution!",
+        urgency_level: "high"
+      }
+    })
+  }
+);
+
+const flowResult = await flowExecution.json();
+console.log('Flow execution status:', flowResult.execution.status);
+console.log('Flow duration:', `${flowResult.execution.duration_ms}ms`);
+
+// Check step results
+flowResult.execution.steps.forEach(step => {
+  console.log(`Step ${step.step_name}: ${step.status}`);
+  if (step.outputs) {
+    console.log('  Outputs:', step.outputs);
+  }
+});
+```
+
+```python Python
+flow_execution_request = {
+    "inputs": {
+        "user_message": "My first successful workflow execution!",
+        "urgency_level": "high"
+    }
+}
+
+response = requests.post(
+    f'https://api.tolstoy.dev/flows/{flow_id}/execute',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    },
+    json=flow_execution_request
+)
+
+if response.status_code == 200:
+    result = response.json()
+    execution = result['execution']
+    print(f"Flow execution: {execution['status']}")
+    print(f"Duration: {execution['duration_ms']}ms")
+    
+    for step in execution['steps']:
+        print(f"Step {step['step_name']}: {step['status']}")
+```
+
+</CodeGroup>
+
+## Step 6: Set Up a Webhook (Optional)
+
+To make your flow respond to external events, let's add a webhook trigger:
+
+<CodeGroup>
+
+```javascript Update Flow with Webhook
+// First, update the flow to use webhook trigger
+const webhookFlow = {
+  trigger: {
+    type: "webhook",
+    config: {
+      endpoint: "/my-first-webhook",
+      method: "POST",
+      authentication: {
+        type: "signature",
+        algorithm: "sha256",
+        secret_name: "MY_WEBHOOK_SECRET"
+      }
+    }
+  }
+};
+
+const updateResponse = await fetch(
+  `https://api.tolstoy.dev/flows/${flowId}`,
+  {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(webhookFlow)
+  }
+);
+
+const updatedFlow = await updateResponse.json();
+console.log('Webhook URL:', updatedFlow.flow.trigger.webhook_url);
+
+// Test the webhook
+const webhookTest = await fetch(updatedFlow.flow.trigger.webhook_url, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'X-Webhook-Signature': 'your-signature-here'
+  },
+  body: JSON.stringify({
+    user_message: "Webhook triggered successfully!",
+    urgency_level: "normal"
+  })
+});
+
+console.log('Webhook response:', await webhookTest.text());
+```
+
+</CodeGroup>
+
+## Complete Example: Full Integration
+
+Here's a complete working example that combines everything:
+
+<CodeGroup>
+
+```javascript Complete Integration
+class TolstoyQuickStart {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseUrl = 'https://api.tolstoy.dev';
+  }
+  
+  async request(endpoint, options = {}) {
+    const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`API Error: ${error.error.message}`);
+    }
+    
+    return response.json();
+  }
+  
+  async createNotificationAction() {
+    const action = {
+      name: `notification_action_${Date.now()}`,
+      display_name: "Notification Action",
+      type: "http",
+      configuration: {
+        endpoint: {
+          url: "https://httpbin.org/post",
+          method: "POST"
+        },
+        inputs: [
+          {
+            name: "message",
+            type: "string",
+            required: true
+          }
+        ],
+        timeout: 10000
+      }
+    };
+    
+    const result = await this.request('/actions', {
+      method: 'POST',
+      body: JSON.stringify(action)
+    });
+    
+    console.log('✅ Created action:', result.action.id);
+    return result.action;
+  }
+  
+  async createNotificationFlow(actionId) {
+    const flow = {
+      name: `notification_flow_${Date.now()}`,
+      display_name: "Notification Flow",
+      trigger: { type: "manual" },
+      steps: [
+        {
+          id: "notify",
+          name: "send_notification",
+          action_id: actionId,
+          type: "action",
+          input_mapping: {
+            message: "{{inputs.text}}"
+          }
+        }
+      ],
+      variables: {
+        text: {
+          type: "string",
+          required: true
+        }
+      }
+    };
+    
+    const result = await this.request('/flows', {
+      method: 'POST',
+      body: JSON.stringify(flow)
+    });
+    
+    console.log('✅ Created flow:', result.flow.id);
+    return result.flow;
+  }
+  
+  async executeFlow(flowId, message) {
+    const result = await this.request(`/flows/${flowId}/execute`, {
+      method: 'POST',
+      body: JSON.stringify({
+        inputs: { text: message }
+      })
+    });
+    
+    console.log('✅ Executed flow:', result.execution.status);
+    return result.execution;
+  }
+  
+  async run() {
+    try {
+      console.log('🚀 Starting Tolstoy Quick Start...');
+      
+      // Step 1: Create action
+      const action = await this.createNotificationAction();
+      
+      // Step 2: Create flow
+      const flow = await this.createNotificationFlow(action.id);
+      
+      // Step 3: Execute flow
+      const execution = await this.executeFlow(
+        flow.id, 
+        "Hello from my first Tolstoy integration!"
+      );
+      
+      console.log('🎉 Quick start completed successfully!');
+      console.log(`Action ID: ${action.id}`);
+      console.log(`Flow ID: ${flow.id}`);
+      console.log(`Execution ID: ${execution.id}`);
+      
+      return {
+        action: action.id,
+        flow: flow.id,
+        execution: execution.id
+      };
+      
+    } catch (error) {
+      console.error('❌ Quick start failed:', error.message);
+      throw error;
+    }
+  }
+}
+
+// Usage
+const quickStart = new TolstoyQuickStart('YOUR_API_KEY');
+const results = await quickStart.run();
+```
+
+```python Python Complete Integration
+import requests
+import time
+from typing import Dict, Any
+
+class TolstoyQuickStart:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = 'https://api.tolstoy.dev'
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        })
+    
+    def request(self, endpoint: str, method: str = 'GET', **kwargs) -> Dict[str, Any]:
+        response = self.session.request(
+            method, 
+            f'{self.base_url}{endpoint}',
+            **kwargs
+        )
+        response.raise_for_status()
+        return response.json()
+    
+    def create_notification_action(self) -> Dict[str, Any]:
+        action = {
+            "name": f"notification_action_{int(time.time())}",
+            "display_name": "Notification Action",
+            "type": "http",
+            "configuration": {
+                "endpoint": {
+                    "url": "https://httpbin.org/post",
+                    "method": "POST"
+                },
+                "inputs": [
+                    {
+                        "name": "message",
+                        "type": "string",
+                        "required": True
+                    }
+                ],
+                "timeout": 10000
+            }
+        }
+        
+        result = self.request('/actions', 'POST', json=action)
+        print(f"✅ Created action: {result['action']['id']}")
+        return result['action']
+    
+    def create_notification_flow(self, action_id: str) -> Dict[str, Any]:
+        flow = {
+            "name": f"notification_flow_{int(time.time())}",
+            "display_name": "Notification Flow",
+            "trigger": {"type": "manual"},
+            "steps": [
+                {
+                    "id": "notify",
+                    "name": "send_notification", 
+                    "action_id": action_id,
+                    "type": "action",
+                    "input_mapping": {
+                        "message": "{{inputs.text}}"
+                    }
+                }
+            ],
+            "variables": {
+                "text": {
+                    "type": "string",
+                    "required": True
+                }
+            }
+        }
+        
+        result = self.request('/flows', 'POST', json=flow)
+        print(f"✅ Created flow: {result['flow']['id']}")
+        return result['flow']
+    
+    def execute_flow(self, flow_id: str, message: str) -> Dict[str, Any]:
+        execution_request = {
+            "inputs": {"text": message}
+        }
+        
+        result = self.request(
+            f'/flows/{flow_id}/execute', 
+            'POST', 
+            json=execution_request
+        )
+        
+        print(f"✅ Executed flow: {result['execution']['status']}")
+        return result['execution']
+    
+    def run(self) -> Dict[str, str]:
+        try:
+            print("🚀 Starting Tolstoy Quick Start...")
+            
+            # Create action
+            action = self.create_notification_action()
+            
+            # Create flow  
+            flow = self.create_notification_flow(action['id'])
+            
+            # Execute flow
+            execution = self.execute_flow(
+                flow['id'],
+                "Hello from my first Tolstoy integration!"
+            )
+            
+            print("🎉 Quick start completed successfully!")
+            
+            return {
+                'action_id': action['id'],
+                'flow_id': flow['id'], 
+                'execution_id': execution['id']
+            }
+            
+        except Exception as e:
+            print(f"❌ Quick start failed: {e}")
+            raise
+
+# Usage
+quick_start = TolstoyQuickStart('YOUR_API_KEY')
+results = quick_start.run()
+```
+
+</CodeGroup>
+
+## Next Steps
+
+Congratulations! You've successfully:
+
+1. ✅ Created your first action
+2. ✅ Built a workflow flow
+3. ✅ Executed a complete automation
+
+### **What's Next?**
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Learn about API keys, tokens, and security
+  </Card>
+  <Card title="Webhook Setup" icon="link" href="/api/guides/webhooks">
+    Connect external systems to trigger flows
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/api/guides/error-handling">
+    Build robust integrations with proper error handling
+  </Card>
+  <Card title="Production Deployment" icon="rocket" href="/api/guides/production">
+    Deploy your integration to production
+  </Card>
+</CardGroup>
+
+### **Common Next Steps:**
+
+1. **Add Real Integrations**: Replace httpbin.org with real services (Slack, email, databases)
+2. **Set Up Webhooks**: Connect external systems to trigger your flows automatically
+3. **Add Error Handling**: Implement retry logic and error notifications
+4. **Create More Actions**: Build a library of reusable actions
+5. **Monitor Performance**: Set up logging and monitoring for your workflows
+
+### **Need Help?**
+
+- 📖 [Full API Reference](/api/overview) - Complete endpoint documentation
+- 🛠️ [SDK Documentation](/sdk) - Official SDKs for your language
+- 💬 [Discord Community](https://discord.gg/tolstoy) - Get help from other developers
+- 📧 [Support](mailto:support@tolstoy.dev) - Direct support for integration issues
+
+## API Playground
+
+Test the complete workflow:
+
+<ApiPlayground
+  method="POST"
+  endpoint="/flows/{flow_id}/execute"
+  baseUrl="https://api.tolstoy.dev"
+  auth={{
+    type: "bearer",
+    placeholder: "Your API Key"
+  }}
+  pathParams={[
+    {
+      name: "flow_id",
+      placeholder: "flow_abc123xyz",
+      description: "Your flow ID from Step 4",
+      required: true
+    }
+  ]}
+  body={{
+    type: "json",
+    schema: {
+      inputs: {
+        type: "object",
+        defaultValue: {
+          text: "Hello from my first Tolstoy integration!"
+        },
+        description: "Flow input variables",
+        required: true
+      }
+    }
+  }}
+  sampleResponse={{
+    "execution": {
+      "id": "exec_quickstart_123",
+      "status": "success",
+      "duration_ms": 245,
+      "steps": [
+        {
+          "step_id": "step_1",
+          "status": "success",
+          "outputs": {
+            "status_code": 200
+          }
+        }
+      ]
+    }
+  }}
+/>

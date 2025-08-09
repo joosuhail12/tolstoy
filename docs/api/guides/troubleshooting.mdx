@@ -1,0 +1,2825 @@
+---
+title: 'Troubleshooting Guide'
+description: 'Comprehensive troubleshooting guide for Tolstoy API integrations with common issues, debugging techniques, and solutions'
+---
+
+# Troubleshooting Guide
+
+This guide helps you diagnose and resolve common issues when integrating with the Tolstoy API. Follow the systematic approach to identify and fix problems quickly.
+
+## Quick Diagnostic Checklist
+
+### ✅ Before You Start
+- [ ] Check [Tolstoy Status Page](https://status.tolstoy.com) for known issues
+- [ ] Verify your API key is valid and has proper permissions
+- [ ] Ensure you're using the correct base URL for your environment
+- [ ] Check your internet connectivity and firewall settings
+
+## Common Issues and Solutions
+
+### Authentication Problems
+
+#### Issue: "Unauthorized" (401) Errors
+
+<Accordion title="API Key Issues">
+
+**Symptoms:**
+- `401 Unauthorized` responses
+- Error message: "Invalid API key"
+- Unable to access any endpoints
+
+**Common Causes:**
+1. Missing or incorrect API key
+2. API key for wrong environment (using test key in production)
+3. Expired or revoked API key
+4. Malformed Authorization header
+
+**Solutions:**
+
+<CodeGroup>
+```javascript Debug API Key
+// Debug API key issues
+const debugApiKey = async () => {
+  const apiKey = process.env.TOLSTOY_API_KEY;
+  
+  console.log('API Key Diagnostics:');
+  console.log('- Key present:', !!apiKey);
+  console.log('- Key format:', apiKey ? apiKey.substring(0, 8) + '***' : 'N/A');
+  console.log('- Key environment:', apiKey?.startsWith('prod_') ? 'production' : 'test');
+  
+  // Test API key
+  try {
+    const response = await fetch('https://api.tolstoy.com/v1/health', {
+      headers: { 'Authorization': `Bearer ${apiKey}` }
+    });
+    
+    console.log('- Key validation:', response.ok ? 'VALID' : 'INVALID');
+    console.log('- Response status:', response.status);
+    
+    if (!response.ok) {
+      const error = await response.json();
+      console.log('- Error details:', error);
+    }
+  } catch (error) {
+    console.log('- Network error:', error.message);
+  }
+};
+
+debugApiKey();
+```
+
+```python Debug API Key
+# Debug API key issues
+import os
+import aiohttp
+
+async def debug_api_key():
+    api_key = os.getenv('TOLSTOY_API_KEY')
+    
+    print('API Key Diagnostics:')
+    print(f'- Key present: {bool(api_key)}')
+    print(f'- Key format: {api_key[:8] + "***" if api_key else "N/A"}')
+    print(f'- Key environment: {"production" if api_key and api_key.startswith("prod_") else "test"}')
+    
+    # Test API key
+    try:
+        async with aiohttp.ClientSession() as session:
+            headers = {'Authorization': f'Bearer {api_key}'}
+            async with session.get('https://api.tolstoy.com/v1/health', headers=headers) as response:
+                print(f'- Key validation: {"VALID" if response.ok else "INVALID"}')
+                print(f'- Response status: {response.status}')
+                
+                if not response.ok:
+                    error = await response.json()
+                    print(f'- Error details: {error}')
+    except Exception as error:
+        print(f'- Network error: {error}')
+
+# Run the diagnostic
+import asyncio
+asyncio.run(debug_api_key())
+```
+
+```bash Debug API Key
+#!/bin/bash
+# debug-api-key.sh
+
+echo "API Key Diagnostics:"
+echo "==================="
+
+# Check if API key is set
+if [ -z "$TOLSTOY_API_KEY" ]; then
+    echo "❌ TOLSTOY_API_KEY environment variable is not set"
+    exit 1
+fi
+
+echo "✅ API key is present"
+echo "🔍 Key format: ${TOLSTOY_API_KEY:0:8}***"
+
+# Check key environment
+if [[ $TOLSTOY_API_KEY == prod_* ]]; then
+    echo "🏭 Environment: Production"
+    BASE_URL="https://api.tolstoy.com"
+else
+    echo "🧪 Environment: Test/Development"
+    BASE_URL="https://api-staging.tolstoy.com"
+fi
+
+# Test API key
+echo "🔍 Testing API key..."
+HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+  -H "Authorization: Bearer $TOLSTOY_API_KEY" \
+  "$BASE_URL/v1/health")
+
+if [ "$HTTP_STATUS" = "200" ]; then
+    echo "✅ API key is valid"
+else
+    echo "❌ API key validation failed (HTTP $HTTP_STATUS)"
+    
+    # Get detailed error
+    ERROR_RESPONSE=$(curl -s \
+      -H "Authorization: Bearer $TOLSTOY_API_KEY" \
+      "$BASE_URL/v1/health")
+    echo "Error details: $ERROR_RESPONSE"
+fi
+```
+</CodeGroup>
+
+</Accordion>
+
+<Accordion title="Permission Issues">
+
+**Symptoms:**
+- `403 Forbidden` responses
+- Error message: "Insufficient permissions"
+- Can access some endpoints but not others
+
+**Diagnostic Steps:**
+
+<CodeGroup>
+```javascript Check Permissions
+// Check API key permissions
+const checkPermissions = async () => {
+  const endpoints = [
+    { path: '/v1/workflows', method: 'GET', permission: 'workflow.read' },
+    { path: '/v1/workflows', method: 'POST', permission: 'workflow.create' },
+    { path: '/v1/organizations', method: 'GET', permission: 'organization.read' }
+  ];
+
+  const results = {};
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await fetch(`https://api.tolstoy.com${endpoint.path}`, {
+        method: endpoint.method,
+        headers: {
+          'Authorization': `Bearer ${process.env.TOLSTOY_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: endpoint.method === 'POST' ? JSON.stringify({
+          name: 'Permission Test',
+          trigger: { type: 'manual' },
+          actions: []
+        }) : undefined
+      });
+
+      results[endpoint.permission] = {
+        status: response.status,
+        allowed: response.ok,
+        endpoint: `${endpoint.method} ${endpoint.path}`
+      };
+    } catch (error) {
+      results[endpoint.permission] = {
+        status: 'error',
+        allowed: false,
+        error: error.message,
+        endpoint: `${endpoint.method} ${endpoint.path}`
+      };
+    }
+  }
+
+  console.log('Permission Check Results:');
+  console.table(results);
+  
+  return results;
+};
+
+checkPermissions();
+```
+</CodeGroup>
+
+**Solutions:**
+1. Contact your organization admin to review API key permissions
+2. Ensure you're using the correct organization ID in requests
+3. Verify your API key scope matches your integration needs
+
+</Accordion>
+
+### Network and Connectivity Issues
+
+#### Issue: Timeout Errors
+
+<Accordion title="Request Timeouts">
+
+**Symptoms:**
+- Requests hang and eventually timeout
+- Error: "ETIMEDOUT" or "ECONNRESET"
+- Intermittent connection failures
+
+**Diagnostic Commands:**
+
+<CodeGroup>
+```bash Network Diagnostics
+#!/bin/bash
+# network-diagnostics.sh
+
+echo "Network Connectivity Diagnostics"
+echo "================================"
+
+# Test DNS resolution
+echo "🔍 Testing DNS resolution..."
+dig +short api.tolstoy.com
+dig +short api-staging.tolstoy.com
+
+# Test connectivity
+echo "🔍 Testing connectivity..."
+curl -I https://api.tolstoy.com/v1/health
+curl -w "Connect: %{time_connect}s\nTTFB: %{time_starttransfer}s\nTotal: %{time_total}s\n" \
+  -o /dev/null -s https://api.tolstoy.com/v1/health
+
+# Test from different regions
+echo "🔍 Testing regional connectivity..."
+for region in us-east-1 us-west-2 eu-west-1; do
+  echo "Testing $region..."
+  curl -w "Region $region: %{time_total}s\n" \
+    -o /dev/null -s https://api.tolstoy.com/v1/health
+done
+
+# Check for proxy/firewall issues
+echo "🔍 Checking proxy configuration..."
+echo "HTTP_PROXY: $HTTP_PROXY"
+echo "HTTPS_PROXY: $HTTPS_PROXY"
+echo "NO_PROXY: $NO_PROXY"
+```
+
+```javascript Timeout Diagnostics
+// utils/timeout-diagnostics.js
+class TimeoutDiagnostics {
+  async diagnoseTimeouts() {
+    const tests = [
+      { name: 'DNS Resolution', test: () => this.testDNS() },
+      { name: 'TCP Connection', test: () => this.testTCPConnection() },
+      { name: 'SSL Handshake', test: () => this.testSSLHandshake() },
+      { name: 'HTTP Request', test: () => this.testHTTPRequest() },
+      { name: 'Large Payload', test: () => this.testLargePayload() }
+    ];
+
+    const results = {};
+
+    for (const test of tests) {
+      try {
+        const startTime = Date.now();
+        await test.test();
+        results[test.name] = {
+          status: 'success',
+          duration: Date.now() - startTime
+        };
+      } catch (error) {
+        results[test.name] = {
+          status: 'failed',
+          error: error.message,
+          duration: Date.now() - startTime
+        };
+      }
+    }
+
+    return results;
+  }
+
+  async testDNS() {
+    const dns = await import('dns');
+    return new Promise((resolve, reject) => {
+      dns.lookup('api.tolstoy.com', (err, address) => {
+        if (err) reject(err);
+        else resolve(address);
+      });
+    });
+  }
+
+  async testTCPConnection() {
+    const net = await import('net');
+    return new Promise((resolve, reject) => {
+      const socket = net.createConnection(443, 'api.tolstoy.com');
+      socket.on('connect', () => {
+        socket.end();
+        resolve();
+      });
+      socket.on('error', reject);
+      socket.setTimeout(10000, () => {
+        socket.destroy();
+        reject(new Error('TCP connection timeout'));
+      });
+    });
+  }
+
+  async testSSLHandshake() {
+    const tls = await import('tls');
+    return new Promise((resolve, reject) => {
+      const socket = tls.connect(443, 'api.tolstoy.com');
+      socket.on('secureConnect', () => {
+        socket.end();
+        resolve();
+      });
+      socket.on('error', reject);
+      socket.setTimeout(10000, () => {
+        socket.destroy();
+        reject(new Error('SSL handshake timeout'));
+      });
+    });
+  }
+
+  async testHTTPRequest() {
+    const response = await fetch('https://api.tolstoy.com/v1/health', {
+      timeout: 10000
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    return await response.text();
+  }
+
+  async testLargePayload() {
+    const largePayload = {
+      name: 'Timeout Test Workflow',
+      description: 'x'.repeat(10000), // 10KB description
+      trigger: { type: 'manual' },
+      actions: Array(50).fill({
+        type: 'log',
+        config: { message: 'Large payload test action' }
+      })
+    };
+
+    const response = await fetch('https://api.tolstoy.com/v1/workflows', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.TOLSTOY_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(largePayload),
+      timeout: 30000
+    });
+
+    return response.ok;
+  }
+}
+
+export default new TimeoutDiagnostics();
+```
+</CodeGroup>
+
+**Solutions:**
+1. Increase client timeout values
+2. Implement retry logic with exponential backoff
+3. Check firewall and proxy configurations
+4. Use connection pooling and keep-alive
+5. Contact your network administrator for corporate firewalls
+
+</Accordion>
+
+### Webhook Issues
+
+#### Issue: Webhook Signature Verification Failures
+
+<Accordion title="Signature Verification">
+
+**Symptoms:**
+- Webhook events rejected with signature errors
+- Error: "Invalid webhook signature"
+- Webhooks received but not processed
+
+**Debug Signature Verification:**
+
+<CodeGroup>
+```javascript Debug Webhook Signatures
+// utils/webhook-debugger.js
+import crypto from 'crypto';
+
+class WebhookDebugger {
+  debugSignature(payload, receivedSignature, timestamp, secret) {
+    console.log('Webhook Signature Debug:');
+    console.log('=======================');
+    
+    // Log inputs
+    console.log('Received signature:', receivedSignature);
+    console.log('Timestamp:', timestamp);
+    console.log('Secret length:', secret ? secret.length : 'N/A');
+    console.log('Payload length:', payload.length);
+    console.log('Payload preview:', payload.substring(0, 100) + '...');
+    
+    // Check timestamp age
+    const now = Math.floor(Date.now() / 1000);
+    const eventTime = parseInt(timestamp);
+    const age = now - eventTime;
+    
+    console.log('Timestamp age:', age, 'seconds');
+    
+    if (age > 300) { // 5 minutes
+      console.log('⚠️  WARNING: Timestamp is older than 5 minutes');
+    }
+    
+    // Generate expected signature
+    const signedPayload = `${timestamp}.${payload}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(signedPayload, 'utf8')
+      .digest('hex');
+    
+    const expectedFull = `sha256=${expectedSignature}`;
+    
+    console.log('Generated signature:', expectedFull);
+    console.log('Signatures match:', receivedSignature === expectedFull);
+    
+    // Character-by-character comparison
+    if (receivedSignature !== expectedFull) {
+      console.log('Character comparison:');
+      const maxLength = Math.max(receivedSignature.length, expectedFull.length);
+      
+      for (let i = 0; i < maxLength; i++) {
+        const recv = receivedSignature[i] || '?';
+        const exp = expectedFull[i] || '?';
+        
+        if (recv !== exp) {
+          console.log(`Position ${i}: received '${recv}' vs expected '${exp}'`);
+        }
+      }
+    }
+    
+    return receivedSignature === expectedFull;
+  }
+
+  // Test webhook endpoint
+  async testWebhookEndpoint(url, secret) {
+    const testPayload = {
+      event: 'test.webhook',
+      data: { message: 'This is a test webhook' },
+      timestamp: new Date().toISOString()
+    };
+
+    const timestamp = Math.floor(Date.now() / 1000);
+    const payloadString = JSON.stringify(testPayload);
+    const signature = this.generateSignature(payloadString, timestamp, secret);
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'tolstoy-signature': signature,
+          'tolstoy-timestamp': timestamp.toString()
+        },
+        body: payloadString
+      });
+
+      console.log('Test Webhook Results:');
+      console.log('====================');
+      console.log('Status:', response.status);
+      console.log('Success:', response.ok);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.log('Error response:', errorText);
+      }
+
+      return response.ok;
+    } catch (error) {
+      console.log('Webhook test failed:', error.message);
+      return false;
+    }
+  }
+
+  generateSignature(payload, timestamp, secret) {
+    const signedPayload = `${timestamp}.${payload}`;
+    const signature = crypto
+      .createHmac('sha256', secret)
+      .update(signedPayload, 'utf8')
+      .digest('hex');
+    
+    return `sha256=${signature}`;
+  }
+}
+
+export default new WebhookDebugger();
+```
+
+```python Debug Webhook Signatures
+# utils/webhook_debugger.py
+import hmac
+import hashlib
+import time
+import json
+import aiohttp
+
+class WebhookDebugger:
+    def debug_signature(self, payload: str, received_signature: str, timestamp: str, secret: str) -> bool:
+        print('Webhook Signature Debug:')
+        print('=======================')
+        
+        # Log inputs
+        print(f'Received signature: {received_signature}')
+        print(f'Timestamp: {timestamp}')
+        print(f'Secret length: {len(secret) if secret else "N/A"}')
+        print(f'Payload length: {len(payload)}')
+        print(f'Payload preview: {payload[:100]}...')
+        
+        # Check timestamp age
+        now = int(time.time())
+        event_time = int(timestamp)
+        age = now - event_time
+        
+        print(f'Timestamp age: {age} seconds')
+        
+        if age > 300:  # 5 minutes
+            print('⚠️  WARNING: Timestamp is older than 5 minutes')
+        
+        # Generate expected signature
+        signed_payload = f"{timestamp}.{payload}"
+        expected_signature = hmac.new(
+            secret.encode(),
+            signed_payload.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        
+        expected_full = f"sha256={expected_signature}"
+        
+        print(f'Generated signature: {expected_full}')
+        print(f'Signatures match: {received_signature == expected_full}')
+        
+        # Character-by-character comparison
+        if received_signature != expected_full:
+            print('Character comparison:')
+            max_length = max(len(received_signature), len(expected_full))
+            
+            for i in range(max_length):
+                recv = received_signature[i] if i < len(received_signature) else '?'
+                exp = expected_full[i] if i < len(expected_full) else '?'
+                
+                if recv != exp:
+                    print(f'Position {i}: received "{recv}" vs expected "{exp}"')
+        
+        return received_signature == expected_full
+    
+    async def test_webhook_endpoint(self, url: str, secret: str) -> bool:
+        test_payload = {
+            "event": "test.webhook",
+            "data": {"message": "This is a test webhook"},
+            "timestamp": time.time()
+        }
+        
+        timestamp = int(time.time())
+        payload_string = json.dumps(test_payload)
+        signature = self.generate_signature(payload_string, timestamp, secret)
+        
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {
+                    'Content-Type': 'application/json',
+                    'tolstoy-signature': signature,
+                    'tolstoy-timestamp': str(timestamp)
+                }
+                
+                async with session.post(url, headers=headers, data=payload_string) as response:
+                    print('Test Webhook Results:')
+                    print('====================')
+                    print(f'Status: {response.status}')
+                    print(f'Success: {response.ok}')
+                    
+                    if not response.ok:
+                        error_text = await response.text()
+                        print(f'Error response: {error_text}')
+                    
+                    return response.ok
+        except Exception as error:
+            print(f'Webhook test failed: {error}')
+            return False
+    
+    def generate_signature(self, payload: str, timestamp: int, secret: str) -> str:
+        signed_payload = f"{timestamp}.{payload}"
+        signature = hmac.new(
+            secret.encode(),
+            signed_payload.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        
+        return f"sha256={signature}"
+
+webhook_debugger = WebhookDebugger()
+```
+</CodeGroup>
+
+**Solutions:**
+1. Verify webhook secret matches between Tolstoy dashboard and your code
+2. Ensure timestamp is current (within 5 minutes)
+3. Check payload format and encoding
+4. Verify signature generation algorithm
+
+</Accordion>
+
+#### Issue: Webhook Delivery Failures
+
+<Accordion title="Delivery Failures">
+
+**Symptoms:**
+- Webhook events not received
+- Events visible in Tolstoy dashboard but not reaching your endpoint
+- HTTP errors in webhook delivery logs
+
+**Debug Webhook Delivery:**
+
+<CodeGroup>
+```javascript Debug Webhook Delivery
+// utils/webhook-delivery-debugger.js
+class WebhookDeliveryDebugger {
+  async checkWebhookEndpoint(url) {
+    console.log('Webhook Endpoint Health Check:');
+    console.log('=============================');
+    
+    // Test endpoint accessibility
+    try {
+      const response = await fetch(url, {
+        method: 'GET',
+        timeout: 10000
+      });
+      
+      console.log('✅ Endpoint is accessible');
+      console.log('Status:', response.status);
+      console.log('Headers:', Object.fromEntries(response.headers.entries()));
+    } catch (error) {
+      console.log('❌ Endpoint not accessible:', error.message);
+      return false;
+    }
+
+    // Test POST capability
+    try {
+      const testPayload = { test: true };
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(testPayload),
+        timeout: 10000
+      });
+
+      console.log('✅ POST requests work');
+      console.log('Response status:', response.status);
+    } catch (error) {
+      console.log('❌ POST requests fail:', error.message);
+      return false;
+    }
+
+    // Check SSL certificate
+    await this.checkSSLCertificate(url);
+    
+    return true;
+  }
+
+  async checkSSLCertificate(url) {
+    const https = await import('https');
+    const { URL } = await import('url');
+    
+    const parsedUrl = new URL(url);
+    
+    return new Promise((resolve) => {
+      const req = https.request({
+        hostname: parsedUrl.hostname,
+        port: 443,
+        path: '/',
+        method: 'GET'
+      }, (res) => {
+        const cert = res.socket.getPeerCertificate();
+        
+        console.log('SSL Certificate Info:');
+        console.log('Subject:', cert.subject?.CN);
+        console.log('Issuer:', cert.issuer?.CN);
+        console.log('Valid from:', cert.valid_from);
+        console.log('Valid to:', cert.valid_to);
+        console.log('Valid:', cert.valid_from && cert.valid_to && 
+          new Date() > new Date(cert.valid_from) && 
+          new Date() < new Date(cert.valid_to));
+        
+        resolve();
+      });
+      
+      req.on('error', (error) => {
+        console.log('❌ SSL check failed:', error.message);
+        resolve();
+      });
+      
+      req.end();
+    });
+  }
+
+  async simulateWebhookDelivery(url, secret) {
+    const events = [
+      {
+        event: 'workflow.created',
+        data: { id: 'wf_test_123', name: 'Test Workflow' }
+      },
+      {
+        event: 'workflow.executed',
+        data: { id: 'wf_test_123', execution_id: 'exec_test_456' }
+      },
+      {
+        event: 'workflow.completed',
+        data: { id: 'wf_test_123', execution_id: 'exec_test_456', status: 'completed' }
+      }
+    ];
+
+    for (const eventData of events) {
+      console.log(`Testing ${eventData.event} event...`);
+      
+      const timestamp = Math.floor(Date.now() / 1000);
+      const payload = JSON.stringify(eventData);
+      const signature = this.generateSignature(payload, timestamp, secret);
+
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'tolstoy-signature': signature,
+            'tolstoy-timestamp': timestamp.toString(),
+            'User-Agent': 'Tolstoy-Webhooks/1.0'
+          },
+          body: payload,
+          timeout: 30000
+        });
+
+        console.log(`${eventData.event}: ${response.status} ${response.ok ? '✅' : '❌'}`);
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.log('Error:', errorText);
+        }
+      } catch (error) {
+        console.log(`${eventData.event}: FAILED - ${error.message} ❌`);
+      }
+    }
+  }
+}
+
+export default new WebhookDeliveryDebugger();
+```
+</CodeGroup>
+
+**Solutions:**
+1. Verify webhook URL is publicly accessible
+2. Check firewall rules and network security groups
+3. Ensure endpoint responds within 30 seconds
+4. Implement proper error handling and response codes
+5. Check SSL certificate validity
+
+</Accordion>
+
+### Rate Limiting Issues
+
+#### Issue: "Rate Limit Exceeded" (429) Errors
+
+<Accordion title="Rate Limiting">
+
+**Symptoms:**
+- HTTP 429 "Too Many Requests" responses
+- Degraded performance during high traffic
+- Requests being rejected
+
+**Debug Rate Limiting:**
+
+<CodeGroup>
+```javascript Debug Rate Limits
+// utils/rate-limit-debugger.js
+class RateLimitDebugger {
+  async analyzeRateLimits() {
+    console.log('Rate Limit Analysis:');
+    console.log('===================');
+    
+    const testRequests = 20;
+    const results = [];
+    
+    for (let i = 0; i < testRequests; i++) {
+      const startTime = Date.now();
+      
+      try {
+        const response = await fetch('https://api.tolstoy.com/v1/workflows', {
+          headers: {
+            'Authorization': `Bearer ${process.env.TOLSTOY_API_KEY}`
+          }
+        });
+        
+        const duration = Date.now() - startTime;
+        
+        results.push({
+          request: i + 1,
+          status: response.status,
+          duration,
+          rateLimit: {
+            remaining: response.headers.get('X-RateLimit-Remaining'),
+            reset: response.headers.get('X-RateLimit-Reset'),
+            limit: response.headers.get('X-RateLimit-Limit')
+          }
+        });
+        
+        if (response.status === 429) {
+          console.log(`Request ${i + 1}: Rate limited!`);
+          console.log('Retry-After:', response.headers.get('Retry-After'));
+          break;
+        }
+        
+      } catch (error) {
+        results.push({
+          request: i + 1,
+          error: error.message,
+          duration: Date.now() - startTime
+        });
+      }
+      
+      // Small delay between requests
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    
+    this.analyzeResults(results);
+    return results;
+  }
+
+  analyzeResults(results) {
+    const successful = results.filter(r => r.status === 200);
+    const rateLimited = results.filter(r => r.status === 429);
+    const errors = results.filter(r => r.error);
+    
+    console.log('Analysis Results:');
+    console.log(`- Successful requests: ${successful.length}`);
+    console.log(`- Rate limited requests: ${rateLimited.length}`);
+    console.log(`- Error requests: ${errors.length}`);
+    
+    if (successful.length > 0) {
+      const lastSuccessful = successful[successful.length - 1];
+      console.log('Current rate limit status:');
+      console.log(`- Remaining: ${lastSuccessful.rateLimit.remaining}`);
+      console.log(`- Limit: ${lastSuccessful.rateLimit.limit}`);
+      console.log(`- Reset: ${new Date(parseInt(lastSuccessful.rateLimit.reset) * 1000)}`);
+    }
+
+    if (rateLimited.length > 0) {
+      console.log('💡 Recommendations:');
+      console.log('- Implement exponential backoff retry logic');
+      console.log('- Use request batching where possible');
+      console.log('- Consider caching frequently accessed data');
+      console.log('- Spread requests over longer time periods');
+    }
+  }
+
+  // Monitor rate limit usage over time
+  async monitorRateLimits(duration = 60000) {
+    console.log(`Monitoring rate limits for ${duration / 1000} seconds...`);
+    
+    const measurements = [];
+    const interval = 5000; // Measure every 5 seconds
+    const endTime = Date.now() + duration;
+    
+    while (Date.now() < endTime) {
+      try {
+        const response = await fetch('https://api.tolstoy.com/v1/workflows?limit=1', {
+          headers: {
+            'Authorization': `Bearer ${process.env.TOLSTOY_API_KEY}`
+          }
+        });
+        
+        measurements.push({
+          timestamp: new Date().toISOString(),
+          remaining: parseInt(response.headers.get('X-RateLimit-Remaining') || '0'),
+          limit: parseInt(response.headers.get('X-RateLimit-Limit') || '0'),
+          reset: parseInt(response.headers.get('X-RateLimit-Reset') || '0')
+        });
+        
+      } catch (error) {
+        console.error('Monitoring error:', error.message);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, interval));
+    }
+    
+    this.analyzeUsagePattern(measurements);
+    return measurements;
+  }
+
+  analyzeUsagePattern(measurements) {
+    if (measurements.length < 2) return;
+    
+    console.log('Rate Limit Usage Pattern:');
+    console.log('========================');
+    
+    const usage = measurements.map((m, i) => {
+      if (i === 0) return null;
+      
+      const prev = measurements[i - 1];
+      const used = prev.remaining - m.remaining;
+      
+      return {
+        timestamp: m.timestamp,
+        requests_used: used,
+        remaining: m.remaining,
+        usage_rate: used / 5 // requests per second
+      };
+    }).filter(Boolean);
+    
+    const avgUsageRate = usage.reduce((sum, u) => sum + u.usage_rate, 0) / usage.length;
+    const maxUsageRate = Math.max(...usage.map(u => u.usage_rate));
+    
+    console.log(`Average usage rate: ${avgUsageRate.toFixed(2)} requests/second`);
+    console.log(`Peak usage rate: ${maxUsageRate.toFixed(2)} requests/second`);
+    
+    const lastMeasurement = measurements[measurements.length - 1];
+    const remainingPercent = (lastMeasurement.remaining / lastMeasurement.limit) * 100;
+    
+    console.log(`Current usage: ${(100 - remainingPercent).toFixed(1)}% of rate limit`);
+    
+    if (remainingPercent < 20) {
+      console.log('⚠️  WARNING: Approaching rate limit');
+    }
+  }
+}
+
+export default new RateLimitDebugger();
+```
+</CodeGroup>
+
+**Solutions:**
+1. Implement exponential backoff retry logic
+2. Use request batching and bulk operations
+3. Implement client-side caching
+4. Distribute requests over time
+5. Contact support for rate limit increases if needed
+
+</Accordion>
+
+### Database Issues
+
+#### Issue: Database Connection Problems
+
+<Accordion title="Database Connectivity">
+
+**Symptoms:**
+- "Connection refused" errors
+- "Too many connections" errors
+- Slow database queries
+
+**Debug Database Issues:**
+
+<CodeGroup>
+```javascript Database Diagnostics
+// utils/database-diagnostics.js
+import { Pool } from 'pg';
+
+class DatabaseDiagnostics {
+  async runDiagnostics() {
+    console.log('Database Diagnostics:');
+    console.log('====================');
+    
+    // Test basic connectivity
+    await this.testConnectivity();
+    
+    // Check connection pool status
+    await this.checkConnectionPool();
+    
+    // Analyze query performance
+    await this.analyzeQueryPerformance();
+    
+    // Check database health
+    await this.checkDatabaseHealth();
+  }
+
+  async testConnectivity() {
+    const testPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 1,
+      connectionTimeoutMillis: 5000
+    });
+
+    try {
+      const client = await testPool.connect();
+      const result = await client.query('SELECT NOW() as server_time, version()');
+      
+      console.log('✅ Database connection successful');
+      console.log('Server time:', result.rows[0].server_time);
+      console.log('Database version:', result.rows[0].version.split(' ')[0]);
+      
+      client.release();
+    } catch (error) {
+      console.log('❌ Database connection failed:', error.message);
+      
+      // Provide specific guidance based on error
+      if (error.code === 'ECONNREFUSED') {
+        console.log('💡 Check if database server is running');
+        console.log('💡 Verify host and port in DATABASE_URL');
+      } else if (error.code === 'ENOTFOUND') {
+        console.log('💡 Check DNS resolution for database host');
+      } else if (error.message.includes('password')) {
+        console.log('💡 Verify database credentials');
+      }
+    } finally {
+      await testPool.end();
+    }
+  }
+
+  async checkConnectionPool() {
+    const poolStats = {
+      totalCount: pool.totalCount,
+      idleCount: pool.idleCount,
+      waitingCount: pool.waitingCount
+    };
+
+    console.log('Connection Pool Status:');
+    console.log('- Total connections:', poolStats.totalCount);
+    console.log('- Idle connections:', poolStats.idleCount);
+    console.log('- Waiting clients:', poolStats.waitingCount);
+    
+    if (poolStats.waitingCount > 0) {
+      console.log('⚠️  WARNING: Clients waiting for connections');
+      console.log('💡 Consider increasing pool size or optimizing query performance');
+    }
+
+    if (poolStats.totalCount >= parseInt(process.env.DATABASE_POOL_SIZE || '20')) {
+      console.log('⚠️  WARNING: Connection pool at maximum capacity');
+    }
+  }
+
+  async analyzeQueryPerformance() {
+    try {
+      // Get slow queries from pg_stat_statements
+      const slowQueries = await pool.query(`
+        SELECT 
+          query,
+          calls,
+          mean_exec_time,
+          total_exec_time,
+          rows
+        FROM pg_stat_statements 
+        WHERE mean_exec_time > 100
+        ORDER BY mean_exec_time DESC 
+        LIMIT 10
+      `);
+
+      if (slowQueries.rows.length > 0) {
+        console.log('Slow Queries Detected:');
+        slowQueries.rows.forEach((query, index) => {
+          console.log(`${index + 1}. Average time: ${query.mean_exec_time.toFixed(2)}ms`);
+          console.log(`   Calls: ${query.calls}`);
+          console.log(`   Query: ${query.query.substring(0, 100)}...`);
+        });
+      } else {
+        console.log('✅ No slow queries detected');
+      }
+    } catch (error) {
+      console.log('Cannot analyze query performance:', error.message);
+      console.log('💡 Enable pg_stat_statements extension for query analysis');
+    }
+  }
+
+  async checkDatabaseHealth() {
+    try {
+      const healthChecks = await pool.query(`
+        SELECT 
+          'connections' as metric,
+          (SELECT COUNT(*) FROM pg_stat_activity) as current_value,
+          (SELECT setting::int FROM pg_settings WHERE name = 'max_connections') as max_value
+        UNION ALL
+        SELECT 
+          'database_size' as metric,
+          (SELECT pg_size_pretty(pg_database_size(current_database()))) as current_value,
+          'N/A' as max_value
+        UNION ALL
+        SELECT 
+          'cache_hit_ratio' as metric,
+          ROUND(
+            (sum(blks_hit) * 100.0 / sum(blks_hit + blks_read))::numeric, 2
+          )::text as current_value,
+          '> 95' as max_value
+        FROM pg_stat_database
+        WHERE datname = current_database()
+      `);
+
+      console.log('Database Health Metrics:');
+      healthChecks.rows.forEach(row => {
+        console.log(`- ${row.metric}: ${row.current_value} (target: ${row.max_value})`);
+      });
+    } catch (error) {
+      console.log('Health check failed:', error.message);
+    }
+  }
+}
+
+export default new DatabaseDiagnostics();
+```
+</CodeGroup>
+
+**Solutions:**
+1. Check database server status and connectivity
+2. Verify connection string and credentials
+3. Optimize connection pool settings
+4. Add database query monitoring
+5. Implement query optimization
+
+</Accordion>
+
+### API Response Issues
+
+#### Issue: Unexpected Response Formats
+
+<Accordion title="Response Format Issues">
+
+**Symptoms:**
+- JSON parsing errors
+- Missing expected fields
+- Incorrect data types
+
+**Debug API Responses:**
+
+<CodeGroup>
+```javascript Debug API Responses
+// utils/api-response-debugger.js
+class ApiResponseDebugger {
+  async debugEndpoint(endpoint, method = 'GET', payload = null) {
+    console.log(`Debugging ${method} ${endpoint}:`);
+    console.log('=====================================');
+    
+    const config = {
+      method,
+      headers: {
+        'Authorization': `Bearer ${process.env.TOLSTOY_API_KEY}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'tolstoy-debug/1.0'
+      }
+    };
+
+    if (payload && method !== 'GET') {
+      config.body = JSON.stringify(payload);
+    }
+
+    try {
+      const response = await fetch(`https://api.tolstoy.com${endpoint}`, config);
+      
+      console.log('Response Details:');
+      console.log('- Status:', response.status, response.statusText);
+      console.log('- Headers:');
+      
+      for (const [key, value] of response.headers.entries()) {
+        console.log(`  ${key}: ${value}`);
+      }
+      
+      const responseText = await response.text();
+      console.log('- Body length:', responseText.length, 'bytes');
+      console.log('- Body preview:', responseText.substring(0, 200));
+      
+      // Try to parse as JSON
+      try {
+        const parsed = JSON.parse(responseText);
+        console.log('✅ Valid JSON response');
+        console.log('- Object keys:', Object.keys(parsed));
+        
+        if (parsed.data) {
+          console.log('- Data type:', Array.isArray(parsed.data) ? 'array' : typeof parsed.data);
+          console.log('- Data length:', Array.isArray(parsed.data) ? parsed.data.length : 'N/A');
+        }
+        
+        return { success: true, data: parsed };
+      } catch (parseError) {
+        console.log('❌ Invalid JSON response');
+        console.log('Parse error:', parseError.message);
+        return { success: false, error: 'Invalid JSON', body: responseText };
+      }
+      
+    } catch (error) {
+      console.log('❌ Request failed:', error.message);
+      return { success: false, error: error.message };
+    }
+  }
+
+  async validateResponseSchema(endpoint, expectedSchema) {
+    const response = await this.debugEndpoint(endpoint);
+    
+    if (!response.success) {
+      return { valid: false, error: response.error };
+    }
+
+    const validation = this.validateAgainstSchema(response.data, expectedSchema);
+    
+    console.log('Schema Validation:');
+    console.log('- Valid:', validation.valid);
+    
+    if (!validation.valid) {
+      console.log('- Errors:', validation.errors);
+    }
+    
+    return validation;
+  }
+
+  validateAgainstSchema(data, schema) {
+    const errors = [];
+    
+    for (const [field, expectedType] of Object.entries(schema)) {
+      if (!(field in data)) {
+        errors.push(`Missing required field: ${field}`);
+        continue;
+      }
+      
+      const actualType = Array.isArray(data[field]) ? 'array' : typeof data[field];
+      
+      if (actualType !== expectedType) {
+        errors.push(`Field ${field}: expected ${expectedType}, got ${actualType}`);
+      }
+    }
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
+  // Test all major endpoints
+  async runFullAPITest() {
+    const endpoints = [
+      { path: '/v1/health', method: 'GET' },
+      { path: '/v1/workflows', method: 'GET' },
+      { path: '/v1/organizations', method: 'GET' },
+      { 
+        path: '/v1/workflows', 
+        method: 'POST', 
+        payload: {
+          name: 'Debug Test Workflow',
+          trigger: { type: 'manual' },
+          actions: [{ type: 'log', config: { message: 'test' } }]
+        }
+      }
+    ];
+
+    const results = {};
+    
+    for (const endpoint of endpoints) {
+      const key = `${endpoint.method} ${endpoint.path}`;
+      results[key] = await this.debugEndpoint(
+        endpoint.path, 
+        endpoint.method, 
+        endpoint.payload
+      );
+      
+      // Clean up created resources
+      if (endpoint.method === 'POST' && results[key].success && results[key].data.id) {
+        try {
+          await this.cleanupTestResource(endpoint.path, results[key].data.id);
+        } catch (error) {
+          console.log('Cleanup failed:', error.message);
+        }
+      }
+    }
+    
+    return results;
+  }
+
+  async cleanupTestResource(resourcePath, resourceId) {
+    await fetch(`https://api.tolstoy.com${resourcePath}/${resourceId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${process.env.TOLSTOY_API_KEY}`
+      }
+    });
+  }
+}
+
+export default new ApiResponseDebugger();
+```
+</CodeGroup>
+
+**Solutions:**
+1. Verify API endpoint URLs and HTTP methods
+2. Check request headers and content types
+3. Validate request payload against API documentation
+4. Update client libraries to latest versions
+5. Review API version compatibility
+
+</Accordion>
+
+## Error Investigation Tools
+
+### Comprehensive Error Analysis
+
+<CodeGroup>
+```javascript Error Analysis Tool
+// utils/error-analyzer.js
+class ErrorAnalyzer {
+  constructor() {
+    this.errorPatterns = {
+      network: [/ECONNREFUSED/, /ENOTFOUND/, /ETIMEDOUT/, /ECONNRESET/],
+      authentication: [/401/, /unauthorized/, /invalid.*key/i],
+      authorization: [/403/, /forbidden/, /insufficient.*permission/i],
+      validation: [/400/, /bad request/, /invalid.*input/i],
+      rateLimit: [/429/, /rate.*limit/i, /too.*many.*requests/i],
+      server: [/500/, /502/, /503/, /504/, /internal.*error/i]
+    };
+  }
+
+  analyzeError(error) {
+    const analysis = {
+      category: 'unknown',
+      severity: 'medium',
+      suggestions: [],
+      quickFix: null,
+      moreInfo: null
+    };
+
+    const errorMessage = error.message || error.toString();
+    const errorCode = error.code || error.status;
+
+    // Categorize error
+    for (const [category, patterns] of Object.entries(this.errorPatterns)) {
+      if (patterns.some(pattern => 
+        pattern.test(errorMessage) || pattern.test(errorCode?.toString())
+      )) {
+        analysis.category = category;
+        break;
+      }
+    }
+
+    // Generate specific recommendations
+    switch (analysis.category) {
+      case 'network':
+        analysis.severity = 'high';
+        analysis.suggestions = [
+          'Check internet connectivity',
+          'Verify firewall and proxy settings',
+          'Test DNS resolution',
+          'Check if service is running'
+        ];
+        analysis.quickFix = 'Retry request with exponential backoff';
+        analysis.moreInfo = '#network-and-connectivity-issues';
+        break;
+
+      case 'authentication':
+        analysis.severity = 'critical';
+        analysis.suggestions = [
+          'Verify API key is correct',
+          'Check API key environment (prod vs test)',
+          'Ensure API key has not expired',
+          'Verify Authorization header format'
+        ];
+        analysis.quickFix = 'Check API key in environment variables';
+        analysis.moreInfo = '#authentication-problems';
+        break;
+
+      case 'authorization':
+        analysis.severity = 'high';
+        analysis.suggestions = [
+          'Check API key permissions',
+          'Verify organization membership',
+          'Review role-based access controls',
+          'Contact organization admin'
+        ];
+        analysis.quickFix = 'Review permissions with organization admin';
+        analysis.moreInfo = '#authentication-problems';
+        break;
+
+      case 'validation':
+        analysis.severity = 'medium';
+        analysis.suggestions = [
+          'Validate request payload against API schema',
+          'Check required fields are present',
+          'Verify data types and formats',
+          'Review field value constraints'
+        ];
+        analysis.quickFix = 'Review API documentation for endpoint requirements';
+        analysis.moreInfo = '#api-response-issues';
+        break;
+
+      case 'rateLimit':
+        analysis.severity = 'medium';
+        analysis.suggestions = [
+          'Implement exponential backoff',
+          'Use request batching',
+          'Implement client-side caching',
+          'Spread requests over time'
+        ];
+        analysis.quickFix = 'Wait for rate limit reset and retry';
+        analysis.moreInfo = '#rate-limiting-issues';
+        break;
+
+      case 'server':
+        analysis.severity = 'high';
+        analysis.suggestions = [
+          'Check Tolstoy status page',
+          'Retry request after delay',
+          'Implement circuit breaker pattern',
+          'Contact Tolstoy support if persists'
+        ];
+        analysis.quickFix = 'Retry after exponential backoff delay';
+        analysis.moreInfo = 'https://status.tolstoy.com';
+        break;
+    }
+
+    return analysis;
+  }
+
+  generateErrorReport(error, context = {}) {
+    const analysis = this.analyzeError(error);
+    
+    const report = {
+      timestamp: new Date().toISOString(),
+      error: {
+        message: error.message,
+        code: error.code,
+        status: error.status,
+        stack: error.stack
+      },
+      context: {
+        endpoint: context.endpoint,
+        method: context.method,
+        payload: context.payload,
+        headers: context.headers,
+        userAgent: context.userAgent,
+        requestId: context.requestId
+      },
+      analysis,
+      environment: {
+        nodeVersion: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        memoryUsage: process.memoryUsage(),
+        uptime: process.uptime()
+      }
+    };
+
+    console.log('Error Report Generated:');
+    console.log('======================');
+    console.log(`Category: ${analysis.category}`);
+    console.log(`Severity: ${analysis.severity}`);
+    console.log(`Quick Fix: ${analysis.quickFix}`);
+    console.log('Suggestions:');
+    analysis.suggestions.forEach((suggestion, index) => {
+      console.log(`  ${index + 1}. ${suggestion}`);
+    });
+
+    return report;
+  }
+
+  // Integration with error reporting service
+  async reportError(error, context = {}) {
+    const report = this.generateErrorReport(error, context);
+    
+    // Send to error tracking service (e.g., Sentry)
+    if (process.env.SENTRY_DSN) {
+      const Sentry = await import('@sentry/node');
+      Sentry.captureException(error, {
+        tags: {
+          category: report.analysis.category,
+          severity: report.analysis.severity
+        },
+        extra: report
+      });
+    }
+
+    // Log locally
+    console.error('Error Report:', JSON.stringify(report, null, 2));
+    
+    return report;
+  }
+}
+
+export default new ErrorAnalyzer();
+```
+</CodeGroup>
+
+</Accordion>
+
+## Debug Mode and Logging
+
+### Enhanced Debug Logging
+
+<CodeGroup>
+```javascript Debug Mode
+// utils/debug-logger.js
+import debug from 'debug';
+
+class DebugLogger {
+  constructor() {
+    this.debuggers = {
+      api: debug('tolstoy:api'),
+      auth: debug('tolstoy:auth'),
+      webhook: debug('tolstoy:webhook'),
+      cache: debug('tolstoy:cache'),
+      db: debug('tolstoy:database'),
+      performance: debug('tolstoy:performance')
+    };
+    
+    this.isDebugMode = process.env.DEBUG?.includes('tolstoy') || 
+                      process.env.NODE_ENV === 'development';
+  }
+
+  logApiCall(method, endpoint, duration, status, requestId) {
+    this.debuggers.api(`${method} ${endpoint} - ${status} (${duration}ms) [${requestId}]`);
+    
+    if (this.isDebugMode) {
+      console.log(`🔍 API Call: ${method} ${endpoint}`);
+      console.log(`   Status: ${status}`);
+      console.log(`   Duration: ${duration}ms`);
+      console.log(`   Request ID: ${requestId}`);
+    }
+  }
+
+  logWebhookEvent(event, signature, verified, processingTime) {
+    this.debuggers.webhook(`Event: ${event}, Verified: ${verified}, Time: ${processingTime}ms`);
+    
+    if (this.isDebugMode) {
+      console.log(`🪝 Webhook Event: ${event}`);
+      console.log(`   Signature verified: ${verified ? '✅' : '❌'}`);
+      console.log(`   Processing time: ${processingTime}ms`);
+    }
+  }
+
+  logCacheOperation(operation, key, hit, duration) {
+    this.debuggers.cache(`${operation} ${key} - ${hit ? 'HIT' : 'MISS'} (${duration}ms)`);
+    
+    if (this.isDebugMode && !hit) {
+      console.log(`💾 Cache MISS: ${key} (${duration}ms)`);
+    }
+  }
+
+  logDatabaseQuery(query, params, duration, rowCount) {
+    this.debuggers.db(`Query: ${duration}ms, Rows: ${rowCount}`);
+    
+    if (this.isDebugMode) {
+      console.log(`🗄️  Database Query (${duration}ms):`);
+      console.log(`   SQL: ${query.substring(0, 100)}...`);
+      console.log(`   Params: ${JSON.stringify(params)}`);
+      console.log(`   Rows: ${rowCount}`);
+    }
+  }
+
+  logPerformanceMetric(metric, value, threshold) {
+    this.debuggers.performance(`${metric}: ${value} (threshold: ${threshold})`);
+    
+    if (value > threshold) {
+      console.log(`⚠️  Performance Alert: ${metric} = ${value} (threshold: ${threshold})`);
+    }
+  }
+
+  enableVerboseMode() {
+    process.env.DEBUG = 'tolstoy:*';
+    console.log('🔊 Verbose debug mode enabled');
+    console.log('Set DEBUG=tolstoy:* to enable in production');
+  }
+
+  generateDebugReport() {
+    const report = {
+      timestamp: new Date().toISOString(),
+      debug_mode: this.isDebugMode,
+      environment: process.env.NODE_ENV,
+      debug_namespaces: process.env.DEBUG,
+      recent_metrics: performanceMonitor.getMetrics(),
+      system_info: {
+        memory: process.memoryUsage(),
+        uptime: process.uptime(),
+        platform: process.platform,
+        node_version: process.version
+      }
+    };
+
+    console.log('Debug Report:');
+    console.log('=============');
+    console.log(JSON.stringify(report, null, 2));
+    
+    return report;
+  }
+}
+
+export default new DebugLogger();
+```
+
+```python Debug Mode
+# utils/debug_logger.py
+import os
+import time
+import json
+import logging
+from typing import Dict, Any, Optional
+
+class DebugLogger:
+    def __init__(self):
+        self.is_debug_mode = (
+            os.getenv('DEBUG', '').find('tolstoy') != -1 or
+            os.getenv('NODE_ENV') == 'development'
+        )
+        
+        # Configure debug logging
+        if self.is_debug_mode:
+            logging.basicConfig(
+                level=logging.DEBUG,
+                format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+            )
+        
+        self.loggers = {
+            'api': logging.getLogger('tolstoy.api'),
+            'auth': logging.getLogger('tolstoy.auth'),
+            'webhook': logging.getLogger('tolstoy.webhook'),
+            'cache': logging.getLogger('tolstoy.cache'),
+            'db': logging.getLogger('tolstoy.database'),
+            'performance': logging.getLogger('tolstoy.performance')
+        }
+    
+    def log_api_call(self, method: str, endpoint: str, duration: float, status: int, request_id: str):
+        self.loggers['api'].debug(f"{method} {endpoint} - {status} ({duration:.2f}ms) [{request_id}]")
+        
+        if self.is_debug_mode:
+            print(f"🔍 API Call: {method} {endpoint}")
+            print(f"   Status: {status}")
+            print(f"   Duration: {duration:.2f}ms")
+            print(f"   Request ID: {request_id}")
+    
+    def log_webhook_event(self, event: str, verified: bool, processing_time: float):
+        self.loggers['webhook'].debug(f"Event: {event}, Verified: {verified}, Time: {processing_time:.2f}ms")
+        
+        if self.is_debug_mode:
+            print(f"🪝 Webhook Event: {event}")
+            print(f"   Signature verified: {'✅' if verified else '❌'}")
+            print(f"   Processing time: {processing_time:.2f}ms")
+    
+    def log_cache_operation(self, operation: str, key: str, hit: bool, duration: float):
+        self.loggers['cache'].debug(f"{operation} {key} - {'HIT' if hit else 'MISS'} ({duration:.2f}ms)")
+        
+        if self.is_debug_mode and not hit:
+            print(f"💾 Cache MISS: {key} ({duration:.2f}ms)")
+    
+    def log_database_query(self, query: str, params: list, duration: float, row_count: int):
+        self.loggers['db'].debug(f"Query: {duration:.2f}ms, Rows: {row_count}")
+        
+        if self.is_debug_mode:
+            print(f"🗄️  Database Query ({duration:.2f}ms):")
+            print(f"   SQL: {query[:100]}...")
+            print(f"   Params: {params}")
+            print(f"   Rows: {row_count}")
+    
+    def log_performance_metric(self, metric: str, value: float, threshold: float):
+        self.loggers['performance'].debug(f"{metric}: {value} (threshold: {threshold})")
+        
+        if value > threshold:
+            print(f"⚠️  Performance Alert: {metric} = {value} (threshold: {threshold})")
+    
+    def enable_verbose_mode(self):
+        os.environ['DEBUG'] = 'tolstoy:*'
+        logging.getLogger().setLevel(logging.DEBUG)
+        print('🔊 Verbose debug mode enabled')
+        print('Set DEBUG=tolstoy:* to enable in production')
+    
+    def generate_debug_report(self) -> Dict[str, Any]:
+        import psutil
+        
+        process = psutil.Process()
+        
+        report = {
+            'timestamp': time.time(),
+            'debug_mode': self.is_debug_mode,
+            'environment': os.getenv('NODE_ENV'),
+            'debug_namespaces': os.getenv('DEBUG'),
+            'system_info': {
+                'memory': {
+                    'rss': process.memory_info().rss,
+                    'vms': process.memory_info().vms,
+                    'percent': process.memory_percent()
+                },
+                'cpu_percent': process.cpu_percent(),
+                'uptime': time.time() - process.create_time(),
+                'platform': os.name,
+                'python_version': sys.version
+            }
+        }
+        
+        print('Debug Report:')
+        print('=============')
+        print(json.dumps(report, indent=2))
+        
+        return report
+
+debug_logger = DebugLogger()
+```
+</CodeGroup>
+
+### Log Analysis Tools
+
+<CodeGroup>
+```bash Log Analysis Scripts
+#!/bin/bash
+# analyze-logs.sh
+
+LOG_FILE=${1:-"application.log"}
+TIME_RANGE=${2:-"1h"}
+
+echo "Analyzing logs: $LOG_FILE (last $TIME_RANGE)"
+echo "============================================"
+
+# Error frequency analysis
+echo "Top Errors (last $TIME_RANGE):"
+grep -E "(ERROR|WARN)" "$LOG_FILE" | \
+  awk -v since="$(date -d "$TIME_RANGE ago" '+%Y-%m-%d %H:%M:%S')" '$0 > since' | \
+  grep -oE '"message":"[^"]*"' | \
+  sort | uniq -c | sort -nr | head -10
+
+# API endpoint performance
+echo -e "\nAPI Endpoint Performance:"
+grep "API call completed" "$LOG_FILE" | \
+  jq -r '"\(.endpoint) \(.duration)"' | \
+  awk '{
+    endpoint=$1; 
+    duration=$2; 
+    sum[endpoint]+=duration; 
+    count[endpoint]++; 
+    if(duration>max[endpoint]) max[endpoint]=duration
+  } 
+  END {
+    for(e in sum) 
+      printf "%-30s avg:%.2fms max:%.2fms calls:%d\n", e, sum[e]/count[e], max[e], count[e]
+  }' | sort -k2 -nr
+
+# Rate limit violations
+echo -e "\nRate Limit Violations:"
+grep "rate.*limit" "$LOG_FILE" | \
+  grep -oE '"ip":"[^"]*"' | \
+  sort | uniq -c | sort -nr
+
+# Webhook delivery failures
+echo -e "\nWebhook Delivery Issues:"
+grep "webhook.*failed" "$LOG_FILE" | \
+  grep -oE '"url":"[^"]*"' | \
+  sort | uniq -c | sort -nr
+
+# Performance alerts
+echo -e "\nPerformance Alerts:"
+grep "Performance Alert" "$LOG_FILE" | \
+  tail -20
+```
+
+```javascript Log Parser
+// utils/log-parser.js
+import fs from 'fs';
+import readline from 'readline';
+
+class LogParser {
+  async parseLogFile(filePath, timeRange = '1h') {
+    const cutoffTime = this.getCutoffTime(timeRange);
+    const stats = {
+      totalLines: 0,
+      errors: [],
+      warnings: [],
+      apiCalls: [],
+      webhookEvents: [],
+      performance: []
+    };
+
+    const fileStream = fs.createReadStream(filePath);
+    const rl = readline.createInterface({
+      input: fileStream,
+      crlfDelay: Infinity
+    });
+
+    for await (const line of rl) {
+      stats.totalLines++;
+      
+      try {
+        const logEntry = JSON.parse(line);
+        
+        // Skip old entries
+        if (new Date(logEntry.timestamp) < cutoffTime) continue;
+        
+        // Categorize log entries
+        switch (logEntry.level) {
+          case 'ERROR':
+            stats.errors.push(logEntry);
+            break;
+          case 'WARN':
+            stats.warnings.push(logEntry);
+            break;
+        }
+
+        if (logEntry.type === 'api_call') {
+          stats.apiCalls.push(logEntry);
+        } else if (logEntry.type === 'webhook_event') {
+          stats.webhookEvents.push(logEntry);
+        } else if (logEntry.message?.includes('Performance Alert')) {
+          stats.performance.push(logEntry);
+        }
+      } catch (error) {
+        // Skip malformed log lines
+        continue;
+      }
+    }
+
+    return this.generateAnalysis(stats);
+  }
+
+  getCutoffTime(timeRange) {
+    const now = new Date();
+    const value = parseInt(timeRange);
+    const unit = timeRange.slice(-1);
+    
+    switch (unit) {
+      case 'h':
+        return new Date(now.getTime() - value * 60 * 60 * 1000);
+      case 'd':
+        return new Date(now.getTime() - value * 24 * 60 * 60 * 1000);
+      case 'm':
+        return new Date(now.getTime() - value * 60 * 1000);
+      default:
+        return new Date(now.getTime() - 60 * 60 * 1000); // Default 1 hour
+    }
+  }
+
+  generateAnalysis(stats) {
+    const analysis = {
+      summary: {
+        total_lines: stats.totalLines,
+        error_count: stats.errors.length,
+        warning_count: stats.warnings.length,
+        api_calls: stats.apiCalls.length,
+        webhook_events: stats.webhookEvents.length
+      },
+      top_errors: this.getTopErrors(stats.errors),
+      slow_endpoints: this.getSlowEndpoints(stats.apiCalls),
+      webhook_failures: this.getWebhookFailures(stats.webhookEvents),
+      performance_issues: stats.performance
+    };
+
+    console.log('Log Analysis Results:');
+    console.log('====================');
+    console.log(`Total log lines processed: ${analysis.summary.total_lines}`);
+    console.log(`Errors found: ${analysis.summary.error_count}`);
+    console.log(`API calls analyzed: ${analysis.summary.api_calls}`);
+    
+    if (analysis.top_errors.length > 0) {
+      console.log('\nTop Errors:');
+      analysis.top_errors.forEach((error, index) => {
+        console.log(`${index + 1}. ${error.message} (${error.count} occurrences)`);
+      });
+    }
+
+    return analysis;
+  }
+
+  getTopErrors(errors) {
+    const errorCounts = {};
+    
+    errors.forEach(error => {
+      const message = error.message || error.error || 'Unknown error';
+      errorCounts[message] = (errorCounts[message] || 0) + 1;
+    });
+
+    return Object.entries(errorCounts)
+      .map(([message, count]) => ({ message, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+  }
+
+  getSlowEndpoints(apiCalls) {
+    const endpointStats = {};
+    
+    apiCalls.forEach(call => {
+      const key = `${call.method} ${call.endpoint}`;
+      if (!endpointStats[key]) {
+        endpointStats[key] = { durations: [], count: 0 };
+      }
+      
+      endpointStats[key].durations.push(call.duration);
+      endpointStats[key].count++;
+    });
+
+    return Object.entries(endpointStats)
+      .map(([endpoint, stats]) => ({
+        endpoint,
+        avg_duration: stats.durations.reduce((a, b) => a + b, 0) / stats.durations.length,
+        max_duration: Math.max(...stats.durations),
+        call_count: stats.count
+      }))
+      .sort((a, b) => b.avg_duration - a.avg_duration)
+      .slice(0, 10);
+  }
+
+  getWebhookFailures(webhookEvents) {
+    return webhookEvents
+      .filter(event => event.status === 'failed')
+      .map(event => ({
+        event: event.event,
+        error: event.error,
+        timestamp: event.timestamp
+      }));
+  }
+}
+
+export default new LogParser();
+```
+</CodeGroup>
+
+## Performance Debugging
+
+### Slow Response Diagnosis
+
+<Accordion title="Performance Issues">
+
+**Symptoms:**
+- API responses taking longer than expected
+- Timeouts under normal load
+- High resource usage
+
+**Performance Debugging Tools:**
+
+<CodeGroup>
+```javascript Performance Profiler
+// utils/performance-profiler.js
+class PerformanceProfiler {
+  constructor() {
+    this.profiles = new Map();
+    this.slowRequestThreshold = 1000; // 1 second
+  }
+
+  async profileAPICall(endpoint, method = 'GET', payload = null) {
+    const profile = {
+      endpoint,
+      method,
+      timestamp: Date.now(),
+      phases: {}
+    };
+
+    // DNS resolution time
+    const dnsStart = Date.now();
+    await this.resolveDNS('api.tolstoy.com');
+    profile.phases.dns = Date.now() - dnsStart;
+
+    // Connection establishment
+    const connectStart = Date.now();
+    const response = await this.makeTrackedRequest(endpoint, method, payload, profile);
+    profile.phases.total = Date.now() - profile.timestamp;
+
+    // Analyze results
+    this.analyzeProfile(profile);
+    
+    return profile;
+  }
+
+  async makeTrackedRequest(endpoint, method, payload, profile) {
+    const url = `https://api.tolstoy.com${endpoint}`;
+    
+    const requestConfig = {
+      method,
+      headers: {
+        'Authorization': `Bearer ${process.env.TOLSTOY_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: payload ? JSON.stringify(payload) : undefined
+    };
+
+    // Track request phases
+    const requestStart = Date.now();
+    
+    try {
+      const response = await fetch(url, requestConfig);
+      
+      profile.phases.request = Date.now() - requestStart;
+      profile.phases.ttfb = Date.now() - requestStart; // Time to first byte
+      
+      const bodyStart = Date.now();
+      const body = await response.text();
+      profile.phases.download = Date.now() - bodyStart;
+      
+      profile.response = {
+        status: response.status,
+        size: body.length,
+        headers: Object.fromEntries(response.headers.entries())
+      };
+
+      return response;
+    } catch (error) {
+      profile.error = error.message;
+      throw error;
+    }
+  }
+
+  analyzeProfile(profile) {
+    console.log(`Performance Profile: ${profile.method} ${profile.endpoint}`);
+    console.log('================================================');
+    
+    Object.entries(profile.phases).forEach(([phase, duration]) => {
+      const status = duration > 100 ? '🐌' : duration > 50 ? '⚠️' : '✅';
+      console.log(`${status} ${phase}: ${duration}ms`);
+    });
+
+    if (profile.response) {
+      console.log(`📊 Response: ${profile.response.status} (${profile.response.size} bytes)`);
+    }
+
+    // Generate recommendations
+    const recommendations = this.generateRecommendations(profile);
+    if (recommendations.length > 0) {
+      console.log('\n💡 Recommendations:');
+      recommendations.forEach(rec => console.log(`   - ${rec}`));
+    }
+  }
+
+  generateRecommendations(profile) {
+    const recommendations = [];
+    
+    if (profile.phases.dns > 100) {
+      recommendations.push('DNS resolution is slow - consider DNS caching');
+    }
+    
+    if (profile.phases.request > 500) {
+      recommendations.push('Network latency is high - check server location');
+    }
+    
+    if (profile.phases.download > 200) {
+      recommendations.push('Response download is slow - implement compression');
+    }
+    
+    if (profile.response?.size > 100000) {
+      recommendations.push('Large response size - implement pagination');
+    }
+    
+    if (profile.phases.total > this.slowRequestThreshold) {
+      recommendations.push('Overall response time is slow - investigate bottlenecks');
+    }
+
+    return recommendations;
+  }
+
+  async resolveDNS(hostname) {
+    const dns = await import('dns');
+    return new Promise((resolve, reject) => {
+      dns.lookup(hostname, (err, address) => {
+        if (err) reject(err);
+        else resolve(address);
+      });
+    });
+  }
+
+  // Profile multiple endpoints
+  async profileEndpoints(endpoints) {
+    const profiles = {};
+    
+    for (const endpoint of endpoints) {
+      try {
+        profiles[endpoint.name] = await this.profileAPICall(
+          endpoint.path,
+          endpoint.method,
+          endpoint.payload
+        );
+        
+        // Wait between requests
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (error) {
+        profiles[endpoint.name] = { error: error.message };
+      }
+    }
+    
+    return profiles;
+  }
+}
+
+export default new PerformanceProfiler();
+```
+</CodeGroup>
+
+</Accordion>
+
+## Troubleshooting Workflows
+
+### Systematic Debugging Approach
+
+<CodeGroup>
+```javascript Systematic Debugger
+// utils/systematic-debugger.js
+class SystematicDebugger {
+  async runFullDiagnostics() {
+    console.log('🔍 Starting comprehensive diagnostic suite...');
+    console.log('============================================');
+    
+    const diagnostics = {
+      environment: await this.checkEnvironment(),
+      connectivity: await this.checkConnectivity(),
+      authentication: await this.checkAuthentication(),
+      api_endpoints: await this.checkAPIEndpoints(),
+      webhook_setup: await this.checkWebhookSetup(),
+      performance: await this.checkPerformance(),
+      database: await this.checkDatabase(),
+      cache: await this.checkCache()
+    };
+
+    this.generateDiagnosticReport(diagnostics);
+    return diagnostics;
+  }
+
+  async checkEnvironment() {
+    return {
+      node_version: process.version,
+      environment: process.env.NODE_ENV,
+      platform: process.platform,
+      memory_limit: process.env.MEMORY_LIMIT,
+      cpu_count: os.cpus().length,
+      environment_variables: {
+        tolstoy_api_key: !!process.env.TOLSTOY_API_KEY,
+        tolstoy_base_url: process.env.TOLSTOY_BASE_URL,
+        database_url: !!process.env.DATABASE_URL,
+        redis_url: !!process.env.REDIS_URL,
+        webhook_secret: !!process.env.TOLSTOY_WEBHOOK_SECRET
+      }
+    };
+  }
+
+  async checkConnectivity() {
+    const tests = [
+      { name: 'Tolstoy API', url: 'https://api.tolstoy.com/v1/health' },
+      { name: 'Tolstoy Status', url: 'https://status.tolstoy.com' }
+    ];
+
+    const results = {};
+    
+    for (const test of tests) {
+      try {
+        const start = Date.now();
+        const response = await fetch(test.url, { timeout: 10000 });
+        
+        results[test.name] = {
+          status: 'success',
+          response_time: Date.now() - start,
+          http_status: response.status
+        };
+      } catch (error) {
+        results[test.name] = {
+          status: 'failed',
+          error: error.message
+        };
+      }
+    }
+
+    return results;
+  }
+
+  async checkAuthentication() {
+    try {
+      const response = await fetch('https://api.tolstoy.com/v1/health', {
+        headers: {
+          'Authorization': `Bearer ${process.env.TOLSTOY_API_KEY}`
+        }
+      });
+
+      return {
+        status: response.ok ? 'valid' : 'invalid',
+        http_status: response.status,
+        api_key_format: this.validateAPIKeyFormat(process.env.TOLSTOY_API_KEY)
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        error: error.message
+      };
+    }
+  }
+
+  validateAPIKeyFormat(apiKey) {
+    if (!apiKey) return 'missing';
+    
+    if (/^prod_sk_[a-zA-Z0-9]{32,}$/.test(apiKey)) return 'production';
+    if (/^test_sk_[a-zA-Z0-9]{32,}$/.test(apiKey)) return 'test';
+    
+    return 'invalid_format';
+  }
+
+  async checkAPIEndpoints() {
+    const endpoints = [
+      { path: '/v1/workflows', method: 'GET' },
+      { path: '/v1/organizations', method: 'GET' }
+    ];
+
+    const results = {};
+    
+    for (const endpoint of endpoints) {
+      const key = `${endpoint.method} ${endpoint.path}`;
+      
+      try {
+        const start = Date.now();
+        const response = await fetch(`https://api.tolstoy.com${endpoint.path}`, {
+          method: endpoint.method,
+          headers: {
+            'Authorization': `Bearer ${process.env.TOLSTOY_API_KEY}`
+          }
+        });
+
+        results[key] = {
+          status: response.ok ? 'success' : 'failed',
+          http_status: response.status,
+          response_time: Date.now() - start,
+          rate_limit_remaining: response.headers.get('X-RateLimit-Remaining')
+        };
+      } catch (error) {
+        results[key] = {
+          status: 'error',
+          error: error.message
+        };
+      }
+    }
+
+    return results;
+  }
+
+  generateDiagnosticReport(diagnostics) {
+    console.log('\n📋 Diagnostic Report Summary:');
+    console.log('=============================');
+    
+    const categories = Object.keys(diagnostics);
+    let overallHealth = 'healthy';
+    
+    categories.forEach(category => {
+      const result = diagnostics[category];
+      let categoryStatus = '✅';
+      
+      // Determine category health
+      if (typeof result === 'object') {
+        const hasErrors = JSON.stringify(result).includes('"status":"error"') ||
+                         JSON.stringify(result).includes('"status":"failed"');
+        if (hasErrors) {
+          categoryStatus = '❌';
+          overallHealth = 'unhealthy';
+        }
+      }
+      
+      console.log(`${categoryStatus} ${category.replace('_', ' ')}`);
+    });
+
+    console.log(`\n🏥 Overall Health: ${overallHealth === 'healthy' ? '✅ Healthy' : '❌ Issues Detected'}`);
+    
+    if (overallHealth !== 'healthy') {
+      console.log('\n🔧 Next Steps:');
+      console.log('1. Review failed checks above');
+      console.log('2. Follow specific troubleshooting guides');
+      console.log('3. Contact support if issues persist');
+    }
+  }
+}
+
+export default new SystematicDebugger();
+```
+</CodeGroup>
+
+## Common Error Codes and Solutions
+
+### HTTP Status Code Guide
+
+| Code | Meaning | Common Causes | Solutions |
+|------|---------|---------------|-----------|
+| **400** | Bad Request | Invalid payload, missing fields, malformed JSON | Validate request format, check required fields |
+| **401** | Unauthorized | Invalid/missing API key, wrong auth header | Check API key and Authorization header |
+| **403** | Forbidden | Insufficient permissions, wrong organization | Review API key permissions and organization access |
+| **404** | Not Found | Invalid endpoint, deleted resource | Verify endpoint URL and resource existence |
+| **409** | Conflict | Resource already exists, concurrent updates | Check for duplicates, implement optimistic locking |
+| **422** | Unprocessable Entity | Valid JSON but business logic errors | Review field values and business rules |
+| **429** | Too Many Requests | Rate limit exceeded | Implement backoff, reduce request frequency |
+| **500** | Internal Server Error | Server-side issues | Check Tolstoy status page, retry with backoff |
+| **502/503** | Service Unavailable | Temporary server issues, maintenance | Retry with exponential backoff |
+
+### Webhook Error Codes
+
+| Error | Description | Solution |
+|-------|-------------|----------|
+| **signature_invalid** | Webhook signature verification failed | Check webhook secret and signature generation |
+| **timestamp_too_old** | Webhook timestamp older than 5 minutes | Ensure system clocks are synchronized |
+| **payload_too_large** | Webhook payload exceeds size limit | Implement payload size validation |
+| **endpoint_unreachable** | Cannot deliver to webhook URL | Check URL accessibility and firewall rules |
+| **timeout** | Webhook endpoint didn't respond in time | Optimize webhook handler performance |
+
+## Diagnostic Tools and Scripts
+
+### All-in-One Diagnostic Script
+
+<CodeGroup>
+```bash Complete Diagnostic Tool
+#!/bin/bash
+# tolstoy-diagnostics.sh
+
+set -e
+
+TOLSTOY_ENV=${TOLSTOY_ENV:-"production"}
+LOG_FILE=${LOG_FILE:-"application.log"}
+
+echo "🔍 Tolstoy Integration Diagnostics"
+echo "=================================="
+echo "Environment: $TOLSTOY_ENV"
+echo "Timestamp: $(date)"
+echo ""
+
+# Environment check
+echo "📋 Environment Check:"
+echo "--------------------"
+check_env_var() {
+    if [ -z "${!1}" ]; then
+        echo "❌ $1 is not set"
+        return 1
+    else
+        echo "✅ $1 is set"
+        return 0
+    fi
+}
+
+check_env_var "TOLSTOY_API_KEY"
+check_env_var "TOLSTOY_WEBHOOK_SECRET"
+check_env_var "DATABASE_URL"
+
+echo ""
+
+# Connectivity check
+echo "🌐 Connectivity Check:"
+echo "---------------------"
+if curl -f -s https://api.tolstoy.com/v1/health > /dev/null; then
+    echo "✅ Tolstoy API is reachable"
+else
+    echo "❌ Cannot reach Tolstoy API"
+fi
+
+# API key validation
+echo ""
+echo "🔑 API Key Validation:"
+echo "---------------------"
+HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+    -H "Authorization: Bearer $TOLSTOY_API_KEY" \
+    "https://api.tolstoy.com/v1/health")
+
+if [ "$HTTP_STATUS" = "200" ]; then
+    echo "✅ API key is valid"
+else
+    echo "❌ API key validation failed (HTTP $HTTP_STATUS)"
+fi
+
+# Database check
+echo ""
+echo "🗄️  Database Check:"
+echo "------------------"
+if command -v psql > /dev/null && [ -n "$DATABASE_URL" ]; then
+    if psql "$DATABASE_URL" -c "SELECT 1;" > /dev/null 2>&1; then
+        echo "✅ Database connection successful"
+        
+        # Check database performance
+        DB_CONNECTIONS=$(psql "$DATABASE_URL" -t -c "SELECT COUNT(*) FROM pg_stat_activity;")
+        echo "Active connections: $DB_CONNECTIONS"
+        
+    else
+        echo "❌ Database connection failed"
+    fi
+else
+    echo "⚠️  Cannot test database (psql not available or DATABASE_URL not set)"
+fi
+
+# Redis check
+echo ""
+echo "💾 Redis Check:"
+echo "--------------"
+if command -v redis-cli > /dev/null && [ -n "$REDIS_URL" ]; then
+    if redis-cli -u "$REDIS_URL" ping > /dev/null 2>&1; then
+        echo "✅ Redis connection successful"
+        
+        REDIS_MEMORY=$(redis-cli -u "$REDIS_URL" info memory | grep used_memory_human | cut -d: -f2 | tr -d '\r')
+        echo "Redis memory usage: $REDIS_MEMORY"
+    else
+        echo "❌ Redis connection failed"
+    fi
+else
+    echo "⚠️  Cannot test Redis (redis-cli not available or REDIS_URL not set)"
+fi
+
+# Log analysis
+echo ""
+echo "📝 Recent Log Analysis:"
+echo "----------------------"
+if [ -f "$LOG_FILE" ]; then
+    ERROR_COUNT=$(grep -c "ERROR" "$LOG_FILE" 2>/dev/null || echo "0")
+    WARN_COUNT=$(grep -c "WARN" "$LOG_FILE" 2>/dev/null || echo "0")
+    
+    echo "Recent errors: $ERROR_COUNT"
+    echo "Recent warnings: $WARN_COUNT"
+    
+    if [ "$ERROR_COUNT" -gt "0" ]; then
+        echo ""
+        echo "Last 5 errors:"
+        grep "ERROR" "$LOG_FILE" | tail -5
+    fi
+else
+    echo "⚠️  Log file not found: $LOG_FILE"
+fi
+
+echo ""
+echo "🏁 Diagnostic complete!"
+echo "If issues persist, contact support with this diagnostic output."
+```
+
+```python Complete Diagnostic Tool
+#!/usr/bin/env python3
+# tolstoy_diagnostics.py
+
+import os
+import sys
+import time
+import json
+import asyncio
+import aiohttp
+import subprocess
+from datetime import datetime
+
+class CompleteDiagnosticTool:
+    def __init__(self):
+        self.results = {}
+        self.start_time = time.time()
+    
+    async def run_full_diagnostics(self):
+        print("🔍 Tolstoy Integration Diagnostics")
+        print("==================================")
+        print(f"Timestamp: {datetime.now().isoformat()}")
+        print("")
+        
+        # Run all diagnostic checks
+        await self.check_environment()
+        await self.check_connectivity()
+        await self.check_authentication()
+        await self.check_api_endpoints()
+        await self.check_database()
+        await self.check_redis()
+        await self.analyze_logs()
+        
+        # Generate final report
+        self.generate_final_report()
+    
+    async def check_environment(self):
+        print("📋 Environment Check:")
+        print("--------------------")
+        
+        env_vars = [
+            'TOLSTOY_API_KEY',
+            'TOLSTOY_WEBHOOK_SECRET',
+            'DATABASE_URL',
+            'REDIS_URL'
+        ]
+        
+        env_status = {}
+        for var in env_vars:
+            is_set = bool(os.getenv(var))
+            env_status[var] = is_set
+            print(f"{'✅' if is_set else '❌'} {var} is {'set' if is_set else 'not set'}")
+        
+        self.results['environment'] = env_status
+        print("")
+    
+    async def check_connectivity(self):
+        print("🌐 Connectivity Check:")
+        print("---------------------")
+        
+        urls = [
+            'https://api.tolstoy.com/v1/health',
+            'https://status.tolstoy.com'
+        ]
+        
+        connectivity = {}
+        
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10)) as session:
+            for url in urls:
+                try:
+                    start = time.time()
+                    async with session.get(url) as response:
+                        duration = (time.time() - start) * 1000
+                        connectivity[url] = {
+                            'status': 'success',
+                            'response_time': duration,
+                            'http_status': response.status
+                        }
+                        print(f"✅ {url} ({duration:.2f}ms)")
+                except Exception as error:
+                    connectivity[url] = {
+                        'status': 'failed',
+                        'error': str(error)
+                    }
+                    print(f"❌ {url} - {error}")
+        
+        self.results['connectivity'] = connectivity
+        print("")
+    
+    async def check_authentication(self):
+        print("🔑 Authentication Check:")
+        print("-----------------------")
+        
+        api_key = os.getenv('TOLSTOY_API_KEY')
+        
+        if not api_key:
+            print("❌ API key not found")
+            self.results['authentication'] = {'status': 'missing_key'}
+            return
+        
+        # Validate key format
+        if api_key.startswith('prod_sk_'):
+            key_env = 'production'
+        elif api_key.startswith('test_sk_'):
+            key_env = 'test'
+        else:
+            key_env = 'invalid_format'
+        
+        print(f"🔍 Key environment: {key_env}")
+        
+        # Test API key
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {'Authorization': f'Bearer {api_key}'}
+                async with session.get('https://api.tolstoy.com/v1/health', headers=headers) as response:
+                    if response.ok:
+                        print("✅ API key is valid")
+                        auth_status = 'valid'
+                    else:
+                        print(f"❌ API key validation failed (HTTP {response.status})")
+                        auth_status = 'invalid'
+                        
+        except Exception as error:
+            print(f"❌ Authentication test failed: {error}")
+            auth_status = 'error'
+        
+        self.results['authentication'] = {
+            'status': auth_status,
+            'key_environment': key_env
+        }
+        print("")
+    
+    def generate_final_report(self):
+        print("📊 Final Diagnostic Report:")
+        print("===========================")
+        
+        # Overall health assessment
+        issues_found = []
+        
+        for category, results in self.results.items():
+            if isinstance(results, dict):
+                if 'status' in results and results['status'] in ['failed', 'error', 'invalid']:
+                    issues_found.append(f"{category}: {results.get('error', 'Check failed')}")
+                elif any(isinstance(v, dict) and v.get('status') in ['failed', 'error'] 
+                        for v in results.values()):
+                    issues_found.append(f"{category}: Some checks failed")
+        
+        if not issues_found:
+            print("✅ All diagnostics passed - integration appears healthy")
+        else:
+            print("❌ Issues detected:")
+            for issue in issues_found:
+                print(f"   - {issue}")
+            
+            print("\n🔧 Recommended Actions:")
+            print("1. Address the issues listed above")
+            print("2. Re-run diagnostics to verify fixes")
+            print("3. Check relevant troubleshooting sections")
+            print("4. Contact support if issues persist")
+        
+        print(f"\n⏱️  Diagnostic completed in {time.time() - self.start_time:.2f} seconds")
+
+async def main():
+    diagnostics = CompleteDiagnosticTool()
+    await diagnostics.run_full_diagnostics()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+</CodeGroup>
+
+## Getting Help and Support
+
+### When to Contact Support
+
+Contact Tolstoy support when:
+
+1. **API is down**: Status page shows outages
+2. **Widespread issues**: Multiple endpoints failing
+3. **Account-specific problems**: API key or billing issues
+4. **Performance degradation**: Significant increase in response times
+5. **Security concerns**: Suspected security incidents
+
+### Information to Include in Support Requests
+
+<CodeGroup>
+```javascript Support Info Generator
+// utils/support-info.js
+class SupportInfoGenerator {
+  generateSupportPackage() {
+    const supportInfo = {
+      timestamp: new Date().toISOString(),
+      integration: {
+        name: 'Your Integration Name',
+        version: process.env.APP_VERSION || 'unknown',
+        environment: process.env.NODE_ENV || 'unknown'
+      },
+      api: {
+        base_url: process.env.TOLSTOY_BASE_URL || 'https://api.tolstoy.com',
+        api_key_prefix: process.env.TOLSTOY_API_KEY?.substring(0, 8) || 'not_set',
+        user_agent: 'tolstoy-integration/1.0'
+      },
+      system: {
+        node_version: process.version,
+        platform: process.platform,
+        arch: process.arch,
+        memory: process.memoryUsage(),
+        uptime: process.uptime()
+      },
+      recent_errors: this.getRecentErrors(),
+      performance_metrics: performanceMonitor.getMetrics(),
+      network_info: this.getNetworkInfo()
+    };
+
+    // Remove sensitive information
+    supportInfo.sanitized = true;
+    
+    console.log('Support Package Generated:');
+    console.log('=========================');
+    console.log(JSON.stringify(supportInfo, null, 2));
+    
+    return supportInfo;
+  }
+
+  getRecentErrors() {
+    // Return last 10 errors from your error tracking
+    return [
+      // Example error format
+      {
+        timestamp: '2024-01-15T10:30:00Z',
+        message: 'Rate limit exceeded',
+        endpoint: '/v1/workflows',
+        status: 429
+      }
+    ];
+  }
+
+  getNetworkInfo() {
+    const os = require('os');
+    const networkInterfaces = os.networkInterfaces();
+    
+    return {
+      hostname: os.hostname(),
+      interfaces: Object.keys(networkInterfaces),
+      dns: process.env.DNS_SERVERS || 'system_default'
+    };
+  }
+}
+
+export default new SupportInfoGenerator();
+```
+</CodeGroup>
+
+### Support Channels
+
+- **Email**: support@tolstoy.com
+- **Status Page**: https://status.tolstoy.com
+- **Documentation**: https://docs.tolstoy.com
+- **GitHub Issues**: For integration-specific problems
+
+## Preventive Measures
+
+### Proactive Monitoring Setup
+
+<CodeGroup>
+```javascript Proactive Monitoring
+// utils/proactive-monitor.js
+class ProactiveMonitor {
+  constructor() {
+    this.healthChecks = [
+      { name: 'API Health', check: () => this.checkAPIHealth() },
+      { name: 'Database Health', check: () => this.checkDatabaseHealth() },
+      { name: 'Cache Health', check: () => this.checkCacheHealth() },
+      { name: 'Performance', check: () => this.checkPerformance() }
+    ];
+    
+    this.alertThresholds = {
+      response_time: 1000,    // 1 second
+      error_rate: 0.05,       // 5%
+      memory_usage: 0.8,      // 80%
+      cache_hit_rate: 0.7     // 70%
+    };
+  }
+
+  async runHealthChecks() {
+    const results = {};
+    
+    for (const healthCheck of this.healthChecks) {
+      try {
+        results[healthCheck.name] = await healthCheck.check();
+      } catch (error) {
+        results[healthCheck.name] = {
+          status: 'error',
+          error: error.message
+        };
+      }
+    }
+
+    await this.evaluateHealth(results);
+    return results;
+  }
+
+  async evaluateHealth(results) {
+    const alerts = [];
+    
+    // Check for critical issues
+    Object.entries(results).forEach(([name, result]) => {
+      if (result.status === 'error' || result.status === 'critical') {
+        alerts.push({
+          severity: 'high',
+          component: name,
+          message: result.error || result.message
+        });
+      } else if (result.status === 'warning') {
+        alerts.push({
+          severity: 'medium',
+          component: name,
+          message: result.message
+        });
+      }
+    });
+
+    // Send alerts if necessary
+    if (alerts.length > 0) {
+      await this.sendHealthAlerts(alerts);
+    }
+  }
+
+  async sendHealthAlerts(alerts) {
+    for (const alert of alerts) {
+      console.log(`🚨 ${alert.severity.toUpperCase()} ALERT: ${alert.component} - ${alert.message}`);
+      
+      // Send to monitoring system
+      if (process.env.SLACK_WEBHOOK_URL) {
+        await this.sendSlackAlert(alert);
+      }
+    }
+  }
+
+  // Schedule regular health checks
+  startProactiveMonitoring(interval = 5 * 60 * 1000) { // 5 minutes
+    console.log('Starting proactive monitoring...');
+    
+    setInterval(async () => {
+      try {
+        await this.runHealthChecks();
+      } catch (error) {
+        console.error('Health check failed:', error);
+      }
+    }, interval);
+  }
+}
+
+export default new ProactiveMonitor();
+```
+</CodeGroup>
+
+## Best Practices for Troubleshooting
+
+### 🔍 Systematic Approach
+
+1. **Reproduce the Issue**: Ensure you can consistently reproduce the problem
+2. **Gather Information**: Collect logs, error messages, and system state
+3. **Isolate Variables**: Test with minimal configuration to isolate the cause
+4. **Check Recent Changes**: Review recent code or configuration changes
+5. **Verify Assumptions**: Double-check API documentation and requirements
+
+### 📊 Monitoring and Alerting
+
+1. **Implement Health Checks**: Monitor critical system components
+2. **Set Up Alerts**: Get notified before users experience issues
+3. **Log Everything**: Comprehensive logging for post-incident analysis
+4. **Track Metrics**: Monitor performance trends over time
+5. **Regular Testing**: Automated testing to catch regressions early
+
+### 🛠️ Debug Tools
+
+1. **Request/Response Logging**: Log all API interactions for analysis
+2. **Performance Profiling**: Identify bottlenecks and optimization opportunities
+3. **Error Categorization**: Classify errors for targeted solutions
+4. **Network Analysis**: Diagnose connectivity and latency issues
+5. **Resource Monitoring**: Track CPU, memory, and database usage
+
+### 📚 Documentation
+
+1. **Maintain Runbooks**: Document common issues and their solutions
+2. **Update Troubleshooting Guides**: Keep documentation current
+3. **Share Knowledge**: Document lessons learned from incidents
+4. **Create Checklists**: Standardize diagnostic procedures
+5. **Version Control**: Track changes to troubleshooting procedures
+
+## Emergency Response Procedures
+
+When experiencing critical issues:
+
+1. **Immediate Assessment**: Determine scope and impact
+2. **Implement Workarounds**: Restore service if possible
+3. **Escalate if Needed**: Contact appropriate teams or support
+4. **Document Everything**: Record timeline and actions taken
+5. **Post-Incident Review**: Analyze root cause and prevent recurrence
+
+For additional help, see our [Security Best Practices](/api/guides/security) and [Performance Optimization](/api/guides/performance) guides.

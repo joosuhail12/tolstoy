@@ -1,0 +1,2555 @@
+---
+title: 'Security Best Practices'
+description: 'Comprehensive security guide for implementing secure Tolstoy API integrations with authentication, data protection, and threat mitigation'
+---
+
+# Security Best Practices
+
+Security is paramount when integrating with the Tolstoy API. This guide covers comprehensive security practices to protect your integration, data, and users from threats.
+
+## API Security Fundamentals
+
+### Authentication Security
+
+<CodeGroup>
+```javascript Secure API Key Management
+// config/auth.js
+import crypto from 'crypto';
+
+class ApiKeyManager {
+  constructor() {
+    this.apiKey = this.loadApiKey();
+    this.rotationSchedule = 24 * 60 * 60 * 1000; // 24 hours
+  }
+
+  loadApiKey() {
+    // Never hardcode API keys
+    const apiKey = process.env.TOLSTOY_API_KEY;
+    
+    if (!apiKey) {
+      throw new Error('TOLSTOY_API_KEY environment variable is required');
+    }
+    
+    if (!this.validateApiKeyFormat(apiKey)) {
+      throw new Error('Invalid API key format');
+    }
+    
+    return apiKey;
+  }
+
+  validateApiKeyFormat(key) {
+    // Tolstoy API keys follow pattern: prod_sk_* or test_sk_*
+    return /^(prod|test)_sk_[a-zA-Z0-9]{32,64}$/.test(key);
+  }
+
+  maskApiKey(key) {
+    if (!key) return 'not_set';
+    return key.substring(0, 8) + '***' + key.substring(key.length - 4);
+  }
+
+  async rotateApiKey() {
+    // Implement key rotation logic
+    const newKey = await this.fetchNewApiKey();
+    
+    // Test new key before switching
+    if (await this.testApiKey(newKey)) {
+      this.apiKey = newKey;
+      await this.updateStoredKey(newKey);
+      return true;
+    }
+    
+    throw new Error('New API key validation failed');
+  }
+
+  async testApiKey(key) {
+    try {
+      const response = await fetch('https://api.tolstoy.com/v1/health', {
+        headers: { 'Authorization': `Bearer ${key}` }
+      });
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+export default new ApiKeyManager();
+```
+
+```python Secure API Key Management
+# config/auth.py
+import os
+import re
+import hashlib
+import secrets
+from typing import Optional
+from cryptography.fernet import Fernet
+
+class ApiKeyManager:
+    def __init__(self):
+        self.api_key = self.load_api_key()
+        self.encryption_key = self.load_encryption_key()
+        self.cipher = Fernet(self.encryption_key)
+    
+    def load_api_key(self) -> str:
+        api_key = os.getenv('TOLSTOY_API_KEY')
+        
+        if not api_key:
+            raise ValueError('TOLSTOY_API_KEY environment variable is required')
+        
+        if not self.validate_api_key_format(api_key):
+            raise ValueError('Invalid API key format')
+        
+        return api_key
+    
+    def load_encryption_key(self) -> bytes:
+        key = os.getenv('ENCRYPTION_KEY')
+        if not key:
+            # Generate new key for development (NOT for production)
+            if os.getenv('NODE_ENV') != 'production':
+                return Fernet.generate_key()
+            raise ValueError('ENCRYPTION_KEY required in production')
+        return key.encode()
+    
+    def validate_api_key_format(self, key: str) -> bool:
+        # Tolstoy API keys follow pattern: prod_sk_* or test_sk_*
+        pattern = r'^(prod|test)_sk_[a-zA-Z0-9]{32,64}$'
+        return bool(re.match(pattern, key))
+    
+    def mask_api_key(self, key: Optional[str] = None) -> str:
+        key = key or self.api_key
+        if not key:
+            return 'not_set'
+        return key[:8] + '***' + key[-4:]
+    
+    def encrypt_sensitive_data(self, data: str) -> str:
+        return self.cipher.encrypt(data.encode()).decode()
+    
+    def decrypt_sensitive_data(self, encrypted_data: str) -> str:
+        return self.cipher.decrypt(encrypted_data.encode()).decode()
+    
+    def generate_webhook_secret(self) -> str:
+        return secrets.token_urlsafe(32)
+    
+    async def rotate_api_key(self) -> bool:
+        # Implement key rotation logic
+        new_key = await self.fetch_new_api_key()
+        
+        if await self.test_api_key(new_key):
+            self.api_key = new_key
+            await self.update_stored_key(new_key)
+            return True
+        
+        raise Exception('New API key validation failed')
+    
+    async def test_api_key(self, key: str) -> bool:
+        import aiohttp
+        try:
+            async with aiohttp.ClientSession() as session:
+                headers = {'Authorization': f'Bearer {key}'}
+                async with session.get('https://api.tolstoy.com/v1/health', headers=headers) as response:
+                    return response.ok
+        except:
+            return False
+
+api_key_manager = ApiKeyManager()
+```
+</CodeGroup>
+
+### Input Validation and Sanitization
+
+<CodeGroup>
+```javascript Input Validation
+// middleware/validation.js
+import Joi from 'joi';
+import xss from 'xss';
+import { rateLimit } from 'express-rate-limit';
+
+// Schema definitions
+const schemas = {
+  workflow: Joi.object({
+    name: Joi.string()
+      .trim()
+      .min(1)
+      .max(100)
+      .pattern(/^[a-zA-Z0-9\s\-_]+$/)
+      .required(),
+    description: Joi.string()
+      .trim()
+      .max(500)
+      .optional(),
+    trigger: Joi.object({
+      type: Joi.string()
+        .valid('webhook', 'scheduled', 'manual')
+        .required(),
+      config: Joi.object().required()
+    }).required(),
+    actions: Joi.array()
+      .items(Joi.object({
+        type: Joi.string().required(),
+        config: Joi.object().required()
+      }))
+      .min(1)
+      .max(10)
+      .required()
+  }),
+  
+  webhookEvent: Joi.object({
+    event: Joi.string()
+      .pattern(/^[a-z_]+\.[a-z_]+$/)
+      .required(),
+    data: Joi.object().required(),
+    timestamp: Joi.string().isoDate().required()
+  })
+};
+
+// Input sanitization middleware
+export const sanitizeInput = (req, res, next) => {
+  function sanitizeObject(obj) {
+    if (typeof obj !== 'object' || obj === null) {
+      return typeof obj === 'string' ? xss(obj) : obj;
+    }
+    
+    if (Array.isArray(obj)) {
+      return obj.map(sanitizeObject);
+    }
+    
+    const sanitized = {};
+    for (const [key, value] of Object.entries(obj)) {
+      sanitized[key] = sanitizeObject(value);
+    }
+    return sanitized;
+  }
+  
+  if (req.body) {
+    req.body = sanitizeObject(req.body);
+  }
+  
+  if (req.query) {
+    req.query = sanitizeObject(req.query);
+  }
+  
+  next();
+};
+
+// Validation middleware factory
+export const validateSchema = (schemaName) => {
+  return (req, res, next) => {
+    const schema = schemas[schemaName];
+    if (!schema) {
+      return res.status(500).json({ error: 'Invalid schema' });
+    }
+    
+    const { error, value } = schema.validate(req.body, {
+      abortEarly: false,
+      stripUnknown: true
+    });
+    
+    if (error) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: error.details.map(detail => ({
+          field: detail.path.join('.'),
+          message: detail.message
+        }))
+      });
+    }
+    
+    req.body = value;
+    next();
+  };
+};
+
+// Rate limiting configuration
+export const createRateLimit = (windowMs, max, skipSuccessfulRequests = false) => {
+  return rateLimit({
+    windowMs,
+    max,
+    skipSuccessfulRequests,
+    standardHeaders: true,
+    legacyHeaders: false,
+    handler: (req, res) => {
+      res.status(429).json({
+        error: 'Rate limit exceeded',
+        retry_after: Math.ceil(windowMs / 1000)
+      });
+    },
+    keyGenerator: (req) => {
+      // Use API key if available, otherwise IP
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        const apiKey = authHeader.substring(7);
+        return crypto.createHash('sha256').update(apiKey).digest('hex');
+      }
+      return req.ip;
+    }
+  });
+};
+
+// Specific rate limits
+export const apiRateLimit = createRateLimit(15 * 60 * 1000, 1000); // 1000 requests per 15 minutes
+export const webhookRateLimit = createRateLimit(60 * 1000, 100);    // 100 webhooks per minute
+export const authRateLimit = createRateLimit(60 * 1000, 5);         // 5 auth attempts per minute
+```
+
+```python Input Validation
+# middleware/validation.py
+import re
+import html
+import json
+from typing import Any, Dict, List, Optional
+from pydantic import BaseModel, Field, validator
+from fastapi import HTTPException, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import bleach
+
+# Pydantic models for validation
+class TriggerConfig(BaseModel):
+    type: str = Field(..., regex=r'^(webhook|scheduled|manual)$')
+    config: Dict[str, Any]
+
+class ActionConfig(BaseModel):
+    type: str = Field(..., min_length=1, max_length=50)
+    config: Dict[str, Any]
+
+class WorkflowCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100, regex=r'^[a-zA-Z0-9\s\-_]+$')
+    description: Optional[str] = Field(None, max_length=500)
+    trigger: TriggerConfig
+    actions: List[ActionConfig] = Field(..., min_items=1, max_items=10)
+    
+    @validator('name', 'description')
+    def sanitize_text(cls, v):
+        if v is None:
+            return v
+        # Remove any HTML tags and sanitize
+        return bleach.clean(v.strip(), tags=[], strip=True)
+
+class WebhookEvent(BaseModel):
+    event: str = Field(..., regex=r'^[a-z_]+\.[a-z_]+$')
+    data: Dict[str, Any]
+    timestamp: str = Field(..., regex=r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$')
+
+# Input sanitization utilities
+class InputSanitizer:
+    
+    @staticmethod
+    def sanitize_string(value: str) -> str:
+        if not isinstance(value, str):
+            return value
+        
+        # HTML encode to prevent XSS
+        sanitized = html.escape(value)
+        
+        # Remove any potentially dangerous characters
+        sanitized = re.sub(r'[<>"\']', '', sanitized)
+        
+        return sanitized.strip()
+    
+    @staticmethod
+    def sanitize_dict(data: Dict[str, Any]) -> Dict[str, Any]:
+        sanitized = {}
+        for key, value in data.items():
+            if isinstance(value, str):
+                sanitized[key] = InputSanitizer.sanitize_string(value)
+            elif isinstance(value, dict):
+                sanitized[key] = InputSanitizer.sanitize_dict(value)
+            elif isinstance(value, list):
+                sanitized[key] = InputSanitizer.sanitize_list(value)
+            else:
+                sanitized[key] = value
+        return sanitized
+    
+    @staticmethod
+    def sanitize_list(data: List[Any]) -> List[Any]:
+        return [
+            InputSanitizer.sanitize_string(item) if isinstance(item, str)
+            else InputSanitizer.sanitize_dict(item) if isinstance(item, dict)
+            else item
+            for item in data
+        ]
+
+# Rate limiting
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+limiter = Limiter(key_func=get_remote_address)
+
+# Custom rate limit handler
+def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    response = JSONResponse(
+        status_code=429,
+        content={
+            "error": "Rate limit exceeded",
+            "detail": f"Rate limit exceeded: {exc.detail}",
+            "retry_after": exc.retry_after
+        }
+    )
+    response.headers["Retry-After"] = str(exc.retry_after)
+    return response
+
+# Authentication dependency
+security = HTTPBearer()
+
+async def validate_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    api_key = credentials.credentials
+    
+    if not api_key_manager.validate_api_key_format(api_key):
+        raise HTTPException(status_code=401, detail="Invalid API key format")
+    
+    # Additional validation logic here
+    if not await verify_api_key_permissions(api_key):
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    return api_key
+```
+</CodeGroup>
+
+## Webhook Security
+
+### Signature Verification
+
+<CodeGroup>
+```javascript Webhook Signature Verification
+// middleware/webhook-security.js
+import crypto from 'crypto';
+import { timingSafeEqual } from 'crypto';
+
+class WebhookSecurity {
+  constructor() {
+    this.webhookSecret = process.env.TOLSTOY_WEBHOOK_SECRET;
+    this.maxAge = 5 * 60 * 1000; // 5 minutes
+    
+    if (!this.webhookSecret) {
+      throw new Error('TOLSTOY_WEBHOOK_SECRET is required');
+    }
+  }
+
+  verifySignature(payload, signature, timestamp) {
+    // Verify timestamp to prevent replay attacks
+    const now = Date.now();
+    const eventTime = parseInt(timestamp) * 1000;
+    
+    if (Math.abs(now - eventTime) > this.maxAge) {
+      throw new Error('Request timestamp too old');
+    }
+
+    // Create expected signature
+    const signedPayload = `${timestamp}.${payload}`;
+    const expectedSignature = crypto
+      .createHmac('sha256', this.webhookSecret)
+      .update(signedPayload, 'utf8')
+      .digest('hex');
+
+    const expected = Buffer.from(`sha256=${expectedSignature}`, 'utf8');
+    const actual = Buffer.from(signature, 'utf8');
+
+    // Use timing-safe comparison to prevent timing attacks
+    if (expected.length !== actual.length) {
+      throw new Error('Invalid signature');
+    }
+
+    if (!timingSafeEqual(expected, actual)) {
+      throw new Error('Invalid signature');
+    }
+
+    return true;
+  }
+
+  middleware() {
+    return (req, res, next) => {
+      try {
+        const signature = req.headers['tolstoy-signature'];
+        const timestamp = req.headers['tolstoy-timestamp'];
+        const payload = JSON.stringify(req.body);
+
+        if (!signature || !timestamp) {
+          return res.status(401).json({
+            error: 'Missing signature or timestamp'
+          });
+        }
+
+        this.verifySignature(payload, signature, timestamp);
+        
+        // Add verified flag to request
+        req.webhookVerified = true;
+        next();
+      } catch (error) {
+        return res.status(401).json({
+          error: 'Webhook verification failed',
+          message: error.message
+        });
+      }
+    };
+  }
+
+  // Generate signature for outgoing webhooks
+  generateSignature(payload, timestamp) {
+    const signedPayload = `${timestamp}.${payload}`;
+    return crypto
+      .createHmac('sha256', this.webhookSecret)
+      .update(signedPayload, 'utf8')
+      .digest('hex');
+  }
+}
+
+export default new WebhookSecurity();
+```
+
+```python Webhook Signature Verification
+# middleware/webhook_security.py
+import os
+import time
+import hmac
+import hashlib
+import secrets
+from typing import Optional
+from fastapi import HTTPException, Request
+
+class WebhookSecurity:
+    def __init__(self):
+        self.webhook_secret = os.getenv('TOLSTOY_WEBHOOK_SECRET')
+        self.max_age = 5 * 60  # 5 minutes
+        
+        if not self.webhook_secret:
+            raise ValueError('TOLSTOY_WEBHOOK_SECRET is required')
+    
+    def verify_signature(self, payload: str, signature: str, timestamp: str) -> bool:
+        # Verify timestamp to prevent replay attacks
+        try:
+            event_time = int(timestamp)
+            now = int(time.time())
+            
+            if abs(now - event_time) > self.max_age:
+                raise HTTPException(status_code=401, detail="Request timestamp too old")
+        except ValueError:
+            raise HTTPException(status_code=401, detail="Invalid timestamp")
+        
+        # Create expected signature
+        signed_payload = f"{timestamp}.{payload}"
+        expected_signature = hmac.new(
+            self.webhook_secret.encode(),
+            signed_payload.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        
+        expected = f"sha256={expected_signature}"
+        
+        # Use secure comparison to prevent timing attacks
+        if not hmac.compare_digest(expected, signature):
+            raise HTTPException(status_code=401, detail="Invalid signature")
+        
+        return True
+    
+    async def verify_webhook(self, request: Request) -> bool:
+        # Get headers
+        signature = request.headers.get('tolstoy-signature')
+        timestamp = request.headers.get('tolstoy-timestamp')
+        
+        if not signature or not timestamp:
+            raise HTTPException(
+                status_code=401, 
+                detail="Missing signature or timestamp headers"
+            )
+        
+        # Get raw body for signature verification
+        body = await request.body()
+        payload = body.decode('utf-8')
+        
+        return self.verify_signature(payload, signature, timestamp)
+    
+    def generate_signature(self, payload: str, timestamp: Optional[int] = None) -> tuple:
+        if timestamp is None:
+            timestamp = int(time.time())
+        
+        signed_payload = f"{timestamp}.{payload}"
+        signature = hmac.new(
+            self.webhook_secret.encode(),
+            signed_payload.encode(),
+            hashlib.sha256
+        ).hexdigest()
+        
+        return f"sha256={signature}", timestamp
+    
+    def generate_webhook_secret(self) -> str:
+        return secrets.token_urlsafe(32)
+
+webhook_security = WebhookSecurity()
+
+# FastAPI dependency for webhook verification
+async def verify_webhook_signature(request: Request):
+    await webhook_security.verify_webhook(request)
+    return True
+```
+</CodeGroup>
+
+## Data Protection
+
+### Encryption at Rest and in Transit
+
+<CodeGroup>
+```javascript Data Encryption
+// utils/encryption.js
+import crypto from 'crypto';
+import { promisify } from 'util';
+
+class DataEncryption {
+  constructor() {
+    this.algorithm = 'aes-256-gcm';
+    this.keyLength = 32;
+    this.ivLength = 16;
+    this.tagLength = 16;
+    
+    // Load encryption key from secure storage
+    this.masterKey = this.loadMasterKey();
+  }
+
+  loadMasterKey() {
+    const key = process.env.ENCRYPTION_MASTER_KEY;
+    if (!key) {
+      throw new Error('ENCRYPTION_MASTER_KEY environment variable is required');
+    }
+    
+    // Key should be base64 encoded 256-bit key
+    return Buffer.from(key, 'base64');
+  }
+
+  async encrypt(plaintext) {
+    const iv = crypto.randomBytes(this.ivLength);
+    const cipher = crypto.createCipher(this.algorithm, this.masterKey, iv);
+    
+    let encrypted = cipher.update(plaintext, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    
+    const tag = cipher.getAuthTag();
+    
+    // Combine IV, tag, and encrypted data
+    const combined = Buffer.concat([iv, tag, Buffer.from(encrypted, 'hex')]);
+    return combined.toString('base64');
+  }
+
+  async decrypt(encryptedData) {
+    const combined = Buffer.from(encryptedData, 'base64');
+    
+    const iv = combined.slice(0, this.ivLength);
+    const tag = combined.slice(this.ivLength, this.ivLength + this.tagLength);
+    const encrypted = combined.slice(this.ivLength + this.tagLength);
+    
+    const decipher = crypto.createDecipher(this.algorithm, this.masterKey, iv);
+    decipher.setAuthTag(tag);
+    
+    let decrypted = decipher.update(encrypted, null, 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  }
+
+  // Encrypt sensitive fields in database records
+  async encryptSensitiveFields(record) {
+    const sensitiveFields = ['api_key', 'webhook_secret', 'credentials'];
+    const encrypted = { ...record };
+    
+    for (const field of sensitiveFields) {
+      if (encrypted[field]) {
+        encrypted[field] = await this.encrypt(encrypted[field]);
+      }
+    }
+    
+    return encrypted;
+  }
+
+  async decryptSensitiveFields(record) {
+    const sensitiveFields = ['api_key', 'webhook_secret', 'credentials'];
+    const decrypted = { ...record };
+    
+    for (const field of sensitiveFields) {
+      if (decrypted[field]) {
+        decrypted[field] = await this.decrypt(decrypted[field]);
+      }
+    }
+    
+    return decrypted;
+  }
+
+  // Generate secure random tokens
+  generateSecureToken(length = 32) {
+    return crypto.randomBytes(length).toString('base64url');
+  }
+
+  // Hash passwords securely
+  async hashPassword(password) {
+    const salt = crypto.randomBytes(16);
+    const hash = await promisify(crypto.pbkdf2)(password, salt, 100000, 64, 'sha512');
+    return `${salt.toString('hex')}:${hash.toString('hex')}`;
+  }
+
+  async verifyPassword(password, hashedPassword) {
+    const [salt, hash] = hashedPassword.split(':');
+    const hashBuffer = await promisify(crypto.pbkdf2)(
+      password, 
+      Buffer.from(salt, 'hex'), 
+      100000, 
+      64, 
+      'sha512'
+    );
+    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), hashBuffer);
+  }
+}
+
+export default new DataEncryption();
+```
+
+```python Data Encryption
+# utils/encryption.py
+import os
+import base64
+import secrets
+import hashlib
+import hmac
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from typing import Dict, Any, Optional
+
+class DataEncryption:
+    def __init__(self):
+        self.master_key = self.load_master_key()
+        self.fernet = Fernet(self.master_key)
+    
+    def load_master_key(self) -> bytes:
+        key = os.getenv('ENCRYPTION_MASTER_KEY')
+        if not key:
+            # Generate new key for development (NOT for production)
+            if os.getenv('NODE_ENV') != 'production':
+                return Fernet.generate_key()
+            raise ValueError('ENCRYPTION_MASTER_KEY required in production')
+        
+        try:
+            return base64.b64decode(key)
+        except:
+            raise ValueError('Invalid ENCRYPTION_MASTER_KEY format')
+    
+    def encrypt(self, plaintext: str) -> str:
+        try:
+            encrypted = self.fernet.encrypt(plaintext.encode())
+            return base64.b64encode(encrypted).decode()
+        except Exception as e:
+            raise ValueError(f"Encryption failed: {str(e)}")
+    
+    def decrypt(self, encrypted_data: str) -> str:
+        try:
+            encrypted_bytes = base64.b64decode(encrypted_data)
+            decrypted = self.fernet.decrypt(encrypted_bytes)
+            return decrypted.decode()
+        except Exception as e:
+            raise ValueError(f"Decryption failed: {str(e)}")
+    
+    def encrypt_sensitive_fields(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        sensitive_fields = ['api_key', 'webhook_secret', 'credentials', 'access_token']
+        encrypted = record.copy()
+        
+        for field in sensitive_fields:
+            if field in encrypted and encrypted[field]:
+                encrypted[field] = self.encrypt(str(encrypted[field]))
+        
+        return encrypted
+    
+    def decrypt_sensitive_fields(self, record: Dict[str, Any]) -> Dict[str, Any]:
+        sensitive_fields = ['api_key', 'webhook_secret', 'credentials', 'access_token']
+        decrypted = record.copy()
+        
+        for field in sensitive_fields:
+            if field in decrypted and decrypted[field]:
+                try:
+                    decrypted[field] = self.decrypt(decrypted[field])
+                except ValueError:
+                    # Field might not be encrypted (backward compatibility)
+                    pass
+        
+        return decrypted
+    
+    def generate_secure_token(self, length: int = 32) -> str:
+        return secrets.token_urlsafe(length)
+    
+    def hash_password(self, password: str) -> str:
+        salt = secrets.token_bytes(32)
+        pwdhash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+        return base64.b64encode(salt + pwdhash).decode()
+    
+    def verify_password(self, password: str, hashed_password: str) -> bool:
+        try:
+            decoded = base64.b64decode(hashed_password)
+            salt = decoded[:32]
+            stored_hash = decoded[32:]
+            
+            pwdhash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+            return hmac.compare_digest(stored_hash, pwdhash)
+        except:
+            return False
+    
+    def secure_compare(self, a: str, b: str) -> bool:
+        return hmac.compare_digest(a.encode(), b.encode())
+
+data_encryption = DataEncryption()
+```
+</CodeGroup>
+
+### Secure Data Storage
+
+<CodeGroup>
+```sql Secure Database Schema
+-- Enable row-level security
+ALTER TABLE workflows ENABLE ROW LEVEL SECURITY;
+ALTER TABLE executions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE webhook_endpoints ENABLE ROW LEVEL SECURITY;
+
+-- Create security policies
+CREATE POLICY workflow_organization_policy ON workflows
+    FOR ALL TO application_user
+    USING (organization_id = current_setting('app.current_org_id')::uuid);
+
+CREATE POLICY execution_workflow_policy ON executions
+    FOR ALL TO application_user
+    USING (workflow_id IN (
+        SELECT id FROM workflows 
+        WHERE organization_id = current_setting('app.current_org_id')::uuid
+    ));
+
+-- Audit table for sensitive operations
+CREATE TABLE audit_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    organization_id UUID NOT NULL,
+    action VARCHAR(100) NOT NULL,
+    resource_type VARCHAR(50) NOT NULL,
+    resource_id UUID,
+    old_values JSONB,
+    new_values JSONB,
+    ip_address INET,
+    user_agent TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Index for audit queries
+CREATE INDEX idx_audit_log_org_action ON audit_log(organization_id, action, created_at);
+CREATE INDEX idx_audit_log_user ON audit_log(user_id, created_at);
+
+-- Encrypt sensitive columns
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- Function to encrypt sensitive data
+CREATE OR REPLACE FUNCTION encrypt_sensitive(data TEXT)
+RETURNS TEXT AS $$
+BEGIN
+    RETURN encode(pgp_sym_encrypt(data, current_setting('app.encryption_key')), 'base64');
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Function to decrypt sensitive data
+CREATE OR REPLACE FUNCTION decrypt_sensitive(encrypted_data TEXT)
+RETURNS TEXT AS $$
+BEGIN
+    RETURN pgp_sym_decrypt(decode(encrypted_data, 'base64'), current_setting('app.encryption_key'));
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+```
+
+```javascript Secure Database Access
+// utils/secure-database.js
+import pool from '../config/database.js';
+import dataEncryption from './encryption.js';
+
+class SecureDatabase {
+  constructor() {
+    this.pool = pool;
+    this.auditEnabled = process.env.AUDIT_ENABLED === 'true';
+  }
+
+  async executeWithAudit(query, params, context = {}) {
+    const client = await this.pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Set organization context for RLS
+      if (context.organizationId) {
+        await client.query(
+          "SELECT set_config('app.current_org_id', $1, true)",
+          [context.organizationId]
+        );
+      }
+      
+      // Execute main query
+      const result = await client.query(query, params);
+      
+      // Log audit trail if enabled
+      if (this.auditEnabled && context.audit) {
+        await this.logAudit(client, context.audit);
+      }
+      
+      await client.query('COMMIT');
+      return result;
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async logAudit(client, auditData) {
+    const auditQuery = `
+      INSERT INTO audit_log (
+        user_id, organization_id, action, resource_type, 
+        resource_id, old_values, new_values, ip_address, user_agent
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `;
+    
+    await client.query(auditQuery, [
+      auditData.userId,
+      auditData.organizationId,
+      auditData.action,
+      auditData.resourceType,
+      auditData.resourceId,
+      auditData.oldValues ? JSON.stringify(auditData.oldValues) : null,
+      auditData.newValues ? JSON.stringify(auditData.newValues) : null,
+      auditData.ipAddress,
+      auditData.userAgent
+    ]);
+  }
+
+  async createWorkflowSecure(workflowData, context) {
+    // Encrypt sensitive fields before storage
+    const encrypted = await dataEncryption.encryptSensitiveFields(workflowData);
+    
+    const query = `
+      INSERT INTO workflows (name, description, trigger, actions, organization_id)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, name, status, created_at
+    `;
+    
+    const result = await this.executeWithAudit(
+      query,
+      [
+        encrypted.name,
+        encrypted.description,
+        JSON.stringify(encrypted.trigger),
+        JSON.stringify(encrypted.actions),
+        context.organizationId
+      ],
+      {
+        organizationId: context.organizationId,
+        audit: {
+          userId: context.userId,
+          organizationId: context.organizationId,
+          action: 'workflow.create',
+          resourceType: 'workflow',
+          newValues: workflowData,
+          ipAddress: context.ipAddress,
+          userAgent: context.userAgent
+        }
+      }
+    );
+    
+    return result.rows[0];
+  }
+
+  async getWorkflowSecure(workflowId, context) {
+    const query = `
+      SELECT id, name, description, trigger, actions, status, created_at, updated_at
+      FROM workflows 
+      WHERE id = $1
+    `;
+    
+    const result = await this.executeWithAudit(
+      query,
+      [workflowId],
+      { organizationId: context.organizationId }
+    );
+    
+    if (result.rows.length === 0) {
+      return null;
+    }
+    
+    // Decrypt sensitive fields before returning
+    return await dataEncryption.decryptSensitiveFields(result.rows[0]);
+  }
+}
+
+export default new SecureDatabase();
+```
+</CodeGroup>
+
+## Access Control and Authorization
+
+### Role-Based Access Control (RBAC)
+
+<CodeGroup>
+```javascript RBAC Implementation
+// middleware/rbac.js
+class RoleBasedAccess {
+  constructor() {
+    this.permissions = {
+      admin: ['*'],
+      manager: [
+        'workflow.create',
+        'workflow.read',
+        'workflow.update',
+        'workflow.delete',
+        'organization.read',
+        'organization.update'
+      ],
+      developer: [
+        'workflow.create',
+        'workflow.read',
+        'workflow.update',
+        'execution.read'
+      ],
+      viewer: [
+        'workflow.read',
+        'execution.read',
+        'organization.read'
+      ]
+    };
+  }
+
+  hasPermission(userRole, requiredPermission) {
+    const rolePermissions = this.permissions[userRole] || [];
+    
+    // Admin has all permissions
+    if (rolePermissions.includes('*')) {
+      return true;
+    }
+    
+    // Check exact permission match
+    if (rolePermissions.includes(requiredPermission)) {
+      return true;
+    }
+    
+    // Check wildcard permissions
+    const [resource, action] = requiredPermission.split('.');
+    const wildcardPermission = `${resource}.*`;
+    
+    return rolePermissions.includes(wildcardPermission);
+  }
+
+  middleware(requiredPermission) {
+    return async (req, res, next) => {
+      try {
+        const user = req.user; // Set by authentication middleware
+        
+        if (!user) {
+          return res.status(401).json({ error: 'Authentication required' });
+        }
+
+        if (!this.hasPermission(user.role, requiredPermission)) {
+          return res.status(403).json({
+            error: 'Insufficient permissions',
+            required: requiredPermission,
+            user_role: user.role
+          });
+        }
+
+        next();
+      } catch (error) {
+        return res.status(500).json({ error: 'Authorization check failed' });
+      }
+    };
+  }
+
+  // Organization-level access control
+  async checkOrganizationAccess(userId, organizationId, permission) {
+    const query = `
+      SELECT role FROM organization_members 
+      WHERE user_id = $1 AND organization_id = $2 AND status = 'active'
+    `;
+    
+    const result = await pool.query(query, [userId, organizationId]);
+    
+    if (result.rows.length === 0) {
+      throw new Error('User not member of organization');
+    }
+    
+    const userRole = result.rows[0].role;
+    
+    if (!this.hasPermission(userRole, permission)) {
+      throw new Error('Insufficient organization permissions');
+    }
+    
+    return true;
+  }
+}
+
+export default new RoleBasedAccess();
+```
+
+```python RBAC Implementation
+# middleware/rbac.py
+from typing import Dict, List, Optional
+from fastapi import HTTPException, Depends
+from functools import wraps
+
+class RoleBasedAccess:
+    def __init__(self):
+        self.permissions = {
+            'admin': ['*'],
+            'manager': [
+                'workflow.create', 'workflow.read', 'workflow.update', 'workflow.delete',
+                'organization.read', 'organization.update'
+            ],
+            'developer': [
+                'workflow.create', 'workflow.read', 'workflow.update',
+                'execution.read'
+            ],
+            'viewer': [
+                'workflow.read', 'execution.read', 'organization.read'
+            ]
+        }
+    
+    def has_permission(self, user_role: str, required_permission: str) -> bool:
+        role_permissions = self.permissions.get(user_role, [])
+        
+        # Admin has all permissions
+        if '*' in role_permissions:
+            return True
+        
+        # Check exact permission match
+        if required_permission in role_permissions:
+            return True
+        
+        # Check wildcard permissions
+        resource, action = required_permission.split('.')
+        wildcard_permission = f"{resource}.*"
+        
+        return wildcard_permission in role_permissions
+    
+    def require_permission(self, permission: str):
+        def decorator(func):
+            @wraps(func)
+            async def wrapper(*args, **kwargs):
+                # Extract user from request context
+                request = kwargs.get('request') or args[0] if args else None
+                user = getattr(request, 'user', None) if request else None
+                
+                if not user:
+                    raise HTTPException(status_code=401, detail="Authentication required")
+                
+                if not self.has_permission(user.role, permission):
+                    raise HTTPException(
+                        status_code=403,
+                        detail={
+                            "error": "Insufficient permissions",
+                            "required": permission,
+                            "user_role": user.role
+                        }
+                    )
+                
+                return await func(*args, **kwargs)
+            return wrapper
+        return decorator
+    
+    async def check_organization_access(
+        self, 
+        user_id: str, 
+        organization_id: str, 
+        permission: str
+    ) -> bool:
+        query = """
+            SELECT role FROM organization_members 
+            WHERE user_id = $1 AND organization_id = $2 AND status = 'active'
+        """
+        
+        result = await db_pool.fetch(query, user_id, organization_id)
+        
+        if not result:
+            raise HTTPException(status_code=403, detail="User not member of organization")
+        
+        user_role = result[0]['role']
+        
+        if not self.has_permission(user_role, permission):
+            raise HTTPException(status_code=403, detail="Insufficient organization permissions")
+        
+        return True
+
+rbac = RoleBasedAccess()
+
+# Usage as decorator
+@rbac.require_permission('workflow.create')
+async def create_workflow(workflow_data: WorkflowCreate, request: Request):
+    # Implementation here
+    pass
+```
+</CodeGroup>
+
+## Security Headers and CORS
+
+### HTTP Security Headers
+
+<CodeGroup>
+```javascript Security Headers
+// middleware/security-headers.js
+import helmet from 'helmet';
+import cors from 'cors';
+
+export const securityHeaders = helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'", "https://api.tolstoy.com"],
+      fontSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+    },
+  },
+  crossOriginEmbedderPolicy: true,
+  crossOriginOpenerPolicy: true,
+  crossOriginResourcePolicy: { policy: "same-origin" },
+  dnsPrefetchControl: true,
+  frameguard: { action: 'deny' },
+  hidePoweredBy: true,
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  },
+  ieNoOpen: true,
+  noSniff: true,
+  originAgentCluster: true,
+  permittedCrossDomainPolicies: false,
+  referrerPolicy: { policy: "no-referrer" },
+  xssFilter: true
+});
+
+export const corsConfig = cors({
+  origin: (origin, callback) => {
+    const allowedOrigins = [
+      'https://app.yourcompany.com',
+      'https://admin.yourcompany.com'
+    ];
+    
+    // Allow requests with no origin (mobile apps, etc.)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With',
+    'Content-Type',
+    'Accept',
+    'Authorization',
+    'tolstoy-signature',
+    'tolstoy-timestamp'
+  ],
+  exposedHeaders: [
+    'X-RateLimit-Remaining',
+    'X-RateLimit-Reset',
+    'X-Request-ID'
+  ],
+  maxAge: 86400 // 24 hours
+});
+
+// Additional custom security middleware
+export const additionalSecurity = (req, res, next) => {
+  // Remove server information
+  res.removeHeader('X-Powered-By');
+  res.removeHeader('Server');
+  
+  // Add custom security headers
+  res.setHeader('X-Request-ID', req.id || crypto.randomUUID());
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  
+  next();
+};
+```
+</CodeGroup>
+
+## Threat Protection
+
+### DDoS Protection and Rate Limiting
+
+<CodeGroup>
+```javascript Advanced Rate Limiting
+// middleware/advanced-rate-limiting.js
+import rateLimit from 'express-rate-limit';
+import slowDown from 'express-slow-down';
+import { RateLimiterRedis } from 'rate-limiter-flexible';
+import Redis from 'ioredis';
+
+const redisClient = new Redis(process.env.REDIS_URL);
+
+// Distributed rate limiting
+const rateLimiter = new RateLimiterRedis({
+  storeClient: redisClient,
+  keyGeneratorFunc: (req) => {
+    // Use API key or IP address
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      return `api_key:${crypto.createHash('sha256').update(authHeader.substring(7)).digest('hex')}`;
+    }
+    return `ip:${req.ip}`;
+  },
+  points: 1000, // Number of requests
+  duration: 3600, // Per hour
+  blockDuration: 3600, // Block for 1 hour if exceeded
+});
+
+// Progressive rate limiting
+const createProgressiveLimit = (points, duration, blockDuration) => {
+  const limiter = new RateLimiterRedis({
+    storeClient: redisClient,
+    points,
+    duration,
+    blockDuration,
+  });
+
+  return async (req, res, next) => {
+    try {
+      await limiter.consume(req.ip);
+      next();
+    } catch (rejRes) {
+      const msBeforeNext = rejRes.msBeforeNext || 1000;
+      
+      res.set({
+        'Retry-After': Math.round(msBeforeNext / 1000),
+        'X-RateLimit-Limit': points,
+        'X-RateLimit-Remaining': rejRes.remainingPoints || 0,
+        'X-RateLimit-Reset': new Date(Date.now() + msBeforeNext)
+      });
+      
+      res.status(429).json({
+        error: 'Rate limit exceeded',
+        retry_after: Math.round(msBeforeNext / 1000)
+      });
+    }
+  };
+};
+
+// Endpoint-specific rate limits
+export const apiRateLimit = createProgressiveLimit(1000, 3600, 3600); // 1000/hour
+export const webhookRateLimit = createProgressiveLimit(100, 60, 300);   // 100/minute
+export const authRateLimit = createProgressiveLimit(5, 900, 3600);      // 5/15min
+
+// Slow down middleware for suspicious activity
+export const slowDown = slowDown({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  delayAfter: 100, // Allow 100 requests per windowMs without delay
+  delayMs: 500, // Add 500ms delay per request after delayAfter
+  maxDelayMs: 20000, // Maximum delay of 20 seconds
+});
+
+// DDoS protection
+export const ddosProtection = (req, res, next) => {
+  const suspiciousPatterns = [
+    /union.*select/i,        // SQL injection
+    /<script.*>/i,           // XSS
+    /javascript:/i,          // Protocol injection
+    /\.\.\/.*\.\.\//, // Path traversal
+  ];
+
+  const userAgent = req.headers['user-agent'] || '';
+  const referer = req.headers.referer || '';
+  const requestBody = JSON.stringify(req.body || {});
+
+  // Check for suspicious patterns
+  const combinedInput = `${userAgent} ${referer} ${requestBody}`;
+  
+  for (const pattern of suspiciousPatterns) {
+    if (pattern.test(combinedInput)) {
+      console.warn('Suspicious request detected:', {
+        ip: req.ip,
+        userAgent,
+        pattern: pattern.toString(),
+        path: req.path
+      });
+      
+      return res.status(400).json({ error: 'Bad request' });
+    }
+  }
+
+  // Check request size
+  const contentLength = parseInt(req.headers['content-length'] || '0');
+  if (contentLength > 10 * 1024 * 1024) { // 10MB limit
+    return res.status(413).json({ error: 'Request too large' });
+  }
+
+  next();
+};
+```
+
+```python Advanced Rate Limiting
+# middleware/rate_limiting.py
+import time
+import redis
+import hashlib
+import json
+from typing import Optional
+from fastapi import HTTPException, Request
+from functools import wraps
+
+class AdvancedRateLimiter:
+    def __init__(self):
+        self.redis_client = redis.Redis.from_url(os.getenv('REDIS_URL'))
+        self.default_window = 3600  # 1 hour
+        self.default_limit = 1000
+    
+    def get_key(self, request: Request, identifier: Optional[str] = None) -> str:
+        if identifier:
+            return f"rate_limit:{identifier}"
+        
+        # Use API key if available, otherwise IP
+        auth_header = request.headers.get('authorization', '')
+        if auth_header.startswith('Bearer '):
+            api_key = auth_header[7:]
+            hashed_key = hashlib.sha256(api_key.encode()).hexdigest()
+            return f"rate_limit:api_key:{hashed_key}"
+        
+        return f"rate_limit:ip:{request.client.host}"
+    
+    def is_rate_limited(
+        self, 
+        request: Request, 
+        limit: int = None, 
+        window: int = None,
+        identifier: Optional[str] = None
+    ) -> tuple[bool, dict]:
+        limit = limit or self.default_limit
+        window = window or self.default_window
+        
+        key = self.get_key(request, identifier)
+        now = int(time.time())
+        pipeline = self.redis_client.pipeline()
+        
+        # Remove old entries
+        pipeline.zremrangebyscore(key, 0, now - window)
+        
+        # Count current entries
+        pipeline.zcard(key)
+        
+        # Add current request
+        pipeline.zadd(key, {str(now): now})
+        
+        # Set expiration
+        pipeline.expire(key, window)
+        
+        results = pipeline.execute()
+        current_count = results[1]
+        
+        is_limited = current_count >= limit
+        remaining = max(0, limit - current_count)
+        reset_time = now + window
+        
+        return is_limited, {
+            'limit': limit,
+            'remaining': remaining,
+            'reset': reset_time,
+            'window': window
+        }
+    
+    def rate_limit(
+        self, 
+        limit: int = None, 
+        window: int = None,
+        identifier: Optional[str] = None
+    ):
+        def decorator(func):
+            @wraps(func)
+            async def wrapper(request: Request, *args, **kwargs):
+                is_limited, info = self.is_rate_limited(request, limit, window, identifier)
+                
+                if is_limited:
+                    raise HTTPException(
+                        status_code=429,
+                        detail={
+                            "error": "Rate limit exceeded",
+                            "retry_after": info['reset'] - int(time.time())
+                        },
+                        headers={
+                            "X-RateLimit-Limit": str(info['limit']),
+                            "X-RateLimit-Remaining": str(info['remaining']),
+                            "X-RateLimit-Reset": str(info['reset']),
+                            "Retry-After": str(info['reset'] - int(time.time()))
+                        }
+                    )
+                
+                return await func(request, *args, **kwargs)
+            return wrapper
+        return decorator
+
+# DDoS protection
+class DDoSProtection:
+    def __init__(self):
+        self.suspicious_patterns = [
+            r'union.*select',     # SQL injection
+            r'<script.*>',        # XSS
+            r'javascript:',       # Protocol injection
+            r'\.\.\/.*\.\.\/     # Path traversal
+        ]
+    
+    def check_suspicious_activity(self, request: Request) -> bool:
+        user_agent = request.headers.get('user-agent', '')
+        referer = request.headers.get('referer', '')
+        
+        # Get request body safely
+        try:
+            body_str = json.dumps(getattr(request, '_body', {}))
+        except:
+            body_str = ''
+        
+        combined_input = f"{user_agent} {referer} {body_str}".lower()
+        
+        for pattern in self.suspicious_patterns:
+            if re.search(pattern, combined_input, re.IGNORECASE):
+                return True
+        
+        return False
+    
+    def middleware(self):
+        async def ddos_protection_middleware(request: Request, call_next):
+            # Check for suspicious patterns
+            if self.check_suspicious_activity(request):
+                raise HTTPException(status_code=400, detail="Bad request")
+            
+            # Check request size
+            content_length = int(request.headers.get('content-length', 0))
+            if content_length > 10 * 1024 * 1024:  # 10MB limit
+                raise HTTPException(status_code=413, detail="Request too large")
+            
+            response = await call_next(request)
+            return response
+        
+        return ddos_protection_middleware
+
+rate_limiter = AdvancedRateLimiter()
+ddos_protection = DDoSProtection()
+```
+</CodeGroup>
+
+## Vulnerability Management
+
+### Security Scanning and Monitoring
+
+<CodeGroup>
+```javascript Security Scanner
+// utils/security-scanner.js
+import crypto from 'crypto';
+import { execSync } from 'child_process';
+
+class SecurityScanner {
+  constructor() {
+    this.vulnerabilityDatabase = new Map();
+    this.lastScan = null;
+  }
+
+  async scanDependencies() {
+    try {
+      // Run npm audit
+      const auditResult = execSync('npm audit --json', { encoding: 'utf8' });
+      const audit = JSON.parse(auditResult);
+      
+      // Check for high/critical vulnerabilities
+      const criticalVulns = audit.vulnerabilities
+        ? Object.values(audit.vulnerabilities).filter(
+            vuln => ['high', 'critical'].includes(vuln.severity)
+          )
+        : [];
+
+      if (criticalVulns.length > 0) {
+        await this.alertSecurityTeam('Critical vulnerabilities found', {
+          count: criticalVulns.length,
+          vulnerabilities: criticalVulns.map(v => ({
+            name: v.name,
+            severity: v.severity,
+            description: v.description
+          }))
+        });
+      }
+
+      this.lastScan = Date.now();
+      return {
+        total: audit.metadata?.vulnerabilities?.total || 0,
+        critical: criticalVulns.length,
+        scanned_at: new Date().toISOString()
+      };
+      
+    } catch (error) {
+      console.error('Dependency scan failed:', error);
+      throw error;
+    }
+  }
+
+  async scanSecrets() {
+    const secretPatterns = [
+      /(?:password|passwd|pwd)\s*[:=]\s*["']?([^"\s']+)/i,
+      /(?:secret|token|key)\s*[:=]\s*["']?([^"\s']+)/i,
+      /(?:api[_-]?key)\s*[:=]\s*["']?([^"\s']+)/i,
+      /sk_[a-zA-Z0-9]{32,}/,  // Tolstoy secret keys
+      /pk_[a-zA-Z0-9]{32,}/   // Tolstoy public keys
+    ];
+
+    const results = [];
+    const filesToScan = ['.env*', '*.js', '*.ts', '*.json', '*.yml', '*.yaml'];
+
+    for (const pattern of filesToScan) {
+      try {
+        const files = execSync(`find . -name "${pattern}" -not -path "./node_modules/*"`, 
+          { encoding: 'utf8' }).split('\n').filter(f => f);
+
+        for (const file of files) {
+          const content = await fs.readFile(file, 'utf8');
+          
+          for (const secretPattern of secretPatterns) {
+            const matches = content.match(secretPattern);
+            if (matches) {
+              results.push({
+                file,
+                pattern: secretPattern.toString(),
+                line: this.findLineNumber(content, matches[0])
+              });
+            }
+          }
+        }
+      } catch (error) {
+        console.warn(`Error scanning pattern ${pattern}:`, error.message);
+      }
+    }
+
+    if (results.length > 0) {
+      await this.alertSecurityTeam('Potential secrets found in code', {
+        findings: results
+      });
+    }
+
+    return results;
+  }
+
+  findLineNumber(content, match) {
+    const lines = content.substring(0, content.indexOf(match)).split('\n');
+    return lines.length;
+  }
+
+  async alertSecurityTeam(title, details) {
+    // Send security alert to designated channels
+    const alert = {
+      title,
+      details,
+      timestamp: new Date().toISOString(),
+      service: 'tolstoy-integration'
+    };
+
+    console.error('SECURITY ALERT:', alert);
+    
+    // Send to security monitoring system
+    if (process.env.SECURITY_WEBHOOK_URL) {
+      await fetch(process.env.SECURITY_WEBHOOK_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(alert)
+      });
+    }
+  }
+
+  async performSecurityScan() {
+    const results = {
+      timestamp: new Date().toISOString(),
+      dependencies: await this.scanDependencies(),
+      secrets: await this.scanSecrets(),
+      last_scan: this.lastScan
+    };
+
+    return results;
+  }
+}
+
+export default new SecurityScanner();
+```
+
+```yaml Security Scanning Pipeline
+# .github/workflows/security-scan.yml
+name: Security Scan
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Daily at 2 AM
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  security-scan:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run npm audit
+        run: npm audit --audit-level=moderate
+        continue-on-error: true
+      
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+      
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/init@v2
+        with:
+          languages: javascript
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+      
+      - name: Run Semgrep security scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+      
+      - name: Scan for secrets
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: main
+          head: HEAD
+      
+      - name: Upload security scan results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-scan-results
+          path: |
+            security-report.json
+            dependency-check-report.html
+```
+</CodeGroup>
+
+## Secure Configuration Management
+
+### Environment-Specific Security
+
+<CodeGroup>
+```javascript Secure Configuration
+// config/secure-config.js
+import fs from 'fs';
+import path from 'path';
+import { decrypt } from '../utils/encryption.js';
+
+class SecureConfig {
+  constructor() {
+    this.config = {};
+    this.sensitiveKeys = new Set([
+      'api_key', 'webhook_secret', 'database_password', 
+      'jwt_secret', 'encryption_key', 'oauth_client_secret'
+    ]);
+    
+    this.loadConfiguration();
+  }
+
+  loadConfiguration() {
+    const env = process.env.NODE_ENV || 'development';
+    const configPath = path.join(process.cwd(), 'config', `${env}.json`);
+    
+    if (fs.existsSync(configPath)) {
+      const rawConfig = fs.readFileSync(configPath, 'utf8');
+      const parsedConfig = JSON.parse(rawConfig);
+      
+      // Decrypt sensitive values
+      this.config = this.decryptSensitiveValues(parsedConfig);
+    }
+    
+    // Override with environment variables
+    this.mergeEnvironmentVariables();
+    
+    // Validate required configuration
+    this.validateRequiredConfig();
+  }
+
+  decryptSensitiveValues(config) {
+    const decrypted = { ...config };
+    
+    for (const [key, value] of Object.entries(config)) {
+      if (this.sensitiveKeys.has(key) && typeof value === 'string' && value.startsWith('encrypted:')) {
+        try {
+          decrypted[key] = decrypt(value.substring(10));
+        } catch (error) {
+          throw new Error(`Failed to decrypt configuration key: ${key}`);
+        }
+      }
+    }
+    
+    return decrypted;
+  }
+
+  mergeEnvironmentVariables() {
+    const envMappings = {
+      TOLSTOY_API_KEY: 'api_key',
+      TOLSTOY_WEBHOOK_SECRET: 'webhook_secret',
+      DATABASE_URL: 'database_url',
+      REDIS_URL: 'redis_url',
+      JWT_SECRET: 'jwt_secret'
+    };
+
+    for (const [envVar, configKey] of Object.entries(envMappings)) {
+      if (process.env[envVar]) {
+        this.config[configKey] = process.env[envVar];
+      }
+    }
+  }
+
+  validateRequiredConfig() {
+    const required = ['api_key', 'webhook_secret', 'database_url'];
+    const missing = required.filter(key => !this.config[key]);
+    
+    if (missing.length > 0) {
+      throw new Error(`Missing required configuration: ${missing.join(', ')}`);
+    }
+  }
+
+  get(key, defaultValue = null) {
+    return this.config[key] ?? defaultValue;
+  }
+
+  isSensitive(key) {
+    return this.sensitiveKeys.has(key);
+  }
+
+  // Safe logging - masks sensitive values
+  getSafeConfig() {
+    const safe = { ...this.config };
+    
+    for (const key of this.sensitiveKeys) {
+      if (safe[key]) {
+        safe[key] = this.maskValue(safe[key]);
+      }
+    }
+    
+    return safe;
+  }
+
+  maskValue(value) {
+    if (typeof value !== 'string' || value.length < 8) {
+      return '***';
+    }
+    return value.substring(0, 4) + '***' + value.substring(value.length - 4);
+  }
+}
+
+export default new SecureConfig();
+```
+</CodeGroup>
+
+## Security Monitoring and Incident Response
+
+### Security Event Detection
+
+<CodeGroup>
+```javascript Security Event Monitor
+// utils/security-monitor.js
+import crypto from 'crypto';
+
+class SecurityMonitor {
+  constructor() {
+    this.events = [];
+    this.threatThresholds = {
+      failed_auth_attempts: 5,
+      suspicious_patterns: 3,
+      rate_limit_violations: 10,
+      unusual_access_patterns: 5
+    };
+    
+    this.alertChannels = [
+      process.env.SECURITY_SLACK_WEBHOOK,
+      process.env.SECURITY_EMAIL_ENDPOINT
+    ].filter(Boolean);
+  }
+
+  logSecurityEvent(eventType, details, severity = 'medium') {
+    const event = {
+      id: crypto.randomUUID(),
+      type: eventType,
+      severity,
+      details,
+      timestamp: new Date().toISOString(),
+      source_ip: details.ip,
+      user_agent: details.userAgent
+    };
+
+    this.events.push(event);
+    
+    // Keep only last 1000 events in memory
+    if (this.events.length > 1000) {
+      this.events = this.events.slice(-1000);
+    }
+
+    // Check for patterns and trigger alerts
+    this.analyzeSecurityPatterns(event);
+    
+    // Log to security monitoring system
+    console.log('SECURITY_EVENT:', JSON.stringify(event));
+    
+    return event;
+  }
+
+  analyzeSecurityPatterns(newEvent) {
+    const recentWindow = 5 * 60 * 1000; // 5 minutes
+    const now = Date.now();
+    
+    const recentEvents = this.events.filter(
+      event => now - new Date(event.timestamp).getTime() < recentWindow
+    );
+
+    // Check for multiple failed auth attempts from same IP
+    const failedAuths = recentEvents.filter(
+      event => event.type === 'auth_failure' && 
+               event.source_ip === newEvent.source_ip
+    );
+
+    if (failedAuths.length >= this.threatThresholds.failed_auth_attempts) {
+      this.triggerSecurityAlert('Brute force attack detected', {
+        ip: newEvent.source_ip,
+        attempts: failedAuths.length,
+        timeframe: '5 minutes'
+      });
+    }
+
+    // Check for suspicious user agent patterns
+    const suspiciousAgents = recentEvents.filter(
+      event => this.isSuspiciousUserAgent(event.details.userAgent)
+    );
+
+    if (suspiciousAgents.length >= this.threatThresholds.suspicious_patterns) {
+      this.triggerSecurityAlert('Suspicious user agent activity', {
+        patterns: suspiciousAgents.map(e => e.details.userAgent),
+        count: suspiciousAgents.length
+      });
+    }
+
+    // Check for rate limit violations
+    const rateLimitViolations = recentEvents.filter(
+      event => event.type === 'rate_limit_exceeded'
+    );
+
+    if (rateLimitViolations.length >= this.threatThresholds.rate_limit_violations) {
+      this.triggerSecurityAlert('Excessive rate limit violations', {
+        violations: rateLimitViolations.length,
+        sources: [...new Set(rateLimitViolations.map(e => e.source_ip))]
+      });
+    }
+  }
+
+  isSuspiciousUserAgent(userAgent) {
+    const suspiciousPatterns = [
+      /bot/i,
+      /crawler/i,
+      /scanner/i,
+      /sqlmap/i,
+      /nmap/i,
+      /masscan/i,
+      /^$/  // Empty user agent
+    ];
+
+    return suspiciousPatterns.some(pattern => pattern.test(userAgent || ''));
+  }
+
+  async triggerSecurityAlert(title, details) {
+    const alert = {
+      title,
+      details,
+      timestamp: new Date().toISOString(),
+      service: 'tolstoy-integration',
+      severity: 'high'
+    };
+
+    console.error('SECURITY ALERT:', alert);
+
+    // Send to all configured alert channels
+    for (const channel of this.alertChannels) {
+      try {
+        await this.sendAlert(channel, alert);
+      } catch (error) {
+        console.error('Failed to send security alert:', error);
+      }
+    }
+  }
+
+  async sendAlert(webhookUrl, alert) {
+    await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: `🚨 Security Alert: ${alert.title}`,
+        attachments: [{
+          color: 'danger',
+          fields: [
+            { title: 'Service', value: alert.service, short: true },
+            { title: 'Severity', value: alert.severity, short: true },
+            { title: 'Timestamp', value: alert.timestamp, short: true },
+            { title: 'Details', value: JSON.stringify(alert.details, null, 2) }
+          ]
+        }]
+      })
+    });
+  }
+
+  getSecurityMetrics() {
+    const now = Date.now();
+    const last24h = this.events.filter(
+      event => now - new Date(event.timestamp).getTime() < 24 * 60 * 60 * 1000
+    );
+
+    return {
+      total_events_24h: last24h.length,
+      events_by_type: this.groupBy(last24h, 'type'),
+      events_by_severity: this.groupBy(last24h, 'severity'),
+      unique_ips: new Set(last24h.map(e => e.source_ip)).size,
+      last_scan: this.lastScan
+    };
+  }
+
+  groupBy(array, key) {
+    return array.reduce((result, item) => {
+      const group = item[key];
+      result[group] = (result[group] || 0) + 1;
+      return result;
+    }, {});
+  }
+}
+
+export default new SecurityMonitor();
+```
+</CodeGroup>
+
+### Incident Response Automation
+
+<CodeGroup>
+```javascript Incident Response
+// utils/incident-response.js
+class IncidentResponse {
+  constructor() {
+    this.activeIncidents = new Map();
+    this.responsePlaybooks = {
+      'brute_force_attack': this.handleBruteForceAttack.bind(this),
+      'data_breach_suspected': this.handleDataBreachSuspected.bind(this),
+      'ddos_attack': this.handleDDoSAttack.bind(this),
+      'unauthorized_access': this.handleUnauthorizedAccess.bind(this)
+    };
+  }
+
+  async triggerIncident(incidentType, details) {
+    const incident = {
+      id: crypto.randomUUID(),
+      type: incidentType,
+      status: 'active',
+      details,
+      created_at: new Date().toISOString(),
+      actions_taken: []
+    };
+
+    this.activeIncidents.set(incident.id, incident);
+
+    // Execute automated response
+    const playbook = this.responsePlaybooks[incidentType];
+    if (playbook) {
+      await playbook(incident);
+    }
+
+    // Notify security team
+    await this.notifySecurityTeam(incident);
+
+    return incident;
+  }
+
+  async handleBruteForceAttack(incident) {
+    const { ip } = incident.details;
+    
+    // Immediately block the IP
+    await this.blockIP(ip, '1 hour');
+    incident.actions_taken.push(`Blocked IP ${ip} for 1 hour`);
+
+    // Increase rate limiting for this IP
+    await this.adjustRateLimit(ip, 'strict');
+    incident.actions_taken.push(`Applied strict rate limiting to IP ${ip}`);
+
+    // Check if this IP has attacked before
+    const history = await this.getIPHistory(ip);
+    if (history.previous_incidents > 2) {
+      await this.blockIP(ip, '24 hours');
+      incident.actions_taken.push(`Extended block to 24 hours due to repeat offenses`);
+    }
+  }
+
+  async handleDataBreachSuspected(incident) {
+    // Immediately revoke all API keys for affected organization
+    const { organization_id } = incident.details;
+    
+    await this.revokeOrganizationAPIKeys(organization_id);
+    incident.actions_taken.push(`Revoked all API keys for organization ${organization_id}`);
+
+    // Enable enhanced logging
+    await this.enableEnhancedLogging(organization_id);
+    incident.actions_taken.push('Enabled enhanced security logging');
+
+    // Notify organization admin
+    await this.notifyOrganizationAdmin(organization_id, incident);
+    incident.actions_taken.push('Notified organization administrator');
+  }
+
+  async handleDDoSAttack(incident) {
+    // Enable DDoS protection mode
+    await this.enableDDoSProtection();
+    incident.actions_taken.push('Enabled DDoS protection mode');
+
+    // Scale up infrastructure
+    await this.scaleUpInfrastructure();
+    incident.actions_taken.push('Scaled up infrastructure');
+
+    // Contact CDN provider for additional protection
+    await this.requestCDNProtection(incident.details);
+    incident.actions_taken.push('Requested CDN-level DDoS protection');
+  }
+
+  async handleUnauthorizedAccess(incident) {
+    const { user_id, organization_id } = incident.details;
+    
+    // Suspend user account
+    await this.suspendUser(user_id);
+    incident.actions_taken.push(`Suspended user account ${user_id}`);
+
+    // Force password reset
+    await this.forcePasswordReset(user_id);
+    incident.actions_taken.push('Initiated forced password reset');
+
+    // Audit user's recent activity
+    const activity = await this.auditUserActivity(user_id, '24 hours');
+    incident.actions_taken.push(`Audited user activity: ${activity.summary}`);
+  }
+
+  async blockIP(ip, duration) {
+    // Implementation depends on your infrastructure
+    // This could use iptables, cloud provider APIs, or load balancer rules
+    console.log(`Blocking IP ${ip} for ${duration}`);
+  }
+
+  async notifySecurityTeam(incident) {
+    const message = {
+      text: `🚨 Security Incident: ${incident.type}`,
+      attachments: [{
+        color: 'danger',
+        fields: [
+          { title: 'Incident ID', value: incident.id, short: true },
+          { title: 'Type', value: incident.type, short: true },
+          { title: 'Status', value: incident.status, short: true },
+          { title: 'Created', value: incident.created_at, short: true },
+          { title: 'Details', value: JSON.stringify(incident.details, null, 2) },
+          { title: 'Actions Taken', value: incident.actions_taken.join('\n') }
+        ]
+      }]
+    };
+
+    // Send to security team Slack channel
+    if (process.env.SECURITY_SLACK_WEBHOOK) {
+      await fetch(process.env.SECURITY_SLACK_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(message)
+      });
+    }
+  }
+}
+
+export default new IncidentResponse();
+```
+</CodeGroup>
+
+## Compliance and Auditing
+
+### Audit Logging
+
+<CodeGroup>
+```javascript Comprehensive Audit Logging
+// utils/audit-logger.js
+class AuditLogger {
+  constructor() {
+    this.auditQueue = [];
+    this.batchSize = 100;
+    this.flushInterval = 30000; // 30 seconds
+    
+    // Start batch processing
+    setInterval(() => this.flushAuditQueue(), this.flushInterval);
+  }
+
+  logAuditEvent(action, resource, user, details = {}) {
+    const auditEvent = {
+      id: crypto.randomUUID(),
+      timestamp: new Date().toISOString(),
+      action,
+      resource: {
+        type: resource.type,
+        id: resource.id,
+        organization_id: resource.organization_id
+      },
+      user: {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        organization_id: user.organization_id
+      },
+      details: {
+        ip_address: details.ip,
+        user_agent: details.userAgent,
+        request_id: details.requestId,
+        changes: details.changes || null,
+        metadata: details.metadata || {}
+      },
+      compliance: {
+        gdpr_applicable: this.isGDPRApplicable(user, resource),
+        sox_applicable: this.isSOXApplicable(resource),
+        retention_period: this.getRetentionPeriod(action, resource)
+      }
+    };
+
+    this.auditQueue.push(auditEvent);
+
+    // Immediate flush for critical events
+    if (this.isCriticalEvent(action)) {
+      this.flushAuditQueue();
+    }
+
+    return auditEvent.id;
+  }
+
+  async flushAuditQueue() {
+    if (this.auditQueue.length === 0) return;
+
+    const batch = this.auditQueue.splice(0, this.batchSize);
+    
+    try {
+      // Store in database
+      await this.storeBatchInDatabase(batch);
+      
+      // Send to external audit system
+      await this.sendToExternalAuditSystem(batch);
+      
+      console.log(`Flushed ${batch.length} audit events`);
+    } catch (error) {
+      console.error('Failed to flush audit queue:', error);
+      
+      // Re-queue failed events
+      this.auditQueue.unshift(...batch);
+    }
+  }
+
+  async storeBatchInDatabase(events) {
+    const query = `
+      INSERT INTO audit_log (
+        id, timestamp, action, resource_type, resource_id, 
+        user_id, user_email, ip_address, user_agent, 
+        changes, metadata, compliance_flags
+      ) VALUES ${events.map((_, i) => `($${i * 12 + 1}, $${i * 12 + 2}, $${i * 12 + 3}, $${i * 12 + 4}, $${i * 12 + 5}, $${i * 12 + 6}, $${i * 12 + 7}, $${i * 12 + 8}, $${i * 12 + 9}, $${i * 12 + 10}, $${i * 12 + 11}, $${i * 12 + 12})`).join(', ')}
+    `;
+
+    const params = events.flatMap(event => [
+      event.id,
+      event.timestamp,
+      event.action,
+      event.resource.type,
+      event.resource.id,
+      event.user.id,
+      event.user.email,
+      event.details.ip_address,
+      event.details.user_agent,
+      JSON.stringify(event.details.changes),
+      JSON.stringify(event.details.metadata),
+      JSON.stringify(event.compliance)
+    ]);
+
+    await pool.query(query, params);
+  }
+
+  isCriticalEvent(action) {
+    const criticalActions = [
+      'api_key.delete',
+      'user.delete',
+      'organization.delete',
+      'webhook.signature_failure',
+      'auth.multiple_failures'
+    ];
+    
+    return criticalActions.includes(action);
+  }
+
+  isGDPRApplicable(user, resource) {
+    // Check if user or resource is in EU/EEA
+    const euCountries = ['DE', 'FR', 'IT', 'ES', 'NL', 'BE', 'AT', 'IE'];
+    return euCountries.includes(user.country) || 
+           euCountries.includes(resource.country);
+  }
+
+  isSOXApplicable(resource) {
+    // Check if resource affects financial reporting
+    const financialResourceTypes = ['billing', 'subscription', 'payment'];
+    return financialResourceTypes.includes(resource.type);
+  }
+
+  getRetentionPeriod(action, resource) {
+    // Different retention periods based on compliance requirements
+    if (this.isSOXApplicable(resource)) return '7 years';
+    if (action.includes('delete')) return '10 years';
+    return '3 years';
+  }
+
+  async generateComplianceReport(startDate, endDate, organizationId) {
+    const query = `
+      SELECT 
+        action,
+        resource_type,
+        COUNT(*) as event_count,
+        array_agg(DISTINCT user_email) as users,
+        MIN(timestamp) as first_event,
+        MAX(timestamp) as last_event
+      FROM audit_log 
+      WHERE timestamp BETWEEN $1 AND $2
+        AND (compliance_flags->>'gdpr_applicable')::boolean = true
+        AND resource_id IN (
+          SELECT id FROM workflows WHERE organization_id = $3
+        )
+      GROUP BY action, resource_type
+      ORDER BY event_count DESC
+    `;
+
+    const result = await pool.query(query, [startDate, endDate, organizationId]);
+    
+    return {
+      organization_id: organizationId,
+      period: { start: startDate, end: endDate },
+      events: result.rows,
+      generated_at: new Date().toISOString(),
+      compliance_standards: ['GDPR', 'SOX', 'SOC2']
+    };
+  }
+}
+
+export default new AuditLogger();
+```
+</CodeGroup>
+
+## Security Testing
+
+### Penetration Testing Scripts
+
+<CodeGroup>
+```javascript Security Tests
+// tests/security/penetration-tests.js
+describe('Security Penetration Tests', () => {
+  
+  test('should prevent SQL injection attacks', async () => {
+    const maliciousInputs = [
+      "'; DROP TABLE workflows; --",
+      "1' OR '1'='1",
+      "admin'/**/OR/**/1=1#",
+      "' UNION SELECT password FROM users --"
+    ];
+
+    for (const input of maliciousInputs) {
+      const response = await request(app)
+        .post('/api/workflows')
+        .set('Authorization', `Bearer ${testApiKey}`)
+        .send({
+          name: input,
+          trigger: { type: 'manual' },
+          actions: [{ type: 'log', config: { message: 'test' } }]
+        });
+
+      // Should either reject with validation error or sanitize input
+      expect([400, 422]).toContain(response.status);
+    }
+  });
+
+  test('should prevent XSS attacks', async () => {
+    const xssPayloads = [
+      "<script>alert('xss')</script>",
+      "javascript:alert('xss')",
+      "<img src=x onerror=alert('xss')>",
+      "';alert(String.fromCharCode(88,83,83))//';alert(String.fromCharCode(88,83,83))//"
+    ];
+
+    for (const payload of xssPayloads) {
+      const response = await request(app)
+        .post('/api/workflows')
+        .set('Authorization', `Bearer ${testApiKey}`)
+        .send({
+          name: payload,
+          description: payload,
+          trigger: { type: 'manual' },
+          actions: [{ type: 'log', config: { message: payload } }]
+        });
+
+      // Should sanitize or reject XSS attempts
+      if (response.status === 201) {
+        expect(response.body.name).not.toContain('<script>');
+        expect(response.body.description).not.toContain('<script>');
+      }
+    }
+  });
+
+  test('should prevent unauthorized access', async () => {
+    // Test without API key
+    let response = await request(app)
+      .get('/api/workflows');
+    expect(response.status).toBe(401);
+
+    // Test with invalid API key
+    response = await request(app)
+      .get('/api/workflows')
+      .set('Authorization', 'Bearer invalid_key');
+    expect(response.status).toBe(401);
+
+    // Test with expired API key
+    response = await request(app)
+      .get('/api/workflows')
+      .set('Authorization', 'Bearer expired_key');
+    expect(response.status).toBe(401);
+  });
+
+  test('should prevent privilege escalation', async () => {
+    // Create limited user API key
+    const limitedUserKey = await createTestUser('viewer');
+
+    // Attempt to perform admin action
+    const response = await request(app)
+      .delete('/api/workflows/wf_123')
+      .set('Authorization', `Bearer ${limitedUserKey}`);
+    
+    expect(response.status).toBe(403);
+  });
+
+  test('should handle webhook signature spoofing', async () => {
+    const payload = { event: 'test', data: {} };
+    
+    // Test without signature
+    let response = await request(app)
+      .post('/webhooks/tolstoy')
+      .send(payload);
+    expect(response.status).toBe(401);
+
+    // Test with invalid signature
+    response = await request(app)
+      .post('/webhooks/tolstoy')
+      .set('tolstoy-signature', 'sha256=invalid')
+      .set('tolstoy-timestamp', Math.floor(Date.now() / 1000).toString())
+      .send(payload);
+    expect(response.status).toBe(401);
+
+    // Test with old timestamp (replay attack)
+    const oldTimestamp = Math.floor((Date.now() - 10 * 60 * 1000) / 1000);
+    const validSignature = generateValidSignature(payload, oldTimestamp);
+    
+    response = await request(app)
+      .post('/webhooks/tolstoy')
+      .set('tolstoy-signature', validSignature)
+      .set('tolstoy-timestamp', oldTimestamp.toString())
+      .send(payload);
+    expect(response.status).toBe(401);
+  });
+});
+```
+</CodeGroup>
+
+## Security Checklist
+
+### 🛡️ Authentication & Authorization
+- [ ] API keys stored securely (never in code)
+- [ ] API key rotation implemented
+- [ ] Strong authentication mechanisms
+- [ ] Role-based access control (RBAC)
+- [ ] Session management security
+- [ ] Multi-factor authentication (where applicable)
+
+### 🔐 Data Protection
+- [ ] Encryption at rest for sensitive data
+- [ ] Encryption in transit (HTTPS/TLS)
+- [ ] Secure key management
+- [ ] Data classification and handling procedures
+- [ ] PII data protection measures
+- [ ] Secure data deletion procedures
+
+### 🌐 Network Security
+- [ ] HTTPS enforcement
+- [ ] Proper CORS configuration
+- [ ] Security headers implemented
+- [ ] Network segmentation
+- [ ] Firewall rules configured
+- [ ] VPN access for admin functions
+
+### 🔍 Monitoring & Logging
+- [ ] Security event logging
+- [ ] Audit trail implementation
+- [ ] Real-time threat detection
+- [ ] Security metrics collection
+- [ ] Incident response procedures
+- [ ] Log retention policies
+
+### 🚨 Threat Protection
+- [ ] Input validation and sanitization
+- [ ] SQL injection prevention
+- [ ] XSS protection
+- [ ] CSRF protection
+- [ ] Rate limiting implemented
+- [ ] DDoS protection measures
+
+### 📋 Compliance
+- [ ] GDPR compliance (if applicable)
+- [ ] SOX compliance (if applicable)
+- [ ] SOC2 Type II certification
+- [ ] Data residency requirements
+- [ ] Privacy policy implementation
+- [ ] Regular compliance audits
+
+## Security Resources
+
+### Emergency Contacts
+
+```
+Security Team: security@yourcompany.com
+Incident Response: +1-800-SECURITY
+Tolstoy Security: security@tolstoy.com
+```
+
+### Security Tools and Services
+
+- **Vulnerability Scanning**: Snyk, OWASP ZAP, Nessus
+- **SIEM/SOAR**: Splunk, Elastic Security, Chronicle
+- **WAF**: Cloudflare, AWS WAF, ModSecurity
+- **Secret Management**: HashiCorp Vault, AWS Secrets Manager, Azure Key Vault
+- **Compliance**: Vanta, Drata, Strike Graph
+
+For ongoing security maintenance, see our [Monitoring Guide](/api/guides/monitoring) and [Troubleshooting Guide](/api/guides/troubleshooting).

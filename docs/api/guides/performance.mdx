@@ -1,0 +1,2667 @@
+---
+title: 'Performance Optimization'
+description: 'Comprehensive guide to optimizing Tolstoy API integration performance with caching, batching, and scaling strategies'
+---
+
+# Performance Optimization
+
+Optimizing your Tolstoy API integration performance ensures fast response times, efficient resource usage, and excellent user experience. This guide covers proven strategies for maximizing performance.
+
+## Performance Fundamentals
+
+### Key Performance Metrics
+
+| Metric | Target | Description |
+|--------|--------|-------------|
+| **Response Time** | < 200ms (P95) | Time from request to response |
+| **Throughput** | > 1000 RPS | Requests processed per second |
+| **Error Rate** | < 0.1% | Percentage of failed requests |
+| **Resource Usage** | < 70% | CPU and memory utilization |
+
+### Performance Monitoring Setup
+
+<CodeGroup>
+```javascript Performance Monitoring
+// utils/performance-monitor.js
+import { performance, PerformanceObserver } from 'perf_hooks';
+
+class PerformanceMonitor {
+  constructor() {
+    this.metrics = {
+      apiCalls: new Map(),
+      databaseQueries: new Map(),
+      cacheHits: 0,
+      cacheMisses: 0,
+      totalRequests: 0
+    };
+    
+    this.setupPerformanceObserver();
+  }
+
+  setupPerformanceObserver() {
+    const obs = new PerformanceObserver((list) => {
+      for (const entry of list.getEntries()) {
+        this.recordMetric(entry.name, entry.duration);
+      }
+    });
+    
+    obs.observe({ entryTypes: ['measure'] });
+  }
+
+  startTimer(name) {
+    performance.mark(`${name}-start`);
+    return name;
+  }
+
+  endTimer(name) {
+    performance.mark(`${name}-end`);
+    performance.measure(name, `${name}-start`, `${name}-end`);
+  }
+
+  recordMetric(name, duration) {
+    if (!this.metrics.apiCalls.has(name)) {
+      this.metrics.apiCalls.set(name, {
+        count: 0,
+        totalDuration: 0,
+        minDuration: Infinity,
+        maxDuration: 0,
+        p95Duration: []
+      });
+    }
+
+    const metric = this.metrics.apiCalls.get(name);
+    metric.count++;
+    metric.totalDuration += duration;
+    metric.minDuration = Math.min(metric.minDuration, duration);
+    metric.maxDuration = Math.max(metric.maxDuration, duration);
+    metric.p95Duration.push(duration);
+    
+    // Keep only last 1000 measurements for P95 calculation
+    if (metric.p95Duration.length > 1000) {
+      metric.p95Duration = metric.p95Duration.slice(-1000);
+    }
+  }
+
+  getMetrics() {
+    const processedMetrics = {};
+    
+    for (const [name, metric] of this.metrics.apiCalls.entries()) {
+      const sorted = [...metric.p95Duration].sort((a, b) => a - b);
+      const p95Index = Math.floor(sorted.length * 0.95);
+      
+      processedMetrics[name] = {
+        count: metric.count,
+        avgDuration: metric.totalDuration / metric.count,
+        minDuration: metric.minDuration,
+        maxDuration: metric.maxDuration,
+        p95Duration: sorted[p95Index] || 0
+      };
+    }
+
+    return {
+      apiCalls: processedMetrics,
+      cacheHitRate: this.metrics.cacheHits / (this.metrics.cacheHits + this.metrics.cacheMisses),
+      totalRequests: this.metrics.totalRequests,
+      memoryUsage: process.memoryUsage(),
+      uptime: process.uptime()
+    };
+  }
+
+  recordCacheHit() {
+    this.metrics.cacheHits++;
+  }
+
+  recordCacheMiss() {
+    this.metrics.cacheMisses++;
+  }
+
+  recordRequest() {
+    this.metrics.totalRequests++;
+  }
+}
+
+export default new PerformanceMonitor();
+```
+
+```python Performance Monitoring
+# utils/performance_monitor.py
+import time
+import statistics
+from collections import defaultdict, deque
+from contextlib import contextmanager
+from typing import Dict, Any, Optional
+
+class PerformanceMonitor:
+    def __init__(self):
+        self.metrics = {
+            'api_calls': defaultdict(lambda: {
+                'count': 0,
+                'total_duration': 0,
+                'min_duration': float('inf'),
+                'max_duration': 0,
+                'durations': deque(maxlen=1000)  # Keep last 1000 for percentiles
+            }),
+            'cache_hits': 0,
+            'cache_misses': 0,
+            'total_requests': 0
+        }
+    
+    @contextmanager
+    def timer(self, name: str):
+        start_time = time.perf_counter()
+        try:
+            yield
+        finally:
+            duration = (time.perf_counter() - start_time) * 1000  # Convert to ms
+            self.record_metric(name, duration)
+    
+    def record_metric(self, name: str, duration: float):
+        metric = self.metrics['api_calls'][name]
+        metric['count'] += 1
+        metric['total_duration'] += duration
+        metric['min_duration'] = min(metric['min_duration'], duration)
+        metric['max_duration'] = max(metric['max_duration'], duration)
+        metric['durations'].append(duration)
+    
+    def get_metrics(self) -> Dict[str, Any]:
+        processed_metrics = {}
+        
+        for name, metric in self.metrics['api_calls'].items():
+            durations = list(metric['durations'])
+            
+            processed_metrics[name] = {
+                'count': metric['count'],
+                'avg_duration': metric['total_duration'] / metric['count'] if metric['count'] > 0 else 0,
+                'min_duration': metric['min_duration'] if metric['min_duration'] != float('inf') else 0,
+                'max_duration': metric['max_duration'],
+                'p95_duration': statistics.quantiles(durations, n=20)[18] if len(durations) >= 20 else 0,
+                'p99_duration': statistics.quantiles(durations, n=100)[98] if len(durations) >= 100 else 0
+            }
+        
+        cache_total = self.metrics['cache_hits'] + self.metrics['cache_misses']
+        cache_hit_rate = self.metrics['cache_hits'] / cache_total if cache_total > 0 else 0
+        
+        return {
+            'api_calls': processed_metrics,
+            'cache_hit_rate': cache_hit_rate,
+            'total_requests': self.metrics['total_requests'],
+            'memory_usage': self.get_memory_usage(),
+            'timestamp': time.time()
+        }
+    
+    def record_cache_hit(self):
+        self.metrics['cache_hits'] += 1
+    
+    def record_cache_miss(self):
+        self.metrics['cache_misses'] += 1
+    
+    def record_request(self):
+        self.metrics['total_requests'] += 1
+    
+    def get_memory_usage(self) -> Dict[str, Any]:
+        import psutil
+        process = psutil.Process()
+        memory_info = process.memory_info()
+        
+        return {
+            'rss': memory_info.rss,
+            'vms': memory_info.vms,
+            'percent': process.memory_percent(),
+            'available': psutil.virtual_memory().available
+        }
+
+performance_monitor = PerformanceMonitor()
+```
+</CodeGroup>
+
+## API Request Optimization
+
+### Request Batching and Bulk Operations
+
+<CodeGroup>
+```javascript Request Batching
+// utils/batch-processor.js
+class BatchProcessor {
+  constructor(maxBatchSize = 50, maxWaitTime = 1000) {
+    this.maxBatchSize = maxBatchSize;
+    this.maxWaitTime = maxWaitTime;
+    this.queues = new Map();
+  }
+
+  async batchRequest(operation, item, batchKey = 'default') {
+    return new Promise((resolve, reject) => {
+      if (!this.queues.has(batchKey)) {
+        this.queues.set(batchKey, {
+          items: [],
+          promises: [],
+          timer: null
+        });
+      }
+
+      const queue = this.queues.get(batchKey);
+      queue.items.push(item);
+      queue.promises.push({ resolve, reject });
+
+      // Clear existing timer
+      if (queue.timer) {
+        clearTimeout(queue.timer);
+      }
+
+      // Process batch if full or after timeout
+      if (queue.items.length >= this.maxBatchSize) {
+        this.processBatch(operation, batchKey);
+      } else {
+        queue.timer = setTimeout(() => {
+          this.processBatch(operation, batchKey);
+        }, this.maxWaitTime);
+      }
+    });
+  }
+
+  async processBatch(operation, batchKey) {
+    const queue = this.queues.get(batchKey);
+    if (!queue || queue.items.length === 0) return;
+
+    const { items, promises } = queue;
+    
+    // Reset queue
+    this.queues.set(batchKey, {
+      items: [],
+      promises: [],
+      timer: null
+    });
+
+    try {
+      const results = await operation(items);
+      
+      // Resolve all promises with their respective results
+      promises.forEach((promise, index) => {
+        promise.resolve(results[index]);
+      });
+    } catch (error) {
+      // Reject all promises with the error
+      promises.forEach(promise => {
+        promise.reject(error);
+      });
+    }
+  }
+
+  // Batch workflow creation
+  async createWorkflowsBatch(workflows) {
+    const timer = performanceMonitor.startTimer('batch-create-workflows');
+    
+    try {
+      const response = await fetch('https://api.tolstoy.com/v1/workflows/batch', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ workflows })
+      });
+
+      const results = await response.json();
+      return results.data;
+    } finally {
+      performanceMonitor.endTimer(timer);
+    }
+  }
+
+  // Usage
+  async createWorkflow(workflowData) {
+    return this.batchRequest(
+      this.createWorkflowsBatch.bind(this),
+      workflowData,
+      'workflows'
+    );
+  }
+}
+
+export default new BatchProcessor();
+```
+
+```python Request Batching
+# utils/batch_processor.py
+import asyncio
+import time
+from typing import List, Dict, Any, Callable, Optional
+from collections import defaultdict
+
+class BatchProcessor:
+    def __init__(self, max_batch_size: int = 50, max_wait_time: float = 1.0):
+        self.max_batch_size = max_batch_size
+        self.max_wait_time = max_wait_time
+        self.queues = defaultdict(lambda: {
+            'items': [],
+            'futures': [],
+            'timer': None
+        })
+    
+    async def batch_request(
+        self, 
+        operation: Callable, 
+        item: Any, 
+        batch_key: str = 'default'
+    ) -> Any:
+        loop = asyncio.get_event_loop()
+        future = loop.create_future()
+        
+        queue = self.queues[batch_key]
+        queue['items'].append(item)
+        queue['futures'].append(future)
+        
+        # Cancel existing timer
+        if queue['timer']:
+            queue['timer'].cancel()
+        
+        # Process batch if full or after timeout
+        if len(queue['items']) >= self.max_batch_size:
+            await self.process_batch(operation, batch_key)
+        else:
+            queue['timer'] = asyncio.create_task(
+                self.delayed_process(operation, batch_key)
+            )
+        
+        return await future
+    
+    async def delayed_process(self, operation: Callable, batch_key: str):
+        await asyncio.sleep(self.max_wait_time)
+        await self.process_batch(operation, batch_key)
+    
+    async def process_batch(self, operation: Callable, batch_key: str):
+        queue = self.queues[batch_key]
+        
+        if not queue['items']:
+            return
+        
+        items = queue['items'].copy()
+        futures = queue['futures'].copy()
+        
+        # Reset queue
+        queue['items'].clear()
+        queue['futures'].clear()
+        if queue['timer']:
+            queue['timer'].cancel()
+            queue['timer'] = None
+        
+        try:
+            results = await operation(items)
+            
+            # Resolve all futures with their respective results
+            for future, result in zip(futures, results):
+                if not future.done():
+                    future.set_result(result)
+        
+        except Exception as error:
+            # Reject all futures with the error
+            for future in futures:
+                if not future.done():
+                    future.set_exception(error)
+    
+    async def create_workflows_batch(self, workflows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        with performance_monitor.timer('batch-create-workflows'):
+            async with aiohttp.ClientSession() as session:
+                headers = {
+                    'Authorization': f'Bearer {api_key}',
+                    'Content-Type': 'application/json'
+                }
+                
+                async with session.post(
+                    'https://api.tolstoy.com/v1/workflows/batch',
+                    headers=headers,
+                    json={'workflows': workflows}
+                ) as response:
+                    result = await response.json()
+                    return result['data']
+    
+    async def create_workflow(self, workflow_data: Dict[str, Any]) -> Dict[str, Any]:
+        return await self.batch_request(
+            self.create_workflows_batch,
+            workflow_data,
+            'workflows'
+        )
+
+batch_processor = BatchProcessor()
+```
+</CodeGroup>
+
+## Caching Strategies
+
+### Multi-Layer Caching
+
+<CodeGroup>
+```javascript Advanced Caching
+// utils/cache-manager.js
+import Redis from 'ioredis';
+import LRU from 'lru-cache';
+
+class CacheManager {
+  constructor() {
+    // L1 Cache: In-memory LRU cache
+    this.l1Cache = new LRU({
+      max: 1000,
+      ttl: 5 * 60 * 1000, // 5 minutes
+      updateAgeOnGet: true
+    });
+
+    // L2 Cache: Redis distributed cache
+    this.l2Cache = new Redis(process.env.REDIS_URL, {
+      retryDelayOnFailover: 100,
+      maxRetriesPerRequest: 3,
+      lazyConnect: true
+    });
+
+    this.defaultTtl = 10 * 60; // 10 minutes
+    this.shortTtl = 2 * 60;    // 2 minutes
+    this.longTtl = 60 * 60;    // 1 hour
+  }
+
+  async get(key, options = {}) {
+    const { useL1 = true, useL2 = true } = options;
+    
+    // Try L1 cache first
+    if (useL1) {
+      const l1Value = this.l1Cache.get(key);
+      if (l1Value !== undefined) {
+        performanceMonitor.recordCacheHit();
+        return l1Value;
+      }
+    }
+
+    // Try L2 cache
+    if (useL2) {
+      try {
+        const l2Value = await this.l2Cache.get(key);
+        if (l2Value) {
+          const parsed = JSON.parse(l2Value);
+          
+          // Populate L1 cache
+          if (useL1) {
+            this.l1Cache.set(key, parsed);
+          }
+          
+          performanceMonitor.recordCacheHit();
+          return parsed;
+        }
+      } catch (error) {
+        console.warn('L2 cache error:', error);
+      }
+    }
+
+    performanceMonitor.recordCacheMiss();
+    return null;
+  }
+
+  async set(key, value, ttl = this.defaultTtl, options = {}) {
+    const { useL1 = true, useL2 = true } = options;
+
+    // Set in L1 cache
+    if (useL1) {
+      this.l1Cache.set(key, value, { ttl: ttl * 1000 });
+    }
+
+    // Set in L2 cache
+    if (useL2) {
+      try {
+        await this.l2Cache.setex(key, ttl, JSON.stringify(value));
+      } catch (error) {
+        console.warn('L2 cache set error:', error);
+      }
+    }
+  }
+
+  async del(key) {
+    this.l1Cache.delete(key);
+    
+    try {
+      await this.l2Cache.del(key);
+    } catch (error) {
+      console.warn('L2 cache delete error:', error);
+    }
+  }
+
+  async mget(keys) {
+    const results = new Map();
+    const missingKeys = [];
+
+    // Check L1 cache first
+    for (const key of keys) {
+      const l1Value = this.l1Cache.get(key);
+      if (l1Value !== undefined) {
+        results.set(key, l1Value);
+        performanceMonitor.recordCacheHit();
+      } else {
+        missingKeys.push(key);
+      }
+    }
+
+    // Check L2 cache for missing keys
+    if (missingKeys.length > 0) {
+      try {
+        const l2Values = await this.l2Cache.mget(missingKeys);
+        
+        missingKeys.forEach((key, index) => {
+          const value = l2Values[index];
+          if (value) {
+            const parsed = JSON.parse(value);
+            results.set(key, parsed);
+            
+            // Populate L1 cache
+            this.l1Cache.set(key, parsed);
+            performanceMonitor.recordCacheHit();
+          } else {
+            performanceMonitor.recordCacheMiss();
+          }
+        });
+      } catch (error) {
+        console.warn('L2 cache mget error:', error);
+        missingKeys.forEach(() => performanceMonitor.recordCacheMiss());
+      }
+    }
+
+    return results;
+  }
+
+  // Intelligent cache warming
+  async warmCache() {
+    const timer = performanceMonitor.startTimer('cache-warming');
+    
+    try {
+      // Warm frequently accessed data
+      const popularWorkflows = await this.getPopularWorkflows();
+      for (const workflow of popularWorkflows) {
+        await this.set(`workflow:${workflow.id}`, workflow, this.longTtl);
+      }
+
+      // Warm organization data
+      const activeOrgs = await this.getActiveOrganizations();
+      for (const org of activeOrgs) {
+        await this.set(`organization:${org.id}`, org, this.longTtl);
+      }
+
+      console.log(`Cache warmed with ${popularWorkflows.length} workflows and ${activeOrgs.length} organizations`);
+    } finally {
+      performanceMonitor.endTimer(timer);
+    }
+  }
+
+  // Cache invalidation patterns
+  async invalidatePattern(pattern) {
+    // For L1 cache, we need to iterate
+    for (const key of this.l1Cache.keys()) {
+      if (key.includes(pattern)) {
+        this.l1Cache.delete(key);
+      }
+    }
+
+    // For L2 cache, use Redis SCAN
+    try {
+      const stream = this.l2Cache.scanStream({
+        match: `*${pattern}*`,
+        count: 100
+      });
+
+      const keysToDelete = [];
+      stream.on('data', (keys) => {
+        keysToDelete.push(...keys);
+      });
+
+      stream.on('end', async () => {
+        if (keysToDelete.length > 0) {
+          await this.l2Cache.del(...keysToDelete);
+        }
+      });
+    } catch (error) {
+      console.warn('Cache pattern invalidation error:', error);
+    }
+  }
+}
+
+export default new CacheManager();
+```
+</CodeGroup>
+
+### Cache-Aside Pattern Implementation
+
+<CodeGroup>
+```javascript Cache-Aside Pattern
+// utils/cached-data-access.js
+class CachedDataAccess {
+  constructor(cache, database) {
+    this.cache = cache;
+    this.database = database;
+  }
+
+  async getWorkflow(workflowId, organizationId) {
+    const cacheKey = `workflow:${workflowId}`;
+    
+    // Try cache first
+    let workflow = await this.cache.get(cacheKey);
+    
+    if (!workflow) {
+      // Cache miss - fetch from database
+      const timer = performanceMonitor.startTimer('db-get-workflow');
+      
+      try {
+        workflow = await this.database.getWorkflow(workflowId, organizationId);
+        
+        if (workflow) {
+          // Cache for future requests
+          await this.cache.set(cacheKey, workflow, this.cache.defaultTtl);
+        }
+      } finally {
+        performanceMonitor.endTimer(timer);
+      }
+    }
+
+    return workflow;
+  }
+
+  async updateWorkflow(workflowId, updates, organizationId) {
+    const timer = performanceMonitor.startTimer('db-update-workflow');
+    
+    try {
+      // Update database
+      const updatedWorkflow = await this.database.updateWorkflow(
+        workflowId, 
+        updates, 
+        organizationId
+      );
+
+      // Invalidate cache
+      await this.cache.del(`workflow:${workflowId}`);
+      
+      // Invalidate related caches
+      await this.cache.invalidatePattern(`org:${organizationId}:workflows`);
+
+      // Cache updated data
+      await this.cache.set(
+        `workflow:${workflowId}`, 
+        updatedWorkflow, 
+        this.cache.shortTtl
+      );
+
+      return updatedWorkflow;
+    } finally {
+      performanceMonitor.endTimer(timer);
+    }
+  }
+
+  async getWorkflowsByOrganization(organizationId, page = 1, limit = 50) {
+    const cacheKey = `org:${organizationId}:workflows:${page}:${limit}`;
+    
+    let workflows = await this.cache.get(cacheKey);
+    
+    if (!workflows) {
+      const timer = performanceMonitor.startTimer('db-get-org-workflows');
+      
+      try {
+        workflows = await this.database.getWorkflowsByOrganization(
+          organizationId, 
+          page, 
+          limit
+        );
+
+        // Cache with shorter TTL for paginated results
+        await this.cache.set(cacheKey, workflows, this.cache.shortTtl);
+      } finally {
+        performanceMonitor.endTimer(timer);
+      }
+    }
+
+    return workflows;
+  }
+
+  // Bulk operations with caching
+  async getMultipleWorkflows(workflowIds, organizationId) {
+    const cacheKeys = workflowIds.map(id => `workflow:${id}`);
+    const cached = await this.cache.mget(cacheKeys);
+    
+    const results = [];
+    const missingIds = [];
+    
+    workflowIds.forEach((id, index) => {
+      const cachedValue = cached.get(cacheKeys[index]);
+      if (cachedValue) {
+        results[index] = cachedValue;
+      } else {
+        missingIds.push({ id, index });
+      }
+    });
+
+    // Fetch missing workflows from database
+    if (missingIds.length > 0) {
+      const timer = performanceMonitor.startTimer('db-get-multiple-workflows');
+      
+      try {
+        const missing = await this.database.getMultipleWorkflows(
+          missingIds.map(m => m.id),
+          organizationId
+        );
+
+        // Cache missing workflows and add to results
+        for (let i = 0; i < missing.length; i++) {
+          const workflow = missing[i];
+          const { index } = missingIds[i];
+          
+          results[index] = workflow;
+          
+          // Cache individual workflow
+          await this.cache.set(
+            `workflow:${workflow.id}`, 
+            workflow, 
+            this.cache.defaultTtl
+          );
+        }
+      } finally {
+        performanceMonitor.endTimer(timer);
+      }
+    }
+
+    return results.filter(Boolean);
+  }
+}
+
+export default CachedDataAccess;
+```
+</CodeGroup>
+
+## Database Optimization
+
+### Query Optimization
+
+<CodeGroup>
+```sql Performance Indexes
+-- Workflow queries optimization
+CREATE INDEX CONCURRENTLY idx_workflows_org_status_created 
+    ON workflows(organization_id, status, created_at DESC);
+
+CREATE INDEX CONCURRENTLY idx_workflows_name_search 
+    ON workflows USING gin(to_tsvector('english', name || ' ' || description));
+
+-- Execution queries optimization
+CREATE INDEX CONCURRENTLY idx_executions_workflow_status_created 
+    ON executions(workflow_id, status, created_at DESC);
+
+CREATE INDEX CONCURRENTLY idx_executions_status_created 
+    ON executions(status, created_at) 
+    WHERE status IN ('running', 'pending');
+
+-- Partial indexes for active data
+CREATE INDEX CONCURRENTLY idx_workflows_active 
+    ON workflows(organization_id, created_at DESC) 
+    WHERE status = 'active';
+
+-- Composite indexes for common filter combinations
+CREATE INDEX CONCURRENTLY idx_workflows_org_status_updated 
+    ON workflows(organization_id, status, updated_at DESC) 
+    WHERE status IN ('active', 'paused');
+
+-- Performance monitoring
+CREATE INDEX CONCURRENTLY idx_audit_log_performance 
+    ON audit_log(action, timestamp DESC) 
+    WHERE action LIKE '%performance%';
+
+-- Analyze query performance
+EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) 
+SELECT w.id, w.name, w.status, 
+       COUNT(e.id) as execution_count,
+       MAX(e.created_at) as last_execution
+FROM workflows w 
+LEFT JOIN executions e ON w.id = e.workflow_id 
+    AND e.created_at > NOW() - INTERVAL '30 days'
+WHERE w.organization_id = $1 
+    AND w.status = 'active'
+GROUP BY w.id, w.name, w.status 
+ORDER BY w.created_at DESC 
+LIMIT 50;
+```
+
+```javascript Database Query Optimization
+// utils/optimized-queries.js
+class OptimizedQueries {
+  constructor(pool) {
+    this.pool = pool;
+    this.preparedStatements = new Map();
+  }
+
+  async prepareStatements() {
+    const statements = {
+      getWorkflowsByOrg: `
+        SELECT w.id, w.name, w.status, w.created_at,
+               COUNT(e.id) as execution_count,
+               MAX(e.created_at) as last_execution
+        FROM workflows w 
+        LEFT JOIN executions e ON w.id = e.workflow_id 
+            AND e.created_at > $3
+        WHERE w.organization_id = $1 
+            AND ($2::text IS NULL OR w.status = $2)
+        GROUP BY w.id, w.name, w.status, w.created_at
+        ORDER BY w.created_at DESC 
+        LIMIT $4 OFFSET $5
+      `,
+      
+      getWorkflowExecutions: `
+        SELECT e.id, e.status, e.created_at, e.completed_at,
+               e.input, e.output, e.error_message
+        FROM executions e
+        WHERE e.workflow_id = $1
+            AND ($2::text IS NULL OR e.status = $2)
+            AND e.created_at BETWEEN $3 AND $4
+        ORDER BY e.created_at DESC
+        LIMIT $5 OFFSET $6
+      `,
+
+      getOrganizationStats: `
+        SELECT 
+          COUNT(DISTINCT w.id) as total_workflows,
+          COUNT(DISTINCT CASE WHEN w.status = 'active' THEN w.id END) as active_workflows,
+          COUNT(DISTINCT e.id) as total_executions,
+          COUNT(DISTINCT CASE WHEN e.status = 'completed' THEN e.id END) as successful_executions
+        FROM workflows w
+        LEFT JOIN executions e ON w.id = e.workflow_id
+        WHERE w.organization_id = $1
+            AND w.created_at > $2
+      `
+    };
+
+    for (const [name, sql] of Object.entries(statements)) {
+      this.preparedStatements.set(name, sql);
+    }
+  }
+
+  async getWorkflowsByOrganization(
+    organizationId, 
+    status = null, 
+    page = 1, 
+    limit = 50
+  ) {
+    const timer = performanceMonitor.startTimer('optimized-get-workflows');
+    
+    try {
+      const offset = (page - 1) * limit;
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      
+      const query = this.preparedStatements.get('getWorkflowsByOrg');
+      const result = await this.pool.query(query, [
+        organizationId,
+        status,
+        thirtyDaysAgo,
+        limit,
+        offset
+      ]);
+
+      return result.rows;
+    } finally {
+      performanceMonitor.endTimer(timer);
+    }
+  }
+
+  async getWorkflowExecutions(
+    workflowId,
+    status = null,
+    startDate = null,
+    endDate = null,
+    page = 1,
+    limit = 50
+  ) {
+    const timer = performanceMonitor.startTimer('optimized-get-executions');
+    
+    try {
+      const offset = (page - 1) * limit;
+      const defaultStartDate = startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const defaultEndDate = endDate || new Date();
+
+      const query = this.preparedStatements.get('getWorkflowExecutions');
+      const result = await this.pool.query(query, [
+        workflowId,
+        status,
+        defaultStartDate,
+        defaultEndDate,
+        limit,
+        offset
+      ]);
+
+      return result.rows;
+    } finally {
+      performanceMonitor.endTimer(timer);
+    }
+  }
+
+  async getOrganizationStats(organizationId, since = null) {
+    const timer = performanceMonitor.startTimer('optimized-get-org-stats');
+    
+    try {
+      const defaultSince = since || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+      
+      const query = this.preparedStatements.get('getOrganizationStats');
+      const result = await this.pool.query(query, [organizationId, defaultSince]);
+
+      return result.rows[0];
+    } finally {
+      performanceMonitor.endTimer(timer);
+    }
+  }
+
+  // Connection pooling optimization
+  async withTransaction(callback) {
+    const client = await this.pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      const result = await callback(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+}
+
+export default OptimizedQueries;
+```
+</CodeGroup>
+
+## API Response Optimization
+
+### Response Compression and Optimization
+
+<CodeGroup>
+```javascript Response Optimization
+// middleware/response-optimization.js
+import compression from 'compression';
+import { promisify } from 'util';
+
+// Intelligent compression middleware
+export const smartCompression = compression({
+  filter: (req, res) => {
+    // Don't compress images, videos, or already compressed files
+    const contentType = res.getHeader('Content-Type') || '';
+    
+    if (contentType.includes('image/') || 
+        contentType.includes('video/') ||
+        contentType.includes('application/zip')) {
+      return false;
+    }
+
+    // Compress text-based responses
+    return compression.filter(req, res);
+  },
+  threshold: 1024, // Only compress responses larger than 1KB
+  level: 6, // Balance between compression ratio and speed
+});
+
+// Response optimization middleware
+export const optimizeResponse = (req, res, next) => {
+  const originalJson = res.json;
+  
+  res.json = function(data) {
+    // Add performance headers
+    res.set({
+      'X-Response-Time': `${Date.now() - req.startTime}ms`,
+      'X-Request-ID': req.id,
+      'Cache-Control': getCacheHeaders(req.path),
+      'ETag': generateETag(data)
+    });
+
+    // Optimize response data
+    const optimizedData = optimizeResponseData(data, req.query);
+    
+    return originalJson.call(this, optimizedData);
+  };
+
+  next();
+};
+
+function getCacheHeaders(path) {
+  // Cache static reference data longer
+  if (path.includes('/reference/') || path.includes('/status-codes')) {
+    return 'public, max-age=3600'; // 1 hour
+  }
+  
+  // Cache workflow data for shorter time
+  if (path.includes('/workflows')) {
+    return 'private, max-age=300'; // 5 minutes
+  }
+  
+  // Don't cache dynamic data
+  return 'no-cache';
+}
+
+function generateETag(data) {
+  const hash = crypto
+    .createHash('md5')
+    .update(JSON.stringify(data))
+    .digest('hex');
+  return `"${hash}"`;
+}
+
+function optimizeResponseData(data, queryParams) {
+  // Remove null/undefined fields unless explicitly requested
+  if (queryParams.include_null !== 'true') {
+    data = removeNullFields(data);
+  }
+
+  // Apply field filtering if requested
+  if (queryParams.fields) {
+    const requestedFields = queryParams.fields.split(',');
+    data = filterFields(data, requestedFields);
+  }
+
+  // Apply response size limits
+  if (Array.isArray(data) && data.length > 1000) {
+    console.warn('Large response detected, consider pagination');
+  }
+
+  return data;
+}
+
+function removeNullFields(obj) {
+  if (Array.isArray(obj)) {
+    return obj.map(removeNullFields);
+  }
+  
+  if (obj && typeof obj === 'object') {
+    const cleaned = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== null && value !== undefined) {
+        cleaned[key] = removeNullFields(value);
+      }
+    }
+    return cleaned;
+  }
+  
+  return obj;
+}
+
+function filterFields(obj, fields) {
+  if (Array.isArray(obj)) {
+    return obj.map(item => filterFields(item, fields));
+  }
+  
+  if (obj && typeof obj === 'object') {
+    const filtered = {};
+    for (const field of fields) {
+      if (obj.hasOwnProperty(field)) {
+        filtered[field] = obj[field];
+      }
+    }
+    return filtered;
+  }
+  
+  return obj;
+}
+
+// Request timing middleware
+export const requestTiming = (req, res, next) => {
+  req.startTime = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - req.startTime;
+    performanceMonitor.recordMetric(`${req.method}:${req.route?.path || req.path}`, duration);
+  });
+  
+  next();
+};
+```
+</CodeGroup>
+
+### Pagination Optimization
+
+<CodeGroup>
+```javascript Cursor-Based Pagination
+// utils/pagination.js
+class PaginationOptimizer {
+  constructor() {
+    this.defaultLimit = 50;
+    this.maxLimit = 200;
+  }
+
+  // Cursor-based pagination for better performance
+  async paginateWorkflows(organizationId, cursor = null, limit = this.defaultLimit) {
+    limit = Math.min(limit, this.maxLimit);
+    
+    const timer = performanceMonitor.startTimer('paginate-workflows');
+    
+    try {
+      let query, params;
+      
+      if (cursor) {
+        // Cursor-based pagination using created_at and id for tie-breaking
+        query = `
+          SELECT id, name, status, created_at, updated_at
+          FROM workflows
+          WHERE organization_id = $1
+            AND (created_at, id) < (
+              SELECT created_at, id FROM workflows WHERE id = $2
+            )
+          ORDER BY created_at DESC, id DESC
+          LIMIT $3
+        `;
+        params = [organizationId, cursor, limit + 1]; // +1 to check if there are more
+      } else {
+        // First page
+        query = `
+          SELECT id, name, status, created_at, updated_at
+          FROM workflows
+          WHERE organization_id = $1
+          ORDER BY created_at DESC, id DESC
+          LIMIT $2
+        `;
+        params = [organizationId, limit + 1];
+      }
+
+      const result = await pool.query(query, params);
+      const workflows = result.rows;
+      
+      // Check if there are more results
+      const hasMore = workflows.length > limit;
+      if (hasMore) {
+        workflows.pop(); // Remove the extra record
+      }
+
+      // Generate next cursor
+      const nextCursor = hasMore && workflows.length > 0 
+        ? workflows[workflows.length - 1].id 
+        : null;
+
+      return {
+        data: workflows,
+        pagination: {
+          cursor: nextCursor,
+          has_more: hasMore,
+          limit
+        }
+      };
+    } finally {
+      performanceMonitor.endTimer(timer);
+    }
+  }
+
+  // Offset-based pagination with optimization
+  async paginateWithOffset(
+    tableName, 
+    organizationId, 
+    page = 1, 
+    limit = this.defaultLimit,
+    filters = {}
+  ) {
+    limit = Math.min(limit, this.maxLimit);
+    const offset = (page - 1) * limit;
+    
+    // Use COUNT(*) over window function for better performance on large datasets
+    const whereClause = this.buildWhereClause(filters);
+    const orderClause = filters.sort || 'created_at DESC';
+    
+    const dataQuery = `
+      SELECT *
+      FROM ${tableName}
+      WHERE organization_id = $1 ${whereClause}
+      ORDER BY ${orderClause}
+      LIMIT $2 OFFSET $3
+    `;
+
+    // Get total count efficiently
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM ${tableName}
+      WHERE organization_id = $1 ${whereClause}
+    `;
+
+    const timer = performanceMonitor.startTimer('paginate-with-offset');
+    
+    try {
+      const [dataResult, countResult] = await Promise.all([
+        pool.query(dataQuery, [organizationId, limit, offset]),
+        pool.query(countQuery, [organizationId])
+      ]);
+
+      const total = parseInt(countResult.rows[0].total);
+      const totalPages = Math.ceil(total / limit);
+
+      return {
+        data: dataResult.rows,
+        pagination: {
+          page,
+          limit,
+          total,
+          total_pages: totalPages,
+          has_previous: page > 1,
+          has_next: page < totalPages
+        }
+      };
+    } finally {
+      performanceMonitor.endTimer(timer);
+    }
+  }
+
+  buildWhereClause(filters) {
+    const conditions = [];
+    
+    if (filters.status) {
+      conditions.push(`AND status = '${filters.status}'`);
+    }
+    
+    if (filters.created_after) {
+      conditions.push(`AND created_at > '${filters.created_after}'`);
+    }
+    
+    if (filters.search) {
+      conditions.push(`AND (name ILIKE '%${filters.search}%' OR description ILIKE '%${filters.search}%')`);
+    }
+    
+    return conditions.join(' ');
+  }
+
+  // Efficient count estimation for large datasets
+  async estimateCount(tableName, organizationId) {
+    const query = `
+      SELECT schemaname, tablename, attname, n_distinct, correlation
+      FROM pg_stats
+      WHERE tablename = $1 AND attname = 'organization_id'
+    `;
+    
+    const result = await pool.query(query, [tableName]);
+    
+    if (result.rows.length > 0) {
+      // Use statistics to estimate count
+      const stats = result.rows[0];
+      return Math.round(stats.n_distinct * 1000); // Rough estimation
+    }
+    
+    // Fallback to actual count
+    const countResult = await pool.query(
+      `SELECT COUNT(*) FROM ${tableName} WHERE organization_id = $1`,
+      [organizationId]
+    );
+    
+    return parseInt(countResult.rows[0].count);
+  }
+}
+
+export default new PaginationOptimizer();
+```
+</CodeGroup>
+
+## HTTP Client Optimization
+
+### Connection Pooling and Keep-Alive
+
+<CodeGroup>
+```javascript HTTP Client Optimization
+// utils/optimized-http-client.js
+import https from 'https';
+import http from 'http';
+import { Agent } from 'https';
+
+class OptimizedHttpClient {
+  constructor() {
+    // Configure connection pooling
+    this.httpsAgent = new https.Agent({
+      keepAlive: true,
+      keepAliveMsecs: 30000,
+      maxSockets: 50,
+      maxFreeSockets: 10,
+      timeout: 60000,
+      freeSocketTimeout: 30000
+    });
+
+    this.httpAgent = new http.Agent({
+      keepAlive: true,
+      keepAliveMsecs: 30000,
+      maxSockets: 50,
+      maxFreeSockets: 10,
+      timeout: 60000,
+      freeSocketTimeout: 30000
+    });
+
+    this.baseURL = process.env.TOLSTOY_BASE_URL || 'https://api.tolstoy.com';
+    this.apiKey = process.env.TOLSTOY_API_KEY;
+    
+    // Request queue for rate limiting
+    this.requestQueue = [];
+    this.isProcessingQueue = false;
+    this.requestsPerSecond = 10;
+    this.burstSize = 50;
+  }
+
+  async makeRequest(method, endpoint, data = null, options = {}) {
+    const requestConfig = {
+      method,
+      url: `${this.baseURL}${endpoint}`,
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'tolstoy-integration/1.0',
+        'Accept-Encoding': 'gzip, deflate',
+        ...options.headers
+      },
+      agent: this.baseURL.startsWith('https') ? this.httpsAgent : this.httpAgent,
+      timeout: options.timeout || 30000,
+      data: data ? JSON.stringify(data) : undefined
+    };
+
+    // Add to request queue for rate limiting
+    return new Promise((resolve, reject) => {
+      this.requestQueue.push({
+        config: requestConfig,
+        resolve,
+        reject,
+        timestamp: Date.now()
+      });
+
+      this.processQueue();
+    });
+  }
+
+  async processQueue() {
+    if (this.isProcessingQueue || this.requestQueue.length === 0) {
+      return;
+    }
+
+    this.isProcessingQueue = true;
+    
+    try {
+      const batchSize = Math.min(this.burstSize, this.requestQueue.length);
+      const batch = this.requestQueue.splice(0, batchSize);
+      
+      // Process batch with controlled concurrency
+      const semaphore = new Semaphore(10); // Max 10 concurrent requests
+      
+      const promises = batch.map(async (request) => {
+        await semaphore.acquire();
+        
+        try {
+          const timer = performanceMonitor.startTimer(`api-${request.config.method}-${request.config.url}`);
+          
+          try {
+            const response = await this.executeRequest(request.config);
+            request.resolve(response);
+          } catch (error) {
+            request.reject(error);
+          } finally {
+            performanceMonitor.endTimer(timer);
+          }
+        } finally {
+          semaphore.release();
+        }
+      });
+
+      await Promise.allSettled(promises);
+      
+      // Continue processing queue if there are more requests
+      if (this.requestQueue.length > 0) {
+        setTimeout(() => {
+          this.isProcessingQueue = false;
+          this.processQueue();
+        }, 1000 / this.requestsPerSecond);
+      } else {
+        this.isProcessingQueue = false;
+      }
+    } catch (error) {
+      console.error('Queue processing error:', error);
+      this.isProcessingQueue = false;
+    }
+  }
+
+  async executeRequest(config) {
+    const fetch = (await import('node-fetch')).default;
+    
+    const response = await fetch(config.url, {
+      method: config.method,
+      headers: config.headers,
+      body: config.data,
+      agent: config.agent,
+      timeout: config.timeout
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  // Bulk operations
+  async bulkCreateWorkflows(workflows) {
+    const chunks = this.chunkArray(workflows, 25); // Process in chunks of 25
+    const results = [];
+
+    for (const chunk of chunks) {
+      const response = await this.makeRequest('POST', '/v1/workflows/bulk', {
+        workflows: chunk
+      });
+      results.push(...response.data);
+    }
+
+    return results;
+  }
+
+  chunkArray(array, chunkSize) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
+  }
+}
+
+// Semaphore for concurrency control
+class Semaphore {
+  constructor(permits) {
+    this.permits = permits;
+    this.waiting = [];
+  }
+
+  async acquire() {
+    if (this.permits > 0) {
+      this.permits--;
+      return;
+    }
+
+    return new Promise(resolve => {
+      this.waiting.push(resolve);
+    });
+  }
+
+  release() {
+    this.permits++;
+    
+    if (this.waiting.length > 0) {
+      const resolve = this.waiting.shift();
+      this.permits--;
+      resolve();
+    }
+  }
+}
+
+export default new OptimizedHttpClient();
+```
+</CodeGroup>
+
+## Memory Optimization
+
+### Memory Management
+
+<CodeGroup>
+```javascript Memory Optimization
+// utils/memory-manager.js
+class MemoryManager {
+  constructor() {
+    this.memoryThreshold = 0.8; // 80% memory usage threshold
+    this.gcInterval = 5 * 60 * 1000; // 5 minutes
+    this.objectPools = new Map();
+    
+    this.startMemoryMonitoring();
+  }
+
+  startMemoryMonitoring() {
+    setInterval(() => {
+      this.checkMemoryUsage();
+    }, this.gcInterval);
+  }
+
+  checkMemoryUsage() {
+    const usage = process.memoryUsage();
+    const totalMemory = os.totalmem();
+    const usagePercent = usage.heapUsed / totalMemory;
+
+    if (usagePercent > this.memoryThreshold) {
+      console.warn('High memory usage detected:', {
+        heapUsed: `${Math.round(usage.heapUsed / 1024 / 1024)}MB`,
+        heapTotal: `${Math.round(usage.heapTotal / 1024 / 1024)}MB`,
+        external: `${Math.round(usage.external / 1024 / 1024)}MB`,
+        rss: `${Math.round(usage.rss / 1024 / 1024)}MB`,
+        usagePercent: `${(usagePercent * 100).toFixed(2)}%`
+      });
+
+      this.performGarbageCollection();
+    }
+  }
+
+  performGarbageCollection() {
+    // Clear expired cache entries
+    this.clearExpiredCaches();
+    
+    // Clear object pools
+    this.clearObjectPools();
+    
+    // Force garbage collection if available
+    if (global.gc) {
+      global.gc();
+    }
+  }
+
+  clearExpiredCaches() {
+    // Clear L1 cache expired entries
+    if (cache.l1Cache && typeof cache.l1Cache.prune === 'function') {
+      cache.l1Cache.prune();
+    }
+  }
+
+  clearObjectPools() {
+    for (const [name, pool] of this.objectPools.entries()) {
+      if (pool.length > 100) {
+        pool.splice(50); // Keep only 50 objects
+        console.log(`Cleared object pool: ${name}`);
+      }
+    }
+  }
+
+  // Object pooling for frequently created objects
+  getPooledObject(type, factory) {
+    if (!this.objectPools.has(type)) {
+      this.objectPools.set(type, []);
+    }
+
+    const pool = this.objectPools.get(type);
+    
+    if (pool.length > 0) {
+      return pool.pop();
+    }
+    
+    return factory();
+  }
+
+  returnToPool(type, object) {
+    if (!this.objectPools.has(type)) {
+      return;
+    }
+
+    const pool = this.objectPools.get(type);
+    
+    // Reset object state
+    if (typeof object.reset === 'function') {
+      object.reset();
+    }
+    
+    // Don't let pools grow too large
+    if (pool.length < 50) {
+      pool.push(object);
+    }
+  }
+
+  // Stream processing for large datasets
+  createWorkflowStream(organizationId) {
+    const { Readable } = require('stream');
+    
+    let offset = 0;
+    const limit = 100;
+    let hasMore = true;
+
+    return new Readable({
+      objectMode: true,
+      async read() {
+        if (!hasMore) {
+          this.push(null); // End stream
+          return;
+        }
+
+        try {
+          const query = `
+            SELECT * FROM workflows
+            WHERE organization_id = $1
+            ORDER BY created_at DESC
+            LIMIT $2 OFFSET $3
+          `;
+          
+          const result = await pool.query(query, [organizationId, limit, offset]);
+          const workflows = result.rows;
+
+          if (workflows.length < limit) {
+            hasMore = false;
+          }
+
+          for (const workflow of workflows) {
+            this.push(workflow);
+          }
+
+          offset += limit;
+        } catch (error) {
+          this.destroy(error);
+        }
+      }
+    });
+  }
+}
+
+export default new MemoryManager();
+```
+</CodeGroup>
+
+## CDN and Edge Optimization
+
+### Content Delivery Network Setup
+
+<CodeGroup>
+```javascript CDN Configuration
+// config/cdn.js
+class CDNManager {
+  constructor() {
+    this.cdnUrl = process.env.CDN_URL || 'https://cdn.yourapp.com';
+    this.staticAssetsDomain = process.env.STATIC_ASSETS_DOMAIN || 'https://static.yourapp.com';
+  }
+
+  // Optimize static asset delivery
+  getOptimizedAssetUrl(assetPath, options = {}) {
+    const {
+      width,
+      height,
+      quality = 80,
+      format = 'webp',
+      cache = true
+    } = options;
+
+    let url = `${this.staticAssetsDomain}${assetPath}`;
+    const params = new URLSearchParams();
+
+    if (width) params.append('w', width.toString());
+    if (height) params.append('h', height.toString());
+    if (quality !== 80) params.append('q', quality.toString());
+    if (format !== 'webp') params.append('f', format);
+    if (!cache) params.append('cache', 'false');
+
+    const queryString = params.toString();
+    return queryString ? `${url}?${queryString}` : url;
+  }
+
+  // Edge caching headers
+  getCacheHeaders(resourceType, isDynamic = false) {
+    const headers = {};
+
+    switch (resourceType) {
+      case 'static':
+        headers['Cache-Control'] = 'public, max-age=31536000, immutable'; // 1 year
+        headers['Expires'] = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toUTCString();
+        break;
+
+      case 'api-reference':
+        headers['Cache-Control'] = 'public, max-age=3600, stale-while-revalidate=86400'; // 1 hour, revalidate daily
+        break;
+
+      case 'workflow-data':
+        if (isDynamic) {
+          headers['Cache-Control'] = 'private, max-age=300'; // 5 minutes
+        } else {
+          headers['Cache-Control'] = 'public, max-age=1800, stale-while-revalidate=3600'; // 30 minutes
+        }
+        break;
+
+      case 'user-data':
+        headers['Cache-Control'] = 'private, max-age=60'; // 1 minute
+        break;
+
+      default:
+        headers['Cache-Control'] = 'no-cache';
+    }
+
+    // Add ETag for better caching
+    headers['Vary'] = 'Accept-Encoding, Authorization';
+    
+    return headers;
+  }
+
+  // Preload critical resources
+  generatePreloadHeaders(criticalResources) {
+    const preloadLinks = criticalResources.map(resource => {
+      return `<${resource.url}>; rel=preload; as=${resource.type}`;
+    });
+
+    return {
+      'Link': preloadLinks.join(', ')
+    };
+  }
+}
+
+export default new CDNManager();
+```
+
+```yaml CloudFront Configuration
+# cloudfront-config.yml
+Resources:
+  TolstoyDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        HttpVersion: http2
+        PriceClass: PriceClass_100
+        
+        Origins:
+          - Id: tolstoy-api-origin
+            DomainName: api.yourapp.com
+            CustomOriginConfig:
+              HTTPPort: 443
+              HTTPSPort: 443
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+                - TLSv1.3
+        
+        DefaultCacheBehavior:
+          TargetOriginId: tolstoy-api-origin
+          ViewerProtocolPolicy: redirect-to-https
+          CachePolicyId: !Ref APICachePolicy
+          OriginRequestPolicyId: !Ref APIOriginRequestPolicy
+          Compress: true
+        
+        CacheBehaviors:
+          - PathPattern: "/api/v1/reference/*"
+            TargetOriginId: tolstoy-api-origin
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: !Ref StaticContentCachePolicy
+            Compress: true
+          
+          - PathPattern: "/api/v1/workflows/*"
+            TargetOriginId: tolstoy-api-origin
+            ViewerProtocolPolicy: redirect-to-https
+            CachePolicyId: !Ref DynamicContentCachePolicy
+            Compress: true
+
+  APICachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: TolstoyAPICache
+        DefaultTTL: 300    # 5 minutes
+        MaxTTL: 3600       # 1 hour
+        MinTTL: 0
+        ParametersInCacheKeyAndForwardedToOrigin:
+          EnableAcceptEncodingGzip: true
+          EnableAcceptEncodingBrotli: true
+          QueryStringsConfig:
+            QueryStringBehavior: whitelist
+            QueryStrings:
+              - page
+              - limit
+              - status
+          HeadersConfig:
+            HeaderBehavior: whitelist
+            Headers:
+              - Authorization
+              - Accept
+              - Content-Type
+
+  StaticContentCachePolicy:
+    Type: AWS::CloudFront::CachePolicy
+    Properties:
+      CachePolicyConfig:
+        Name: TolstoyStaticCache
+        DefaultTTL: 86400   # 24 hours
+        MaxTTL: 31536000    # 1 year
+        MinTTL: 0
+```
+</CodeGroup>
+
+## Asynchronous Processing
+
+### Background Job Processing
+
+<CodeGroup>
+```javascript Background Jobs
+// utils/job-processor.js
+import Bull from 'bull';
+import Redis from 'ioredis';
+
+class JobProcessor {
+  constructor() {
+    this.redis = new Redis(process.env.REDIS_URL);
+    
+    // Create job queues
+    this.queues = {
+      webhookDelivery: new Bull('webhook delivery', process.env.REDIS_URL, {
+        defaultJobOptions: {
+          removeOnComplete: 100,
+          removeOnFail: 50,
+          attempts: 3,
+          backoff: {
+            type: 'exponential',
+            delay: 2000
+          }
+        }
+      }),
+      
+      workflowExecution: new Bull('workflow execution', process.env.REDIS_URL, {
+        defaultJobOptions: {
+          removeOnComplete: 50,
+          removeOnFail: 25,
+          attempts: 2,
+          backoff: 'fixed',
+          delay: 5000
+        }
+      }),
+      
+      dataProcessing: new Bull('data processing', process.env.REDIS_URL, {
+        defaultJobOptions: {
+          removeOnComplete: 10,
+          removeOnFail: 10,
+          attempts: 1
+        }
+      })
+    };
+
+    this.setupJobProcessors();
+  }
+
+  setupJobProcessors() {
+    // Webhook delivery processor
+    this.queues.webhookDelivery.process(10, async (job) => {
+      const { url, payload, headers, attempt } = job.data;
+      
+      const timer = performanceMonitor.startTimer('webhook-delivery');
+      
+      try {
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...headers
+          },
+          body: JSON.stringify(payload),
+          timeout: 30000
+        });
+
+        if (!response.ok) {
+          throw new Error(`Webhook delivery failed: ${response.status}`);
+        }
+
+        return { 
+          status: 'delivered', 
+          responseStatus: response.status,
+          attempt
+        };
+      } finally {
+        performanceMonitor.endTimer(timer);
+      }
+    });
+
+    // Workflow execution processor
+    this.queues.workflowExecution.process(5, async (job) => {
+      const { workflowId, input, executionId } = job.data;
+      
+      const timer = performanceMonitor.startTimer('workflow-execution');
+      
+      try {
+        const result = await this.executeWorkflow(workflowId, input, executionId);
+        return result;
+      } finally {
+        performanceMonitor.endTimer(timer);
+      }
+    });
+
+    // Data processing processor
+    this.queues.dataProcessing.process(20, async (job) => {
+      const { operation, data } = job.data;
+      
+      switch (operation) {
+        case 'aggregate_metrics':
+          return await this.aggregateMetrics(data);
+        case 'cleanup_old_data':
+          return await this.cleanupOldData(data);
+        case 'generate_reports':
+          return await this.generateReports(data);
+        default:
+          throw new Error(`Unknown operation: ${operation}`);
+      }
+    });
+  }
+
+  async queueWebhookDelivery(url, payload, headers = {}) {
+    return await this.queues.webhookDelivery.add('deliver', {
+      url,
+      payload,
+      headers,
+      timestamp: Date.now()
+    }, {
+      priority: 1,
+      delay: 0
+    });
+  }
+
+  async queueWorkflowExecution(workflowId, input, executionId) {
+    return await this.queues.workflowExecution.add('execute', {
+      workflowId,
+      input,
+      executionId,
+      timestamp: Date.now()
+    }, {
+      priority: 2
+    });
+  }
+
+  async queueDataProcessing(operation, data, priority = 0) {
+    return await this.queues.dataProcessing.add(operation, {
+      operation,
+      data,
+      timestamp: Date.now()
+    }, {
+      priority,
+      delay: 60000 // Process after 1 minute
+    });
+  }
+
+  // Monitor queue health
+  getQueueStats() {
+    const stats = {};
+    
+    for (const [name, queue] of Object.entries(this.queues)) {
+      stats[name] = {
+        waiting: queue.waiting(),
+        active: queue.active(),
+        completed: queue.completed(),
+        failed: queue.failed(),
+        delayed: queue.delayed()
+      };
+    }
+    
+    return stats;
+  }
+
+  async executeWorkflow(workflowId, input, executionId) {
+    // Implementation of workflow execution logic
+    const workflow = await database.getWorkflow(workflowId);
+    
+    // Process workflow steps
+    const results = [];
+    for (const action of workflow.actions) {
+      const result = await this.executeAction(action, input);
+      results.push(result);
+    }
+
+    // Update execution status
+    await database.updateExecution(executionId, {
+      status: 'completed',
+      output: results,
+      completed_at: new Date()
+    });
+
+    return { executionId, status: 'completed', results };
+  }
+}
+
+export default new JobProcessor();
+```
+</CodeGroup>
+
+### Stream Processing
+
+<CodeGroup>
+```javascript Stream Processing
+// utils/stream-processor.js
+import { Transform, pipeline } from 'stream';
+import { promisify } from 'util';
+
+const pipelineAsync = promisify(pipeline);
+
+class StreamProcessor {
+  constructor() {
+    this.batchSize = 100;
+    this.concurrency = 10;
+  }
+
+  // Transform stream for processing large datasets
+  createProcessingStream(processor) {
+    let batch = [];
+    
+    return new Transform({
+      objectMode: true,
+      transform(chunk, encoding, callback) {
+        batch.push(chunk);
+        
+        if (batch.length >= this.batchSize) {
+          this.processBatch(batch, processor)
+            .then(results => {
+              results.forEach(result => this.push(result));
+              batch = [];
+              callback();
+            })
+            .catch(callback);
+        } else {
+          callback();
+        }
+      },
+      
+      flush(callback) {
+        if (batch.length > 0) {
+          this.processBatch(batch, processor)
+            .then(results => {
+              results.forEach(result => this.push(result));
+              callback();
+            })
+            .catch(callback);
+        } else {
+          callback();
+        }
+      }
+    });
+  }
+
+  async processBatch(batch, processor) {
+    const semaphore = new Semaphore(this.concurrency);
+    
+    const promises = batch.map(async (item) => {
+      await semaphore.acquire();
+      
+      try {
+        return await processor(item);
+      } finally {
+        semaphore.release();
+      }
+    });
+
+    return await Promise.all(promises);
+  }
+
+  // Process large workflow exports
+  async exportWorkflows(organizationId, outputStream) {
+    const workflowStream = memoryManager.createWorkflowStream(organizationId);
+    
+    const transformStream = this.createProcessingStream(async (workflow) => {
+      // Transform workflow for export
+      return {
+        id: workflow.id,
+        name: workflow.name,
+        status: workflow.status,
+        created_at: workflow.created_at,
+        execution_count: await this.getExecutionCount(workflow.id)
+      };
+    });
+
+    const formatStream = new Transform({
+      objectMode: true,
+      transform(chunk, encoding, callback) {
+        this.push(JSON.stringify(chunk) + '\n');
+        callback();
+      }
+    });
+
+    await pipelineAsync(
+      workflowStream,
+      transformStream,
+      formatStream,
+      outputStream
+    );
+  }
+
+  async getExecutionCount(workflowId) {
+    // Use cached count if available
+    const cacheKey = `execution_count:${workflowId}`;
+    const cached = await cache.get(cacheKey);
+    
+    if (cached !== null) {
+      return cached;
+    }
+
+    const result = await pool.query(
+      'SELECT COUNT(*) FROM executions WHERE workflow_id = $1',
+      [workflowId]
+    );
+    
+    const count = parseInt(result.rows[0].count);
+    
+    // Cache for 5 minutes
+    await cache.set(cacheKey, count, 5 * 60);
+    
+    return count;
+  }
+}
+
+export default new StreamProcessor();
+```
+</CodeGroup>
+
+## Performance Testing and Benchmarking
+
+### Load Testing
+
+<CodeGroup>
+```javascript Load Testing
+// tests/performance/load-test.js
+import autocannon from 'autocannon';
+
+class LoadTester {
+  constructor() {
+    this.baseUrl = process.env.TEST_BASE_URL || 'http://localhost:3000';
+    this.apiKey = process.env.TOLSTOY_TEST_API_KEY;
+  }
+
+  async runLoadTest(endpoint, options = {}) {
+    const {
+      connections = 10,
+      duration = 60,
+      pipelining = 1,
+      method = 'GET',
+      body = null
+    } = options;
+
+    console.log(`Running load test on ${endpoint}...`);
+    
+    const result = await autocannon({
+      url: `${this.baseUrl}${endpoint}`,
+      connections,
+      duration,
+      pipelining,
+      method,
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: body ? JSON.stringify(body) : undefined
+    });
+
+    return this.analyzeResults(result);
+  }
+
+  analyzeResults(result) {
+    const analysis = {
+      summary: {
+        total_requests: result.requests.total,
+        requests_per_second: result.requests.average,
+        avg_latency: result.latency.average,
+        p95_latency: result.latency.p95,
+        p99_latency: result.latency.p99,
+        throughput: result.throughput.average,
+        errors: result.errors,
+        timeouts: result.timeouts
+      },
+      performance_grade: this.calculatePerformanceGrade(result),
+      recommendations: this.generateRecommendations(result)
+    };
+
+    return analysis;
+  }
+
+  calculatePerformanceGrade(result) {
+    let score = 100;
+    
+    // Penalize high latency
+    if (result.latency.p95 > 500) score -= 20;
+    if (result.latency.p95 > 1000) score -= 30;
+    
+    // Penalize low throughput
+    if (result.requests.average < 100) score -= 20;
+    if (result.requests.average < 50) score -= 40;
+    
+    // Penalize errors
+    if (result.errors > 0) score -= 30;
+    if (result.timeouts > 0) score -= 40;
+    
+    if (score >= 90) return 'A';
+    if (score >= 80) return 'B';
+    if (score >= 70) return 'C';
+    if (score >= 60) return 'D';
+    return 'F';
+  }
+
+  generateRecommendations(result) {
+    const recommendations = [];
+    
+    if (result.latency.p95 > 500) {
+      recommendations.push('Consider implementing response caching');
+      recommendations.push('Optimize database queries');
+    }
+    
+    if (result.requests.average < 100) {
+      recommendations.push('Consider horizontal scaling');
+      recommendations.push('Implement connection pooling');
+    }
+    
+    if (result.errors > 0) {
+      recommendations.push('Investigate and fix error conditions');
+    }
+    
+    if (result.timeouts > 0) {
+      recommendations.push('Increase timeout values or optimize slow operations');
+    }
+
+    return recommendations;
+  }
+
+  // Run comprehensive performance test suite
+  async runPerformanceTestSuite() {
+    const tests = [
+      { name: 'List Workflows', endpoint: '/api/v1/workflows', connections: 10 },
+      { name: 'Get Workflow', endpoint: '/api/v1/workflows/wf_test_123', connections: 20 },
+      { name: 'Create Workflow', endpoint: '/api/v1/workflows', method: 'POST', 
+        body: { name: 'Load Test', trigger: { type: 'manual' }, actions: [] }, connections: 5 },
+      { name: 'Webhook Endpoint', endpoint: '/webhooks/tolstoy', method: 'POST',
+        body: { event: 'test', data: {} }, connections: 15 }
+    ];
+
+    const results = {};
+    
+    for (const test of tests) {
+      console.log(`Running ${test.name} test...`);
+      results[test.name] = await this.runLoadTest(test.endpoint, test);
+      
+      // Wait between tests
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+
+    return this.generateSuiteReport(results);
+  }
+
+  generateSuiteReport(results) {
+    const report = {
+      timestamp: new Date().toISOString(),
+      overall_grade: 'A',
+      tests: results,
+      summary: {
+        total_tests: Object.keys(results).length,
+        passed_tests: 0,
+        failed_tests: 0,
+        avg_rps: 0,
+        avg_p95_latency: 0
+      }
+    };
+
+    let totalRps = 0;
+    let totalP95 = 0;
+    let grades = [];
+
+    for (const [testName, result] of Object.entries(results)) {
+      if (result.summary.errors === 0) {
+        report.summary.passed_tests++;
+      } else {
+        report.summary.failed_tests++;
+      }
+
+      totalRps += result.summary.requests_per_second;
+      totalP95 += result.summary.p95_latency;
+      grades.push(result.performance_grade);
+    }
+
+    report.summary.avg_rps = totalRps / Object.keys(results).length;
+    report.summary.avg_p95_latency = totalP95 / Object.keys(results).length;
+    
+    // Calculate overall grade
+    const gradeValues = { A: 4, B: 3, C: 2, D: 1, F: 0 };
+    const avgGrade = grades.reduce((sum, grade) => sum + gradeValues[grade], 0) / grades.length;
+    
+    if (avgGrade >= 3.5) report.overall_grade = 'A';
+    else if (avgGrade >= 2.5) report.overall_grade = 'B';
+    else if (avgGrade >= 1.5) report.overall_grade = 'C';
+    else if (avgGrade >= 0.5) report.overall_grade = 'D';
+    else report.overall_grade = 'F';
+
+    return report;
+  }
+}
+
+export default new LoadTester();
+```
+</CodeGroup>
+
+## Resource Management
+
+### CPU and Memory Optimization
+
+<CodeGroup>
+```javascript Resource Management
+// utils/resource-manager.js
+import cluster from 'cluster';
+import os from 'os';
+
+class ResourceManager {
+  constructor() {
+    this.cpuCount = os.cpus().length;
+    this.memoryLimit = this.parseMemoryLimit(process.env.MEMORY_LIMIT || '512MB');
+    this.cpuThreshold = 0.8; // 80% CPU threshold
+    this.memoryThreshold = 0.8; // 80% memory threshold
+    
+    this.startResourceMonitoring();
+  }
+
+  parseMemoryLimit(limit) {
+    const value = parseInt(limit);
+    const unit = limit.toLowerCase().slice(-2);
+    
+    switch (unit) {
+      case 'gb': return value * 1024 * 1024 * 1024;
+      case 'mb': return value * 1024 * 1024;
+      case 'kb': return value * 1024;
+      default: return value;
+    }
+  }
+
+  startResourceMonitoring() {
+    setInterval(() => {
+      this.checkResourceUsage();
+    }, 30000); // Check every 30 seconds
+  }
+
+  checkResourceUsage() {
+    const memUsage = process.memoryUsage();
+    const cpuUsage = process.cpuUsage();
+    
+    // Check memory usage
+    const memoryPercent = memUsage.heapUsed / this.memoryLimit;
+    if (memoryPercent > this.memoryThreshold) {
+      console.warn('High memory usage detected:', {
+        used: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
+        limit: `${Math.round(this.memoryLimit / 1024 / 1024)}MB`,
+        percent: `${(memoryPercent * 100).toFixed(2)}%`
+      });
+      
+      this.triggerMemoryOptimization();
+    }
+
+    // Log resource metrics
+    performanceMonitor.recordMetric('memory.heap_used', memUsage.heapUsed);
+    performanceMonitor.recordMetric('memory.heap_total', memUsage.heapTotal);
+    performanceMonitor.recordMetric('memory.external', memUsage.external);
+  }
+
+  triggerMemoryOptimization() {
+    // Clear caches
+    cache.l1Cache.clear();
+    
+    // Clear object pools
+    memoryManager.clearObjectPools();
+    
+    // Process cleanup jobs
+    jobProcessor.queueDataProcessing('cleanup_old_data', {
+      cutoff_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
+    });
+
+    // Force garbage collection
+    if (global.gc) {
+      global.gc();
+    }
+  }
+
+  // CPU-intensive task optimization
+  async optimizeCPUIntensiveTask(task, data) {
+    const chunkSize = Math.ceil(data.length / this.cpuCount);
+    const chunks = [];
+    
+    for (let i = 0; i < data.length; i += chunkSize) {
+      chunks.push(data.slice(i, i + chunkSize));
+    }
+
+    // Process chunks in parallel using worker threads
+    const { Worker, isMainThread, parentPort, workerData } = await import('worker_threads');
+    
+    if (isMainThread) {
+      const workers = chunks.map((chunk, index) => {
+        return new Promise((resolve, reject) => {
+          const worker = new Worker(__filename, {
+            workerData: { task, chunk, index }
+          });
+          
+          worker.on('message', resolve);
+          worker.on('error', reject);
+          worker.on('exit', (code) => {
+            if (code !== 0) {
+              reject(new Error(`Worker stopped with exit code ${code}`));
+            }
+          });
+        });
+      });
+
+      const results = await Promise.all(workers);
+      return results.flat();
+    } else {
+      // Worker thread code
+      const { task, chunk } = workerData;
+      const result = await this.processChunk(task, chunk);
+      parentPort.postMessage(result);
+    }
+  }
+
+  async processChunk(task, chunk) {
+    switch (task) {
+      case 'validate_workflows':
+        return chunk.map(workflow => this.validateWorkflow(workflow));
+      case 'transform_data':
+        return chunk.map(item => this.transformData(item));
+      default:
+        throw new Error(`Unknown task: ${task}`);
+    }
+  }
+
+  validateWorkflow(workflow) {
+    // CPU-intensive validation logic
+    return {
+      id: workflow.id,
+      valid: this.performComplexValidation(workflow),
+      timestamp: Date.now()
+    };
+  }
+}
+
+export default new ResourceManager();
+```
+</CodeGroup>
+
+## Performance Monitoring Dashboard
+
+### Real-Time Performance Metrics
+
+<CodeGroup>
+```javascript Performance Dashboard
+// routes/performance-dashboard.js
+import express from 'express';
+
+const router = express.Router();
+
+router.get('/metrics', async (req, res) => {
+  const metrics = {
+    timestamp: Date.now(),
+    application: {
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      cpu_usage: await getCPUUsage(),
+      ...performanceMonitor.getMetrics()
+    },
+    database: await getDatabaseMetrics(),
+    cache: await getCacheMetrics(),
+    queue: jobProcessor.getQueueStats(),
+    external_apis: await getExternalAPIMetrics()
+  };
+
+  res.json(metrics);
+});
+
+router.get('/health-score', async (req, res) => {
+  const score = await calculateHealthScore();
+  
+  res.json({
+    score,
+    grade: score >= 90 ? 'A' : score >= 80 ? 'B' : score >= 70 ? 'C' : 'D',
+    components: score.components,
+    recommendations: score.recommendations
+  });
+});
+
+async function getCPUUsage() {
+  return new Promise((resolve) => {
+    const startUsage = process.cpuUsage();
+    
+    setTimeout(() => {
+      const endUsage = process.cpuUsage(startUsage);
+      const userPercent = (endUsage.user / 1000 / 1000) * 100;
+      const systemPercent = (endUsage.system / 1000 / 1000) * 100;
+      
+      resolve({
+        user: userPercent,
+        system: systemPercent,
+        total: userPercent + systemPercent
+      });
+    }, 1000);
+  });
+}
+
+async function getDatabaseMetrics() {
+  const result = await pool.query(`
+    SELECT 
+      (SELECT COUNT(*) FROM pg_stat_activity WHERE state = 'active') as active_connections,
+      (SELECT COUNT(*) FROM pg_stat_activity WHERE state = 'idle') as idle_connections,
+      (SELECT AVG(mean_exec_time) FROM pg_stat_statements WHERE calls > 100) as avg_query_time
+  `);
+
+  return result.rows[0];
+}
+
+async function getCacheMetrics() {
+  const info = await cache.l2Cache.info();
+  const memory = info.split('\r\n').find(line => line.startsWith('used_memory:'));
+  const usedMemory = memory ? parseInt(memory.split(':')[1]) : 0;
+
+  return {
+    hit_rate: performanceMonitor.metrics.cacheHits / 
+              (performanceMonitor.metrics.cacheHits + performanceMonitor.metrics.cacheMisses),
+    memory_used: usedMemory,
+    l1_size: cache.l1Cache.size,
+    l2_size: await cache.l2Cache.dbsize()
+  };
+}
+
+async function calculateHealthScore() {
+  const metrics = performanceMonitor.getMetrics();
+  let score = 100;
+  const components = {};
+  const recommendations = [];
+
+  // Response time component (30 points)
+  const avgResponseTime = Object.values(metrics.apiCalls)
+    .reduce((sum, metric) => sum + metric.avgDuration, 0) / 
+    Object.keys(metrics.apiCalls).length;
+
+  if (avgResponseTime > 500) {
+    score -= 15;
+    components.response_time = 'poor';
+    recommendations.push('Optimize API response times');
+  } else if (avgResponseTime > 200) {
+    score -= 5;
+    components.response_time = 'good';
+  } else {
+    components.response_time = 'excellent';
+  }
+
+  // Cache hit rate component (20 points)
+  if (metrics.cacheHitRate < 0.7) {
+    score -= 15;
+    components.cache_performance = 'poor';
+    recommendations.push('Improve cache hit rate');
+  } else if (metrics.cacheHitRate < 0.9) {
+    score -= 5;
+    components.cache_performance = 'good';
+  } else {
+    components.cache_performance = 'excellent';
+  }
+
+  // Memory usage component (25 points)
+  const memoryPercent = metrics.memoryUsage.heapUsed / (1024 * 1024 * 1024); // Convert to GB
+  if (memoryPercent > 0.8) {
+    score -= 20;
+    components.memory_usage = 'critical';
+    recommendations.push('Reduce memory usage');
+  } else if (memoryPercent > 0.6) {
+    score -= 10;
+    components.memory_usage = 'warning';
+  } else {
+    components.memory_usage = 'good';
+  }
+
+  // Error rate component (25 points)
+  const errorRate = calculateErrorRate();
+  if (errorRate > 0.05) {
+    score -= 25;
+    components.error_rate = 'critical';
+    recommendations.push('Investigate and fix errors');
+  } else if (errorRate > 0.01) {
+    score -= 10;
+    components.error_rate = 'warning';
+  } else {
+    components.error_rate = 'good';
+  }
+
+  return { score: Math.max(0, score), components, recommendations };
+}
+
+export default router;
+```
+</CodeGroup>
+
+## Performance Optimization Checklist
+
+### 🚀 API Performance
+- [ ] Response times under 200ms (P95)
+- [ ] Proper HTTP caching headers
+- [ ] Response compression enabled
+- [ ] Request batching implemented
+- [ ] Connection pooling configured
+- [ ] Keep-alive connections enabled
+
+### 💾 Database Performance
+- [ ] Proper indexing strategy
+- [ ] Query optimization
+- [ ] Connection pooling
+- [ ] Read replicas for read-heavy workloads
+- [ ] Query result caching
+- [ ] Prepared statements used
+
+### 🧠 Memory Management
+- [ ] Memory usage monitoring
+- [ ] Garbage collection tuning
+- [ ] Object pooling for frequently created objects
+- [ ] Memory leak detection
+- [ ] Proper cache size limits
+- [ ] Stream processing for large datasets
+
+### 🔄 Caching Strategy
+- [ ] Multi-layer caching (L1 + L2)
+- [ ] Cache hit rate > 90%
+- [ ] Proper cache invalidation
+- [ ] Cache warming for critical data
+- [ ] CDN for static assets
+- [ ] Edge caching configured
+
+### 📊 Monitoring & Alerting
+- [ ] Real-time performance monitoring
+- [ ] Performance regression detection
+- [ ] Resource usage alerts
+- [ ] Performance dashboard
+- [ ] Regular performance testing
+- [ ] Capacity planning metrics
+
+## Performance Optimization Strategies
+
+### Quick Wins (Immediate Impact)
+
+1. **Enable Response Compression**: Reduce bandwidth by 60-80%
+2. **Implement HTTP Caching**: Reduce server load by 40-60%
+3. **Add Database Indexes**: Improve query performance by 10-100x
+4. **Enable Connection Pooling**: Reduce connection overhead by 50%
+5. **Implement Basic Caching**: Reduce API calls by 70-90%
+
+### Medium-Term Improvements
+
+1. **Database Query Optimization**: Analyze and optimize slow queries
+2. **Multi-Layer Caching**: Implement L1 (memory) + L2 (Redis) caching
+3. **Request Batching**: Reduce API calls through intelligent batching
+4. **Background Job Processing**: Move heavy operations to background queues
+5. **CDN Implementation**: Distribute static assets globally
+
+### Long-Term Scaling
+
+1. **Microservices Architecture**: Split monolith into focused services
+2. **Event-Driven Architecture**: Implement async processing patterns
+3. **Auto-Scaling**: Automatic resource scaling based on demand
+4. **Database Sharding**: Distribute data across multiple databases
+5. **Edge Computing**: Move processing closer to users
+
+## Next Steps
+
+After implementing these performance optimizations:
+
+1. **Continuous Monitoring**: Set up ongoing performance monitoring
+2. **Regular Testing**: Implement automated performance regression testing
+3. **Capacity Planning**: Plan for future growth and scaling needs
+4. **Performance Reviews**: Regular architecture and performance reviews
+
+For troubleshooting performance issues, see our [Troubleshooting Guide](/api/guides/troubleshooting).

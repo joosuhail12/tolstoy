@@ -1,0 +1,2027 @@
+---
+title: 'Production Deployment'
+description: 'Complete guide to deploying Tolstoy API integrations to production with security, monitoring, and reliability'
+---
+
+# Production Deployment
+
+Deploying your Tolstoy API integration to production requires careful planning around security, reliability, monitoring, and scalability. This guide covers everything you need for a robust production deployment.
+
+## Pre-Deployment Checklist
+
+### ✅ Security Requirements
+- [ ] API keys stored in secure environment variables or secrets management
+- [ ] HTTPS/TLS enabled for all endpoints
+- [ ] Webhook signature verification implemented
+- [ ] Input validation and sanitization
+- [ ] No sensitive data in logs or error messages
+- [ ] Rate limiting implemented
+- [ ] Authentication and authorization configured
+
+### ✅ Reliability Requirements
+- [ ] Error handling and retry logic implemented
+- [ ] Circuit breakers for external dependencies
+- [ ] Database connection pooling configured
+- [ ] Graceful shutdown procedures
+- [ ] Health check endpoints available
+- [ ] Backup and recovery procedures documented
+
+### ✅ Monitoring Requirements
+- [ ] Application performance monitoring (APM) configured
+- [ ] Structured logging implemented
+- [ ] Metrics collection and alerting
+- [ ] Webhook delivery monitoring
+- [ ] Database performance monitoring
+
+## Environment Configuration
+
+### Production Environment Variables
+
+<CodeGroup>
+```bash Environment Variables
+# Production .env file
+NODE_ENV=production
+
+# Tolstoy API Configuration
+TOLSTOY_API_KEY=prod_sk_your_actual_production_key
+TOLSTOY_BASE_URL=https://api.tolstoy.com
+TOLSTOY_WEBHOOK_SECRET=your_webhook_secret_256_chars
+
+# Database Configuration
+DATABASE_URL=postgresql://user:password@prod-db.example.com:5432/tolstoy_prod
+DATABASE_POOL_SIZE=20
+DATABASE_TIMEOUT=30000
+
+# Redis Configuration
+REDIS_URL=redis://prod-redis.example.com:6379
+REDIS_CLUSTER_NODES=redis1.example.com:6379,redis2.example.com:6379
+
+# Application Configuration
+PORT=3000
+LOG_LEVEL=info
+MAX_REQUEST_SIZE=10mb
+RATE_LIMIT_REQUESTS=1000
+RATE_LIMIT_WINDOW=3600000
+
+# Monitoring
+DATADOG_API_KEY=your_datadog_key
+SENTRY_DSN=https://your-sentry-dsn@sentry.io/project
+NEWRELIC_LICENSE_KEY=your_newrelic_key
+
+# AWS Configuration (if using AWS)
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=your_aws_access_key
+AWS_SECRET_ACCESS_KEY=your_aws_secret_key
+```
+
+```yaml Kubernetes ConfigMap
+# k8s-configmap.yml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tolstoy-config
+  namespace: production
+data:
+  NODE_ENV: "production"
+  TOLSTOY_BASE_URL: "https://api.tolstoy.com"
+  DATABASE_POOL_SIZE: "20"
+  DATABASE_TIMEOUT: "30000"
+  PORT: "3000"
+  LOG_LEVEL: "info"
+  RATE_LIMIT_REQUESTS: "1000"
+  RATE_LIMIT_WINDOW: "3600000"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: tolstoy-secrets
+  namespace: production
+type: Opaque
+stringData:
+  TOLSTOY_API_KEY: "prod_sk_your_actual_production_key"
+  TOLSTOY_WEBHOOK_SECRET: "your_webhook_secret_256_chars"
+  DATABASE_URL: "postgresql://user:password@prod-db.example.com:5432/tolstoy_prod"
+```
+
+```yaml Docker Compose Production
+# docker-compose.prod.yml
+version: '3.8'
+
+services:
+  tolstoy-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    env_file:
+      - .env.production
+    depends_on:
+      - postgres
+      - redis
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_DB: tolstoy_prod
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    restart: unless-stopped
+
+  redis:
+    image: redis:7
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - tolstoy-app
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+```
+</CodeGroup>
+
+## Infrastructure Setup
+
+### Kubernetes Deployment
+
+<CodeGroup>
+```yaml Kubernetes Deployment
+# k8s-deployment.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tolstoy-integration
+  namespace: production
+  labels:
+    app: tolstoy-integration
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: tolstoy-integration
+  template:
+    metadata:
+      labels:
+        app: tolstoy-integration
+    spec:
+      containers:
+      - name: tolstoy-app
+        image: your-registry/tolstoy-integration:latest
+        ports:
+        - containerPort: 3000
+        envFrom:
+        - configMapRef:
+            name: tolstoy-config
+        - secretRef:
+            name: tolstoy-secrets
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tolstoy-service
+  namespace: production
+spec:
+  selector:
+    app: tolstoy-integration
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
+  type: LoadBalancer
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tolstoy-ingress
+  namespace: production
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+spec:
+  tls:
+  - hosts:
+    - api.yourapp.com
+    secretName: tolstoy-tls
+  rules:
+  - host: api.yourapp.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: tolstoy-service
+            port:
+              number: 80
+```
+
+```yaml Horizontal Pod Autoscaler
+# k8s-hpa.yml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: tolstoy-hpa
+  namespace: production
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: tolstoy-integration
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+```
+</CodeGroup>
+
+### AWS ECS Deployment
+
+<CodeGroup>
+```json ECS Task Definition
+{
+  "family": "tolstoy-integration",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "executionRoleArn": "arn:aws:iam::account:role/ecsTaskExecutionRole",
+  "taskRoleArn": "arn:aws:iam::account:role/tolstoyTaskRole",
+  "containerDefinitions": [
+    {
+      "name": "tolstoy-app",
+      "image": "your-account.dkr.ecr.us-east-1.amazonaws.com/tolstoy-integration:latest",
+      "portMappings": [
+        {
+          "containerPort": 3000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "NODE_ENV",
+          "value": "production"
+        },
+        {
+          "name": "PORT",
+          "value": "3000"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "TOLSTOY_API_KEY",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:account:secret:tolstoy/api-key"
+        },
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:account:secret:tolstoy/database-url"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/tolstoy-integration",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "healthCheck": {
+        "command": ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3
+      }
+    }
+  ]
+}
+```
+
+```yaml ECS Service Definition
+# ecs-service.yml
+apiVersion: ecs.aws.crossplane.io/v1alpha1
+kind: Service
+metadata:
+  name: tolstoy-integration-service
+spec:
+  forProvider:
+    cluster: production-cluster
+    taskDefinition: tolstoy-integration
+    desiredCount: 3
+    launchType: FARGATE
+    networkConfiguration:
+      awsvpcConfiguration:
+        subnets:
+          - subnet-12345
+          - subnet-67890
+        securityGroups:
+          - sg-tolstoy-app
+        assignPublicIp: ENABLED
+    loadBalancers:
+      - targetGroupArn: arn:aws:elasticloadbalancing:us-east-1:account:targetgroup/tolstoy-tg
+        containerName: tolstoy-app
+        containerPort: 3000
+    deploymentConfiguration:
+      maximumPercent: 200
+      minimumHealthyPercent: 50
+      deploymentCircuitBreaker:
+        enable: true
+        rollback: true
+```
+</CodeGroup>
+
+## Database Production Setup
+
+### PostgreSQL Production Configuration
+
+<CodeGroup>
+```sql Database Setup
+-- Create production database
+CREATE DATABASE tolstoy_prod;
+CREATE USER tolstoy_user WITH ENCRYPTED PASSWORD 'secure_password_here';
+GRANT ALL PRIVILEGES ON DATABASE tolstoy_prod TO tolstoy_user;
+
+-- Performance optimizations
+ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements';
+ALTER SYSTEM SET track_activity_query_size = 2048;
+ALTER SYSTEM SET track_io_timing = on;
+ALTER SYSTEM SET log_min_duration_statement = 1000;
+
+-- Connection pooling settings
+ALTER SYSTEM SET max_connections = 200;
+ALTER SYSTEM SET shared_buffers = '256MB';
+ALTER SYSTEM SET effective_cache_size = '1GB';
+ALTER SYSTEM SET work_mem = '4MB';
+
+SELECT pg_reload_conf();
+```
+
+```javascript Connection Pool
+// config/database.js
+import { Pool } from 'pg';
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  max: parseInt(process.env.DATABASE_POOL_SIZE) || 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+  maxUses: 7500,
+  ssl: process.env.NODE_ENV === 'production' ? {
+    rejectUnauthorized: false
+  } : false,
+  application_name: 'tolstoy-integration'
+});
+
+// Connection monitoring
+pool.on('connect', (client) => {
+  console.log('Database connection established');
+});
+
+pool.on('error', (err, client) => {
+  console.error('Database connection error:', err);
+});
+
+export default pool;
+```
+
+```python Connection Pool
+# config/database.py
+import os
+import asyncpg
+from asyncpg import pool
+
+class DatabasePool:
+    def __init__(self):
+        self.pool = None
+    
+    async def initialize(self):
+        self.pool = await asyncpg.create_pool(
+            dsn=os.getenv('DATABASE_URL'),
+            min_size=5,
+            max_size=20,
+            max_queries=50000,
+            max_inactive_connection_lifetime=300,
+            command_timeout=60,
+            server_settings={
+                'application_name': 'tolstoy-integration',
+                'jit': 'off'
+            }
+        )
+    
+    async def close(self):
+        if self.pool:
+            await self.pool.close()
+    
+    async def execute(self, query, *args):
+        async with self.pool.acquire() as connection:
+            return await connection.execute(query, *args)
+    
+    async def fetch(self, query, *args):
+        async with self.pool.acquire() as connection:
+            return await connection.fetch(query, *args)
+
+# Usage
+db_pool = DatabasePool()
+```
+</CodeGroup>
+
+## Security Configuration
+
+### API Key Management
+
+<CodeGroup>
+```javascript AWS Secrets Manager
+// utils/secrets.js
+import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager';
+
+class SecretsManager {
+  constructor() {
+    this.client = new SecretsManagerClient({
+      region: process.env.AWS_REGION || 'us-east-1'
+    });
+    this.cache = new Map();
+    this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
+  }
+
+  async getSecret(secretName) {
+    const cacheKey = secretName;
+    const cached = this.cache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
+      return cached.value;
+    }
+
+    try {
+      const command = new GetSecretValueCommand({
+        SecretId: secretName
+      });
+      
+      const response = await this.client.send(command);
+      const secret = JSON.parse(response.SecretString);
+      
+      this.cache.set(cacheKey, {
+        value: secret,
+        timestamp: Date.now()
+      });
+      
+      return secret;
+    } catch (error) {
+      console.error(`Failed to fetch secret ${secretName}:`, error);
+      throw error;
+    }
+  }
+
+  async getTolstoyApiKey() {
+    const secrets = await this.getSecret('tolstoy/production');
+    return secrets.api_key;
+  }
+
+  async getWebhookSecret() {
+    const secrets = await this.getSecret('tolstoy/production');
+    return secrets.webhook_secret;
+  }
+}
+
+export default new SecretsManager();
+```
+
+```python Azure Key Vault
+# utils/secrets.py
+import os
+import json
+import time
+from azure.keyvault.secrets import SecretClient
+from azure.identity import DefaultAzureCredential
+
+class SecretsManager:
+    def __init__(self):
+        vault_url = os.getenv('AZURE_KEY_VAULT_URL')
+        self.client = SecretClient(
+            vault_url=vault_url,
+            credential=DefaultAzureCredential()
+        )
+        self.cache = {}
+        self.cache_timeout = 300  # 5 minutes
+    
+    def get_secret(self, secret_name: str) -> str:
+        cache_key = secret_name
+        cached = self.cache.get(cache_key)
+        
+        if cached and time.time() - cached['timestamp'] < self.cache_timeout:
+            return cached['value']
+        
+        try:
+            secret = self.client.get_secret(secret_name)
+            value = secret.value
+            
+            self.cache[cache_key] = {
+                'value': value,
+                'timestamp': time.time()
+            }
+            
+            return value
+        except Exception as e:
+            print(f"Failed to fetch secret {secret_name}: {e}")
+            raise
+    
+    def get_tolstoy_config(self) -> dict:
+        config_json = self.get_secret('tolstoy-production-config')
+        return json.loads(config_json)
+    
+    def get_tolstoy_api_key(self) -> str:
+        config = self.get_tolstoy_config()
+        return config['api_key']
+    
+    def get_webhook_secret(self) -> str:
+        config = self.get_tolstoy_config()
+        return config['webhook_secret']
+
+secrets_manager = SecretsManager()
+```
+</CodeGroup>
+
+### HTTPS and SSL Configuration
+
+<CodeGroup>
+```nginx Nginx SSL Configuration
+# nginx.conf
+events {
+    worker_connections 1024;
+}
+
+http {
+    upstream tolstoy_app {
+        server tolstoy-app:3000;
+        keepalive 32;
+    }
+
+    # Rate limiting
+    limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+    limit_req_zone $binary_remote_addr zone=webhook:10m rate=100r/m;
+
+    server {
+        listen 80;
+        server_name api.yourapp.com;
+        
+        # Redirect HTTP to HTTPS
+        return 301 https://$server_name$request_uri;
+    }
+
+    server {
+        listen 443 ssl http2;
+        server_name api.yourapp.com;
+
+        # SSL Configuration
+        ssl_certificate /etc/nginx/ssl/cert.pem;
+        ssl_certificate_key /etc/nginx/ssl/key.pem;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_ciphers ECDHE-RSA-AES256-GCM-SHA512:DHE-RSA-AES256-GCM-SHA512;
+        ssl_prefer_server_ciphers off;
+        ssl_session_cache shared:SSL:10m;
+        ssl_session_timeout 10m;
+
+        # Security headers
+        add_header Strict-Transport-Security "max-age=31536000" always;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-Frame-Options DENY;
+        add_header X-XSS-Protection "1; mode=block";
+
+        # API endpoints
+        location /api/ {
+            limit_req zone=api burst=20 nodelay;
+            
+            proxy_pass http://tolstoy_app;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            proxy_connect_timeout 5s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+        }
+
+        # Webhook endpoints
+        location /webhooks/ {
+            limit_req zone=webhook burst=50 nodelay;
+            
+            proxy_pass http://tolstoy_app;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            
+            client_max_body_size 10M;
+            proxy_connect_timeout 5s;
+            proxy_send_timeout 30s;
+            proxy_read_timeout 30s;
+        }
+
+        # Health checks (no rate limiting)
+        location /health {
+            proxy_pass http://tolstoy_app;
+            access_log off;
+        }
+    }
+}
+```
+</CodeGroup>
+
+## Monitoring and Observability
+
+### Application Performance Monitoring
+
+<CodeGroup>
+```javascript APM Configuration
+// config/monitoring.js
+import * as Sentry from '@sentry/node';
+import { ProfilingIntegration } from '@sentry/profiling-node';
+import DatadogTracer from 'dd-trace';
+
+// Sentry configuration
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: process.env.NODE_ENV,
+  integrations: [
+    new ProfilingIntegration(),
+  ],
+  tracesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
+  profilesSampleRate: 0.1,
+  beforeSend(event) {
+    // Filter out sensitive information
+    if (event.extra && event.extra.apiKey) {
+      delete event.extra.apiKey;
+    }
+    return event;
+  }
+});
+
+// Datadog APM
+if (process.env.NODE_ENV === 'production') {
+  DatadogTracer.init({
+    service: 'tolstoy-integration',
+    version: process.env.APP_VERSION,
+    env: process.env.NODE_ENV,
+    logInjection: true,
+    analytics: true
+  });
+}
+
+// Custom metrics
+export class MetricsCollector {
+  constructor() {
+    this.metrics = {
+      apiCalls: 0,
+      webhookEvents: 0,
+      errors: 0,
+      responseTime: []
+    };
+  }
+
+  recordApiCall(duration) {
+    this.metrics.apiCalls++;
+    this.metrics.responseTime.push(duration);
+  }
+
+  recordWebhookEvent() {
+    this.metrics.webhookEvents++;
+  }
+
+  recordError(error) {
+    this.metrics.errors++;
+    Sentry.captureException(error);
+  }
+
+  getMetrics() {
+    const responseTime = this.metrics.responseTime;
+    const avgResponseTime = responseTime.length > 0 
+      ? responseTime.reduce((a, b) => a + b) / responseTime.length 
+      : 0;
+
+    return {
+      ...this.metrics,
+      avgResponseTime,
+      uptime: process.uptime()
+    };
+  }
+}
+
+export const metrics = new MetricsCollector();
+```
+
+```python APM Configuration
+# config/monitoring.py
+import os
+import time
+import sentry_sdk
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+from datadog import initialize, statsd
+
+# Sentry configuration
+sentry_sdk.init(
+    dsn=os.getenv('SENTRY_DSN'),
+    environment=os.getenv('NODE_ENV', 'development'),
+    integrations=[
+        AsyncioIntegration(transaction_style="endpoint"),
+        SqlalchemyIntegration(),
+    ],
+    traces_sample_rate=0.1 if os.getenv('NODE_ENV') == 'production' else 1.0,
+    before_send=lambda event, hint: filter_sensitive_data(event)
+)
+
+# Datadog configuration
+if os.getenv('NODE_ENV') == 'production':
+    initialize(
+        api_key=os.getenv('DATADOG_API_KEY'),
+        app_key=os.getenv('DATADOG_APP_KEY')
+    )
+
+class MetricsCollector:
+    def __init__(self):
+        self.metrics = {
+            'api_calls': 0,
+            'webhook_events': 0,
+            'errors': 0,
+            'response_times': []
+        }
+    
+    def record_api_call(self, duration: float):
+        self.metrics['api_calls'] += 1
+        self.metrics['response_times'].append(duration)
+        
+        # Send to Datadog
+        statsd.increment('tolstoy.api.calls')
+        statsd.histogram('tolstoy.api.response_time', duration)
+    
+    def record_webhook_event(self, event_type: str):
+        self.metrics['webhook_events'] += 1
+        statsd.increment('tolstoy.webhook.events', tags=[f'type:{event_type}'])
+    
+    def record_error(self, error: Exception):
+        self.metrics['errors'] += 1
+        statsd.increment('tolstoy.errors')
+        sentry_sdk.capture_exception(error)
+    
+    def get_metrics(self) -> dict:
+        response_times = self.metrics['response_times']
+        avg_response_time = sum(response_times) / len(response_times) if response_times else 0
+        
+        return {
+            **self.metrics,
+            'avg_response_time': avg_response_time,
+            'uptime': time.time() - start_time
+        }
+
+def filter_sensitive_data(event):
+    # Remove sensitive information from Sentry events
+    if 'extra' in event and 'api_key' in event['extra']:
+        del event['extra']['api_key']
+    return event
+
+metrics = MetricsCollector()
+start_time = time.time()
+```
+</CodeGroup>
+
+### Logging Configuration
+
+<CodeGroup>
+```javascript Production Logging
+// config/logger.js
+import winston from 'winston';
+import 'winston-daily-rotate-file';
+
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  defaultMeta: {
+    service: 'tolstoy-integration',
+    version: process.env.APP_VERSION
+  },
+  transports: [
+    // Console output for development
+    new winston.transports.Console({
+      format: winston.format.combine(
+        winston.format.colorize(),
+        winston.format.simple()
+      )
+    }),
+    
+    // File rotation for production
+    new winston.transports.DailyRotateFile({
+      filename: 'logs/application-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      maxSize: '20m',
+      maxFiles: '14d',
+      auditFile: 'logs/audit.json'
+    }),
+    
+    // Error-specific log file
+    new winston.transports.DailyRotateFile({
+      filename: 'logs/error-%DATE%.log',
+      datePattern: 'YYYY-MM-DD',
+      level: 'error',
+      maxSize: '20m',
+      maxFiles: '30d'
+    })
+  ]
+});
+
+// Structured logging helpers
+export const logApiCall = (method, endpoint, duration, status) => {
+  logger.info('API call completed', {
+    type: 'api_call',
+    method,
+    endpoint,
+    duration,
+    status,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logWebhookEvent = (event, webhookId, status) => {
+  logger.info('Webhook event processed', {
+    type: 'webhook_event',
+    event,
+    webhook_id: webhookId,
+    status,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export const logError = (error, context = {}) => {
+  logger.error('Application error', {
+    type: 'error',
+    message: error.message,
+    stack: error.stack,
+    context,
+    timestamp: new Date().toISOString()
+  });
+};
+
+export default logger;
+```
+
+```python Production Logging
+# config/logger.py
+import os
+import json
+import logging
+import logging.handlers
+from datetime import datetime
+from typing import Any, Dict
+
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_entry = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'level': record.levelname,
+            'message': record.getMessage(),
+            'service': 'tolstoy-integration',
+            'version': os.getenv('APP_VERSION', 'unknown')
+        }
+        
+        if hasattr(record, 'extra'):
+            log_entry.update(record.extra)
+        
+        if record.exc_info:
+            log_entry['exception'] = self.formatException(record.exc_info)
+        
+        return json.dumps(log_entry)
+
+def setup_logging():
+    logger = logging.getLogger('tolstoy-integration')
+    logger.setLevel(getattr(logging, os.getenv('LOG_LEVEL', 'INFO').upper()))
+    
+    # Console handler
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(JSONFormatter())
+    logger.addHandler(console_handler)
+    
+    # File handler with rotation
+    file_handler = logging.handlers.RotatingFileHandler(
+        'logs/application.log',
+        maxBytes=20 * 1024 * 1024,  # 20MB
+        backupCount=10
+    )
+    file_handler.setFormatter(JSONFormatter())
+    logger.addHandler(file_handler)
+    
+    # Error-specific handler
+    error_handler = logging.handlers.RotatingFileHandler(
+        'logs/error.log',
+        maxBytes=20 * 1024 * 1024,
+        backupCount=30
+    )
+    error_handler.setLevel(logging.ERROR)
+    error_handler.setFormatter(JSONFormatter())
+    logger.addHandler(error_handler)
+    
+    return logger
+
+logger = setup_logging()
+
+def log_api_call(method: str, endpoint: str, duration: float, status: int):
+    logger.info("API call completed", extra={
+        'type': 'api_call',
+        'method': method,
+        'endpoint': endpoint,
+        'duration': duration,
+        'status': status
+    })
+
+def log_webhook_event(event: str, webhook_id: str, status: str):
+    logger.info("Webhook event processed", extra={
+        'type': 'webhook_event',
+        'event': event,
+        'webhook_id': webhook_id,
+        'status': status
+    })
+
+def log_error(error: Exception, context: Dict[str, Any] = None):
+    logger.error("Application error", extra={
+        'type': 'error',
+        'context': context or {}
+    }, exc_info=error)
+```
+</CodeGroup>
+
+## Health Checks and Monitoring
+
+### Health Check Endpoints
+
+<CodeGroup>
+```javascript Health Checks
+// routes/health.js
+import express from 'express';
+import pool from '../config/database.js';
+import redis from '../config/redis.js';
+import { metrics } from '../config/monitoring.js';
+
+const router = express.Router();
+
+// Basic health check
+router.get('/health', async (req, res) => {
+  try {
+    const health = {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      version: process.env.APP_VERSION
+    };
+
+    res.status(200).json(health);
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Detailed readiness check
+router.get('/ready', async (req, res) => {
+  const checks = {};
+  let overall = 'ready';
+
+  try {
+    // Database check
+    const dbStart = Date.now();
+    await pool.query('SELECT 1');
+    checks.database = {
+      status: 'healthy',
+      response_time: Date.now() - dbStart
+    };
+  } catch (error) {
+    checks.database = {
+      status: 'unhealthy',
+      error: error.message
+    };
+    overall = 'not_ready';
+  }
+
+  try {
+    // Redis check
+    const redisStart = Date.now();
+    await redis.ping();
+    checks.redis = {
+      status: 'healthy',
+      response_time: Date.now() - redisStart
+    };
+  } catch (error) {
+    checks.redis = {
+      status: 'unhealthy',
+      error: error.message
+    };
+    overall = 'not_ready';
+  }
+
+  try {
+    // Tolstoy API check
+    const apiStart = Date.now();
+    const response = await fetch('https://api.tolstoy.com/v1/health', {
+      headers: { 'Authorization': `Bearer ${process.env.TOLSTOY_API_KEY}` }
+    });
+    
+    checks.tolstoy_api = {
+      status: response.ok ? 'healthy' : 'unhealthy',
+      response_time: Date.now() - apiStart,
+      status_code: response.status
+    };
+    
+    if (!response.ok) overall = 'not_ready';
+  } catch (error) {
+    checks.tolstoy_api = {
+      status: 'unhealthy',
+      error: error.message
+    };
+    overall = 'not_ready';
+  }
+
+  const status = overall === 'ready' ? 200 : 503;
+  
+  res.status(status).json({
+    status: overall,
+    checks,
+    metrics: metrics.getMetrics(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+export default router;
+```
+
+```python Health Checks
+# routes/health.py
+import time
+import asyncio
+import asyncpg
+import aioredis
+import aiohttp
+from fastapi import APIRouter, HTTPException
+from config.database import db_pool
+from config.monitoring import metrics
+
+router = APIRouter()
+
+@router.get("/health")
+async def health_check():
+    try:
+        health = {
+            "status": "healthy",
+            "timestamp": time.time(),
+            "uptime": time.time() - start_time,
+            "memory": get_memory_usage(),
+            "version": os.getenv("APP_VERSION", "unknown")
+        }
+        return health
+    except Exception as e:
+        raise HTTPException(status_code=503, detail={
+            "status": "unhealthy",
+            "error": str(e),
+            "timestamp": time.time()
+        })
+
+@router.get("/ready")
+async def readiness_check():
+    checks = {}
+    overall = "ready"
+    
+    # Database check
+    try:
+        db_start = time.time()
+        await db_pool.execute("SELECT 1")
+        checks["database"] = {
+            "status": "healthy",
+            "response_time": time.time() - db_start
+        }
+    except Exception as e:
+        checks["database"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+        overall = "not_ready"
+    
+    # Redis check
+    try:
+        redis_start = time.time()
+        redis = aioredis.from_url(os.getenv('REDIS_URL'))
+        await redis.ping()
+        await redis.close()
+        checks["redis"] = {
+            "status": "healthy",
+            "response_time": time.time() - redis_start
+        }
+    except Exception as e:
+        checks["redis"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+        overall = "not_ready"
+    
+    # Tolstoy API check
+    try:
+        api_start = time.time()
+        async with aiohttp.ClientSession() as session:
+            headers = {"Authorization": f"Bearer {os.getenv('TOLSTOY_API_KEY')}"}
+            async with session.get("https://api.tolstoy.com/v1/health", headers=headers) as response:
+                checks["tolstoy_api"] = {
+                    "status": "healthy" if response.ok else "unhealthy",
+                    "response_time": time.time() - api_start,
+                    "status_code": response.status
+                }
+                if not response.ok:
+                    overall = "not_ready"
+    except Exception as e:
+        checks["tolstoy_api"] = {
+            "status": "unhealthy",
+            "error": str(e)
+        }
+        overall = "not_ready"
+    
+    status_code = 200 if overall == "ready" else 503
+    
+    return {
+        "status": overall,
+        "checks": checks,
+        "metrics": metrics.get_metrics(),
+        "timestamp": time.time()
+    }
+
+def get_memory_usage():
+    import psutil
+    process = psutil.Process()
+    return {
+        "rss": process.memory_info().rss,
+        "vms": process.memory_info().vms,
+        "percent": process.memory_percent()
+    }
+
+start_time = time.time()
+```
+</CodeGroup>
+
+### Alerting Configuration
+
+<CodeGroup>
+```yaml Prometheus Alerts
+# alerts.yml
+groups:
+- name: tolstoy-integration
+  rules:
+  - alert: HighErrorRate
+    expr: rate(tolstoy_errors_total[5m]) > 0.1
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High error rate detected"
+      description: "Error rate is {{ $value }} errors per second"
+
+  - alert: SlowResponseTime
+    expr: histogram_quantile(0.95, rate(tolstoy_response_time_seconds_bucket[5m])) > 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Slow response times detected"
+      description: "95th percentile response time is {{ $value }}s"
+
+  - alert: DatabaseConnectionFailure
+    expr: tolstoy_database_connections_failed_total > 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Database connection failures"
+      description: "{{ $value }} database connections have failed"
+
+  - alert: WebhookDeliveryFailure
+    expr: rate(tolstoy_webhook_delivery_failures_total[10m]) > 0.05
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "High webhook delivery failure rate"
+      description: "Webhook delivery failure rate is {{ $value }}"
+```
+
+```javascript PagerDuty Integration
+// utils/alerting.js
+import axios from 'axios';
+
+class AlertManager {
+  constructor() {
+    this.pagerDutyKey = process.env.PAGERDUTY_INTEGRATION_KEY;
+    this.slackWebhook = process.env.SLACK_WEBHOOK_URL;
+  }
+
+  async sendCriticalAlert(title, description, context = {}) {
+    const promises = [];
+
+    // PagerDuty alert
+    if (this.pagerDutyKey) {
+      promises.push(this.sendPagerDutyAlert(title, description, context));
+    }
+
+    // Slack notification
+    if (this.slackWebhook) {
+      promises.push(this.sendSlackAlert(title, description, context));
+    }
+
+    await Promise.allSettled(promises);
+  }
+
+  async sendPagerDutyAlert(title, description, context) {
+    try {
+      await axios.post('https://events.pagerduty.com/v2/enqueue', {
+        routing_key: this.pagerDutyKey,
+        event_action: 'trigger',
+        payload: {
+          summary: title,
+          source: 'tolstoy-integration',
+          severity: 'critical',
+          custom_details: {
+            description,
+            context,
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Failed to send PagerDuty alert:', error);
+    }
+  }
+
+  async sendSlackAlert(title, description, context) {
+    try {
+      await axios.post(this.slackWebhook, {
+        text: `🚨 *${title}*`,
+        blocks: [
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `*${title}*\n${description}`
+            }
+          },
+          {
+            type: 'section',
+            fields: Object.entries(context).map(([key, value]) => ({
+              type: 'mrkdwn',
+              text: `*${key}:*\n${value}`
+            }))
+          }
+        ]
+      });
+    } catch (error) {
+      console.error('Failed to send Slack alert:', error);
+    }
+  }
+}
+
+export default new AlertManager();
+```
+</CodeGroup>
+
+## Deployment Strategies
+
+### Blue-Green Deployment
+
+<CodeGroup>
+```yaml Blue-Green K8s
+# deployment-strategy.yml
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: tolstoy-integration
+spec:
+  replicas: 5
+  strategy:
+    blueGreen:
+      activeService: tolstoy-active
+      previewService: tolstoy-preview
+      autoPromotionEnabled: false
+      scaleDownDelaySeconds: 30
+      prePromotionAnalysis:
+        templates:
+        - templateName: success-rate
+        args:
+        - name: service-name
+          value: tolstoy-preview
+      postPromotionAnalysis:
+        templates:
+        - templateName: success-rate
+        args:
+        - name: service-name
+          value: tolstoy-active
+  selector:
+    matchLabels:
+      app: tolstoy-integration
+  template:
+    metadata:
+      labels:
+        app: tolstoy-integration
+    spec:
+      containers:
+      - name: tolstoy-app
+        image: your-registry/tolstoy-integration:latest
+        ports:
+        - containerPort: 3000
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+```
+
+```bash Deployment Script
+#!/bin/bash
+# scripts/deploy.sh
+
+set -e
+
+ENVIRONMENT=${1:-staging}
+VERSION=${2:-latest}
+REGISTRY="your-account.dkr.ecr.us-east-1.amazonaws.com"
+IMAGE_NAME="tolstoy-integration"
+
+echo "Deploying ${IMAGE_NAME}:${VERSION} to ${ENVIRONMENT}"
+
+# Build and push Docker image
+echo "Building Docker image..."
+docker build -t ${IMAGE_NAME}:${VERSION} .
+docker tag ${IMAGE_NAME}:${VERSION} ${REGISTRY}/${IMAGE_NAME}:${VERSION}
+
+echo "Pushing to registry..."
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${REGISTRY}
+docker push ${REGISTRY}/${IMAGE_NAME}:${VERSION}
+
+# Deploy to Kubernetes
+echo "Updating Kubernetes deployment..."
+kubectl set image deployment/tolstoy-integration \
+  tolstoy-app=${REGISTRY}/${IMAGE_NAME}:${VERSION} \
+  -n ${ENVIRONMENT}
+
+# Wait for rollout to complete
+echo "Waiting for rollout to complete..."
+kubectl rollout status deployment/tolstoy-integration -n ${ENVIRONMENT} --timeout=300s
+
+# Run post-deployment health checks
+echo "Running health checks..."
+HEALTH_URL="https://api-${ENVIRONMENT}.yourapp.com/health"
+for i in {1..10}; do
+  if curl -f ${HEALTH_URL}; then
+    echo "Health check passed"
+    break
+  else
+    echo "Health check failed, attempt ${i}/10"
+    if [ ${i} -eq 10 ]; then
+      echo "Health checks failed, rolling back..."
+      kubectl rollout undo deployment/tolstoy-integration -n ${ENVIRONMENT}
+      exit 1
+    fi
+    sleep 10
+  fi
+done
+
+echo "Deployment completed successfully!"
+```
+</CodeGroup>
+
+### Canary Deployment
+
+<CodeGroup>
+```yaml Istio Canary
+# canary-deployment.yml
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: tolstoy-integration
+spec:
+  replicas: 10
+  strategy:
+    canary:
+      steps:
+      - setWeight: 10
+      - pause: {duration: 2m}
+      - setWeight: 20
+      - pause: {duration: 5m}
+      - setWeight: 50
+      - pause: {duration: 10m}
+      - setWeight: 100
+      canaryService: tolstoy-canary
+      stableService: tolstoy-stable
+      trafficRouting:
+        istio:
+          virtualService:
+            name: tolstoy-vs
+            routes:
+            - primary
+      analysis:
+        templates:
+        - templateName: error-rate
+        - templateName: response-time
+        args:
+        - name: service-name
+          value: tolstoy-canary
+        startingStep: 2
+        interval: 20s
+        count: 5
+        successCondition: result[0] < 0.05 && result[1] < 500
+        failureCondition: result[0] >= 0.1 || result[1] >= 1000
+```
+</CodeGroup>
+
+## Production Monitoring Dashboards
+
+### Grafana Dashboard Configuration
+
+<CodeGroup>
+```json Grafana Dashboard
+{
+  "dashboard": {
+    "title": "Tolstoy Integration Production",
+    "panels": [
+      {
+        "title": "API Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(tolstoy_api_requests_total[5m])",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ]
+      },
+      {
+        "title": "Response Time P95",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(tolstoy_response_time_seconds_bucket[5m]))",
+            "legendFormat": "P95 Response Time"
+          }
+        ]
+      },
+      {
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(tolstoy_errors_total[5m]) / rate(tolstoy_api_requests_total[5m])",
+            "legendFormat": "Error Rate"
+          }
+        ]
+      },
+      {
+        "title": "Webhook Events",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(tolstoy_webhook_events_total[5m])",
+            "legendFormat": "{{event_type}}"
+          }
+        ]
+      },
+      {
+        "title": "Database Connections",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "tolstoy_database_connections_active",
+            "legendFormat": "Active"
+          },
+          {
+            "expr": "tolstoy_database_connections_idle",
+            "legendFormat": "Idle"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+</CodeGroup>
+
+## Backup and Recovery
+
+### Database Backup Strategy
+
+<CodeGroup>
+```bash Automated Backups
+#!/bin/bash
+# scripts/backup-database.sh
+
+BACKUP_DIR="/backups"
+DATE=$(date +%Y%m%d_%H%M%S)
+DB_NAME="tolstoy_prod"
+RETENTION_DAYS=30
+
+# Create backup
+echo "Creating database backup..."
+pg_dump ${DATABASE_URL} | gzip > ${BACKUP_DIR}/tolstoy_${DATE}.sql.gz
+
+# Upload to S3
+aws s3 cp ${BACKUP_DIR}/tolstoy_${DATE}.sql.gz s3://your-backup-bucket/database/
+
+# Clean up old backups
+find ${BACKUP_DIR} -name "tolstoy_*.sql.gz" -mtime +${RETENTION_DAYS} -delete
+
+# Verify backup integrity
+gunzip -t ${BACKUP_DIR}/tolstoy_${DATE}.sql.gz
+if [ $? -eq 0 ]; then
+    echo "Backup created and verified successfully"
+else
+    echo "Backup verification failed"
+    exit 1
+fi
+```
+
+```yaml Backup CronJob
+# k8s-backup-cronjob.yml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-backup
+  namespace: production
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: backup
+            image: postgres:14
+            command:
+            - /bin/bash
+            - -c
+            - |
+              pg_dump $DATABASE_URL | gzip > /backup/tolstoy_$(date +%Y%m%d_%H%M%S).sql.gz
+              aws s3 sync /backup/ s3://your-backup-bucket/database/
+              find /backup -name "*.sql.gz" -mtime +30 -delete
+            env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: tolstoy-secrets
+                  key: DATABASE_URL
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-pvc
+          restartPolicy: OnFailure
+```
+</CodeGroup>
+
+## Disaster Recovery
+
+### Recovery Procedures
+
+<CodeGroup>
+```bash Recovery Script
+#!/bin/bash
+# scripts/disaster-recovery.sh
+
+ENVIRONMENT=${1:-production}
+BACKUP_DATE=${2}
+
+if [ -z "$BACKUP_DATE" ]; then
+    echo "Usage: $0 <environment> <backup_date>"
+    echo "Example: $0 production 20240115_020000"
+    exit 1
+fi
+
+echo "Starting disaster recovery for ${ENVIRONMENT}..."
+
+# Step 1: Scale down application
+echo "Scaling down application..."
+kubectl scale deployment tolstoy-integration --replicas=0 -n ${ENVIRONMENT}
+
+# Step 2: Restore database
+echo "Restoring database from backup..."
+aws s3 cp s3://your-backup-bucket/database/tolstoy_${BACKUP_DATE}.sql.gz .
+gunzip tolstoy_${BACKUP_DATE}.sql.gz
+
+# Create new database and restore
+createdb tolstoy_recovery
+psql tolstoy_recovery < tolstoy_${BACKUP_DATE}.sql
+
+# Step 3: Verify data integrity
+echo "Verifying data integrity..."
+RECORD_COUNT=$(psql tolstoy_recovery -t -c "SELECT COUNT(*) FROM workflows;")
+echo "Restored ${RECORD_COUNT} workflow records"
+
+# Step 4: Switch to recovered database
+echo "Updating database connection..."
+kubectl patch secret tolstoy-secrets -n ${ENVIRONMENT} \
+  --type='json' \
+  -p='[{"op": "replace", "path": "/data/DATABASE_URL", "value": "'$(echo -n $RECOVERY_DATABASE_URL | base64)'"}]'
+
+# Step 5: Scale up application
+echo "Scaling up application..."
+kubectl scale deployment tolstoy-integration --replicas=3 -n ${ENVIRONMENT}
+
+# Step 6: Verify recovery
+echo "Verifying application health..."
+sleep 30
+kubectl get pods -n ${ENVIRONMENT}
+curl -f https://api-${ENVIRONMENT}.yourapp.com/health
+
+echo "Disaster recovery completed successfully!"
+```
+</CodeGroup>
+
+## Performance Optimization
+
+### Database Optimization
+
+<CodeGroup>
+```sql Database Indexes
+-- Create performance indexes
+CREATE INDEX CONCURRENTLY idx_workflows_org_id ON workflows(organization_id);
+CREATE INDEX CONCURRENTLY idx_workflows_status ON workflows(status);
+CREATE INDEX CONCURRENTLY idx_workflows_created_at ON workflows(created_at);
+CREATE INDEX CONCURRENTLY idx_executions_workflow_id ON executions(workflow_id);
+CREATE INDEX CONCURRENTLY idx_executions_status_created ON executions(status, created_at);
+
+-- Composite indexes for common queries
+CREATE INDEX CONCURRENTLY idx_workflows_org_status ON workflows(organization_id, status);
+CREATE INDEX CONCURRENTLY idx_executions_workflow_status ON executions(workflow_id, status);
+
+-- Analyze query performance
+EXPLAIN (ANALYZE, BUFFERS) 
+SELECT w.*, COUNT(e.id) as execution_count 
+FROM workflows w 
+LEFT JOIN executions e ON w.id = e.workflow_id 
+WHERE w.organization_id = $1 AND w.status = 'active'
+GROUP BY w.id 
+ORDER BY w.created_at DESC 
+LIMIT 50;
+```
+
+```javascript Query Optimization
+// utils/database-optimizer.js
+class QueryOptimizer {
+  constructor(pool) {
+    this.pool = pool;
+    this.queryCache = new Map();
+    this.cacheTimeout = 5 * 60 * 1000; // 5 minutes
+  }
+
+  async cachedQuery(key, query, params = [], ttl = this.cacheTimeout) {
+    const cached = this.queryCache.get(key);
+    
+    if (cached && Date.now() - cached.timestamp < ttl) {
+      return cached.result;
+    }
+
+    const result = await this.pool.query(query, params);
+    
+    this.queryCache.set(key, {
+      result,
+      timestamp: Date.now()
+    });
+
+    return result;
+  }
+
+  async getWorkflowsOptimized(orgId, limit = 50, offset = 0) {
+    const cacheKey = `workflows:${orgId}:${limit}:${offset}`;
+    
+    return this.cachedQuery(
+      cacheKey,
+      `SELECT w.*, 
+              COUNT(e.id) as execution_count,
+              MAX(e.created_at) as last_execution
+       FROM workflows w 
+       LEFT JOIN executions e ON w.id = e.workflow_id 
+       WHERE w.organization_id = $1 AND w.status = 'active'
+       GROUP BY w.id 
+       ORDER BY w.created_at DESC 
+       LIMIT $2 OFFSET $3`,
+      [orgId, limit, offset],
+      2 * 60 * 1000 // 2 minute cache
+    );
+  }
+
+  clearCache() {
+    this.queryCache.clear();
+  }
+}
+
+export default QueryOptimizer;
+```
+</CodeGroup>
+
+### Caching Strategy
+
+<CodeGroup>
+```javascript Redis Caching
+// utils/cache.js
+import Redis from 'ioredis';
+
+class CacheManager {
+  constructor() {
+    this.redis = new Redis(process.env.REDIS_URL, {
+      retryDelayOnFailover: 100,
+      maxRetriesPerRequest: 3,
+      lazyConnect: true
+    });
+    
+    this.defaultTtl = 5 * 60; // 5 minutes
+  }
+
+  async get(key) {
+    try {
+      const value = await this.redis.get(key);
+      return value ? JSON.parse(value) : null;
+    } catch (error) {
+      console.error('Cache get error:', error);
+      return null;
+    }
+  }
+
+  async set(key, value, ttl = this.defaultTtl) {
+    try {
+      await this.redis.setex(key, ttl, JSON.stringify(value));
+    } catch (error) {
+      console.error('Cache set error:', error);
+    }
+  }
+
+  async del(key) {
+    try {
+      await this.redis.del(key);
+    } catch (error) {
+      console.error('Cache delete error:', error);
+    }
+  }
+
+  async mget(keys) {
+    try {
+      const values = await this.redis.mget(keys);
+      return values.map(value => value ? JSON.parse(value) : null);
+    } catch (error) {
+      console.error('Cache mget error:', error);
+      return keys.map(() => null);
+    }
+  }
+
+  // Cache workflow with related data
+  async cacheWorkflow(workflow) {
+    const key = `workflow:${workflow.id}`;
+    await this.set(key, workflow, 10 * 60); // 10 minute cache
+    
+    // Also cache by organization for faster listing
+    const orgKey = `org:${workflow.organization_id}:workflows`;
+    const existing = await this.get(orgKey) || [];
+    existing.unshift(workflow);
+    await this.set(orgKey, existing.slice(0, 100), 5 * 60); // Top 100 workflows
+  }
+
+  async invalidateWorkflow(workflowId, orgId) {
+    await this.del(`workflow:${workflowId}`);
+    await this.del(`org:${orgId}:workflows`);
+  }
+}
+
+export default new CacheManager();
+```
+</CodeGroup>
+
+## Scaling Considerations
+
+### Auto-scaling Configuration
+
+<CodeGroup>
+```yaml KEDA Scaling
+# keda-scaler.yml
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: tolstoy-integration-scaler
+  namespace: production
+spec:
+  scaleTargetRef:
+    name: tolstoy-integration
+  minReplicaCount: 3
+  maxReplicaCount: 20
+  triggers:
+  - type: prometheus
+    metadata:
+      serverAddress: http://prometheus:9090
+      metricName: tolstoy_api_requests_per_second
+      threshold: '50'
+      query: rate(tolstoy_api_requests_total[1m])
+  - type: redis
+    metadata:
+      address: redis:6379
+      listName: tolstoy_webhook_queue
+      listLength: '10'
+```
+
+```javascript Load Balancing
+// config/cluster.js
+import cluster from 'cluster';
+import os from 'os';
+import process from 'process';
+
+const numCPUs = os.cpus().length;
+
+if (cluster.isPrimary) {
+  console.log(`Primary ${process.pid} is running`);
+
+  // Fork workers
+  for (let i = 0; i < numCPUs; i++) {
+    cluster.fork();
+  }
+
+  cluster.on('exit', (worker, code, signal) => {
+    console.log(`Worker ${worker.process.pid} died`);
+    console.log('Starting a new worker');
+    cluster.fork();
+  });
+} else {
+  // Workers can share any TCP port
+  const app = await import('./app.js');
+  app.listen(process.env.PORT || 3000);
+  
+  console.log(`Worker ${process.pid} started`);
+}
+```
+</CodeGroup>
+
+## Production Troubleshooting
+
+### Common Production Issues
+
+| Issue | Symptoms | Investigation | Resolution |
+|-------|----------|---------------|------------|
+| High latency | Slow API responses, timeouts | Check database queries, network latency | Optimize queries, add caching |
+| Memory leaks | Increasing memory usage, OOM kills | Monitor heap dumps, check event listeners | Fix resource cleanup, restart policy |
+| Database locks | Hanging requests, query timeouts | Check pg_stat_activity, lock tables | Optimize transactions, add indexes |
+| Rate limiting | 429 responses, rejected requests | Check rate limit metrics, API quotas | Implement backoff, increase limits |
+
+### Emergency Procedures
+
+<CodeGroup>
+```bash Emergency Response
+#!/bin/bash
+# scripts/emergency-response.sh
+
+SEVERITY=${1:-high}
+ENVIRONMENT=${2:-production}
+
+case $SEVERITY in
+  critical)
+    echo "CRITICAL: Initiating emergency procedures..."
+    
+    # Scale down to minimum replicas
+    kubectl scale deployment tolstoy-integration --replicas=1 -n $ENVIRONMENT
+    
+    # Enable maintenance mode
+    kubectl patch ingress tolstoy-ingress -n $ENVIRONMENT \
+      --type='json' \
+      -p='[{"op": "add", "path": "/metadata/annotations/nginx.ingress.kubernetes.io~1default-backend", "value": "maintenance-page"}]'
+    
+    # Alert team
+    curl -X POST $SLACK_WEBHOOK_URL \
+      -H 'Content-type: application/json' \
+      --data '{"text":"🚨 CRITICAL: Tolstoy integration in emergency mode"}'
+    ;;
+    
+  high)
+    echo "HIGH: Implementing protective measures..."
+    
+    # Reduce traffic gradually
+    kubectl patch deployment tolstoy-integration -n $ENVIRONMENT \
+      --type='json' \
+      -p='[{"op": "replace", "path": "/spec/replicas", "value": 2}]'
+    
+    # Enable circuit breaker mode
+    kubectl patch configmap tolstoy-config -n $ENVIRONMENT \
+      --type='json' \
+      -p='[{"op": "replace", "path": "/data/CIRCUIT_BREAKER_ENABLED", "value": "true"}]'
+    ;;
+esac
+
+echo "Emergency response completed for severity: $SEVERITY"
+```
+</CodeGroup>
+
+## Deployment Best Practices
+
+### 🎯 Key Principles
+
+1. **Zero-Downtime Deployments**: Use rolling updates or blue-green deployments
+2. **Automated Rollbacks**: Implement automatic rollback on health check failures
+3. **Gradual Rollouts**: Use canary deployments for high-risk changes
+4. **Comprehensive Testing**: Run full test suite before production deployment
+5. **Monitoring First**: Ensure monitoring and alerting are configured before deployment
+
+### 🔒 Security Best Practices
+
+1. **Secret Management**: Use dedicated secret management systems
+2. **Network Security**: Implement proper VPC, security groups, and firewalls
+3. **Access Control**: Use IAM roles and least privilege access
+4. **Audit Logging**: Log all administrative actions and API access
+5. **Regular Updates**: Keep dependencies and base images updated
+
+### 📊 Monitoring Best Practices
+
+1. **Golden Signals**: Monitor latency, traffic, errors, and saturation
+2. **Business Metrics**: Track workflow success rates and execution times
+3. **Infrastructure Metrics**: Monitor CPU, memory, disk, and network
+4. **Custom Metrics**: Track application-specific KPIs
+5. **Alerting Strategy**: Implement tiered alerting with clear escalation paths
+
+## Next Steps
+
+After successful production deployment:
+
+1. **Performance Monitoring**: Continuously monitor and optimize performance
+2. **Capacity Planning**: Plan for growth and scaling requirements
+3. **Security Audits**: Regular security reviews and penetration testing
+4. **Disaster Recovery Testing**: Regularly test backup and recovery procedures
+5. **Documentation Updates**: Keep runbooks and procedures current
+
+For ongoing maintenance, see our [Performance Optimization Guide](/api/guides/performance) and [Troubleshooting Guide](/api/guides/troubleshooting).

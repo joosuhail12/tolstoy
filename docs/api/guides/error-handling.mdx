@@ -1,0 +1,2281 @@
+---
+title: "Error Handling Best Practices"
+description: "Comprehensive guide to handling errors and building resilient Tolstoy API integrations"
+---
+
+# Error Handling Best Practices
+
+Building resilient integrations requires robust error handling. This guide covers proven patterns for handling API errors, implementing retry logic, and building fault-tolerant systems with the Tolstoy API.
+
+## Error Handling Fundamentals
+
+### **Error Categories**
+
+Understanding error types helps you choose the right handling strategy:
+
+| Category | HTTP Status | Retry Strategy | Examples |
+|----------|-------------|----------------|----------|
+| **Client Errors** | 4xx | Don't retry | Invalid parameters, auth failures |
+| **Server Errors** | 5xx | Retry with backoff | Internal errors, timeouts |
+| **Rate Limits** | 429 | Retry after delay | Rate limit exceeded |
+| **Network Errors** | - | Retry with backoff | Connection failures, DNS issues |
+
+### **Error Response Structure**
+
+All Tolstoy API errors follow this structure:
+
+```json
+{
+  "error": {
+    "code": "EXECUTION_FAILED",
+    "message": "Flow execution failed",
+    "type": "execution",
+    "details": "External service timeout after 30 seconds",
+    "retryable": true,
+    "retry_after": 60,
+    "suggestion": "Check external service health",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+## Basic Error Handling
+
+### **Simple Error Handler**
+
+<CodeGroup>
+
+```javascript Basic Error Handler
+class TolstoyAPIError extends Error {
+  constructor(errorData, response) {
+    super(errorData.message);
+    this.name = 'TolstoyAPIError';
+    this.code = errorData.code;
+    this.type = errorData.type;
+    this.details = errorData.details;
+    this.retryable = errorData.retryable;
+    this.retryAfter = errorData.retry_after;
+    this.suggestion = errorData.suggestion;
+    this.requestId = errorData.request_id;
+    this.status = response.status;
+  }
+  
+  toString() {
+    return `TolstoyAPIError [${this.code}]: ${this.message}`;
+  }
+}
+
+async function makeAPIRequest(endpoint, options = {}) {
+  const response = await fetch(`https://api.tolstoy.dev${endpoint}`, {
+    headers: {
+      'Authorization': `Bearer ${process.env.TOLSTOY_API_KEY}`,
+      'Content-Type': 'application/json',
+      ...options.headers
+    },
+    ...options
+  });
+  
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new TolstoyAPIError(errorData.error, response);
+  }
+  
+  return response.json();
+}
+
+// Usage
+try {
+  const actions = await makeAPIRequest('/actions');
+  console.log(`Found ${actions.actions.length} actions`);
+} catch (error) {
+  if (error instanceof TolstoyAPIError) {
+    console.error(`API Error [${error.code}]: ${error.message}`);
+    
+    if (error.suggestion) {
+      console.log(`💡 Suggestion: ${error.suggestion}`);
+    }
+    
+    if (error.retryable) {
+      console.log(`🔄 This error is retryable after ${error.retryAfter || 60} seconds`);
+    }
+  } else {
+    console.error('Network error:', error.message);
+  }
+}
+```
+
+```python Basic Error Handler - Python
+import requests
+import time
+from typing import Optional, Dict, Any
+
+class TolstoyAPIError(Exception):
+    def __init__(self, error_data: Dict[str, Any], status_code: int):
+        super().__init__(error_data['message'])
+        self.code = error_data['code']
+        self.type = error_data['type']
+        self.details = error_data.get('details')
+        self.retryable = error_data.get('retryable', False)
+        self.retry_after = error_data.get('retry_after', 60)
+        self.suggestion = error_data.get('suggestion')
+        self.request_id = error_data.get('request_id')
+        self.status_code = status_code
+
+class TolstoyClient:
+    def __init__(self, api_key: str, base_url: str = 'https://api.tolstoy.dev'):
+        self.api_key = api_key
+        self.base_url = base_url
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        })
+    
+    def request(self, endpoint: str, method: str = 'GET', **kwargs) -> Dict[str, Any]:
+        url = f'{self.base_url}{endpoint}'
+        
+        try:
+            response = self.session.request(method, url, **kwargs)
+            
+            if not response.ok:
+                error_data = response.json().get('error', {})
+                raise TolstoyAPIError(error_data, response.status_code)
+            
+            return response.json()
+            
+        except requests.exceptions.RequestException as e:
+            raise TolstoyAPIError({
+                'code': 'NETWORK_ERROR',
+                'message': str(e),
+                'type': 'network',
+                'retryable': True
+            }, 0)
+
+# Usage
+client = TolstoyClient(api_key)
+
+try:
+    actions = client.request('/actions')
+    print(f"Found {len(actions['actions'])} actions")
+except TolstoyAPIError as e:
+    print(f"API Error [{e.code}]: {e}")
+    
+    if e.suggestion:
+        print(f"💡 Suggestion: {e.suggestion}")
+    
+    if e.retryable:
+        print(f"🔄 Retryable after {e.retry_after} seconds")
+```
+
+</CodeGroup>
+
+## Advanced Retry Strategies
+
+### **Exponential Backoff with Jitter**
+
+<CodeGroup>
+
+```javascript Advanced Retry Logic
+class RetryHandler {
+  constructor(options = {}) {
+    this.maxRetries = options.maxRetries || 3;
+    this.baseDelay = options.baseDelay || 1000;
+    this.maxDelay = options.maxDelay || 30000;
+    this.jitterFactor = options.jitterFactor || 0.1;
+    this.retryableErrors = options.retryableErrors || [
+      'INTERNAL_SERVER_ERROR',
+      'SERVICE_UNAVAILABLE', 
+      'GATEWAY_TIMEOUT',
+      'RATE_LIMIT_EXCEEDED',
+      'NETWORK_ERROR'
+    ];
+  }
+  
+  async executeWithRetry(fn, context = {}) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= this.maxRetries + 1; attempt++) {
+      try {
+        const result = await fn();
+        
+        if (attempt > 1) {
+          console.log(`✅ Succeeded on attempt ${attempt}`);
+        }
+        
+        return result;
+        
+      } catch (error) {
+        lastError = error;
+        
+        if (attempt > this.maxRetries || !this.shouldRetry(error)) {
+          break;
+        }
+        
+        const delay = this.calculateDelay(attempt, error);
+        console.log(`🔄 Attempt ${attempt} failed, retrying in ${delay}ms: ${error.message}`);
+        
+        await this.delay(delay);
+      }
+    }
+    
+    throw lastError;
+  }
+  
+  shouldRetry(error) {
+    // Check if error code is retryable
+    if (error instanceof TolstoyAPIError) {
+      return error.retryable || this.retryableErrors.includes(error.code);
+    }
+    
+    // Network errors are typically retryable
+    if (error.name === 'FetchError' || error.code === 'ECONNRESET') {
+      return true;
+    }
+    
+    return false;
+  }
+  
+  calculateDelay(attempt, error) {
+    let delay;
+    
+    // Use server-provided retry-after if available
+    if (error instanceof TolstoyAPIError && error.retryAfter) {
+      delay = error.retryAfter * 1000;
+    } else {
+      // Exponential backoff
+      delay = this.baseDelay * Math.pow(2, attempt - 1);
+    }
+    
+    // Add jitter to prevent thundering herd
+    const jitter = delay * this.jitterFactor * Math.random();
+    delay += jitter;
+    
+    // Cap at maximum delay
+    return Math.min(delay, this.maxDelay);
+  }
+  
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// Usage
+const retryHandler = new RetryHandler({
+  maxRetries: 5,
+  baseDelay: 1000,
+  maxDelay: 60000,
+  jitterFactor: 0.2
+});
+
+// Execute API call with retry
+const result = await retryHandler.executeWithRetry(async () => {
+  return makeAPIRequest('/flows', {
+    method: 'POST',
+    body: JSON.stringify(flowConfig)
+  });
+});
+```
+
+</CodeGroup>
+
+### **Circuit Breaker Pattern**
+
+<CodeGroup>
+
+```javascript Circuit Breaker Implementation
+class CircuitBreaker {
+  constructor(options = {}) {
+    this.failureThreshold = options.failureThreshold || 5;
+    this.recoveryTimeout = options.recoveryTimeout || 60000;
+    this.monitoringPeriod = options.monitoringPeriod || 300000; // 5 minutes
+    
+    this.state = 'CLOSED'; // CLOSED, OPEN, HALF_OPEN
+    this.failureCount = 0;
+    this.lastFailureTime = null;
+    this.successCount = 0;
+    this.requestCount = 0;
+    
+    // Reset counters periodically
+    setInterval(() => this.resetCounters(), this.monitoringPeriod);
+  }
+  
+  async execute(fn) {
+    if (this.state === 'OPEN') {
+      if (Date.now() - this.lastFailureTime < this.recoveryTimeout) {
+        throw new Error('Circuit breaker is OPEN - service unavailable');
+      } else {
+        // Try to recover
+        this.state = 'HALF_OPEN';
+        console.log('🔄 Circuit breaker moving to HALF_OPEN state');
+      }
+    }
+    
+    try {
+      this.requestCount++;
+      const result = await fn();
+      
+      this.onSuccess();
+      return result;
+      
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+  
+  onSuccess() {
+    this.successCount++;
+    
+    if (this.state === 'HALF_OPEN') {
+      // Recovery successful
+      this.state = 'CLOSED';
+      this.failureCount = 0;
+      console.log('✅ Circuit breaker recovered - state: CLOSED');
+    }
+  }
+  
+  onFailure() {
+    this.failureCount++;
+    this.lastFailureTime = Date.now();
+    
+    if (this.failureCount >= this.failureThreshold) {
+      this.state = 'OPEN';
+      console.log(`🚫 Circuit breaker opened after ${this.failureCount} failures`);
+    }
+  }
+  
+  getState() {
+    return {
+      state: this.state,
+      failure_count: this.failureCount,
+      success_count: this.successCount,
+      request_count: this.requestCount,
+      failure_rate: this.requestCount > 0 ? this.failureCount / this.requestCount : 0,
+      last_failure: this.lastFailureTime
+    };
+  }
+  
+  resetCounters() {
+    this.requestCount = 0;
+    this.successCount = 0;
+    
+    // Only reset failure count if circuit is closed
+    if (this.state === 'CLOSED') {
+      this.failureCount = 0;
+    }
+  }
+}
+
+// Service-specific circuit breakers
+class TolstoyAPIClient {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.circuitBreakers = {
+      actions: new CircuitBreaker({ failureThreshold: 5, recoveryTimeout: 60000 }),
+      flows: new CircuitBreaker({ failureThreshold: 3, recoveryTimeout: 120000 }),
+      executions: new CircuitBreaker({ failureThreshold: 10, recoveryTimeout: 30000 })
+    };
+  }
+  
+  async makeRequest(endpoint, options = {}) {
+    // Determine which circuit breaker to use
+    const service = this.getServiceFromEndpoint(endpoint);
+    const circuitBreaker = this.circuitBreakers[service] || this.circuitBreakers.actions;
+    
+    return circuitBreaker.execute(async () => {
+      return makeAPIRequest(endpoint, {
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        ...options
+      });
+    });
+  }
+  
+  getServiceFromEndpoint(endpoint) {
+    if (endpoint.startsWith('/actions')) return 'actions';
+    if (endpoint.startsWith('/flows')) return 'flows';
+    if (endpoint.includes('/execute')) return 'executions';
+    return 'actions';
+  }
+  
+  getCircuitBreakerStates() {
+    const states = {};
+    for (const [service, breaker] of Object.entries(this.circuitBreakers)) {
+      states[service] = breaker.getState();
+    }
+    return states;
+  }
+}
+
+// Usage
+const client = new TolstoyAPIClient(apiKey);
+
+try {
+  const flows = await client.makeRequest('/flows');
+  console.log('Flows retrieved successfully');
+} catch (error) {
+  if (error.message.includes('Circuit breaker is OPEN')) {
+    console.log('Service temporarily unavailable due to circuit breaker');
+    // Implement fallback logic
+  } else {
+    console.error('API request failed:', error.message);
+  }
+}
+
+// Monitor circuit breaker health
+setInterval(() => {
+  const states = client.getCircuitBreakerStates();
+  console.log('Circuit Breaker States:', states);
+}, 60000); // Check every minute
+```
+
+</CodeGroup>
+
+## Execution Error Handling
+
+### **Flow Execution Resilience**
+
+<CodeGroup>
+
+```javascript Resilient Flow Execution
+class ResilientFlowExecutor {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.retryHandler = new RetryHandler({
+      maxRetries: 3,
+      baseDelay: 2000,
+      retryableErrors: ['EXECUTION_FAILED', 'EXTERNAL_SERVICE_ERROR']
+    });
+  }
+  
+  async executeFlowWithResilience(flowId, inputs, options = {}) {
+    const executionConfig = {
+      inputs,
+      execution_mode: options.mode || 'synchronous',
+      timeout: options.timeout || 300000, // 5 minutes
+      retry_policy: {
+        max_retries: 2,
+        backoff_multiplier: 1.5,
+        retryable_errors: ['EXTERNAL_SERVICE_ERROR', 'TIMEOUT']
+      },
+      error_handling: {
+        continue_on_step_failure: options.continueOnStepFailure || false,
+        collect_partial_results: true
+      }
+    };
+    
+    return this.retryHandler.executeWithRetry(async () => {
+      const response = await fetch(`https://api.tolstoy.dev/flows/${flowId}/execute`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(executionConfig)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new TolstoyAPIError(errorData.error, response);
+      }
+      
+      const execution = await response.json();
+      
+      // Monitor execution if async
+      if (executionConfig.execution_mode === 'asynchronous') {
+        return this.monitorAsyncExecution(execution.execution.id);
+      }
+      
+      return execution;
+    });
+  }
+  
+  async monitorAsyncExecution(executionId) {
+    const maxWaitTime = 600000; // 10 minutes
+    const pollInterval = 5000;   // 5 seconds
+    const startTime = Date.now();
+    
+    while (Date.now() - startTime < maxWaitTime) {
+      try {
+        const response = await fetch(`https://api.tolstoy.dev/executions/${executionId}`, {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`
+          }
+        });
+        
+        if (!response.ok) {
+          throw new Error(`Failed to check execution status: ${response.status}`);
+        }
+        
+        const status = await response.json();
+        const execution = status.execution;
+        
+        console.log(`📊 Execution ${executionId}: ${execution.status} (${execution.duration_ms || 0}ms)`);
+        
+        switch (execution.status) {
+          case 'success':
+            console.log('✅ Flow execution completed successfully');
+            return execution;
+            
+          case 'failed':
+            console.error('❌ Flow execution failed:', execution.error);
+            
+            // Check if failure is recoverable
+            if (this.isRecoverableFailure(execution.error)) {
+              console.log('🔄 Attempting recovery...');
+              return this.attemptRecovery(executionId, execution);
+            }
+            
+            throw new Error(`Flow execution failed: ${execution.error.message}`);
+            
+          case 'timeout':
+            console.error('⏰ Flow execution timed out');
+            throw new Error('Flow execution timed out');
+            
+          case 'cancelled':
+            console.log('🛑 Flow execution was cancelled');
+            throw new Error('Flow execution was cancelled');
+            
+          case 'running':
+          case 'queued':
+            // Continue monitoring
+            break;
+            
+          default:
+            console.warn(`Unknown execution status: ${execution.status}`);
+        }
+        
+        await this.delay(pollInterval);
+        
+      } catch (error) {
+        console.error('Error monitoring execution:', error.message);
+        
+        // If monitoring fails, wait a bit longer before retrying
+        await this.delay(pollInterval * 2);
+      }
+    }
+    
+    throw new Error(`Execution monitoring timed out after ${maxWaitTime / 1000} seconds`);
+  }
+  
+  isRecoverableFailure(error) {
+    const recoverableCodes = [
+      'EXTERNAL_SERVICE_ERROR',
+      'RATE_LIMIT_EXCEEDED',
+      'TIMEOUT',
+      'NETWORK_ERROR'
+    ];
+    
+    return recoverableCodes.includes(error.code);
+  }
+  
+  async attemptRecovery(executionId, execution) {
+    // Analyze what failed and why
+    const failedSteps = execution.steps?.filter(step => step.status === 'failed') || [];
+    
+    if (failedSteps.length === 0) {
+      throw new Error('No failed steps to recover from');
+    }
+    
+    console.log(`🔧 Attempting to recover ${failedSteps.length} failed steps...`);
+    
+    // Try to restart from failed step
+    for (const failedStep of failedSteps) {
+      if (this.canRetryStep(failedStep)) {
+        console.log(`🔄 Retrying step: ${failedStep.step_name}`);
+        
+        try {
+          await this.retryFailedStep(executionId, failedStep.step_id);
+        } catch (retryError) {
+          console.error(`❌ Step retry failed: ${retryError.message}`);
+        }
+      }
+    }
+    
+    // Check if recovery was successful
+    return this.monitorAsyncExecution(executionId);
+  }
+  
+  canRetryStep(step) {
+    const retryableStepErrors = [
+      'EXTERNAL_SERVICE_ERROR',
+      'TIMEOUT',
+      'RATE_LIMIT_EXCEEDED'
+    ];
+    
+    return step.error && retryableStepErrors.includes(step.error.code);
+  }
+  
+  async retryFailedStep(executionId, stepId) {
+    const response = await fetch(`https://api.tolstoy.dev/executions/${executionId}/steps/${stepId}/retry`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error.message);
+    }
+    
+    return response.json();
+  }
+  
+  delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+
+// Usage
+const executor = new ResilientFlowExecutor(apiKey);
+
+try {
+  const result = await executor.executeFlowWithResilience('flow_123456789', {
+    customer_email: 'john@example.com',
+    plan_type: 'professional'
+  }, {
+    mode: 'asynchronous',
+    timeout: 600000,
+    continueOnStepFailure: true
+  });
+  
+  console.log('🎉 Flow executed successfully:', result.execution.id);
+  console.log('📊 Results:', result.execution.outputs);
+  
+} catch (error) {
+  console.error('💥 Flow execution failed completely:', error.message);
+  
+  // Implement fallback logic
+  await handleFlowExecutionFailure(flowId, inputs, error);
+}
+```
+
+</CodeGroup>
+
+## Error Recovery Patterns
+
+### **Graceful Degradation**
+
+<CodeGroup>
+
+```javascript Graceful Degradation
+class GracefulDegradationHandler {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.fallbackStrategies = new Map();
+    this.setupFallbacks();
+  }
+  
+  setupFallbacks() {
+    // Email service fallback
+    this.fallbackStrategies.set('send_email', async (inputs) => {
+      console.log('📧 Email service degraded, using fallback...');
+      
+      // Try backup email service
+      try {
+        return await this.sendViaBackupEmailService(inputs);
+      } catch (backupError) {
+        // Final fallback: queue for later
+        return await this.queueEmailForLater(inputs);
+      }
+    });
+    
+    // CRM service fallback
+    this.fallbackStrategies.set('create_crm_contact', async (inputs) => {
+      console.log('👤 CRM service degraded, using fallback...');
+      
+      // Store in local database for sync later
+      return await this.storeContactLocally(inputs);
+    });
+    
+    // Notification fallback
+    this.fallbackStrategies.set('send_notification', async (inputs) => {
+      console.log('🔔 Notification service degraded, using fallback...');
+      
+      // Try multiple notification channels
+      const strategies = [
+        () => this.sendSlackNotification(inputs),
+        () => this.sendEmailNotification(inputs),
+        () => this.sendSMSNotification(inputs)
+      ];
+      
+      for (const strategy of strategies) {
+        try {
+          return await strategy();
+        } catch (error) {
+          console.log(`Notification strategy failed: ${error.message}`);
+          continue;
+        }
+      }
+      
+      // All strategies failed - log for manual follow-up
+      await this.logNotificationFailure(inputs);
+      return { status: 'fallback_logged' };
+    });
+  }
+  
+  async executeWithFallback(actionName, inputs) {
+    try {
+      // Try primary execution
+      return await this.executePrimaryAction(actionName, inputs);
+      
+    } catch (error) {
+      console.warn(`Primary action failed: ${error.message}`);
+      
+      // Check if we have a fallback strategy
+      const fallback = this.fallbackStrategies.get(actionName);
+      
+      if (fallback) {
+        console.log(`🔄 Executing fallback for ${actionName}...`);
+        
+        try {
+          const fallbackResult = await fallback(inputs);
+          
+          // Mark as degraded service
+          fallbackResult._fallback_used = true;
+          fallbackResult._primary_error = error.message;
+          
+          return fallbackResult;
+          
+        } catch (fallbackError) {
+          console.error(`Fallback also failed: ${fallbackError.message}`);
+          
+          // Both primary and fallback failed
+          throw new Error(`All strategies failed. Primary: ${error.message}, Fallback: ${fallbackError.message}`);
+        }
+      } else {
+        // No fallback available
+        throw error;
+      }
+    }
+  }
+  
+  async executePrimaryAction(actionName, inputs) {
+    // Get action ID by name
+    const action = await this.getActionByName(actionName);
+    
+    if (!action) {
+      throw new Error(`Action not found: ${actionName}`);
+    }
+    
+    // Execute action
+    const response = await fetch(`https://api.tolstoy.dev/actions/${action.id}/execute`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ inputs })
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new TolstoyAPIError(error.error, response);
+    }
+    
+    return response.json();
+  }
+  
+  async sendViaBackupEmailService(inputs) {
+    // Implement backup email service logic
+    const backupResponse = await fetch('https://backup-email-service.com/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.BACKUP_EMAIL_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        to: inputs.to_email,
+        subject: 'Welcome!',
+        template: 'welcome_backup'
+      })
+    });
+    
+    if (!backupResponse.ok) {
+      throw new Error('Backup email service also failed');
+    }
+    
+    return {
+      status: 'sent_via_backup',
+      service: 'backup_email_service',
+      message_id: 'backup_' + Date.now()
+    };
+  }
+  
+  async queueEmailForLater(inputs) {
+    // Queue email for later delivery when service recovers
+    const emailQueue = await this.getEmailQueue();
+    
+    await emailQueue.add('send_welcome_email', inputs, {
+      delay: 300000, // Try again in 5 minutes
+      attempts: 5,
+      backoff: {
+        type: 'exponential',
+        delay: 60000
+      }
+    });
+    
+    return {
+      status: 'queued_for_later',
+      queue_id: `queue_${Date.now()}`,
+      retry_at: new Date(Date.now() + 300000).toISOString()
+    };
+  }
+}
+
+// Usage with graceful degradation
+const handler = new GracefulDegradationHandler(apiKey);
+
+async function processCustomerSignup(customerData) {
+  const results = {};
+  
+  try {
+    // Send welcome email (with fallbacks)
+    results.email = await handler.executeWithFallback('send_email', {
+      to_email: customerData.email,
+      user_name: customerData.first_name,
+      plan_type: customerData.plan
+    });
+    
+    // Create CRM contact (with fallbacks)
+    results.crm = await handler.executeWithFallback('create_crm_contact', {
+      email: customerData.email,
+      name: customerData.name,
+      company: customerData.company
+    });
+    
+    // Send notification (with fallbacks)
+    results.notification = await handler.executeWithFallback('send_notification', {
+      message: `New ${customerData.plan} customer: ${customerData.name}`,
+      customer_data: customerData
+    });
+    
+    console.log('✅ Customer signup processed successfully');
+    
+    // Check if any fallbacks were used
+    const fallbacksUsed = Object.values(results).filter(r => r._fallback_used);
+    if (fallbacksUsed.length > 0) {
+      console.warn(`⚠️ ${fallbacksUsed.length} operations used fallback strategies`);
+      await this.scheduleHealthCheck();
+    }
+    
+    return results;
+    
+  } catch (error) {
+    console.error('💥 Customer signup processing failed:', error.message);
+    
+    // Emergency fallback - minimal processing
+    return await this.emergencyFallback(customerData, error);
+  }
+}
+
+async function emergencyFallback(customerData, originalError) {
+  console.log('🚨 Executing emergency fallback...');
+  
+  // Minimal viable processing
+  const emergencyResult = {
+    status: 'emergency_fallback',
+    customer_email: customerData.email,
+    timestamp: new Date().toISOString(),
+    original_error: originalError.message,
+    actions_taken: []
+  };
+  
+  try {
+    // Store customer data locally
+    await storeCustomerDataLocally(customerData);
+    emergencyResult.actions_taken.push('data_stored_locally');
+    
+    // Send basic notification
+    await sendBasicNotification(`Emergency: Customer signup processing failed for ${customerData.email}`);
+    emergencyResult.actions_taken.push('admin_notified');
+    
+    // Schedule manual review
+    await scheduleManualReview(customerData, originalError);
+    emergencyResult.actions_taken.push('manual_review_scheduled');
+    
+  } catch (emergencyError) {
+    console.error('💥 Emergency fallback also failed:', emergencyError.message);
+    emergencyResult.emergency_error = emergencyError.message;
+  }
+  
+  return emergencyResult;
+}
+```
+
+</CodeGroup>
+
+### **Partial Success Handling**
+
+<CodeGroup>
+
+```javascript Partial Success Patterns
+class PartialSuccessHandler {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+  }
+  
+  async executeFlowWithPartialSuccess(flowId, inputs) {
+    try {
+      const execution = await this.executeFlow(flowId, inputs);
+      
+      // Analyze execution results
+      const analysis = this.analyzeExecution(execution);
+      
+      if (analysis.status === 'full_success') {
+        console.log('✅ All steps completed successfully');
+        return execution;
+      } else if (analysis.status === 'partial_success') {
+        console.warn('⚠️ Flow completed with some failures');
+        await this.handlePartialSuccess(execution, analysis);
+        return execution;
+      } else {
+        console.error('❌ Flow failed completely');
+        throw new Error(`Flow execution failed: ${execution.error.message}`);
+      }
+      
+    } catch (error) {
+      console.error('💥 Flow execution error:', error.message);
+      throw error;
+    }
+  }
+  
+  analyzeExecution(execution) {
+    const steps = execution.execution.steps || [];
+    const successfulSteps = steps.filter(step => step.status === 'success');
+    const failedSteps = steps.filter(step => step.status === 'failed');
+    const criticalSteps = steps.filter(step => step.critical === true);
+    const failedCriticalSteps = criticalSteps.filter(step => step.status === 'failed');
+    
+    let status;
+    if (failedSteps.length === 0) {
+      status = 'full_success';
+    } else if (failedCriticalSteps.length === 0) {
+      status = 'partial_success';
+    } else {
+      status = 'critical_failure';
+    }
+    
+    return {
+      status,
+      total_steps: steps.length,
+      successful_steps: successfulSteps.length,
+      failed_steps: failedSteps.length,
+      critical_failures: failedCriticalSteps.length,
+      failed_step_details: failedSteps.map(step => ({
+        step_name: step.step_name,
+        error: step.error,
+        retryable: this.isStepRetryable(step)
+      }))
+    };
+  }
+  
+  async handlePartialSuccess(execution, analysis) {
+    console.log(`📊 Partial success: ${analysis.successful_steps}/${analysis.total_steps} steps succeeded`);
+    
+    // Retry failed steps that are retryable
+    const retryableFailures = analysis.failed_step_details.filter(step => step.retryable);
+    
+    if (retryableFailures.length > 0) {
+      console.log(`🔄 Retrying ${retryableFailures.length} failed steps...`);
+      
+      for (const failedStep of retryableFailures) {
+        try {
+          await this.retryStep(execution.execution.id, failedStep.step_name);
+          console.log(`✅ Step retry succeeded: ${failedStep.step_name}`);
+        } catch (retryError) {
+          console.error(`❌ Step retry failed: ${failedStep.step_name}`, retryError.message);
+          
+          // Log for manual intervention
+          await this.logStepFailure(execution.execution.id, failedStep);
+        }
+      }
+    }
+    
+    // Handle non-retryable failures
+    const nonRetryableFailures = analysis.failed_step_details.filter(step => !step.retryable);
+    
+    if (nonRetryableFailures.length > 0) {
+      console.warn(`⚠️ ${nonRetryableFailures.length} steps failed permanently`);
+      
+      // Implement compensating actions
+      await this.executeCompensatingActions(execution, nonRetryableFailures);
+    }
+    
+    // Send partial success notification
+    await this.notifyPartialSuccess(execution, analysis);
+  }
+  
+  async executeCompensatingActions(execution, failedSteps) {
+    console.log('🔧 Executing compensating actions...');
+    
+    for (const failedStep of failedSteps) {
+      const compensatingAction = this.getCompensatingAction(failedStep.step_name);
+      
+      if (compensatingAction) {
+        try {
+          await compensatingAction(execution, failedStep);
+          console.log(`✅ Compensating action executed for: ${failedStep.step_name}`);
+        } catch (error) {
+          console.error(`❌ Compensating action failed for: ${failedStep.step_name}`);
+        }
+      }
+    }
+  }
+  
+  getCompensatingAction(stepName) {
+    const compensatingActions = {
+      'send_welcome_email': async (execution, failedStep) => {
+        // Schedule email for later or use alternative channel
+        await this.scheduleDelayedEmail(execution.inputs.customer_email);
+      },
+      'create_crm_contact': async (execution, failedStep) => {
+        // Store contact info locally for manual import
+        await this.storeForManualCRMSync(execution.inputs);
+      },
+      'charge_payment': async (execution, failedStep) => {
+        // Refund any partial charges
+        await this.initiateRefund(execution.inputs.payment_id);
+      }
+    };
+    
+    return compensatingActions[stepName];
+  }
+}
+```
+
+</CodeGroup>
+
+### **Error Aggregation and Batching**
+
+<CodeGroup>
+
+```javascript Error Aggregation
+class ErrorAggregator {
+  constructor() {
+    this.errorBuffer = [];
+    this.bufferSize = 50;
+    this.flushInterval = 60000; // 1 minute
+    this.errorCounts = new Map();
+    
+    // Auto-flush errors periodically
+    setInterval(() => this.flushErrors(), this.flushInterval);
+  }
+  
+  recordError(error, context = {}) {
+    const errorRecord = {
+      code: error.code,
+      message: error.message,
+      type: error.type,
+      context,
+      timestamp: new Date().toISOString(),
+      count: 1
+    };
+    
+    // Check for duplicate errors
+    const errorKey = `${error.code}:${context.endpoint || 'unknown'}`;
+    
+    if (this.errorCounts.has(errorKey)) {
+      // Increment existing error count
+      const existing = this.errorCounts.get(errorKey);
+      existing.count++;
+      existing.last_seen = errorRecord.timestamp;
+    } else {
+      // New error type
+      this.errorCounts.set(errorKey, errorRecord);
+      this.errorBuffer.push(errorRecord);
+    }
+    
+    // Check if we should flush immediately
+    if (this.shouldFlushImmediately(error)) {
+      this.flushErrors();
+    } else if (this.errorBuffer.length >= this.bufferSize) {
+      this.flushErrors();
+    }
+  }
+  
+  shouldFlushImmediately(error) {
+    const criticalErrors = [
+      'PAYMENT_FAILED',
+      'SECURITY_BREACH',
+      'DATA_CORRUPTION',
+      'CRITICAL_SERVICE_DOWN'
+    ];
+    
+    return criticalErrors.includes(error.code);
+  }
+  
+  async flushErrors() {
+    if (this.errorBuffer.length === 0) return;
+    
+    const errorsToFlush = [...this.errorBuffer];
+    this.errorBuffer = [];
+    
+    console.log(`📤 Flushing ${errorsToFlush.length} error records...`);
+    
+    try {
+      // Send to error tracking service
+      await this.sendToErrorTracker(errorsToFlush);
+      
+      // Send critical alerts
+      await this.sendCriticalAlerts(errorsToFlush);
+      
+      // Update error analytics
+      await this.updateErrorAnalytics(errorsToFlush);
+      
+    } catch (flushError) {
+      console.error('💥 Error flushing failed:', flushError.message);
+      
+      // Re-queue errors for next flush
+      this.errorBuffer.unshift(...errorsToFlush);
+    }
+  }
+  
+  async sendToErrorTracker(errors) {
+    // Send to Sentry, DataDog, or your error tracking service
+    for (const error of errors) {
+      if (process.env.SENTRY_DSN) {
+        // Sentry integration
+        Sentry.captureException(new Error(error.message), {
+          tags: {
+            error_code: error.code,
+            error_type: error.type
+          },
+          extra: error.context
+        });
+      }
+      
+      // Custom error tracking API
+      if (process.env.ERROR_TRACKER_URL) {
+        await fetch(process.env.ERROR_TRACKER_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            source: 'tolstoy_api',
+            error,
+            environment: process.env.NODE_ENV
+          })
+        });
+      }
+    }
+  }
+  
+  async sendCriticalAlerts(errors) {
+    const criticalErrors = errors.filter(error => 
+      ['PAYMENT_FAILED', 'SECURITY_BREACH'].includes(error.code)
+    );
+    
+    for (const criticalError of criticalErrors) {
+      // Send immediate alert
+      await this.sendPagerDutyAlert(criticalError);
+      await this.sendSlackAlert(criticalError);
+    }
+  }
+  
+  getErrorSummary() {
+    const summary = {
+      total_unique_errors: this.errorCounts.size,
+      total_error_instances: Array.from(this.errorCounts.values())
+        .reduce((sum, error) => sum + error.count, 0),
+      most_frequent: this.getMostFrequentErrors(),
+      recent_critical: this.getRecentCriticalErrors()
+    };
+    
+    return summary;
+  }
+  
+  getMostFrequentErrors() {
+    return Array.from(this.errorCounts.entries())
+      .sort(([,a], [,b]) => b.count - a.count)
+      .slice(0, 10)
+      .map(([key, error]) => ({
+        key,
+        code: error.code,
+        count: error.count,
+        last_seen: error.last_seen
+      }));
+  }
+}
+
+// Usage
+const errorAggregator = new ErrorAggregator();
+
+// In your API client
+async function makeAPICall(endpoint, options) {
+  try {
+    return await makeAPIRequest(endpoint, options);
+  } catch (error) {
+    // Record error for aggregation
+    errorAggregator.recordError(error, {
+      endpoint,
+      method: options.method || 'GET',
+      user_id: options.userId
+    });
+    
+    throw error;
+  }
+}
+```
+
+</CodeGroup>
+
+## Error Reporting and Analytics
+
+### **Error Analytics Dashboard**
+
+<CodeGroup>
+
+```javascript Error Analytics
+class ErrorAnalyticsDashboard {
+  constructor() {
+    this.errorHistory = [];
+    this.maxHistorySize = 10000;
+  }
+  
+  recordError(error, context = {}) {
+    const record = {
+      id: `err_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      code: error.code,
+      message: error.message,
+      type: error.type,
+      retryable: error.retryable,
+      context,
+      timestamp: new Date().toISOString()
+    };
+    
+    this.errorHistory.push(record);
+    
+    // Keep history size manageable
+    if (this.errorHistory.length > this.maxHistorySize) {
+      this.errorHistory = this.errorHistory.slice(-this.maxHistorySize);
+    }
+  }
+  
+  generateErrorReport(timeframe = '24h') {
+    const cutoff = this.getTimeframeCutoff(timeframe);
+    const recentErrors = this.errorHistory.filter(e => 
+      new Date(e.timestamp) > cutoff
+    );
+    
+    const report = {
+      timeframe,
+      summary: {
+        total_errors: recentErrors.length,
+        unique_error_codes: new Set(recentErrors.map(e => e.code)).size,
+        retryable_errors: recentErrors.filter(e => e.retryable).length,
+        error_rate_per_hour: this.calculateErrorRate(recentErrors, timeframe)
+      },
+      breakdown: {
+        by_code: this.groupErrorsByCode(recentErrors),
+        by_type: this.groupErrorsByType(recentErrors),
+        by_endpoint: this.groupErrorsByEndpoint(recentErrors),
+        by_hour: this.groupErrorsByHour(recentErrors)
+      },
+      trends: {
+        error_frequency: this.calculateErrorFrequency(recentErrors),
+        peak_error_hour: this.findPeakErrorHour(recentErrors),
+        error_pattern: this.detectErrorPatterns(recentErrors)
+      },
+      recommendations: this.generateRecommendations(recentErrors)
+    };
+    
+    return report;
+  }
+  
+  detectErrorPatterns(errors) {
+    const patterns = [];
+    
+    // Check for error spikes
+    const hourlyErrors = this.groupErrorsByHour(errors);
+    const avgErrorsPerHour = Object.values(hourlyErrors).reduce((a, b) => a + b, 0) / Object.keys(hourlyErrors).length;
+    
+    for (const [hour, count] of Object.entries(hourlyErrors)) {
+      if (count > avgErrorsPerHour * 3) {
+        patterns.push({
+          type: 'error_spike',
+          hour,
+          count,
+          severity: 'high'
+        });
+      }
+    }
+    
+    // Check for recurring errors
+    const errorCodes = this.groupErrorsByCode(errors);
+    for (const [code, count] of Object.entries(errorCodes)) {
+      if (count > 10) {
+        patterns.push({
+          type: 'recurring_error',
+          code,
+          count,
+          severity: 'medium'
+        });
+      }
+    }
+    
+    return patterns;
+  }
+  
+  generateRecommendations(errors) {
+    const recommendations = [];
+    
+    // High failure rate recommendation
+    const retryableErrors = errors.filter(e => e.retryable);
+    if (retryableErrors.length > errors.length * 0.3) {
+      recommendations.push({
+        type: 'retry_strategy',
+        message: 'Consider implementing more aggressive retry strategies',
+        priority: 'medium'
+      });
+    }
+    
+    // External service errors
+    const externalErrors = errors.filter(e => e.code.includes('EXTERNAL_SERVICE'));
+    if (externalErrors.length > 5) {
+      recommendations.push({
+        type: 'external_dependency',
+        message: 'Consider implementing circuit breakers for external services',
+        priority: 'high'
+      });
+    }
+    
+    // Authentication errors
+    const authErrors = errors.filter(e => e.type === 'authentication');
+    if (authErrors.length > 0) {
+      recommendations.push({
+        type: 'authentication',
+        message: 'Review API key management and token refresh logic',
+        priority: 'high'
+      });
+    }
+    
+    return recommendations;
+  }
+  
+  exportErrorReport(format = 'json') {
+    const report = this.generateErrorReport();
+    
+    switch (format) {
+      case 'csv':
+        return this.convertToCSV(this.errorHistory);
+      case 'xlsx':
+        return this.convertToExcel(report);
+      default:
+        return JSON.stringify(report, null, 2);
+    }
+  }
+}
+
+// Usage
+const analytics = new ErrorAnalyticsDashboard();
+
+// Record errors throughout your application
+app.use((req, res, next) => {
+  const originalSend = res.send;
+  
+  res.send = function(data) {
+    if (res.statusCode >= 400) {
+      try {
+        const errorData = JSON.parse(data);
+        if (errorData.error) {
+          analytics.recordError(errorData.error, {
+            endpoint: req.path,
+            method: req.method,
+            user_agent: req.headers['user-agent']
+          });
+        }
+      } catch (parseError) {
+        // Ignore parsing errors
+      }
+    }
+    
+    originalSend.call(this, data);
+  };
+  
+  next();
+});
+
+// Error report endpoint
+app.get('/error-analytics', (req, res) => {
+  const timeframe = req.query.timeframe || '24h';
+  const format = req.query.format || 'json';
+  
+  const report = analytics.generateErrorReport(timeframe);
+  
+  if (format === 'json') {
+    res.json(report);
+  } else {
+    res.send(analytics.exportErrorReport(format));
+  }
+});
+```
+
+</CodeGroup>
+
+## Error Prevention Strategies
+
+### **Proactive Error Prevention**
+
+<CodeGroup>
+
+```javascript Error Prevention
+class ErrorPreventionSystem {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.healthChecks = new Map();
+    this.dependencyStatus = new Map();
+  }
+  
+  async setupPreventiveMonitoring() {
+    console.log('🛡️ Setting up preventive error monitoring...');
+    
+    // Monitor external dependencies
+    await this.startDependencyMonitoring();
+    
+    // Monitor API health
+    await this.startAPIHealthMonitoring();
+    
+    // Monitor resource usage
+    await this.startResourceMonitoring();
+    
+    // Setup predictive alerts
+    await this.setupPredictiveAlerts();
+  }
+  
+  async startDependencyMonitoring() {
+    const dependencies = [
+      { name: 'SendGrid', url: 'https://api.sendgrid.com/v3', timeout: 5000 },
+      { name: 'HubSpot', url: 'https://api.hubapi.com', timeout: 5000 },
+      { name: 'Slack', url: 'https://slack.com/api', timeout: 3000 }
+    ];
+    
+    for (const dep of dependencies) {
+      this.healthChecks.set(dep.name, {
+        url: dep.url,
+        timeout: dep.timeout,
+        status: 'unknown',
+        lastCheck: null,
+        consecutiveFailures: 0
+      });
+    }
+    
+    // Check dependencies every 2 minutes
+    setInterval(() => this.checkAllDependencies(), 120000);
+    
+    // Initial check
+    await this.checkAllDependencies();
+  }
+  
+  async checkAllDependencies() {
+    console.log('🔍 Checking dependency health...');
+    
+    const checkPromises = Array.from(this.healthChecks.entries()).map(
+      ([name, config]) => this.checkDependency(name, config)
+    );
+    
+    await Promise.allSettled(checkPromises);
+  }
+  
+  async checkDependency(name, config) {
+    try {
+      const startTime = Date.now();
+      
+      const response = await fetch(config.url, {
+        method: 'HEAD',
+        timeout: config.timeout
+      });
+      
+      const responseTime = Date.now() - startTime;
+      
+      if (response.ok) {
+        // Dependency is healthy
+        this.dependencyStatus.set(name, {
+          status: 'healthy',
+          response_time_ms: responseTime,
+          last_check: new Date().toISOString()
+        });
+        
+        // Reset failure count
+        config.consecutiveFailures = 0;
+        
+        console.log(`✅ ${name}: healthy (${responseTime}ms)`);
+        
+      } else {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      
+    } catch (error) {
+      // Dependency is unhealthy
+      config.consecutiveFailures++;
+      
+      this.dependencyStatus.set(name, {
+        status: 'unhealthy',
+        error: error.message,
+        consecutive_failures: config.consecutiveFailures,
+        last_check: new Date().toISOString()
+      });
+      
+      console.error(`❌ ${name}: unhealthy - ${error.message}`);
+      
+      // Alert if multiple consecutive failures
+      if (config.consecutiveFailures >= 3) {
+        await this.alertDependencyFailure(name, config);
+      }
+    }
+  }
+  
+  async alertDependencyFailure(name, config) {
+    console.log(`🚨 Dependency alert: ${name} has failed ${config.consecutiveFailures} times`);
+    
+    // Send alert to ops team
+    await this.sendAlert({
+      type: 'dependency_failure',
+      service: name,
+      consecutive_failures: config.consecutiveFailures,
+      suggested_action: `Check ${name} service status and consider enabling fallbacks`
+    });
+  }
+  
+  async preflightCheck(endpoint, action) {
+    // Check if we should proceed with the action based on current system health
+    const requiredDependencies = this.getRequiredDependencies(action);
+    
+    for (const dep of requiredDependencies) {
+      const status = this.dependencyStatus.get(dep);
+      
+      if (status?.status === 'unhealthy') {
+        console.warn(`⚠️ Dependency ${dep} is unhealthy, action may fail`);
+        
+        // Return warning but allow execution
+        return {
+          proceed: true,
+          warnings: [`Dependency ${dep} is currently unhealthy`],
+          recommended_fallbacks: this.getFallbackOptions(dep)
+        };
+      }
+    }
+    
+    return { proceed: true, warnings: [] };
+  }
+  
+  getRequiredDependencies(action) {
+    // Map actions to their dependencies
+    const dependencyMap = {
+      'send_email': ['SendGrid'],
+      'create_crm_contact': ['HubSpot'],
+      'send_notification': ['Slack'],
+      'process_payment': ['Stripe', 'PayPal']
+    };
+    
+    return dependencyMap[action] || [];
+  }
+}
+
+// Usage
+const errorPrevention = new ErrorPreventionSystem(apiKey);
+await errorPrevention.setupPreventiveMonitoring();
+
+// Before executing actions
+async function executeActionSafely(actionName, inputs) {
+  // Preflight check
+  const preflightResult = await errorPrevention.preflightCheck('/actions', actionName);
+  
+  if (!preflightResult.proceed) {
+    throw new Error('Preflight check failed - action execution blocked');
+  }
+  
+  if (preflightResult.warnings.length > 0) {
+    console.warn('⚠️ Preflight warnings:', preflightResult.warnings);
+  }
+  
+  // Execute with fallbacks if warnings present
+  if (preflightResult.warnings.length > 0) {
+    return executeWithFallback(actionName, inputs);
+  } else {
+    return executeAction(actionName, inputs);
+  }
+}
+```
+
+</CodeGroup>
+
+## Testing Error Scenarios
+
+### **Error Simulation Framework**
+
+<CodeGroup>
+
+```javascript Error Testing Framework
+class ErrorSimulator {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.scenarios = [];
+  }
+  
+  addScenario(name, config) {
+    this.scenarios.push({ name, ...config });
+  }
+  
+  async runErrorScenarios() {
+    console.log('🧪 Running error scenario tests...\n');
+    
+    const results = [];
+    
+    for (const scenario of this.scenarios) {
+      console.log(`Testing: ${scenario.name}`);
+      
+      try {
+        const result = await this.executeScenario(scenario);
+        results.push({
+          name: scenario.name,
+          status: 'completed',
+          result
+        });
+        console.log(`✅ ${scenario.name}: handled correctly\n`);
+      } catch (error) {
+        results.push({
+          name: scenario.name,
+          status: 'failed', 
+          error: error.message
+        });
+        console.log(`❌ ${scenario.name}: ${error.message}\n`);
+      }
+    }
+    
+    return results;
+  }
+  
+  async executeScenario(scenario) {
+    switch (scenario.type) {
+      case 'invalid_request':
+        return this.testInvalidRequest(scenario);
+      case 'authentication_failure':
+        return this.testAuthFailure(scenario);
+      case 'rate_limit':
+        return this.testRateLimit(scenario);
+      case 'server_error':
+        return this.testServerError(scenario);
+      case 'network_failure':
+        return this.testNetworkFailure(scenario);
+      default:
+        throw new Error(`Unknown scenario type: ${scenario.type}`);
+    }
+  }
+  
+  async testInvalidRequest(scenario) {
+    try {
+      await fetch('https://api.tolstoy.dev/actions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: scenario.invalidPayload || '{"invalid": json}'
+      });
+      
+      throw new Error('Expected validation error but request succeeded');
+      
+    } catch (error) {
+      if (error.message.includes('validation') || error.message.includes('400')) {
+        return { handled: true, error_type: 'validation' };
+      }
+      throw error;
+    }
+  }
+  
+  async testAuthFailure(scenario) {
+    try {
+      await fetch('https://api.tolstoy.dev/actions', {
+        headers: {
+          'Authorization': 'Bearer invalid_key_here',
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      throw new Error('Expected auth error but request succeeded');
+      
+    } catch (error) {
+      if (error.message.includes('401') || error.message.includes('unauthorized')) {
+        return { handled: true, error_type: 'authentication' };
+      }
+      throw error;
+    }
+  }
+  
+  async testRateLimit(scenario) {
+    // Make rapid requests to trigger rate limiting
+    const rapidRequests = Array(scenario.requestCount || 100).fill().map(() =>
+      fetch('https://api.tolstoy.dev/health', {
+        headers: { 'Authorization': `Bearer ${this.apiKey}` }
+      })
+    );
+    
+    try {
+      await Promise.all(rapidRequests);
+      return { handled: true, rate_limit_triggered: false };
+    } catch (error) {
+      if (error.message.includes('429') || error.message.includes('rate limit')) {
+        return { handled: true, rate_limit_triggered: true };
+      }
+      throw error;
+    }
+  }
+}
+
+// Setup error scenarios
+const errorSimulator = new ErrorSimulator(apiKey);
+
+// Add test scenarios
+errorSimulator.addScenario('Invalid JSON Payload', {
+  type: 'invalid_request',
+  invalidPayload: '{"invalid": json syntax}'
+});
+
+errorSimulator.addScenario('Missing Required Field', {
+  type: 'invalid_request',
+  invalidPayload: JSON.stringify({ display_name: 'Test' }) // Missing 'name'
+});
+
+errorSimulator.addScenario('Invalid API Key', {
+  type: 'authentication_failure'
+});
+
+errorSimulator.addScenario('Rate Limit Trigger', {
+  type: 'rate_limit',
+  requestCount: 50
+});
+
+// Run all scenarios
+const testResults = await errorSimulator.runErrorScenarios();
+
+console.log('📊 Error Testing Summary:');
+console.table(testResults);
+```
+
+</CodeGroup>
+
+## Production Error Handling
+
+### **Production-Ready Error Handler**
+
+<CodeGroup>
+
+```javascript Production Error Handler
+class ProductionErrorHandler {
+  constructor(config) {
+    this.config = {
+      maxRetries: 5,
+      baseDelay: 1000,
+      maxDelay: 60000,
+      jitterFactor: 0.2,
+      circuitBreakerThreshold: 10,
+      alertingEnabled: true,
+      errorTrackingEnabled: true,
+      ...config
+    };
+    
+    this.circuitBreakers = new Map();
+    this.errorAggregator = new ErrorAggregator();
+    this.setupGlobalErrorHandling();
+  }
+  
+  setupGlobalErrorHandling() {
+    // Handle unhandled promise rejections
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('🚨 Unhandled Promise Rejection:', reason);
+      
+      this.errorAggregator.recordError({
+        code: 'UNHANDLED_PROMISE_REJECTION',
+        message: reason.toString(),
+        type: 'system'
+      }, {
+        promise: promise.toString(),
+        stack: reason.stack
+      });
+    });
+    
+    // Handle uncaught exceptions
+    process.on('uncaughtException', (error) => {
+      console.error('🚨 Uncaught Exception:', error);
+      
+      this.errorAggregator.recordError({
+        code: 'UNCAUGHT_EXCEPTION',
+        message: error.message,
+        type: 'system'
+      }, {
+        stack: error.stack
+      });
+      
+      // Graceful shutdown
+      process.exit(1);
+    });
+  }
+  
+  async executeWithFullErrorHandling(operation, context = {}) {
+    const operationName = context.operation || 'unknown';
+    const circuitBreaker = this.getCircuitBreaker(operationName);
+    
+    return circuitBreaker.execute(async () => {
+      return this.executeWithRetry(operation, context);
+    });
+  }
+  
+  async executeWithRetry(operation, context) {
+    let lastError;
+    const maxRetries = context.maxRetries || this.config.maxRetries;
+    
+    for (let attempt = 1; attempt <= maxRetries + 1; attempt++) {
+      try {
+        const result = await operation();
+        
+        // Log successful recovery
+        if (attempt > 1) {
+          console.log(`✅ Operation succeeded on attempt ${attempt}`);
+          
+          if (this.config.errorTrackingEnabled) {
+            this.errorAggregator.recordRecovery(context.operation, attempt);
+          }
+        }
+        
+        return result;
+        
+      } catch (error) {
+        lastError = error;
+        
+        // Record error
+        if (this.config.errorTrackingEnabled) {
+          this.errorAggregator.recordError(error, {
+            ...context,
+            attempt,
+            max_retries: maxRetries
+          });
+        }
+        
+        // Check if we should retry
+        if (attempt > maxRetries || !this.shouldRetry(error, attempt, context)) {
+          break;
+        }
+        
+        const delay = this.calculateRetryDelay(attempt, error, context);
+        console.log(`🔄 Attempt ${attempt}/${maxRetries} failed, retrying in ${delay}ms: ${error.message}`);
+        
+        await this.delay(delay);
+      }
+    }
+    
+    // All retries exhausted
+    console.error(`💥 Operation failed after ${maxRetries} retries: ${lastError.message}`);
+    
+    // Send alert for critical failures
+    if (this.config.alertingEnabled && this.isCriticalError(lastError, context)) {
+      await this.sendCriticalErrorAlert(lastError, context);
+    }
+    
+    throw lastError;
+  }
+  
+  shouldRetry(error, attempt, context) {
+    // Don't retry if explicitly marked as non-retryable
+    if (error.retryable === false) {
+      return false;
+    }
+    
+    // Don't retry client errors (except rate limits)
+    if (error instanceof TolstoyAPIError) {
+      if (error.status >= 400 && error.status < 500 && error.status !== 429) {
+        return false;
+      }
+    }
+    
+    // Context-specific retry rules
+    if (context.retryRules) {
+      return context.retryRules(error, attempt);
+    }
+    
+    // Default retry logic
+    const retryableErrors = [
+      'INTERNAL_SERVER_ERROR',
+      'SERVICE_UNAVAILABLE',
+      'GATEWAY_TIMEOUT',
+      'RATE_LIMIT_EXCEEDED',
+      'NETWORK_ERROR',
+      'EXTERNAL_SERVICE_ERROR'
+    ];
+    
+    return retryableErrors.includes(error.code);
+  }
+  
+  isCriticalError(error, context) {
+    const criticalOperations = ['payment_processing', 'security_operations'];
+    const criticalErrors = ['PAYMENT_FAILED', 'SECURITY_BREACH', 'DATA_CORRUPTION'];
+    
+    return criticalOperations.includes(context.operation) || 
+           criticalErrors.includes(error.code);
+  }
+  
+  async sendCriticalErrorAlert(error, context) {
+    const alert = {
+      severity: 'critical',
+      error_code: error.code,
+      error_message: error.message,
+      operation: context.operation,
+      timestamp: new Date().toISOString(),
+      request_id: error.requestId,
+      suggested_actions: this.getSuggestedActions(error)
+    };
+    
+    // Send to multiple alert channels
+    await Promise.all([
+      this.sendPagerDutyAlert(alert),
+      this.sendSlackAlert(alert),
+      this.sendEmailAlert(alert)
+    ]);
+  }
+  
+  getSuggestedActions(error) {
+    const actionMap = {
+      'PAYMENT_FAILED': [
+        'Check payment gateway status',
+        'Verify payment credentials',
+        'Review transaction logs'
+      ],
+      'EXTERNAL_SERVICE_ERROR': [
+        'Check external service status',
+        'Verify API credentials',
+        'Consider enabling fallback service'
+      ],
+      'RATE_LIMIT_EXCEEDED': [
+        'Review request patterns',
+        'Implement request queuing',
+        'Consider upgrading API plan'
+      ]
+    };
+    
+    return actionMap[error.code] || ['Contact support with error details'];
+  }
+}
+
+// Usage
+const errorHandler = new ProductionErrorHandler({
+  maxRetries: 5,
+  alertingEnabled: process.env.NODE_ENV === 'production',
+  errorTrackingEnabled: true
+});
+
+// Execute critical operations
+await errorHandler.executeWithFullErrorHandling(
+  async () => {
+    return makeAPIRequest('/flows/critical_flow/execute', {
+      method: 'POST',
+      body: JSON.stringify({ inputs: criticalInputs })
+    });
+  },
+  {
+    operation: 'payment_processing',
+    maxRetries: 2, // Lower retries for time-sensitive operations
+    retryRules: (error, attempt) => {
+      // Custom retry logic for payments
+      return error.code !== 'PAYMENT_DECLINED' && attempt <= 2;
+    }
+  }
+);
+```
+
+</CodeGroup>
+
+## API Playground
+
+Test error handling patterns:
+
+<ApiPlayground
+  method="POST"
+  endpoint="/actions/{action_id}/execute"
+  baseUrl="https://api-dev.tolstoy.dev"
+  auth={{
+    type: "bearer", 
+    placeholder: "Your Development API Key"
+  }}
+  pathParams={[
+    {
+      name: "action_id",
+      placeholder: "action_123456789",
+      description: "Action ID to execute",
+      required: true
+    }
+  ]}
+  body={{
+    type: "json",
+    schema: {
+      inputs: {
+        type: "object",
+        defaultValue: {
+          test_scenario: "success"
+        },
+        description: "Action inputs (use test_scenario: 'error' to simulate failures)"
+      },
+      execution_options: {
+        type: "object",
+        defaultValue: {
+          timeout: 30000,
+          retry_on_failure: true
+        },
+        description: "Execution configuration"
+      }
+    }
+  }}
+  testScenarios={[
+    {
+      name: "Success Scenario",
+      description: "Normal successful execution",
+      body: {
+        inputs: { test_scenario: "success" }
+      }
+    },
+    {
+      name: "Timeout Scenario", 
+      description: "Simulate timeout error",
+      body: {
+        inputs: { test_scenario: "timeout" },
+        execution_options: { timeout: 1000 }
+      }
+    },
+    {
+      name: "External Service Error",
+      description: "Simulate external service failure", 
+      body: {
+        inputs: { test_scenario: "external_error" }
+      }
+    },
+    {
+      name: "Invalid Input",
+      description: "Test validation error handling",
+      body: {
+        inputs: { invalid_field: "bad_value" }
+      }
+    }
+  ]}
+  sampleResponse={{
+    "execution": {
+      "id": "exec_test123",
+      "status": "success",
+      "duration_ms": 1500,
+      "outputs": {
+        "result": "success"
+      }
+    }
+  }}
+/>
+
+## Monitoring Error Handling Effectiveness
+
+### **Error Handling Metrics**
+
+<CodeGroup>
+
+```javascript Error Handling Metrics
+class ErrorHandlingMetrics {
+  constructor() {
+    this.metrics = {
+      total_operations: 0,
+      successful_operations: 0,
+      failed_operations: 0,
+      recovered_operations: 0, // Succeeded after retries
+      retry_effectiveness: new Map(),
+      fallback_usage: new Map(),
+      circuit_breaker_trips: 0,
+      avg_recovery_time: 0
+    };
+  }
+  
+  recordOperation(operation, result) {
+    this.metrics.total_operations++;
+    
+    if (result.success) {
+      this.metrics.successful_operations++;
+      
+      if (result.retry_count > 0) {
+        this.metrics.recovered_operations++;
+        this.updateRetryEffectiveness(operation, result.retry_count, true);
+      }
+    } else {
+      this.metrics.failed_operations++;
+      
+      if (result.retry_count > 0) {
+        this.updateRetryEffectiveness(operation, result.retry_count, false);
+      }
+    }
+    
+    if (result.fallback_used) {
+      this.metrics.fallback_usage.set(
+        operation,
+        (this.metrics.fallback_usage.get(operation) || 0) + 1
+      );
+    }
+    
+    if (result.recovery_time) {
+      this.updateAvgRecoveryTime(result.recovery_time);
+    }
+  }
+  
+  updateRetryEffectiveness(operation, retryCount, succeeded) {
+    if (!this.metrics.retry_effectiveness.has(operation)) {
+      this.metrics.retry_effectiveness.set(operation, {
+        total_retries: 0,
+        successful_retries: 0,
+        failed_retries: 0
+      });
+    }
+    
+    const stats = this.metrics.retry_effectiveness.get(operation);
+    stats.total_retries += retryCount;
+    
+    if (succeeded) {
+      stats.successful_retries += retryCount;
+    } else {
+      stats.failed_retries += retryCount;
+    }
+  }
+  
+  generateReport() {
+    const totalOps = this.metrics.total_operations;
+    
+    return {
+      overview: {
+        total_operations: totalOps,
+        success_rate: totalOps > 0 ? (this.metrics.successful_operations / totalOps * 100).toFixed(2) + '%' : '0%',
+        recovery_rate: totalOps > 0 ? (this.metrics.recovered_operations / totalOps * 100).toFixed(2) + '%' : '0%',
+        avg_recovery_time_ms: Math.round(this.metrics.avg_recovery_time)
+      },
+      retry_effectiveness: this.calculateRetryEffectiveness(),
+      fallback_usage: Object.fromEntries(this.metrics.fallback_usage),
+      recommendations: this.generateRecommendations()
+    };
+  }
+  
+  calculateRetryEffectiveness() {
+    const effectiveness = {};
+    
+    for (const [operation, stats] of this.metrics.retry_effectiveness.entries()) {
+      const effectivenessRate = stats.total_retries > 0 
+        ? (stats.successful_retries / stats.total_retries * 100).toFixed(1)
+        : 0;
+      
+      effectiveness[operation] = {
+        total_retries: stats.total_retries,
+        success_rate: effectivenessRate + '%',
+        avg_retries_per_success: stats.successful_retries > 0 
+          ? (stats.total_retries / stats.successful_retries).toFixed(1)
+          : 'N/A'
+      };
+    }
+    
+    return effectiveness;
+  }
+  
+  generateRecommendations() {
+    const recommendations = [];
+    const totalOps = this.metrics.total_operations;
+    
+    if (totalOps === 0) return recommendations;
+    
+    const failureRate = this.metrics.failed_operations / totalOps;
+    const recoveryRate = this.metrics.recovered_operations / totalOps;
+    
+    if (failureRate > 0.1) {
+      recommendations.push({
+        type: 'high_failure_rate',
+        message: `Failure rate is ${(failureRate * 100).toFixed(1)}% - consider improving error prevention`,
+        priority: 'high'
+      });
+    }
+    
+    if (recoveryRate > 0.05) {
+      recommendations.push({
+        type: 'frequent_retries',
+        message: `${(recoveryRate * 100).toFixed(1)}% of operations require retries - investigate root causes`,
+        priority: 'medium'
+      });
+    }
+    
+    if (this.metrics.circuit_breaker_trips > 0) {
+      recommendations.push({
+        type: 'circuit_breaker_activity',
+        message: `Circuit breakers triggered ${this.metrics.circuit_breaker_trips} times - check dependency health`,
+        priority: 'high'
+      });
+    }
+    
+    return recommendations;
+  }
+}
+
+// Integrated error handling middleware
+function createErrorHandlingMiddleware(errorHandler) {
+  return async (req, res, next) => {
+    const startTime = Date.now();
+    const operation = `${req.method} ${req.path}`;
+    
+    try {
+      await errorHandler.executeWithFullErrorHandling(
+        async () => {
+          return new Promise((resolve, reject) => {
+            // Override res.send to capture results
+            const originalSend = res.send;
+            res.send = function(data) {
+              if (res.statusCode >= 400) {
+                reject(new Error(`HTTP ${res.statusCode}: ${data}`));
+              } else {
+                resolve(data);
+              }
+              originalSend.call(this, data);
+            };
+            
+            next();
+          });
+        },
+        { operation, endpoint: req.path, method: req.method }
+      );
+      
+      // Record successful operation
+      errorHandler.metrics.recordOperation(operation, {
+        success: true,
+        duration: Date.now() - startTime
+      });
+      
+    } catch (error) {
+      // Record failed operation
+      errorHandler.metrics.recordOperation(operation, {
+        success: false,
+        duration: Date.now() - startTime,
+        error: error.message
+      });
+      
+      // Don't re-throw - let normal error handling continue
+    }
+  };
+}
+```
+
+</CodeGroup>
+
+## Related Documentation
+
+<CardGroup cols={2}>
+  <Card title="Error Codes" icon="list" href="/api/error-codes">
+    Complete error code reference
+  </Card>
+  <Card title="Status Codes" icon="list-check" href="/api/status-codes">
+    HTTP status code meanings
+  </Card>
+  <Card title="Rate Limiting" icon="gauge" href="/api/rate-limiting">
+    Handle rate limit errors
+  </Card>
+  <Card title="Troubleshooting" icon="wrench" href="/api/guides/troubleshooting">
+    Common issues and solutions
+  </Card>
+</CardGroup>
