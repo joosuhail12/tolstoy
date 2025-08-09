@@ -24,25 +24,6 @@ export class AppController {
     return this.appService.getHello();
   }
 
-  @Get('health')
-  @ApiOperation({
-    summary: 'Basic Health Check',
-    description: 'Simple health check endpoint (deprecated - use /status instead)',
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Basic health status',
-    schema: {
-      type: 'object',
-      properties: {
-        status: { type: 'string', example: 'ok' },
-        timestamp: { type: 'string', example: '2025-08-08T10:30:00.000Z' },
-      },
-    },
-  })
-  getHealth(): { status: string; timestamp: string } {
-    return this.appService.getHealth();
-  }
 
   @Get('version')
   @ApiOperation({

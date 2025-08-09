@@ -13,12 +13,6 @@ export class AppService {
     return `Hello from ${appName} v1.1.0! 🚀 Now with OAuth2, Metrics & Enhanced Monitoring!`;
   }
 
-  getHealth(): { status: string; timestamp: string } {
-    return {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-    };
-  }
 
   getVersion(): {
     version: string;
