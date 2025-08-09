@@ -77,28 +77,22 @@ jobs:
             pm2 stop tolstoy-api 2>/dev/null || true
             pm2 delete tolstoy-api 2>/dev/null || true
             
-            # Create environment file for PM2 from GitHub secrets
-            echo "🔧 Creating environment configuration..."
-            cat > .env.production << ENV_EOF
-NODE_ENV=production
-PORT=3000
-DATABASE_URL=${{ secrets.DATABASE_URL }}
-DIRECT_URL=${{ secrets.DIRECT_URL }}
-AWS_REGION=us-east-1
-AWS_SECRET_NAME=tolstoy/env
-USE_AWS_SECRETS=true
-INNGEST_EVENT_KEY=${{ secrets.INNGEST_EVENT_KEY }}
-DAYTONA_API_KEY=${{ secrets.DAYTONA_API_KEY }}
-DAYTONA_BASE_URL=${{ secrets.DAYTONA_BASE_URL }}
-UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}
-UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
-SENTRY_DSN=${{ secrets.SENTRY_DSN }}
-ENV_EOF
-            echo "✅ Environment file created"
-            
-            # Start with environment file
+            # Start with environment variables from GitHub secrets
+            echo "🔧 Starting application with environment variables..."
             pm2 start dist/main.js --name tolstoy-api \
-              --env-file .env.production \
+              --env NODE_ENV=production \
+              --env PORT=3000 \
+              --env DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+              --env DIRECT_URL="${{ secrets.DIRECT_URL }}" \
+              --env AWS_REGION=us-east-1 \
+              --env AWS_SECRET_NAME=tolstoy/env \
+              --env USE_AWS_SECRETS=true \
+              --env INNGEST_EVENT_KEY="${{ secrets.INNGEST_EVENT_KEY }}" \
+              --env DAYTONA_API_KEY="${{ secrets.DAYTONA_API_KEY }}" \
+              --env DAYTONA_BASE_URL="${{ secrets.DAYTONA_BASE_URL }}" \
+              --env UPSTASH_REDIS_REST_URL="${{ secrets.UPSTASH_REDIS_REST_URL }}" \
+              --env UPSTASH_REDIS_REST_TOKEN="${{ secrets.UPSTASH_REDIS_REST_TOKEN }}" \
+              --env SENTRY_DSN="${{ secrets.SENTRY_DSN }}" \
               --log /home/ubuntu/logs/tolstoy.log \
               --error /home/ubuntu/logs/tolstoy-error.log \
               --output /home/ubuntu/logs/tolstoy-out.log \
