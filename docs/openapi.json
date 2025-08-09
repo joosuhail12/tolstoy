@@ -4520,8 +4520,8 @@
   "tags": [],
   "servers": [
     {
-      "url": "http://localhost:3000",
-      "description": "Development"
+      "url": "https://tolstoy.getpullse.com",
+      "description": "Production"
     },
     {
       "url": "https://tolstoy.getpullse.com",

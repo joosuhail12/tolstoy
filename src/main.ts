@@ -1,7 +1,4 @@
-// IMPORTANT: Make sure to import `instrument.ts` at the top of your file.
-import './instrument';
-
-// All other imports below
+// All imports below
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -12,6 +9,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AppModule } from './app.module';
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
+import { SentryConfigService } from './config/sentry-config.service';
 import fastifyHelmet from '@fastify/helmet';
 import fastifyCors from '@fastify/cors';
 import fastifyRateLimit from '@fastify/rate-limit';
@@ -45,6 +43,10 @@ async function bootstrap() {
 
   // Use Pino logger globally
   app.useLogger(app.get(Logger));
+
+  // Initialize Sentry with AWS Secrets Manager integration
+  const sentryConfigService = app.get(SentryConfigService);
+  await sentryConfigService.initializeSentry();
 
   // Get configuration service
   const configService = app.get(ConfigService);

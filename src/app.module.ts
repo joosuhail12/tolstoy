@@ -15,6 +15,7 @@ import { RedisCacheService } from './cache/redis-cache.service';
 import { SecretsResolver } from './secrets/secrets-resolver.service';
 import { OAuthTokenService } from './oauth/oauth-token.service';
 import { AblyService } from './ably/ably.service';
+import { SentryConfigService } from './config/sentry-config.service';
 
 // Feature Modules
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -114,6 +115,7 @@ import { AuthModule } from './auth/auth.module';
   providers: [
     AppService,
     AwsSecretsService,
+    SentryConfigService,
     SecretsResolver,
     OAuthTokenService,
     AblyService,
