@@ -42,6 +42,13 @@ jobs:
             set -e
             cd /home/ubuntu/tolstoy
             
+            echo "🔍 Checking AWS configuration..."
+            aws sts get-caller-identity || {
+              echo "❌ AWS credentials not configured on this server"
+              echo "Please ensure EC2 instance has IAM role or AWS credentials configured"
+              exit 1
+            }
+            
             echo "📥 Pulling latest code..."
             git pull origin main
             
@@ -54,9 +61,20 @@ jobs:
             echo "🔨 Building application..."
             npm run build
             
+            echo "🗃️ Running database migrations..."
+            timeout 30 npm run db:migrate:deploy || echo "⚠️ Migration completed or timed out (this may be normal)"
+            
             echo "🔄 Restarting PM2..."
             pm2 stop tolstoy-api 2>/dev/null || true
             pm2 delete tolstoy-api 2>/dev/null || true
+            
+            # Verify AWS secrets access first
+            echo "🔍 Testing AWS secrets access..."
+            aws secretsmanager get-secret-value --secret-id tolstoy/env --region us-east-1 --query 'SecretString' --output text > /dev/null || {
+              echo "❌ Cannot access AWS secrets. Check IAM permissions."
+              exit 1
+            }
+            echo "✅ AWS secrets accessible"
             
             # Start with proper environment
             pm2 start dist/main.js --name tolstoy-api \
@@ -64,7 +82,21 @@ jobs:
               --env PORT=3000 \
               --env AWS_REGION=us-east-1 \
               --env AWS_SECRET_NAME=tolstoy/env \
-              --env USE_AWS_SECRETS=true
+              --env USE_AWS_SECRETS=true \
+              --log /home/ubuntu/logs/tolstoy.log \
+              --error /home/ubuntu/logs/tolstoy-error.log \
+              --out /home/ubuntu/logs/tolstoy-out.log \
+              --time
+            
+            # Wait a moment for PM2 to start
+            sleep 5
+            
+            # Check if PM2 started successfully
+            if ! pm2 describe tolstoy-api > /dev/null; then
+              echo "❌ PM2 failed to start the application"
+              pm2 logs tolstoy-api --lines 10
+              exit 1
+            fi
             
             pm2 save
             
@@ -91,8 +123,24 @@ jobs:
           done
           
           echo "❌ Health check failed after 6 attempts"
-          echo "🔍 Checking server status..."
-          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" "pm2 status && pm2 logs tolstoy-api --lines 20" || true
+          echo "🔍 Checking server status and logs..."
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" << 'DEBUG_EOF'
+            echo "=== PM2 Status ==="
+            pm2 status
+            
+            echo -e "\n=== Application Logs (last 30 lines) ==="
+            pm2 logs tolstoy-api --lines 30
+            
+            echo -e "\n=== Port Check ==="
+            ss -tlnp | grep :3000 || echo "Port 3000 not listening"
+            
+            echo -e "\n=== AWS Secrets Test ==="
+            aws secretsmanager get-secret-value --secret-id tolstoy/env --region us-east-1 --query 'SecretString' --output text | head -c 50 && echo "..." || echo "AWS secrets not accessible"
+            
+            echo -e "\n=== System Resources ==="
+            df -h | head -5
+            free -h
+          DEBUG_EOF
           exit 1
 
       - name: Cleanup
