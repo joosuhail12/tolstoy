@@ -1,0 +1,556 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Tolstoy Docs",
+  "description": "Workflow automation platform documentation - Learn how to create, manage, and execute workflows with Tolstoy",
+  "api": {
+    "playground": {
+      "mode": "show",
+      "showCodeSamples": true
+    },
+    "baseUrl": ["https://tolstoy.getpullse.com", "http://localhost:3000"],
+    "auth": {
+      "method": "custom",
+      "headers": {
+        "x-org-id": "your-organization-id",
+        "x-user-id": "your-user-id"
+      }
+    }
+  },
+  "openapi": "https://app.stainless.com/api/spec/documented/tolstoy-api/openapi.documented.yml",
+  "fallbackOpenapi": "openapi.json",
+  "logo": {
+    "dark": "/logo/dark.svg",
+    "light": "/logo/light.svg"
+  },
+  "favicon": "/favicon.svg",
+  "colors": {
+    "primary": "#2563eb",
+    "light": "#3b82f6",
+    "dark": "#1d4ed8"
+  },
+  "navbar": {
+    "primary": {
+      "type": "button",
+      "label": "Dashboard",
+      "href": "https://app.tolstoy.dev"
+    }
+  },
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Getting Started", 
+        "icon": "rocket",
+        "pages": [
+          "introduction",
+          "quickstart"
+        ]
+      },
+      {
+        "tab": "Product",
+        "icon": "sparkles",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "product/overview/what-is-tolstoy",
+              "product/overview/key-features",
+              "product/overview/use-cases",
+              "product/overview/architecture"
+            ]
+          },
+          {
+            "group": "Getting Started",
+            "pages": [
+              "product/getting-started/account-setup",
+              "product/getting-started/first-workflow",
+              "product/getting-started/dashboard-tour",
+              "product/getting-started/basic-concepts"
+            ]
+          },
+          {
+            "group": "Workflows",
+            "pages": [
+              "product/workflows/creating-workflows",
+              "product/workflows/workflow-patterns",
+              "product/workflows/conditional-logic",
+              "product/workflows/error-handling",
+              "product/workflows/best-practices"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "product/integrations/overview",
+              "product/integrations/popular-integrations/slack",
+              "product/integrations/popular-integrations/github",
+              "product/integrations/popular-integrations/salesforce",
+              "product/integrations/custom-integrations"
+            ]
+          },
+          {
+            "group": "Monitoring",
+            "pages": [
+              "product/monitoring/execution-tracking",
+              "product/monitoring/logs-and-debugging",
+              "product/monitoring/performance-metrics",
+              "product/monitoring/alerting"
+            ]
+          },
+          {
+            "group": "Tutorials",
+            "pages": [
+              "product/tutorials/github-slack-workflow",
+              "product/tutorials/crm-email-automation",
+              "product/tutorials/data-pipeline"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "CLI",
+        "icon": "command-line",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "cli/getting-started/installation",
+              "cli/getting-started/configuration",
+              "cli/getting-started/authentication",
+              "cli/getting-started/first-command"
+            ]
+          },
+          {
+            "group": "Configuration Commands",
+            "pages": [
+              "cli/commands/config/overview",
+              "cli/commands/config/add",
+              "cli/commands/config/list",
+              "cli/commands/config/use",
+              "cli/commands/config/test"
+            ]
+          },
+          {
+            "group": "Flow Commands",
+            "pages": [
+              "cli/commands/flows/overview",
+              "cli/commands/flows/list",
+              "cli/commands/flows/get",
+              "cli/commands/flows/create",
+              "cli/commands/flows/execute",
+              "cli/commands/flows/logs",
+              "cli/commands/flows/delete"
+            ]
+          },
+          {
+            "group": "Tool Commands",
+            "pages": [
+              "cli/commands/tools/overview",
+              "cli/commands/tools/list",
+              "cli/commands/tools/create",
+              "cli/commands/tools/test",
+              "cli/commands/tools/delete"
+            ]
+          },
+          {
+            "group": "Action Commands",
+            "pages": [
+              "cli/commands/actions/overview",
+              "cli/commands/actions/list",
+              "cli/commands/actions/create",
+              "cli/commands/actions/execute"
+            ]
+          },
+          {
+            "group": "Other Commands",
+            "pages": [
+              "cli/commands/users/overview",
+              "cli/commands/webhooks/overview",
+              "cli/commands/logs/overview",
+              "cli/commands/templates/overview"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "cli/guides/ci-cd-integration",
+              "cli/guides/automation-scripts",
+              "cli/guides/profile-management",
+              "cli/guides/troubleshooting"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "cli/reference/global-options",
+              "cli/reference/environment-variables",
+              "cli/reference/configuration-files"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "SDK",
+        "icon": "code",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "sdk/getting-started/installation",
+              "sdk/getting-started/authentication",
+              "sdk/getting-started/quick-start",
+              "sdk/getting-started/client-configuration"
+            ]
+          },
+          {
+            "group": "Health & Status",
+            "pages": [
+              "sdk/resources/health/overview",
+              "sdk/resources/health/check-status",
+              "sdk/resources/health/detailed-status"
+            ]
+          },
+          {
+            "group": "Organizations",
+            "pages": [
+              "sdk/resources/organizations/overview",
+              "sdk/resources/organizations/list",
+              "sdk/resources/organizations/create",
+              "sdk/resources/organizations/get",
+              "sdk/resources/organizations/update",
+              "sdk/resources/organizations/delete"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "sdk/resources/users/overview",
+              "sdk/resources/users/list",
+              "sdk/resources/users/create",
+              "sdk/resources/users/get",
+              "sdk/resources/users/update",
+              "sdk/resources/users/delete"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "sdk/resources/tools/overview",
+              "sdk/resources/tools/list",
+              "sdk/resources/tools/create",
+              "sdk/resources/tools/get",
+              "sdk/resources/tools/update",
+              "sdk/resources/tools/delete"
+            ]
+          },
+          {
+            "group": "Actions",
+            "pages": [
+              "sdk/resources/actions/overview",
+              "sdk/resources/actions/list",
+              "sdk/resources/actions/create",
+              "sdk/resources/actions/get",
+              "sdk/resources/actions/update",
+              "sdk/resources/actions/delete",
+              "sdk/resources/actions/execute"
+            ]
+          },
+          {
+            "group": "Flows",
+            "pages": [
+              "sdk/resources/flows/overview",
+              "sdk/resources/flows/list",
+              "sdk/resources/flows/create",
+              "sdk/resources/flows/get",
+              "sdk/resources/flows/update",
+              "sdk/resources/flows/delete",
+              "sdk/resources/flows/execute",
+              "sdk/resources/flows/get-metrics"
+            ]
+          },
+          {
+            "group": "Execution Logs",
+            "pages": [
+              "sdk/resources/execution-logs/overview",
+              "sdk/resources/execution-logs/list",
+              "sdk/resources/execution-logs/create",
+              "sdk/resources/execution-logs/get",
+              "sdk/resources/execution-logs/update",
+              "sdk/resources/execution-logs/delete"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "sdk/resources/webhooks/overview",
+              "sdk/resources/webhooks/list",
+              "sdk/resources/webhooks/create",
+              "sdk/resources/webhooks/get",
+              "sdk/resources/webhooks/update",
+              "sdk/resources/webhooks/delete",
+              "sdk/resources/webhooks/toggle",
+              "sdk/resources/webhooks/test"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "sdk/guides/error-handling",
+              "sdk/guides/pagination",
+              "sdk/guides/rate-limiting",
+              "sdk/guides/webhooks-setup",
+              "sdk/guides/typescript-tips"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "sdk/examples/basic-workflow",
+              "sdk/examples/async-execution",
+              "sdk/examples/batch-operations",
+              "sdk/examples/integration-patterns"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "sdk/reference/types",
+              "sdk/reference/interfaces",
+              "sdk/reference/utilities"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "icon": "api",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/overview/introduction",
+              "api/overview/authentication",
+              "api/overview/rate-limits",
+              "api/overview/errors",
+              "api/overview/pagination"
+            ]
+          },
+          {
+            "group": "Health",
+            "pages": [
+              "api/resources/health/get-status",
+              "api/resources/health/get-detailed-status"
+            ]
+          },
+          {
+            "group": "Organizations",
+            "pages": [
+              "api/resources/organizations/list-organizations",
+              "api/resources/organizations/create-organization",
+              "api/resources/organizations/get-organization",
+              "api/resources/organizations/update-organization",
+              "api/resources/organizations/delete-organization"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "api/resources/users/list-users",
+              "api/resources/users/create-user",
+              "api/resources/users/get-user",
+              "api/resources/users/update-user",
+              "api/resources/users/delete-user"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "api/resources/tools/list-tools",
+              "api/resources/tools/create-tool",
+              "api/resources/tools/get-tool",
+              "api/resources/tools/update-tool",
+              "api/resources/tools/delete-tool"
+            ]
+          },
+          {
+            "group": "Tool Secrets",
+            "pages": [
+              "api/resources/tools/secrets/store-secret",
+              "api/resources/tools/secrets/get-secret",
+              "api/resources/tools/secrets/delete-secret",
+              "api/resources/tools/secrets/list-secrets"
+            ]
+          },
+          {
+            "group": "Actions",
+            "pages": [
+              "api/resources/actions/list-actions",
+              "api/resources/actions/create-action",
+              "api/resources/actions/get-action",
+              "api/resources/actions/update-action",
+              "api/resources/actions/delete-action",
+              "api/resources/actions/execute-action"
+            ]
+          },
+          {
+            "group": "Flows",
+            "pages": [
+              "api/resources/flows/list-flows",
+              "api/resources/flows/create-flow",
+              "api/resources/flows/get-flow",
+              "api/resources/flows/update-flow",
+              "api/resources/flows/delete-flow",
+              "api/resources/flows/execute-flow",
+              "api/resources/flows/get-metrics"
+            ]
+          },
+          {
+            "group": "Flow Executions",
+            "pages": [
+              "api/resources/flows/executions/list-executions",
+              "api/resources/flows/executions/get-execution",
+              "api/resources/flows/executions/cancel-execution",
+              "api/resources/flows/executions/retry-execution"
+            ]
+          },
+          {
+            "group": "Execution Logs",
+            "pages": [
+              "api/resources/execution-logs/list-execution-logs",
+              "api/resources/execution-logs/create-execution-log",
+              "api/resources/execution-logs/get-execution-log",
+              "api/resources/execution-logs/update-execution-log",
+              "api/resources/execution-logs/delete-execution-log"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "api/resources/webhooks/list-webhooks",
+              "api/resources/webhooks/create-webhook",
+              "api/resources/webhooks/get-webhook",
+              "api/resources/webhooks/update-webhook",
+              "api/resources/webhooks/delete-webhook",
+              "api/resources/webhooks/toggle-webhook",
+              "api/resources/webhooks/test-webhook",
+              "api/resources/webhooks/get-event-types"
+            ]
+          },
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/resources/auth/oauth-login",
+              "api/resources/auth/oauth-callback"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "api/guides/making-requests",
+              "api/guides/handling-responses",
+              "api/guides/webhook-setup",
+              "api/guides/postman-collection"
+            ]
+          },
+          {
+            "group": "Playground",
+            "pages": [
+              "api/playground/getting-started",
+              "api/playground/common-requests"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Internal",
+        "icon": "gear",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "internal/architecture/system-overview",
+              "internal/architecture/database-schema",
+              "internal/architecture/api-design",
+              "internal/architecture/authentication-flow",
+              "internal/architecture/execution-engine",
+              "internal/architecture/scaling-strategy"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "internal/features/flows/definition-system",
+              "internal/features/flows/execution-engine",
+              "internal/features/flows/step-validation",
+              "internal/features/flows/error-handling",
+              "internal/features/actions/action-registry",
+              "internal/features/actions/input-validation",
+              "internal/features/actions/execution-context",
+              "internal/features/tools/integration-system",
+              "internal/features/tools/auth-management",
+              "internal/features/monitoring/logging-system",
+              "internal/features/monitoring/metrics-collection",
+              "internal/features/security/authentication",
+              "internal/features/security/authorization"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "internal/development/setup/local-environment",
+              "internal/development/setup/docker-setup",
+              "internal/development/setup/database-setup",
+              "internal/development/setup/testing-setup",
+              "internal/development/guidelines/coding-standards",
+              "internal/development/guidelines/api-design-principles",
+              "internal/development/guidelines/testing-strategy",
+              "internal/development/patterns/controller-structure",
+              "internal/development/patterns/service-patterns",
+              "internal/development/tools/debugging",
+              "internal/development/tools/profiling"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "internal/deployment/infrastructure/aws-architecture",
+              "internal/deployment/infrastructure/kubernetes-setup",
+              "internal/deployment/infrastructure/database-management",
+              "internal/deployment/infrastructure/monitoring-stack",
+              "internal/deployment/ci-cd/github-actions",
+              "internal/deployment/ci-cd/testing-pipeline",
+              "internal/deployment/ci-cd/deployment-pipeline",
+              "internal/deployment/operations/incident-response",
+              "internal/deployment/operations/maintenance-procedures"
+            ]
+          },
+          {
+            "group": "Onboarding",
+            "pages": [
+              "internal/onboarding/new-engineer-guide",
+              "internal/onboarding/codebase-overview",
+              "internal/onboarding/key-concepts",
+              "internal/onboarding/first-contribution"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/introduction"
+    },
+    {
+      "source": "/index",
+      "destination": "/introduction"
+    }
+  ],
+  "footer": {
+    "socials": {
+      "twitter": "https://twitter.com/tolstoy_dev",
+      "github": "https://github.com/tolstoy-dev"
+    }
+  }
+}

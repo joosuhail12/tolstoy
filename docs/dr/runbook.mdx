@@ -21,7 +21,7 @@ sidebar_position: 6
 - **State Management**: HCP Terraform Cloud
 - **Monitoring**: CloudWatch Dashboard & SNS Alerts
 
----
+<hr/>
 
 ## 🚨 Emergency Contacts
 
@@ -36,7 +36,7 @@ sidebar_position: 6
 2. **Level 2**: Engineering Management (1 hour)
 3. **Level 3**: Executive Team (2 hours)
 
----
+<hr/>
 
 ## 📊 Disaster Classification
 
@@ -57,7 +57,7 @@ sidebar_position: 6
 - Backup failures
 - Monitoring alerts
 
----
+<hr/>
 
 ## 1️⃣ Database Recovery
 
@@ -133,7 +133,7 @@ psql $DATABASE_URL -c "\dt+"
 psql $DATABASE_URL -c "SELECT COUNT(*) FROM flows WHERE created_at >= NOW() - INTERVAL '7 days';"
 ```
 
----
+<hr/>
 
 ## 2️⃣ Infrastructure Recovery
 
@@ -207,7 +207,7 @@ aws lambda invoke --function-name tolstoy-backup-prod response.json
 cat response.json
 ```
 
----
+<hr/>
 
 ## 3️⃣ Application Recovery
 
@@ -251,7 +251,7 @@ curl -X POST $(terraform output -raw api_gateway_url)/flows \
   -d '{"name":"test-flow","description":"DR test"}'
 ```
 
----
+<hr/>
 
 ## 4️⃣ SDK & Integration Recovery
 
@@ -276,7 +276,7 @@ gh workflow list --repo joosuhail12/tolstoy
 gh workflow run "Update API Documentation with Stainless" --repo joosuhail12/tolstoy
 ```
 
----
+<hr/>
 
 ## 5️⃣ Monitoring & Validation
 
@@ -312,7 +312,7 @@ npx tolstoy-api flows execute \
   --variables '{"test": true}'
 ```
 
----
+<hr/>
 
 ## 6️⃣ Post-Recovery Checklist
 
@@ -336,7 +336,7 @@ npx tolstoy-api flows execute \
 - [ ] DR procedures updated based on lessons learned
 - [ ] Team debriefing completed
 
----
+<hr/>
 
 ## 📚 Additional Resources
 
@@ -369,7 +369,7 @@ terraform output                                     # Show outputs
 terraform state list                                 # List resources
 ```
 
----
+<hr/>
 
 ## 🔄 Recovery Time Estimates
 
@@ -381,7 +381,7 @@ terraform state list                                 # List resources
 | End-to-End Validation | 30-45 minutes |
 | **Total RTO** | **~4 hours** |
 
----
+<hr/>
 
 ## 📞 Vendor Support Contacts
 
@@ -390,7 +390,7 @@ terraform state list                                 # List resources
 - **HCP Support**: support@hashicorp.com
 - **Stainless Support**: support@stainless.app
 
----
+<hr/>
 
 ## 📝 Incident Logging Template
 
@@ -425,7 +425,7 @@ terraform state list                                 # List resources
 - [ ] [Action item with owner and due date]
 ```
 
----
+<hr/>
 
 :::tip
 **Remember**: Practice makes perfect. Run DR drills quarterly to ensure procedures work and team familiarity.

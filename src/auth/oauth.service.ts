@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import axios, { AxiosResponse } from 'axios';
@@ -25,7 +31,7 @@ export interface OAuthConfig {
   clientId: string;
   clientSecret: string;
   redirectUri?: string; // Single callback URL (backward compatibility)
-  redirectUris?: string[]; // Multiple callback URLs for multi-environment support  
+  redirectUris?: string[]; // Multiple callback URLs for multi-environment support
   allowedDomains?: string[]; // Allowed domains for dynamic callback generation
   scope?: string;
   authorizeUrl?: string;
@@ -46,11 +52,14 @@ export class OAuthService {
   /**
    * Validate tool access - ensure toolId exists and belongs to orgId
    */
-  private async validateToolAccess(toolId: string, orgId: string): Promise<{ id: string; name: string; orgId: string }> {
+  private async validateToolAccess(
+    toolId: string,
+    orgId: string,
+  ): Promise<{ id: string; name: string; orgId: string }> {
     try {
       const tool = await this.prisma.tool.findUnique({
         where: { id: toolId },
-        select: { id: true, name: true, orgId: true }
+        select: { id: true, name: true, orgId: true },
       });
 
       if (!tool) {
@@ -58,7 +67,9 @@ export class OAuthService {
       }
 
       if (tool.orgId !== orgId) {
-        this.logger.warn(`Unauthorized access attempt: tool ${toolId} does not belong to org ${orgId}`);
+        this.logger.warn(
+          `Unauthorized access attempt: tool ${toolId} does not belong to org ${orgId}`,
+        );
         throw new UnauthorizedException(`Tool ${toolId} does not belong to organization ${orgId}`);
       }
 
@@ -79,18 +90,19 @@ export class OAuthService {
 
     // If a specific host is requested and it's in allowed domains, use it
     if (requestHost && allowedDomains && allowedDomains.length > 0) {
-      const isAllowed = allowedDomains.some(domain => 
-        requestHost === domain || 
-        requestHost.endsWith(`.${domain}`) ||
-        domain === '*' // Wildcard allows any domain
+      const isAllowed = allowedDomains.some(
+        domain => requestHost === domain || requestHost.endsWith(`.${domain}`) || domain === '*', // Wildcard allows any domain
       );
-      
+
       if (isAllowed) {
-        const protocol = requestHost.includes('localhost') || requestHost.includes('127.0.0.1') ? 'http' : 'https';
+        const protocol =
+          requestHost.includes('localhost') || requestHost.includes('127.0.0.1') ? 'http' : 'https';
         baseUrl = `${protocol}://${requestHost}`;
         this.logger.debug(`Using requested host for callback: ${baseUrl}`);
       } else {
-        this.logger.warn(`Requested host ${requestHost} not in allowed domains: ${allowedDomains.join(', ')}`);
+        this.logger.warn(
+          `Requested host ${requestHost} not in allowed domains: ${allowedDomains.join(', ')}`,
+        );
         baseUrl = this.getDefaultBaseUrl();
       }
     } else {
@@ -125,27 +137,27 @@ export class OAuthService {
     if (config.redirectUris && config.redirectUris.length > 0) {
       // Validate all configured URIs
       const validatedUris = config.redirectUris.map(uri => this.validateRedirectUri(uri));
-      
+
       if (requestHost) {
         // Find matching redirect URI for the request host
         const matchingUri = validatedUris.find(uri => {
           const uriHost = new URL(uri).hostname;
           return uriHost === requestHost || requestHost.endsWith(`.${uriHost}`);
         });
-        
+
         if (matchingUri) {
           this.logger.debug(`Using matching redirectUri: ${matchingUri} for host: ${requestHost}`);
           return matchingUri;
         }
       }
-      
+
       // If no match or no requestHost, use the first validated URI
       this.logger.debug(`Using first configured redirectUri: ${validatedUris[0]}`);
       return validatedUris[0];
     }
 
     // Priority 3: Dynamic generation with domain validation (centralized callback)
-    this.logger.debug(`Using dynamic redirect URI generation with centralized callback`);
+    this.logger.debug('Using dynamic redirect URI generation with centralized callback');
     const dynamicUri = this.buildRedirectUri(config.allowedDomains, requestHost);
     return this.validateRedirectUri(dynamicUri);
   }
@@ -161,7 +173,7 @@ export class OAuthService {
       // Security checks
       if (!['http:', 'https:'].includes(url.protocol)) {
         throw new BadRequestException(
-          `Invalid protocol in redirect URI. Only HTTP and HTTPS are allowed.`,
+          'Invalid protocol in redirect URI. Only HTTP and HTTPS are allowed.',
         );
       }
 
@@ -218,7 +230,9 @@ export class OAuthService {
       const tool = await this.validateToolAccess(toolId, orgId);
       const toolKey = tool.name; // Get tool name for provider-specific logic
 
-      this.logger.log(`Generating OAuth URL for tool ${toolKey} (${toolId}), org ${orgId}, user ${userId}`);
+      this.logger.log(
+        `Generating OAuth URL for tool ${toolKey} (${toolId}), org ${orgId}, user ${userId}`,
+      );
 
       // Load org OAuth configuration using toolId
       const orgConfig = await this.authConfig.getOrgAuthConfig(orgId, toolId);
@@ -307,7 +321,9 @@ export class OAuthService {
       const tool = await this.validateToolAccess(toolId, orgId);
       const toolKey = tool.name;
 
-      this.logger.log(`Validated state for tool ${toolKey} (${toolId}), org ${orgId}, user ${userId}`);
+      this.logger.log(
+        `Validated state for tool ${toolKey} (${toolId}), org ${orgId}, user ${userId}`,
+      );
 
       // Load OAuth configuration for token exchange
       const orgConfig = await this.authConfig.getOrgAuthConfig(orgId, toolId);
@@ -318,7 +334,12 @@ export class OAuthService {
       const redirectUri = this.selectRedirectUri(oauthConfig);
 
       // Exchange authorization code for tokens
-      const tokenResponse = await this.exchangeCodeForTokens(code, oauthConfig, toolKey, redirectUri);
+      const tokenResponse = await this.exchangeCodeForTokens(
+        code,
+        oauthConfig,
+        toolKey,
+        redirectUri,
+      );
 
       // Calculate expiration time
       const expiresAt = tokenResponse.expires_in

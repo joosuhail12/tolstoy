@@ -22,7 +22,7 @@ describe('ToolAuthController', () => {
     const mockMetricsService = {
       incrementToolAuthConfig: jest.fn(),
     };
-    
+
     const mockPrismaService = {
       tool: {
         findUnique: jest.fn(),
@@ -100,14 +100,14 @@ describe('ToolAuthController', () => {
     it('should increment tool auth config metrics with get action', async () => {
       const orgId = 'org-123';
       const toolId = 'github';
-      const mockConfig = { 
-        id: 'config-123', 
-        orgId: 'org-123', 
-        toolId: 'github', 
-        type: 'apiKey', 
+      const mockConfig = {
+        id: 'config-123',
+        orgId: 'org-123',
+        toolId: 'github',
+        type: 'apiKey',
         config: { apiKey: 'masked****' },
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
       // Mock tool validation

@@ -152,7 +152,7 @@ describe('AuthConfigService', () => {
 
       // Mock tool not found
       prismaService.tool.findUnique.mockResolvedValueOnce(null);
-      
+
       await expect(service.getOrgAuthConfig('org-456', 'nonexistent-tool-id')).rejects.toThrow(
         new NotFoundException('Tool with ID nonexistent-tool-id not found'),
       );

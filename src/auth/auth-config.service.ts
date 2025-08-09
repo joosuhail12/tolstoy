@@ -53,11 +53,14 @@ export class AuthConfigService {
   /**
    * Validate tool access - ensure toolId exists and belongs to orgId
    */
-  private async validateToolAccess(toolId: string, orgId: string): Promise<{ id: string; name: string; orgId: string }> {
+  private async validateToolAccess(
+    toolId: string,
+    orgId: string,
+  ): Promise<{ id: string; name: string; orgId: string }> {
     try {
       const tool = await this.prisma.tool.findUnique({
         where: { id: toolId },
-        select: { id: true, name: true, orgId: true }
+        select: { id: true, name: true, orgId: true },
       });
 
       if (!tool) {
@@ -65,7 +68,9 @@ export class AuthConfigService {
       }
 
       if (tool.orgId !== orgId) {
-        this.logger.warn(`Unauthorized access attempt: tool ${toolId} does not belong to org ${orgId}`);
+        this.logger.warn(
+          `Unauthorized access attempt: tool ${toolId} does not belong to org ${orgId}`,
+        );
         throw new UnauthorizedException(`Tool ${toolId} does not belong to organization ${orgId}`);
       }
 
@@ -92,8 +97,8 @@ export class AuthConfigService {
    */
   async getOrgAuthConfig(orgId: string, toolId: string): Promise<OrgAuthConfig> {
     // Validate tool access first
-    const tool = await this.validateToolAccess(toolId, orgId);
-    
+    await this.validateToolAccess(toolId, orgId);
+
     const cacheKey = this.orgConfigKey(orgId, toolId);
 
     this.logger.debug(`Loading org auth config for ${orgId}:${toolId}`);
@@ -154,14 +159,10 @@ export class AuthConfigService {
   /**
    * Load user-level OAuth tokens and credentials
    */
-  async getUserCredentials(
-    orgId: string,
-    userId: string,
-    toolId: string,
-  ): Promise<UserCredential> {
+  async getUserCredentials(orgId: string, userId: string, toolId: string): Promise<UserCredential> {
     // Validate tool access first
     await this.validateToolAccess(toolId, orgId);
-    
+
     this.logger.debug(`Loading user credentials for ${orgId}:${userId}:${toolId}`);
 
     const cred = await this.prisma.userCredential.findFirst({
@@ -246,7 +247,7 @@ export class AuthConfigService {
         : new Date(Date.now() + 3600000); // Default 1 hour
 
       // Update credentials in database
-      const updatedCred = await this.prisma.userCredential.update({
+      await this.prisma.userCredential.update({
         where: { id: cred.id },
         data: {
           accessToken: refreshedTokens.access_token,
@@ -280,7 +281,7 @@ export class AuthConfigService {
   ): Promise<OrgAuthConfig> {
     // Validate tool access first
     await this.validateToolAccess(toolId, orgId);
-    
+
     this.logger.debug(`Setting org auth config for ${orgId}:${toolId}`);
 
     const authConfig = await this.prisma.toolAuthConfig.upsert({
@@ -332,7 +333,7 @@ export class AuthConfigService {
   ): Promise<UserCredential> {
     // Validate tool access first
     await this.validateToolAccess(toolId, orgId);
-    
+
     this.logger.debug(`Setting user credentials for ${orgId}:${userId}:${toolId}`);
 
     const credential = await this.prisma.userCredential.upsert({
@@ -365,7 +366,7 @@ export class AuthConfigService {
   async deleteOrgAuthConfig(orgId: string, toolId: string): Promise<void> {
     // Validate tool access first
     await this.validateToolAccess(toolId, orgId);
-    
+
     this.logger.debug(`Deleting org auth config for ${orgId}:${toolId}`);
 
     const deleted = await this.prisma.toolAuthConfig.deleteMany({
@@ -389,7 +390,7 @@ export class AuthConfigService {
   async deleteUserCredentials(orgId: string, userId: string, toolId: string): Promise<void> {
     // Validate tool access first
     await this.validateToolAccess(toolId, orgId);
-    
+
     this.logger.debug(`Deleting user credentials for ${orgId}:${userId}:${toolId}`);
 
     const deleted = await this.prisma.userCredential.deleteMany({
@@ -478,9 +479,7 @@ export class AuthConfigService {
           message: error.message,
         };
         this.logger.error(`Token refresh HTTP error for ${toolKey}:`, errorDetails);
-        throw new Error(
-          `Failed to refresh token: ${error.response?.data?.error || error.message}`,
-        );
+        throw new Error(`Failed to refresh token: ${error.response?.data?.error || error.message}`);
       }
 
       this.logger.error(`Token refresh error for ${toolKey}: ${error.message}`);

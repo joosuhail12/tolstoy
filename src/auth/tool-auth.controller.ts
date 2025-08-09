@@ -44,11 +44,14 @@ export class ToolAuthController {
   /**
    * Validate tool access - ensure toolId exists and belongs to orgId
    */
-  private async validateToolAccess(toolId: string, orgId: string): Promise<{ id: string; name: string; orgId: string }> {
+  private async validateToolAccess(
+    toolId: string,
+    orgId: string,
+  ): Promise<{ id: string; name: string; orgId: string }> {
     try {
       const tool = await this.prisma.tool.findUnique({
         where: { id: toolId },
-        select: { id: true, name: true, orgId: true }
+        select: { id: true, name: true, orgId: true },
       });
 
       if (!tool) {
@@ -56,7 +59,9 @@ export class ToolAuthController {
       }
 
       if (tool.orgId !== orgId) {
-        this.logger.warn(`Unauthorized access attempt: tool ${toolId} does not belong to org ${orgId}`);
+        this.logger.warn(
+          `Unauthorized access attempt: tool ${toolId} does not belong to org ${orgId}`,
+        );
         throw new UnauthorizedException(`Tool ${toolId} does not belong to organization ${orgId}`);
       }
 
@@ -108,7 +113,7 @@ export class ToolAuthController {
 
     // Validate tool ownership first
     const tool = await this.validateToolAccess(toolId, orgId);
-    
+
     this.logger.log(`Creating/updating auth config for tool ${toolId} in org ${orgId}`);
 
     // Record metrics using tool name
@@ -160,7 +165,7 @@ export class ToolAuthController {
 
     // Validate tool ownership first
     const tool = await this.validateToolAccess(toolId, orgId);
-    
+
     this.logger.log(`Fetching auth config for tool ${toolId} in org ${orgId}`);
 
     // Record metrics using tool name
@@ -225,7 +230,7 @@ export class ToolAuthController {
 
     // Validate tool ownership first
     const tool = await this.validateToolAccess(toolId, orgId);
-    
+
     this.logger.log(`Deleting auth config for tool ${toolId} in org ${orgId}`);
 
     // Record metrics using tool name

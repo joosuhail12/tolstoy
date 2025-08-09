@@ -96,16 +96,16 @@ describe('ActionsService', () => {
         { provide: InputValidatorService, useValue: mockInputValidator },
         { provide: AuthConfigService, useValue: mockAuthConfig },
         { provide: MetricsService, useValue: mockMetricsService },
-        { 
-          provide: DaytonaService, 
+        {
+          provide: DaytonaService,
           useValue: {
             executeHttpRequest: jest.fn().mockResolvedValue({
               success: true,
               statusCode: 200,
               data: { result: 'success' },
-              duration: 100
+              duration: 100,
             }),
-          }
+          },
         },
       ],
     }).compile();
@@ -139,7 +139,7 @@ describe('ActionsService', () => {
         success: true,
         statusCode: 200,
         data: { success: true },
-        duration: 100
+        duration: 100,
       });
     });
 
@@ -157,7 +157,7 @@ describe('ActionsService', () => {
         success: true,
         statusCode: 200,
         data: { success: true },
-        duration: 100
+        duration: 100,
       });
 
       authConfig.getOrgAuthConfig.mockResolvedValue(apiKeyConfig);
@@ -261,7 +261,7 @@ describe('ActionsService', () => {
           headers: expect.objectContaining({
             Authorization: 'Bearer oauth-token-123',
           }),
-        })
+        }),
       );
     });
 
@@ -279,7 +279,7 @@ describe('ActionsService', () => {
             'Content-Type': 'application/json',
             'X-Custom': 'header',
           },
-        })
+        }),
       );
     });
 
@@ -309,7 +309,7 @@ describe('ActionsService', () => {
             'Content-Type': 'application/json',
             'X-Custom': 'header',
           },
-        })
+        }),
       );
     });
 
@@ -356,7 +356,7 @@ describe('ActionsService', () => {
         statusCode: 400,
         data: { error: 'Bad Request' },
         error: { message: 'Bad Request', type: 'http' },
-        duration: 200
+        duration: 200,
       });
 
       await expect(
@@ -380,7 +380,7 @@ describe('ActionsService', () => {
         success: true,
         statusCode: 200,
         data: 'Plain text response',
-        duration: 150
+        duration: 150,
       });
 
       const result = await service.executeAction('org-456', 'user-123', 'send-email', validInputs);
@@ -404,8 +404,8 @@ describe('ActionsService', () => {
       // Verify absolute URL was used as-is
       expect(daytonaService.executeHttpRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: 'https://external-api.com/webhook'
-        })
+          url: 'https://external-api.com/webhook',
+        }),
       );
     });
 
@@ -427,7 +427,7 @@ describe('ActionsService', () => {
           url: 'https://api.email.com/api/status',
           headers: expect.any(Object),
           body: undefined,
-        })
+        }),
       );
     });
 
@@ -450,8 +450,8 @@ describe('ActionsService', () => {
       // Verify template replacement
       expect(daytonaService.executeHttpRequest).toHaveBeenCalledWith(
         expect.objectContaining({
-          url: 'https://api.email.com/api/users/user-456/send'
-        })
+          url: 'https://api.email.com/api/users/user-456/send',
+        }),
       );
     });
 
@@ -531,7 +531,7 @@ describe('ActionsService', () => {
           id: 'tool-789',
           name: 'email-service',
           orgId: 'org-456',
-        }
+        },
       };
       prismaService.action.findUnique.mockResolvedValue(mockActionWithOrgId);
 
@@ -542,9 +542,9 @@ describe('ActionsService', () => {
         where: { id: 'action-123' },
         include: {
           tool: {
-            select: { id: true, name: true, orgId: true }
-          }
-        }
+            select: { id: true, name: true, orgId: true },
+          },
+        },
       });
     });
 
@@ -564,7 +564,7 @@ describe('ActionsService', () => {
           id: 'tool-789',
           name: 'email-service',
           orgId: 'different-org',
-        }
+        },
       };
       prismaService.action.findUnique.mockResolvedValue(wrongOrgAction);
 

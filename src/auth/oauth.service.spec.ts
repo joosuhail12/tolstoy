@@ -307,7 +307,7 @@ describe('OAuthService', () => {
         status: 400,
         data: { error: 'invalid_grant', error_description: 'Invalid authorization code' },
       };
-      
+
       // Mock axios.isAxiosError to return true for our error
       mockedIsAxiosError.mockReturnValueOnce(true);
       mockedAxios.post.mockRejectedValue(axiosError);
@@ -402,8 +402,8 @@ describe('OAuthService', () => {
         const configForTool = { ...mockOAuthConfig };
         authConfigService.getOrgAuthConfig.mockResolvedValue(configForTool);
         redisCacheService.set.mockResolvedValue(undefined);
-        
-        // Mock Prisma to return the specific tool for this test  
+
+        // Mock Prisma to return the specific tool for this test
         prismaService.tool.findUnique.mockResolvedValueOnce({
           id: 'tool-' + toolKey,
           name: toolKey,

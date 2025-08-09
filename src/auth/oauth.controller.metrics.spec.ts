@@ -49,9 +49,19 @@ describe('OAuthController - Metrics', () => {
       const orgId = 'org-456';
       const mockUrl = 'https://github.com/login/oauth/authorize?...';
 
-      oauthService.getAuthorizeUrl.mockResolvedValue({ url: mockUrl, state: 'state-123', toolKey: 'github' });
+      oauthService.getAuthorizeUrl.mockResolvedValue({
+        url: mockUrl,
+        state: 'state-123',
+        toolKey: 'github',
+      });
 
-      await controller.initiateLogin(params, query, orgId, { get: () => 'localhost' } as any, mockResponse as Response);
+      await controller.initiateLogin(
+        params,
+        query,
+        orgId,
+        { get: () => 'localhost' } as any,
+        mockResponse as Response,
+      );
 
       expect(metricsService.incrementOAuthRedirect).toHaveBeenCalledWith({
         orgId: 'org-456',
@@ -65,7 +75,13 @@ describe('OAuthController - Metrics', () => {
       const params = { toolId: 'tool-123' };
       const query = { userId: 'user-123' };
 
-      await controller.initiateLogin(params, query, '', { get: () => 'localhost' } as any, mockResponse as Response);
+      await controller.initiateLogin(
+        params,
+        query,
+        '',
+        { get: () => 'localhost' } as any,
+        mockResponse as Response,
+      );
 
       expect(metricsService.incrementOAuthRedirect).not.toHaveBeenCalled();
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.BAD_REQUEST);
@@ -92,9 +108,9 @@ describe('OAuthController - Metrics', () => {
           return null;
         },
         ip: '127.0.0.1',
-        connection: { remoteAddress: '127.0.0.1' }
+        connection: { remoteAddress: '127.0.0.1' },
       };
-      
+
       await controller.handleCallback(query, mockRequest as any, mockResponse as Response);
 
       expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
@@ -119,9 +135,9 @@ describe('OAuthController - Metrics', () => {
           return null;
         },
         ip: '127.0.0.1',
-        connection: { remoteAddress: '127.0.0.1' }
+        connection: { remoteAddress: '127.0.0.1' },
       };
-      
+
       await controller.handleCallback(query, mockRequest as any, mockResponse as Response);
 
       expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
@@ -149,9 +165,9 @@ describe('OAuthController - Metrics', () => {
           return null;
         },
         ip: '127.0.0.1',
-        connection: { remoteAddress: '127.0.0.1' }
+        connection: { remoteAddress: '127.0.0.1' },
       };
-      
+
       await controller.handleCallback(query, mockRequest as any, mockResponse as Response);
 
       // OAuth provider errors should not generate metrics (they're handled differently)

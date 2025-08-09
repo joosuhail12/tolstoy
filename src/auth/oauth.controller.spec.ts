@@ -56,8 +56,8 @@ describe('OAuthController', () => {
       json: jest.fn().mockReturnThis(),
       send: jest.fn().mockReturnThis(),
     } as any;
-    
-    // Mock Express Request object  
+
+    // Mock Express Request object
     mockRequest = {
       get: (header: string) => {
         if (header === 'host') return 'localhost';
@@ -66,7 +66,7 @@ describe('OAuthController', () => {
         return null;
       },
       ip: '127.0.0.1',
-      connection: { remoteAddress: '127.0.0.1' }
+      connection: { remoteAddress: '127.0.0.1' },
     };
   });
 
@@ -89,10 +89,24 @@ describe('OAuthController', () => {
         toolKey: mockToolKey,
       });
 
-      await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockRequest as any, mockResponse);
+      await controller.initiateLogin(
+        mockParams,
+        mockQuery,
+        mockOrgId,
+        mockRequest as any,
+        mockResponse,
+      );
 
-      expect(oauthService.getAuthorizeUrl).toHaveBeenCalledWith(mockToolId, mockOrgId, mockUserId, 'localhost');
-      expect(metricsService.incrementOAuthRedirect).toHaveBeenCalledWith({ orgId: mockOrgId, toolKey: mockToolKey });
+      expect(oauthService.getAuthorizeUrl).toHaveBeenCalledWith(
+        mockToolId,
+        mockOrgId,
+        mockUserId,
+        'localhost',
+      );
+      expect(metricsService.incrementOAuthRedirect).toHaveBeenCalledWith({
+        orgId: mockOrgId,
+        toolKey: mockToolKey,
+      });
       expect(mockResponse.redirect).toHaveBeenCalledWith(302, mockAuthUrl);
     });
 
@@ -114,7 +128,13 @@ describe('OAuthController', () => {
         new BadRequestException('Tool not configured for OAuth'),
       );
 
-      await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockRequest as any, mockResponse);
+      await controller.initiateLogin(
+        mockParams,
+        mockQuery,
+        mockOrgId,
+        mockRequest as any,
+        mockResponse,
+      );
 
       // Metrics are not incremented on service errors
       expect(mockResponse.status).toHaveBeenCalledWith(400);
@@ -128,7 +148,13 @@ describe('OAuthController', () => {
     it('should handle unexpected errors', async () => {
       oauthService.getAuthorizeUrl.mockRejectedValue(new Error('Unexpected error'));
 
-      await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockRequest as any, mockResponse);
+      await controller.initiateLogin(
+        mockParams,
+        mockQuery,
+        mockOrgId,
+        mockRequest as any,
+        mockResponse,
+      );
 
       // Metrics are not incremented on unexpected errors
       expect(mockResponse.status).toHaveBeenCalledWith(500);
@@ -146,10 +172,19 @@ describe('OAuthController', () => {
         toolKey: mockToolKey,
       });
 
-      await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockRequest as any, mockResponse);
+      await controller.initiateLogin(
+        mockParams,
+        mockQuery,
+        mockOrgId,
+        mockRequest as any,
+        mockResponse,
+      );
 
       expect(metricsService.incrementOAuthRedirect).toHaveBeenCalledTimes(1);
-      expect(metricsService.incrementOAuthRedirect).toHaveBeenCalledWith({ orgId: mockOrgId, toolKey: mockToolKey });
+      expect(metricsService.incrementOAuthRedirect).toHaveBeenCalledWith({
+        orgId: mockOrgId,
+        toolKey: mockToolKey,
+      });
     });
   });
 

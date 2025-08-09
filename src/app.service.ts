@@ -13,7 +13,6 @@ export class AppService {
     return `Hello from ${appName} v1.1.0! 🚀 Now with OAuth2, Metrics & Enhanced Monitoring!`;
   }
 
-
   getVersion(): {
     version: string;
     commit: string;

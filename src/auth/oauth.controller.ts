@@ -104,7 +104,12 @@ export class OAuthController {
       const requestHost = req.get('host') || req.hostname;
 
       // Generate authorization URL with request context
-      const { url, toolKey } = await this.oauthService.getAuthorizeUrl(toolId, orgId, userId, requestHost);
+      const { url, toolKey } = await this.oauthService.getAuthorizeUrl(
+        toolId,
+        orgId,
+        userId,
+        requestHost,
+      );
 
       // Record metrics using toolKey
       this.metricsService.incrementOAuthRedirect({ orgId, toolKey });
@@ -184,7 +189,6 @@ export class OAuthController {
     @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-
     try {
       // Security logging - capture key request details for monitoring
       const requestHost = req.get('host');
@@ -192,15 +196,12 @@ export class OAuthController {
       const referer = req.get('referer');
       const clientIp = req.ip || req.connection.remoteAddress;
 
-      this.logger.log(
-        `Processing OAuth callback from ${clientIp} (${requestHost})`,
-        {
-          requestHost,
-          userAgent,
-          referer,
-          clientIp,
-        },
-      );
+      this.logger.log(`Processing OAuth callback from ${clientIp} (${requestHost})`, {
+        requestHost,
+        userAgent,
+        referer,
+        clientIp,
+      });
 
       // Check if OAuth provider returned an error
       if (query.error) {
@@ -234,7 +235,9 @@ export class OAuthController {
       // Process the callback
       const result = await this.oauthService.handleCallback(query.code, query.state);
 
-      this.logger.log(`Successfully completed OAuth callback for ${result.toolKey} (${result.toolId})`);
+      this.logger.log(
+        `Successfully completed OAuth callback for ${result.toolKey} (${result.toolId})`,
+      );
 
       // Basic security check now that we have toolKey
       if (referer && !this.isValidReferer(referer, result.toolKey)) {
@@ -386,7 +389,7 @@ export class OAuthController {
   private isValidReferer(referer: string, toolKey: string): boolean {
     try {
       const refererUrl = new URL(referer);
-      
+
       // List of trusted OAuth provider domains
       const trustedDomains: Record<string, string[]> = {
         github: ['github.com'],
@@ -399,11 +402,10 @@ export class OAuthController {
       };
 
       const allowedDomains = trustedDomains[toolKey.toLowerCase()] || [];
-      
+
       // Check if referer domain is in the allowed list
-      return allowedDomains.some(domain => 
-        refererUrl.hostname === domain || 
-        refererUrl.hostname.endsWith(`.${domain}`)
+      return allowedDomains.some(
+        domain => refererUrl.hostname === domain || refererUrl.hostname.endsWith(`.${domain}`),
       );
     } catch {
       // Invalid URL format
