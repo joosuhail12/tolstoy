@@ -32,12 +32,13 @@ jobs:
           fetch-depth: 2
 
       - name: Run preview builds
-        uses: stainless-api/upload-openapi-spec-action/preview@v1
+        uses: stainless-api/upload-openapi-spec-action@v1
         with:
           stainless_api_key: ${{ secrets.STAINLESS_TOKEN }}
           org: ${{ env.STAINLESS_ORG }}
           project: ${{ env.STAINLESS_PROJECT }}
           oas_path: ${{ env.OAS_PATH }}
+          target: preview
 
   merge:
     # Run builds when PRs that modify OpenAPI spec are merged to main
@@ -53,12 +54,13 @@ jobs:
           fetch-depth: 2
 
       - name: Run merge build
-        uses: stainless-api/upload-openapi-spec-action/merge@v1
+        uses: stainless-api/upload-openapi-spec-action@v1
         with:
           stainless_api_key: ${{ secrets.STAINLESS_TOKEN }}
           org: ${{ env.STAINLESS_ORG }}
           project: ${{ env.STAINLESS_PROJECT }}
           oas_path: ${{ env.OAS_PATH }}
+          target: merge
 
   push:
     # Run builds when changes are pushed directly to main
@@ -73,9 +75,10 @@ jobs:
           fetch-depth: 2
 
       - name: Run push build
-        uses: stainless-api/upload-openapi-spec-action/push@v1
+        uses: stainless-api/upload-openapi-spec-action@v1
         with:
           stainless_api_key: ${{ secrets.STAINLESS_TOKEN }}
           org: ${{ env.STAINLESS_ORG }}
           project: ${{ env.STAINLESS_PROJECT }}
           oas_path: ${{ env.OAS_PATH }}
+          target: push
