@@ -62,6 +62,12 @@ jobs:
             npm run build
             
             echo "🗃️ Running database migrations..."
+            # Extract database URLs from AWS Secrets for Prisma
+            SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id tolstoy/env --region us-east-1 --query 'SecretString' --output text)
+            export DATABASE_URL=$(echo $SECRET_JSON | grep -o '"DATABASE_URL":"[^"]*' | cut -d'"' -f4)
+            export DIRECT_URL=$(echo $SECRET_JSON | grep -o '"DIRECT_URL":"[^"]*' | cut -d'"' -f4 || echo $DATABASE_URL)
+            echo "✅ Database URLs configured for migrations"
+            
             timeout 30 npm run db:migrate:deploy || echo "⚠️ Migration completed or timed out (this may be normal)"
             
             echo "🔄 Restarting PM2..."
@@ -85,7 +91,7 @@ jobs:
               --env USE_AWS_SECRETS=true \
               --log /home/ubuntu/logs/tolstoy.log \
               --error /home/ubuntu/logs/tolstoy-error.log \
-              --out /home/ubuntu/logs/tolstoy-out.log \
+              --output /home/ubuntu/logs/tolstoy-out.log \
               --time
             
             # Wait a moment for PM2 to start
