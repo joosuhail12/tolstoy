@@ -1,4 +1,4 @@
-name: Simple CI
+name: CI/CD Pipeline
 
 on:
   push:
@@ -8,6 +8,7 @@ on:
 
 jobs:
   test:
+    name: Quality Checks & Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -20,4 +21,37 @@ jobs:
       - run: npx tsc --noEmit  
       - run: npx prettier --check "src/**/*.ts"
       - run: npm run build
-      - run: echo "✅ All checks passed!"
+      - run: echo "✅ All quality checks passed!"
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" | base64 -d > ssh_key.pem
+          chmod 600 ssh_key.pem
+
+      - name: Deploy to server
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" << 'EOF'
+            cd /home/ubuntu/tolstoy
+            git pull origin main
+            npm ci
+            npm run build
+            pm2 restart tolstoy-api || pm2 start dist/main.js --name tolstoy-api
+            pm2 save
+          EOF
+
+      - name: Health check
+        run: |
+          sleep 10
+          curl -f http://${{ secrets.EC2_HOST }}/health && echo "✅ Deployment successful!"
+
+      - name: Cleanup
+        if: always()
+        run: rm -f ssh_key.pem
