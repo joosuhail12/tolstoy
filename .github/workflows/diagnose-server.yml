@@ -1,0 +1,150 @@
+name: Server Diagnostics & Fix
+
+on:
+  workflow_dispatch: # Manual trigger only
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'diagnose'
+        type: choice
+        options:
+        - diagnose
+        - fix
+        - restart
+        - logs
+
+jobs:
+  diagnose:
+    name: Server Diagnostics
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" | base64 -d > ssh_key.pem
+          chmod 600 ssh_key.pem
+          
+      - name: 🔍 Run Server Diagnostics
+        if: github.event.inputs.action == 'diagnose'
+        run: |
+          echo "=== SERVER DIAGNOSTICS ==="
+          ssh -i ssh_key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            echo "1. PM2 Status:"
+            pm2 status || echo "PM2 not found"
+            echo ""
+            
+            echo "2. Port 3000 check:"
+            netstat -tlnp | grep 3000 || ss -tlnp | grep 3000 || echo "Port 3000 not in use"
+            echo ""
+            
+            echo "3. Local health check:"
+            curl -s http://localhost:3000/health || echo "Health check failed"
+            echo ""
+            
+            echo "4. AWS access:"
+            aws sts get-caller-identity || echo "AWS not configured"
+            echo ""
+            
+            echo "5. Application directory:"
+            ls -la /home/ubuntu/tolstoy/ | head -5 || echo "App directory missing"
+            echo ""
+            
+            echo "6. PM2 logs (last 10 lines):"
+            pm2 logs --lines 10 || echo "No PM2 logs"
+          EOF
+
+      - name: 🔧 Fix Server Issues
+        if: github.event.inputs.action == 'fix'
+        run: |
+          echo "=== ATTEMPTING SERVER FIX ==="
+          ssh -i ssh_key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            set -e
+            
+            echo "📁 Ensuring application directory exists..."
+            mkdir -p /home/ubuntu/tolstoy
+            cd /home/ubuntu/tolstoy
+            
+            echo "📥 Pulling latest code..."
+            if [ ! -d ".git" ]; then
+              git clone https://github.com/joosuhail12/tolstoy.git .
+            else
+              git pull origin main
+            fi
+            
+            echo "📦 Installing dependencies..."
+            npm ci
+            
+            echo "🔨 Building application..."
+            npm run build
+            
+            echo "🚀 Starting/Restarting PM2..."
+            if [ -f "ecosystem.config.js" ]; then
+              pm2 restart ecosystem.config.js || pm2 start ecosystem.config.js
+            else
+              echo "Creating basic PM2 config..."
+              cat > ecosystem.config.js << 'EOFCONFIG'
+module.exports = {
+  apps: [{
+    name: 'tolstoy-api',
+    script: 'dist/main.js',
+    env: {
+      NODE_ENV: 'production',
+      PORT: 3000,
+      AWS_REGION: 'us-east-1',
+      AWS_SECRET_NAME: 'tolstoy/env',
+      USE_AWS_SECRETS: 'true'
+    },
+    instances: 1,
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '1G'
+  }]
+};
+EOFCONFIG
+              pm2 start ecosystem.config.js
+            fi
+            
+            echo "💾 Saving PM2 configuration..."
+            pm2 save
+            
+            echo "✅ Testing application..."
+            sleep 5
+            curl -s http://localhost:3000/health || echo "Health check still failing"
+            
+            echo "📊 Final status:"
+            pm2 status
+          EOF
+
+      - name: 🔄 Restart Application
+        if: github.event.inputs.action == 'restart'
+        run: |
+          echo "=== RESTARTING APPLICATION ==="
+          ssh -i ssh_key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            cd /home/ubuntu/tolstoy
+            pm2 restart all || pm2 start ecosystem.config.js
+            pm2 save
+            sleep 3
+            pm2 status
+            curl -s http://localhost:3000/health || echo "Health check failed after restart"
+          EOF
+
+      - name: 📋 Show Recent Logs
+        if: github.event.inputs.action == 'logs'
+        run: |
+          echo "=== RECENT APPLICATION LOGS ==="
+          ssh -i ssh_key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            echo "PM2 logs:"
+            pm2 logs --lines 50 || echo "No PM2 logs available"
+            echo ""
+            echo "System logs (last 20 lines):"
+            sudo journalctl -n 20 --no-pager || echo "Cannot access system logs"
+          EOF
+
+      - name: 🧹 Cleanup
+        if: always()
+        run: rm -f ssh_key.pem
