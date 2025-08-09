@@ -66,11 +66,10 @@ jobs:
             npm run build
             
             echo "🗃️ Running database migrations..."
-            # Extract database URLs from AWS Secrets for Prisma
-            SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id tolstoy/env --region us-east-1 --query 'SecretString' --output text)
-            export DATABASE_URL=$(echo $SECRET_JSON | grep -o '"DATABASE_URL":"[^"]*' | cut -d'"' -f4)
-            export DIRECT_URL=$(echo $SECRET_JSON | grep -o '"DIRECT_URL":"[^"]*' | cut -d'"' -f4)
-            echo "✅ Database URLs configured for migrations"
+            # Use GitHub secrets for database URLs during deployment
+            export DATABASE_URL="${{ secrets.DATABASE_URL }}"
+            export DIRECT_URL="${{ secrets.DIRECT_URL }}"
+            echo "✅ Database URLs configured from GitHub secrets"
             
             timeout 30 npm run db:migrate:deploy || echo "⚠️ Migration completed or timed out (this may be normal)"
             
@@ -78,21 +77,28 @@ jobs:
             pm2 stop tolstoy-api 2>/dev/null || true
             pm2 delete tolstoy-api 2>/dev/null || true
             
-            # Verify AWS secrets access first
-            echo "🔍 Testing AWS secrets access..."
-            aws secretsmanager get-secret-value --secret-id tolstoy/env --region us-east-1 --query 'SecretString' --output text > /dev/null || {
-              echo "❌ Cannot access AWS secrets. Check IAM permissions."
-              exit 1
-            }
-            echo "✅ AWS secrets accessible"
+            # Create environment file for PM2 from GitHub secrets
+            echo "🔧 Creating environment configuration..."
+            cat > .env.production << ENV_EOF
+NODE_ENV=production
+PORT=3000
+DATABASE_URL=${{ secrets.DATABASE_URL }}
+DIRECT_URL=${{ secrets.DIRECT_URL }}
+AWS_REGION=us-east-1
+AWS_SECRET_NAME=tolstoy/env
+USE_AWS_SECRETS=true
+INNGEST_EVENT_KEY=${{ secrets.INNGEST_EVENT_KEY }}
+DAYTONA_API_KEY=${{ secrets.DAYTONA_API_KEY }}
+DAYTONA_BASE_URL=${{ secrets.DAYTONA_BASE_URL }}
+UPSTASH_REDIS_REST_URL=${{ secrets.UPSTASH_REDIS_REST_URL }}
+UPSTASH_REDIS_REST_TOKEN=${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+SENTRY_DSN=${{ secrets.SENTRY_DSN }}
+ENV_EOF
+            echo "✅ Environment file created"
             
-            # Start with proper environment
+            # Start with environment file
             pm2 start dist/main.js --name tolstoy-api \
-              --env NODE_ENV=production \
-              --env PORT=3000 \
-              --env AWS_REGION=us-east-1 \
-              --env AWS_SECRET_NAME=tolstoy/env \
-              --env USE_AWS_SECRETS=true \
+              --env-file .env.production \
               --log /home/ubuntu/logs/tolstoy.log \
               --error /home/ubuntu/logs/tolstoy-error.log \
               --output /home/ubuntu/logs/tolstoy-out.log \
