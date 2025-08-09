@@ -36,7 +36,7 @@ interface FastifyReply {
 async function bootstrap() {
   const app: NestFastifyApplication = await NestFactory.create(
     AppModule,
-    new FastifyAdapter({ 
+    new FastifyAdapter({
       logger: false,
       trustProxy: true, // Trust proxy headers from Cloudflare
     }),
@@ -45,7 +45,7 @@ async function bootstrap() {
 
   // Use Pino logger globally
   app.useLogger(app.get(Logger));
-  
+
   // Get configuration service
   const configService = app.get(ConfigService);
   const isProduction = configService.get('NODE_ENV') === 'production';
@@ -56,15 +56,15 @@ async function bootstrap() {
   await app.register(fastifyHelmet, {
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: [`'self'`],
-        styleSrc: [`'self'`, `'unsafe-inline'`, 'cdnjs.cloudflare.com'],
-        scriptSrc: [`'self'`, 'cdnjs.cloudflare.com'],
-        imgSrc: [`'self'`, 'data:', 'https:'],
-        connectSrc: [`'self'`],
-        fontSrc: [`'self'`, 'cdnjs.cloudflare.com'],
-        objectSrc: [`'none'`],
-        mediaSrc: [`'self'`],
-        frameSrc: [`'none'`],
+        defaultSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'cdnjs.cloudflare.com'],
+        scriptSrc: ["'self'", 'cdnjs.cloudflare.com'],
+        imgSrc: ["'self'", 'data:', 'https:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'", 'cdnjs.cloudflare.com'],
+        objectSrc: ["'none'"],
+        mediaSrc: ["'self'"],
+        frameSrc: ["'none'"],
       },
     },
     crossOriginEmbedderPolicy: false, // Disable for API compatibility
@@ -72,9 +72,7 @@ async function bootstrap() {
 
   // Configure CORS for production domain
   await app.register(fastifyCors, {
-    origin: isProduction 
-      ? [`https://${domain}`, 'https://*.getpullse.com']
-      : true, // Allow all origins in development
+    origin: isProduction ? [`https://${domain}`, 'https://*.getpullse.com'] : true, // Allow all origins in development
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'],
     allowedHeaders: [
@@ -186,7 +184,10 @@ async function bootstrap() {
   logger.log(`Application is running on: ${baseUrl}`, 'Bootstrap');
   logger.log(`Environment: ${configService.get('NODE_ENV', 'development')}`, 'Bootstrap');
   logger.log(`Domain: ${domain}`, 'Bootstrap');
-  logger.log(`CORS origins: ${isProduction ? `https://${domain}, https://*.getpullse.com` : 'all origins'}`, 'Bootstrap');
+  logger.log(
+    `CORS origins: ${isProduction ? `https://${domain}, https://*.getpullse.com` : 'all origins'}`,
+    'Bootstrap',
+  );
 }
 
 bootstrap();

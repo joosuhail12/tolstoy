@@ -43,10 +43,11 @@ export class OAuthService {
    * Build redirect URI for OAuth callback based on current domain configuration
    */
   private buildRedirectUri(toolKey: string): string {
-    const baseUrl = this.configService.get('NODE_ENV') === 'production'
-      ? `https://${this.configService.get('DOMAIN', 'tolstoy.getpullse.com')}`
-      : `http://localhost:${this.configService.get('PORT', '3000')}`;
-    
+    const baseUrl =
+      this.configService.get('NODE_ENV') === 'production'
+        ? `https://${this.configService.get('DOMAIN', 'tolstoy.getpullse.com')}`
+        : `http://localhost:${this.configService.get('PORT', '3000')}`;
+
     return `${baseUrl}/auth/oauth/${toolKey}/callback`;
   }
 
@@ -86,10 +87,10 @@ export class OAuthService {
 
       // Build authorization URL
       const authorizeUrl = oauthConfig.authorizeUrl || this.getDefaultAuthorizeUrl(toolKey);
-      
+
       // Use configured redirect URI or build one based on current domain
       const redirectUri = oauthConfig.redirectUri || this.buildRedirectUri(toolKey);
-      
+
       const params = new URLSearchParams({
         response_type: 'code',
         client_id: oauthConfig.clientId,
