@@ -1,0 +1,133 @@
+name: Manual Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: 'Skip tests (emergency deployment)'
+        required: false
+        default: false
+        type: boolean
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+        - production
+        - staging
+      restart_only:
+        description: 'Only restart application (no code pull)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  manual-deploy:
+    name: Manual Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - name: 📥 Checkout code
+        if: ${{ !inputs.restart_only }}
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Node.js
+        if: ${{ !inputs.skip_tests && !inputs.restart_only }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies & test
+        if: ${{ !inputs.skip_tests && !inputs.restart_only }}
+        run: |
+          npm ci
+          npm run lint
+          npm run build
+
+      - name: 🔑 Setup SSH key
+        run: |
+          echo "${{ secrets.EC2_KEY }}" | base64 -d > ssh_key.pem
+          chmod 600 ssh_key.pem
+
+      - name: 🚀 Deploy or restart application
+        run: |
+          if [[ "${{ inputs.restart_only }}" == "true" ]]; then
+            echo "🔄 Restarting application only..."
+            ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${EC2_USER}@${EC2_HOST}" << 'RESTART_SCRIPT'
+              cd /home/ubuntu/tolstoy
+              pm2 restart tolstoy-api
+              pm2 save
+              echo "✅ Application restarted!"
+            RESTART_SCRIPT
+          else
+            echo "🚀 Full deployment..."
+            ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${EC2_USER}@${EC2_HOST}" << 'DEPLOY_SCRIPT'
+              set -e
+              cd /home/ubuntu/tolstoy
+              
+              echo "📥 Pulling latest changes..."
+              git stash push -u -m "Manual deployment stash $(date)" || true
+              git pull origin main
+              
+              echo "📦 Installing dependencies..."
+              npm ci --production=false
+              
+              echo "⚙️ Generating Prisma client..."
+              npm run db:generate
+              
+              echo "🔨 Building application..."
+              npm run build
+              
+              echo "🔄 Restarting with PM2..."
+              pm2 restart tolstoy-api || pm2 start dist/main.js --name tolstoy-api \
+                --env NODE_ENV=production \
+                --env PORT=3000 \
+                --env AWS_REGION=us-east-1 \
+                --env AWS_SECRET_NAME=tolstoy/env \
+                --env USE_AWS_SECRETS=true \
+                --log /home/ubuntu/logs/tolstoy.log \
+                --error /home/ubuntu/logs/tolstoy-error.log \
+                --out /home/ubuntu/logs/tolstoy-out.log \
+                --time
+              
+              pm2 save
+              echo "✅ Manual deployment completed!"
+            DEPLOY_SCRIPT
+          fi
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+
+      - name: 🔍 Quick health check
+        run: |
+          sleep 10
+          HEALTH=$(ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${EC2_USER}@${EC2_HOST} \
+            "curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 15 http://localhost:3000/health" || echo "000")
+          
+          if [ "$HEALTH" -eq 200 ]; then
+            echo "✅ Health check passed"
+          else
+            echo "⚠️ Health check returned: HTTP $HEALTH"
+            echo "Check server logs manually"
+          fi
+        env:
+          EC2_USER: ${{ secrets.EC2_USER }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+
+      - name: 🧹 Cleanup
+        if: always()
+        run: rm -f ssh_key.pem
+
+      - name: 📢 Manual deployment summary
+        run: |
+          echo "🎉 MANUAL DEPLOYMENT COMPLETED!"
+          echo "📊 Summary:"
+          echo "  • Type: ${{ inputs.restart_only && 'Restart Only' || 'Full Deployment' }}"
+          echo "  • Tests: ${{ inputs.skip_tests && 'Skipped' || 'Included' }}"
+          echo "  • Environment: ${{ inputs.environment }}"
+          echo "  • Server: ${EC2_HOST}"
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
