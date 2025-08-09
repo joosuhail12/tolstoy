@@ -10,7 +10,7 @@ export class AppService {
 
   getHello(): string {
     const appName = this.configService.get('APP_NAME', 'Tolstoy');
-    return `Hello from ${appName}! 🚀`;
+    return `Hello from ${appName} v1.1.0! 🚀 Now with OAuth2, Metrics & Enhanced Monitoring!`;
   }
 
   getHealth(): { status: string; timestamp: string } {
