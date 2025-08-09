@@ -21,7 +21,7 @@ tolstoy auth login [OPTIONS]
 
 | Option | Description | Example |
 |--------|-------------|---------|
-| `-t, --tool <toolKey>` | Tool identifier | `-t github` |
+| `-t, --tool <toolId>` | Tool ID | `-t tool-123` |
 | `-u, --user <userId>` | User ID to associate with tokens | `-u user-123` |
 
 ## Optional Options
@@ -38,7 +38,7 @@ Before users can log in, you must configure OAuth2 client credentials for the to
 ```bash
 tolstoy tool auth oauth2 \
   --org my-org \
-  --tool github \
+  --tool tool-123 \
   --client-id Iv1.xxxxxxxxxxxx \
   --client-secret xxxxxxxxxxxxxxxx \
   --callback-url "https://myapp.com/auth/callback" \
@@ -50,20 +50,20 @@ tolstoy tool auth oauth2 \
 ### GitHub Login (Browser)
 ```bash
 tolstoy auth login \
-  --tool github \
+  --tool tool-123 \
   --user user-123 \
   --org my-org
 ```
 
 Output:
 ```
-🚀 Initiating OAuth login for tool "github"
+🚀 Initiating OAuth login for tool "tool-123"
 User ID: user-123
 Organization: my-org
-Tool: github
+Tool: tool-123
 
 📱 Opening browser for OAuth authorization...
-Login URL: https://api.tolstoy.com/auth/github/login?userId=user-123
+Login URL: https://api.tolstoy.com/auth/tool-123/login?userId=user-123
 
 ✅ Browser opened successfully
 Please complete the authorization in your browser.
@@ -79,7 +79,7 @@ Headers that will be sent:
 ### Google Login (Manual URL)
 ```bash
 tolstoy auth login \
-  --tool google \
+  --tool tool-456 \
   --user user-456 \
   --org my-org \
   --no-open
@@ -87,13 +87,13 @@ tolstoy auth login \
 
 Output:
 ```
-🚀 Initiating OAuth login for tool "google"
+🚀 Initiating OAuth login for tool "tool-456"
 User ID: user-456
 Organization: my-org
-Tool: google
+Tool: tool-456
 
 🔗 OAuth Login URL:
-https://api.tolstoy.com/auth/google/login?userId=user-456
+https://api.tolstoy.com/auth/tool-456/login?userId=user-456
 
 Open this URL in your browser to complete the OAuth authorization.
 After approval, tokens will be stored automatically.
@@ -109,7 +109,7 @@ Headers that will be sent:
 User runs the `tolstoy auth login` command:
 
 ```bash
-tolstoy auth login --tool github --user user-123
+tolstoy auth login --tool tool-123 --user user-123
 ```
 
 ### 2. Browser Opens (or URL Displayed)
@@ -155,7 +155,7 @@ app.post('/auth/start/:service', async (req, res) => {
   
   const cli = spawn('tolstoy', [
     'auth', 'login',
-    '--tool', service,
+    '--tool', `tool-${service}`, // Use tool ID format
     '--user', userId,
     '--org', process.env.ORG_ID,
     '--no-open'  // Get URL instead of opening browser
@@ -179,12 +179,12 @@ For automated scripts where user interaction is needed:
 #!/bin/bash
 
 USER_ID="user-123"
-TOOL="github"
+TOOL_ID="tool-123"
 
-echo "Starting OAuth login for $USER_ID on $TOOL"
+echo "Starting OAuth login for $USER_ID on $TOOL_ID"
 
 # Start OAuth flow and capture URL
-AUTH_OUTPUT=$(tolstoy auth login --tool $TOOL --user $USER_ID --no-open 2>&1)
+AUTH_OUTPUT=$(tolstoy auth login --tool $TOOL_ID --user $USER_ID --no-open 2>&1)
 AUTH_URL=$(echo "$AUTH_OUTPUT" | grep -oP 'https://[^\s]+')
 
 echo "Please visit: $AUTH_URL"
@@ -202,13 +202,13 @@ New users connect their accounts during onboarding:
 ```bash
 # Step 1: User registers
 # Step 2: Connect GitHub
-tolstoy auth login --tool github --user new-user-456
+tolstoy auth login --tool tool-github-123 --user new-user-456
 
 # Step 3: Connect Google Drive  
-tolstoy auth login --tool google --user new-user-456
+tolstoy auth login --tool tool-google-456 --user new-user-456
 
 # Step 4: Connect Slack
-tolstoy auth login --tool slack --user new-user-456
+tolstoy auth login --tool tool-slack-789 --user new-user-456
 ```
 
 ### 2. Re-authorization
@@ -216,7 +216,7 @@ Users need to re-authorize when tokens expire:
 
 ```bash
 # Trigger re-auth for specific user and service
-tolstoy auth login --tool github --user existing-user-789
+tolstoy auth login --tool tool-123 --user existing-user-789
 ```
 
 ### 3. Multiple Organizations
@@ -224,10 +224,10 @@ Users can authorize the same service for different organizations:
 
 ```bash
 # Authorize for org A
-tolstoy auth login --tool github --user user-123 --org org-a
+tolstoy auth login --tool tool-123 --user user-123 --org org-a
 
 # Authorize for org B  
-tolstoy auth login --tool github --user user-123 --org org-b
+tolstoy auth login --tool tool-123 --user user-123 --org org-b
 ```
 
 ## Token Management
@@ -244,11 +244,11 @@ Tokens inherit the scope configured during OAuth2 client setup:
 # Configure client with specific scope
 tolstoy tool auth oauth2 \
   --org my-org \
-  --tool github \
+  --tool tool-123 \
   --scope "repo user:email"
   
 # User login will request the same scope
-tolstoy auth login --tool github --user user-123
+tolstoy auth login --tool tool-123 --user user-123
 ```
 
 ## Error Handling
@@ -257,7 +257,7 @@ tolstoy auth login --tool github --user user-123
 
 #### Missing OAuth2 Configuration
 ```
-Error: Tool "github" not configured for OAuth2
+Error: Tool "tool-123" not configured for OAuth2
 ```
 **Solution**: First configure OAuth2 client credentials using `tool auth oauth2`.
 
@@ -305,13 +305,13 @@ Error initiating OAuth login: ECONNREFUSED
 ### Browser Doesn't Open
 ```bash
 # Use manual URL approach
-tolstoy auth login --tool github --user user-123 --no-open
+tolstoy auth login --tool tool-123 --user user-123 --no-open
 ```
 
 ### Wrong Organization
 ```bash
 # Explicitly specify org (overrides ORG_ID env var)
-tolstoy auth login --tool github --user user-123 --org correct-org
+tolstoy auth login --tool tool-123 --user user-123 --org correct-org
 ```
 
 ### Token Refresh Issues

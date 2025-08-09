@@ -3,12 +3,14 @@ import { BadRequestException } from '@nestjs/common';
 import { ToolAuthController } from './tool-auth.controller';
 import { AuthConfigService } from './auth-config.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { PrismaService } from '../prisma.service';
 import { CreateAuthConfigDto } from './dto/create-auth-config.dto';
 
 describe('ToolAuthController', () => {
   let controller: ToolAuthController;
   let authConfigService: jest.Mocked<AuthConfigService>;
   let metricsService: jest.Mocked<MetricsService>;
+  let prismaService: any;
 
   beforeEach(async () => {
     const mockAuthConfigService = {
@@ -20,18 +22,26 @@ describe('ToolAuthController', () => {
     const mockMetricsService = {
       incrementToolAuthConfig: jest.fn(),
     };
+    
+    const mockPrismaService = {
+      tool: {
+        findUnique: jest.fn(),
+      },
+    };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ToolAuthController],
       providers: [
         { provide: AuthConfigService, useValue: mockAuthConfigService },
         { provide: MetricsService, useValue: mockMetricsService },
+        { provide: PrismaService, useValue: mockPrismaService },
       ],
     }).compile();
 
     controller = module.get<ToolAuthController>(ToolAuthController);
     authConfigService = module.get(AuthConfigService);
     metricsService = module.get(MetricsService);
+    prismaService = module.get(PrismaService);
   });
 
   it('should be defined', () => {
@@ -56,13 +66,19 @@ describe('ToolAuthController', () => {
         updatedAt: new Date(),
       };
 
+      // Mock tool validation
+      (prismaService.tool.findUnique as jest.Mock).mockResolvedValue({
+        id: toolId,
+        name: 'github',
+        orgId,
+      });
       authConfigService.setOrgAuthConfig.mockResolvedValue(mockResult);
 
       await controller.upsert(orgId, toolId, dto);
 
       expect(metricsService.incrementToolAuthConfig).toHaveBeenCalledWith({
         orgId,
-        toolKey: toolId,
+        toolKey: 'github', // Should use tool name, not toolId
         action: 'upsert',
       });
     });
@@ -94,13 +110,19 @@ describe('ToolAuthController', () => {
         updatedAt: new Date()
       };
 
+      // Mock tool validation
+      (prismaService.tool.findUnique as jest.Mock).mockResolvedValue({
+        id: toolId,
+        name: 'github',
+        orgId,
+      });
       authConfigService.getOrgAuthConfig.mockResolvedValue(mockConfig);
 
       await controller.get(orgId, toolId);
 
       expect(metricsService.incrementToolAuthConfig).toHaveBeenCalledWith({
         orgId,
-        toolKey: toolId,
+        toolKey: 'github', // Should use tool name, not toolId
         action: 'get',
       });
     });
@@ -111,13 +133,19 @@ describe('ToolAuthController', () => {
       const orgId = 'org-123';
       const toolId = 'github';
 
+      // Mock tool validation
+      (prismaService.tool.findUnique as jest.Mock).mockResolvedValue({
+        id: toolId,
+        name: 'github',
+        orgId,
+      });
       authConfigService.deleteOrgAuthConfig.mockResolvedValue();
 
       await controller.remove(orgId, toolId);
 
       expect(metricsService.incrementToolAuthConfig).toHaveBeenCalledWith({
         orgId,
-        toolKey: toolId,
+        toolKey: 'github', // Should use tool name, not toolId
         action: 'delete',
       });
     });

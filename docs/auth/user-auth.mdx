@@ -30,7 +30,7 @@ First, configure the OAuth2 settings for your organization using the Tool Authen
 
 <CodeGroup>
 ```bash cURL
-curl -X POST "https://api.tolstoy.dev/tools/github/auth" \
+curl -X POST "https://api.tolstoy.dev/tools/tool-123/auth" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "X-Org-ID: your-org-id" \
   -H "Content-Type: application/json" \
@@ -39,7 +39,7 @@ curl -X POST "https://api.tolstoy.dev/tools/github/auth" \
     "config": {
       "clientId": "your-github-client-id",
       "clientSecret": "your-github-client-secret", 
-      "redirectUri": "https://your-app.com/auth/github/callback",
+      "redirectUri": "https://your-app.com/auth/callback",
       "scope": "repo read:user"
     }
   }'
@@ -48,12 +48,12 @@ curl -X POST "https://api.tolstoy.dev/tools/github/auth" \
 ```javascript JavaScript SDK
 const tolstoy = new TolstoyClient({ apiKey: 'your-api-key' });
 
-await tolstoy.auth.configureOAuth('github', {
+await tolstoy.auth.configureOAuth('tool-123', {
   type: 'oauth2',
   config: {
     clientId: 'your-github-client-id',
     clientSecret: 'your-github-client-secret',
-    redirectUri: 'https://your-app.com/auth/github/callback',
+    redirectUri: 'https://your-app.com/auth/callback',
     scope: 'repo read:user'
   }
 }, {
@@ -66,12 +66,12 @@ import tolstoy
 
 client = tolstoy.Client(api_key="your-api-key")
 
-client.auth.configure_oauth("github", {
+client.auth.configure_oauth("tool-123", {
     "type": "oauth2",
     "config": {
         "clientId": "your-github-client-id",
         "clientSecret": "your-github-client-secret",
-        "redirectUri": "https://your-app.com/auth/github/callback",
+        "redirectUri": "https://your-app.com/auth/callback",
         "scope": "repo read:user"
     }
 }, org_id="your-org-id")
@@ -84,10 +84,10 @@ To start the OAuth flow for a user, redirect them to the login endpoint:
 
 <APIPlayground>
 
-**GET** `/auth/{toolKey}/login`
+**GET** `/auth/{toolId}/login`
 
 **Parameters:**
-- `toolKey` (path): Tool identifier (e.g., "github", "google")
+- `toolId` (path): Tool ID for OAuth authentication
 - `userId` (query): User ID to associate with the OAuth tokens
 
 **Headers:**
@@ -100,28 +100,28 @@ To start the OAuth flow for a user, redirect them to the login endpoint:
 
 <CodeGroup>
 ```bash cURL
-curl -X GET "https://api.tolstoy.dev/auth/github/login?userId=user123" \
+curl -X GET "https://api.tolstoy.dev/auth/tool-123/login?userId=user123" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "X-Org-ID: your-org-id"
 ```
 
 ```javascript JavaScript (Frontend)
 // In your frontend application
-const initiateOAuth = (toolKey, userId) => {
-  const url = `https://api.tolstoy.dev/auth/${toolKey}/login?userId=${userId}`;
+const initiateOAuth = (toolId, userId) => {
+  const url = `https://api.tolstoy.dev/auth/${toolId}/login?userId=${userId}`;
   // Open in popup or redirect current window
   window.open(url, 'oauth-popup', 'width=500,height=600');
 };
 
 // Usage
-initiateOAuth('github', 'user123');
+initiateOAuth('tool-123', 'user123');
 ```
 
 ```javascript JavaScript SDK
 const tolstoy = new TolstoyClient({ apiKey: 'your-api-key' });
 
 // Get the login URL instead of automatic redirect
-const loginUrl = tolstoy.auth.getLoginUrl('github', 'user123');
+const loginUrl = tolstoy.auth.getLoginUrl('tool-123', 'user123');
 console.log('Redirect user to:', loginUrl);
 ```
 </CodeGroup>
@@ -132,10 +132,9 @@ The OAuth provider will redirect the user back to your configured redirect URI. 
 
 <APIPlayground>
 
-**GET** `/auth/{toolKey}/callback`
+**GET** `/auth/callback`
 
 **Parameters:**
-- `toolKey` (path): Tool identifier matching the login request
 - `code` (query): Authorization code from OAuth provider
 - `state` (query): State parameter for request validation
 - `error` (query, optional): Error code if authorization failed
@@ -158,14 +157,14 @@ The callback endpoint will:
 
 Tolstoy includes default configurations for popular OAuth providers:
 
-| Provider | Tool Key | Default Scopes | Notes |
-|----------|----------|----------------|-------|
-| GitHub | `github` | `read:user` | Supports organization and repository access |
-| Google | `google` | `openid email profile` | Works with Google Workspace and Gmail |
-| Microsoft | `microsoft` | `openid email profile` | Supports Office 365 and Azure AD |
-| Slack | `slack` | `channels:read` | Team and workspace integrations |
-| Discord | `discord` | `identify` | Server and user integrations |
-| LinkedIn | `linkedin` | `r_liteprofile` | Professional network access |
+| Provider | Tool Name | Default Scopes | Notes |
+|----------|-----------|----------------|-------|
+| GitHub | `GitHub` | `read:user` | Supports organization and repository access |
+| Google | `Google` | `openid email profile` | Works with Google Workspace and Gmail |
+| Microsoft | `Microsoft` | `openid email profile` | Supports Office 365 and Azure AD |
+| Slack | `Slack` | `channels:read` | Team and workspace integrations |
+| Discord | `Discord` | `identify` | Server and user integrations |
+| LinkedIn | `LinkedIn` | `r_liteprofile` | Professional network access |
 
 ### Custom OAuth Providers
 
@@ -219,15 +218,15 @@ OAuth flows are monitored with Prometheus metrics:
 
 ### Redirect Metrics
 ```
-oauth_redirects_total{toolKey="github"} 150
-oauth_redirects_total{toolKey="github",error="true"} 5
+oauth_redirects_total{toolKey="GitHub"} 150
+oauth_redirects_total{toolKey="GitHub",error="true"} 5
 ```
 
 ### Callback Metrics  
 ```
-oauth_callbacks_total{toolKey="github",success="true"} 140
-oauth_callbacks_total{toolKey="github",success="false",error="access_denied"} 8
-oauth_callbacks_total{toolKey="github",success="false",error="processing_error"} 2
+oauth_callbacks_total{toolKey="GitHub",success="true"} 140
+oauth_callbacks_total{toolKey="GitHub",success="false",error="access_denied"} 8
+oauth_callbacks_total{toolKey="GitHub",success="false",error="processing_error"} 2
 ```
 
 ## Best Practices
@@ -257,10 +256,10 @@ const checkClosed = setInterval(() => {
 
 ```javascript
 // Check if user has valid OAuth tokens
-const hasValidToken = await tolstoy.auth.validateToken('github', userId);
+const hasValidToken = await tolstoy.auth.validateToken('tool-123', userId);
 if (!hasValidToken) {
   // Prompt user to re-authorize
-  initiateOAuth('github', userId);
+  initiateOAuth('tool-123', userId);
 }
 ```
 
@@ -269,13 +268,13 @@ if (!hasValidToken) {
 **Token Refresh**: Implement automatic token refresh for long-running processes:
 
 ```javascript
-const getValidToken = async (toolKey, userId) => {
-  const credentials = await tolstoy.auth.getUserCredentials(toolKey, userId);
+const getValidToken = async (toolId, userId) => {
+  const credentials = await tolstoy.auth.getUserCredentials(toolId, userId);
   
   if (credentials.expiresAt < new Date()) {
     // Token expired, initiate refresh
-    await tolstoy.auth.refreshToken(toolKey, userId);
-    return await tolstoy.auth.getUserCredentials(toolKey, userId);
+    await tolstoy.auth.refreshToken(toolId, userId);
+    return await tolstoy.auth.getUserCredentials(toolId, userId);
   }
   
   return credentials;
@@ -352,6 +351,7 @@ The user OAuth API is available in:
 ## API Reference
 
 For complete API documentation, see:
-- [OAuth Login Endpoint](/api/auth/login)
-- [OAuth Callback Endpoint](/api/auth/callback)  
-- [User Credentials Management](/api/auth/credentials)
+- [OAuth Login Endpoint](/api/auth/login) - Initiate user OAuth flow
+- [OAuth Callback Endpoint](/api/auth/callback) - Handle OAuth provider callback
+- [Tool Authentication API](/api/tools/auth) - Configure OAuth client credentials
+- [User Credentials Management](/api/auth/credentials) - Manage user tokens

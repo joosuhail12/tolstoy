@@ -27,7 +27,7 @@ tolstoy tool auth api-key [OPTIONS]
 | Option | Description | Example |
 |--------|-------------|---------|
 | `-o, --org <orgId>` | Organization ID | `-o my-org-123` |
-| `-t, --tool <toolKey>` | Tool identifier | `-t github` |
+| `-t, --tool <toolId>` | Tool ID | `-t tool-123` |
 | `-k, --key <apiKey>` | API key value | `-k ghp_xxxxxxxxxxxx` |
 
 ### Optional Options
@@ -42,7 +42,7 @@ tolstoy tool auth api-key [OPTIONS]
 ```bash
 tolstoy tool auth api-key \
   --org my-org \
-  --tool github \
+  --tool tool-123 \
   --key ghp_1234567890abcdef \
   --header "Authorization"
 ```
@@ -51,7 +51,7 @@ tolstoy tool auth api-key \
 ```bash
 tolstoy tool auth api-key \
   --org my-org \
-  --tool slack \
+  --tool tool-456 \
   --key xoxb-1234567890-abcdef \
   --header "Authorization"
 ```
@@ -60,7 +60,7 @@ tolstoy tool auth api-key \
 ```bash
 tolstoy tool auth api-key \
   --org my-org \
-  --tool custom-api \
+  --tool tool-789 \
   --key secret-key-123 \
   --header "X-API-Key"
 ```
@@ -68,9 +68,9 @@ tolstoy tool auth api-key \
 ### Success Output
 
 ```
-🔧 Configuring API key for tool "github"...
+🔧 Configuring API key for tool "tool-123"...
 ✅ API key configured successfully
-Tool: github
+Tool: tool-123
 Organization: my-org
 Header: Authorization
 Config ID: config-123
@@ -89,7 +89,7 @@ tolstoy tool auth oauth2 [OPTIONS]
 | Option | Description | Example |
 |--------|-------------|---------|
 | `-o, --org <orgId>` | Organization ID | `-o my-org-123` |
-| `-t, --tool <toolKey>` | Tool identifier | `-t google` |
+| `-t, --tool <toolId>` | Tool ID | `-t tool-123` |
 | `-i, --client-id <clientId>` | OAuth2 client ID | `-i 123456.apps.googleusercontent.com` |
 | `-s, --client-secret <secret>` | OAuth2 client secret | `-s GOCSPX-xxxxxxxxxxxx` |
 | `-c, --callback-url <url>` | OAuth2 redirect URL | `-c https://app.com/callback` |
@@ -108,7 +108,7 @@ tolstoy tool auth oauth2 [OPTIONS]
 ```bash
 tolstoy tool auth oauth2 \
   --org my-org \
-  --tool google \
+  --tool tool-123 \
   --client-id 123456789.apps.googleusercontent.com \
   --client-secret GOCSPX-abcdef123456 \
   --callback-url "https://myapp.com/auth/callback" \
@@ -119,10 +119,10 @@ tolstoy tool auth oauth2 \
 ```bash
 tolstoy tool auth oauth2 \
   --org my-org \
-  --tool github \
+  --tool tool-456 \
   --client-id Iv1.1234567890abcdef \
   --client-secret abcdef1234567890abcdef1234567890abcdef12 \
-  --callback-url "https://myapp.com/auth/github/callback" \
+  --callback-url "https://myapp.com/auth/callback" \
   --scope "repo user"
 ```
 
@@ -130,7 +130,7 @@ tolstoy tool auth oauth2 \
 ```bash
 tolstoy tool auth oauth2 \
   --org my-org \
-  --tool custom-oauth \
+  --tool tool-789 \
   --client-id custom-client-id \
   --client-secret custom-secret \
   --callback-url "https://myapp.com/callback" \
@@ -142,9 +142,9 @@ tolstoy tool auth oauth2 \
 ### Success Output
 
 ```
-🔧 Configuring OAuth2 for tool "google"...
+🔧 Configuring OAuth2 for tool "tool-123"...
 ✅ OAuth2 client configured successfully
-Tool: google
+Tool: tool-123
 Organization: my-org
 Client ID: 123456789.apps.googleusercontent.com
 Callback URL: https://myapp.com/auth/callback
@@ -152,7 +152,7 @@ Scope: https://www.googleapis.com/auth/drive
 Config ID: oauth-456
 
 💡 Next steps:
-   1. Users can now run: tolstoy auth login --tool google --user <userId>
+   1. Users can now run: tolstoy auth login --tool tool-123 --user <userId>
    2. This will open a browser for OAuth authorization
    3. After authorization, user tokens will be stored automatically
 ```
@@ -168,7 +168,7 @@ export TOLSTOY_API_KEY="your-api-key"
 export ORG_ID="your-org-id"
 
 # Use environment variables
-tolstoy tool auth api-key -o $ORG_ID -t github -k $GITHUB_TOKEN
+tolstoy tool auth api-key -o $ORG_ID -t $TOOL_ID -k $GITHUB_TOKEN
 ```
 
 ## Common Tool Configurations
@@ -178,16 +178,16 @@ tolstoy tool auth api-key -o $ORG_ID -t github -k $GITHUB_TOKEN
 # Personal Access Token
 tolstoy tool auth api-key \
   --org my-org \
-  --tool github \
+  --tool tool-github-123 \
   --key ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # GitHub App (OAuth)
 tolstoy tool auth oauth2 \
   --org my-org \
-  --tool github \
+  --tool tool-github-123 \
   --client-id Iv1.xxxxxxxxxxxx \
   --client-secret xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
-  --callback-url "https://yourapp.com/auth/github/callback" \
+  --callback-url "https://yourapp.com/auth/callback" \
   --scope "repo user:email"
 ```
 
@@ -196,16 +196,16 @@ tolstoy tool auth oauth2 \
 # Bot Token
 tolstoy tool auth api-key \
   --org my-org \
-  --tool slack \
+  --tool tool-slack-456 \
   --key xoxb-xxxxxxxxx-xxxxxxxxx-xxxxxxxxxxxxxxxxxxxxxxxx
 
 # Slack App (OAuth)
 tolstoy tool auth oauth2 \
   --org my-org \
-  --tool slack \
+  --tool tool-slack-456 \
   --client-id 1234567890.1234567890 \
   --client-secret xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
-  --callback-url "https://yourapp.com/slack/oauth/callback" \
+  --callback-url "https://yourapp.com/auth/callback" \
   --scope "channels:read chat:write"
 ```
 
@@ -214,17 +214,17 @@ tolstoy tool auth oauth2 \
 # Service Account Key (API Key method)
 tolstoy tool auth api-key \
   --org my-org \
-  --tool google-service \
+  --tool tool-google-789 \
   --key "$(cat service-account-key.json)" \
   --header "Authorization"
 
 # OAuth2 Application
 tolstoy tool auth oauth2 \
   --org my-org \
-  --tool google \
+  --tool tool-google-789 \
   --client-id xxxxxxxxx.apps.googleusercontent.com \
   --client-secret GOCSPX-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
-  --callback-url "https://yourapp.com/auth/google/callback" \
+  --callback-url "https://yourapp.com/auth/callback" \
   --scope "https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/gmail.readonly"
 ```
 
@@ -264,11 +264,11 @@ Details: Invalid callback URL format
 ### 1. Use Environment Variables
 ```bash
 # Don't do this (exposes secrets in shell history)
-tolstoy tool auth api-key -o my-org -t github -k ghp_secret123
+tolstoy tool auth api-key -o my-org -t tool-123 -k ghp_secret123
 
 # Do this instead
 export GITHUB_TOKEN="ghp_secret123"
-tolstoy tool auth api-key -o my-org -t github -k "$GITHUB_TOKEN"
+tolstoy tool auth api-key -o my-org -t tool-123 -k "$GITHUB_TOKEN"
 ```
 
 ### 2. Limit Scope
@@ -301,8 +301,9 @@ Regularly rotate API keys and OAuth2 client secrets.
 After configuring tool authentication:
 
 1. **Test the configuration**: Use your configured tools in workflows
-2. **Set up user authentication**: Use `tolstoy auth login` for OAuth2 tools
+2. **Set up user authentication**: Use `tolstoy auth login` for OAuth2 tools  
 3. **Execute actions**: Run `tolstoy actions:execute` to test your setup
+4. **Verify tool ownership**: Ensure tools are properly associated with your organization
 
 ## Related Commands
 

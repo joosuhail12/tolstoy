@@ -8,8 +8,10 @@ import {
   HttpCode,
   HttpStatus,
   Logger,
+  NotFoundException,
   Param,
   Post,
+  UnauthorizedException,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -25,6 +27,7 @@ import { AuthConfigService } from './auth-config.service';
 import { CreateAuthConfigDto } from './dto/create-auth-config.dto';
 import { AuthConfigResponseDto, DeleteAuthConfigResponseDto } from './dto/auth-config-response.dto';
 import { MetricsService } from '../metrics/metrics.service';
+import { PrismaService } from '../prisma.service';
 
 @ApiTags('Tool Authentication')
 @Controller('tools/:toolId/auth')
@@ -35,7 +38,35 @@ export class ToolAuthController {
   constructor(
     private readonly authConfig: AuthConfigService,
     private readonly metricsService: MetricsService,
+    private readonly prisma: PrismaService,
   ) {}
+
+  /**
+   * Validate tool access - ensure toolId exists and belongs to orgId
+   */
+  private async validateToolAccess(toolId: string, orgId: string): Promise<{ id: string; name: string; orgId: string }> {
+    try {
+      const tool = await this.prisma.tool.findUnique({
+        where: { id: toolId },
+        select: { id: true, name: true, orgId: true }
+      });
+
+      if (!tool) {
+        throw new NotFoundException(`Tool with ID ${toolId} not found`);
+      }
+
+      if (tool.orgId !== orgId) {
+        this.logger.warn(`Unauthorized access attempt: tool ${toolId} does not belong to org ${orgId}`);
+        throw new UnauthorizedException(`Tool ${toolId} does not belong to organization ${orgId}`);
+      }
+
+      this.logger.debug(`Validated tool access: ${tool.name} (${toolId}) for org ${orgId}`);
+      return tool;
+    } catch (error) {
+      this.logger.error(`Tool validation failed for ${toolId} in org ${orgId}: ${error.message}`);
+      throw error;
+    }
+  }
 
   @Post()
   @HttpCode(HttpStatus.OK)
@@ -75,12 +106,15 @@ export class ToolAuthController {
       throw new BadRequestException('X-Org-ID header is required');
     }
 
+    // Validate tool ownership first
+    const tool = await this.validateToolAccess(toolId, orgId);
+    
     this.logger.log(`Creating/updating auth config for tool ${toolId} in org ${orgId}`);
 
-    // Record metrics
+    // Record metrics using tool name
     this.metricsService.incrementToolAuthConfig({
       orgId,
-      toolKey: toolId,
+      toolKey: tool.name,
       action: 'upsert',
     });
 
@@ -124,17 +158,19 @@ export class ToolAuthController {
       throw new BadRequestException('X-Org-ID header is required');
     }
 
+    // Validate tool ownership first
+    const tool = await this.validateToolAccess(toolId, orgId);
+    
     this.logger.log(`Fetching auth config for tool ${toolId} in org ${orgId}`);
 
-    // Record metrics
+    // Record metrics using tool name
     this.metricsService.incrementToolAuthConfig({
       orgId,
-      toolKey: toolId,
+      toolKey: tool.name,
       action: 'get',
     });
 
-    // For the GET endpoint, we need to find by tool name/key since getOrgAuthConfig expects toolKey
-    // We'll need to modify this to work with toolId - for now, treating toolId as toolKey
+    // Get auth config using toolId
     const config = await this.authConfig.getOrgAuthConfig(orgId, toolId);
 
     this.logger.log(`Successfully retrieved auth config for tool ${toolId}`);
@@ -187,12 +223,15 @@ export class ToolAuthController {
       throw new BadRequestException('X-Org-ID header is required');
     }
 
+    // Validate tool ownership first
+    const tool = await this.validateToolAccess(toolId, orgId);
+    
     this.logger.log(`Deleting auth config for tool ${toolId} in org ${orgId}`);
 
-    // Record metrics
+    // Record metrics using tool name
     this.metricsService.incrementToolAuthConfig({
       orgId,
-      toolKey: toolId,
+      toolKey: tool.name,
       action: 'delete',
     });
 

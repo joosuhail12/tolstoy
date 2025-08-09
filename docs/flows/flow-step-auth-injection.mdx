@@ -30,10 +30,10 @@ API calls that require OAuth2 authentication get user-specific access tokens inj
 
 ## Tool Name Resolution
 
-The system determines which authentication configuration to use by extracting the tool name from step configuration:
+The system determines which authentication configuration to use by extracting the tool name from step configuration, then looking up the corresponding tool ID:
 
 ### 1. Explicit Tool Name
-If the step config includes a `toolName` property, it's used directly:
+If the step config includes a `toolName` property, it's used to look up the tool ID:
 
 ```json
 {
@@ -69,7 +69,7 @@ Example:
   }
 }
 ```
-This automatically resolves to the "GitHub" tool configuration.
+This automatically resolves to the tool with name "GitHub" and uses its tool ID for authentication configuration lookup.
 
 ## Authentication Types
 

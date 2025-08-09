@@ -52,11 +52,11 @@ export class OAuthCallbackQueryDto {
 
 export class OAuthToolParamDto {
   @ApiProperty({
-    description: 'Tool key/identifier for OAuth provider',
-    example: 'github',
+    description: 'Tool unique identifier (database ID)',
+    example: 'cme3zjbwc0000uppplgvx1hse',
     required: true,
   })
   @IsString()
   @IsNotEmpty()
-  toolKey: string;
+  toolId: string;
 }

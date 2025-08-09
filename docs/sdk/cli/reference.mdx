@@ -40,7 +40,7 @@ tolstoy tool auth api-key [OPTIONS]
 
 **Required Options:**
 - `-o, --org <orgId>` - Organization ID
-- `-t, --tool <toolKey>` - Tool key/identifier
+- `-t, --tool <toolId>` - Tool ID
 - `-k, --key <apiKey>` - API key value
 
 **Optional Options:**
@@ -49,10 +49,10 @@ tolstoy tool auth api-key [OPTIONS]
 **Examples:**
 ```bash
 # GitHub API key
-tolstoy tool auth api-key -o my-org -t github -k ghp_xxxxxxxxxxxx
+tolstoy tool auth api-key -o my-org -t tool-123 -k ghp_xxxxxxxxxxxx
 
 # Custom header
-tolstoy tool auth api-key -o my-org -t api-service -k secret123 -h "X-API-Key"
+tolstoy tool auth api-key -o my-org -t tool-456 -k secret123 -h "X-API-Key"
 ```
 
 **Exit Codes:**
@@ -72,7 +72,7 @@ tolstoy tool auth oauth2 [OPTIONS]
 
 **Required Options:**
 - `-o, --org <orgId>` - Organization ID
-- `-t, --tool <toolKey>` - Tool key/identifier  
+- `-t, --tool <toolId>` - Tool ID  
 - `-i, --client-id <clientId>` - OAuth2 client ID
 - `-s, --client-secret <secret>` - OAuth2 client secret
 - `-c, --callback-url <url>` - OAuth2 callback/redirect URL
@@ -87,7 +87,7 @@ tolstoy tool auth oauth2 [OPTIONS]
 # Google OAuth2
 tolstoy tool auth oauth2 \
   -o my-org \
-  -t google \
+  -t tool-123 \
   -i 123456.apps.googleusercontent.com \
   -s GOCSPX-xxxxxxxxxxxx \
   -c "https://app.com/callback" \
@@ -96,7 +96,7 @@ tolstoy tool auth oauth2 \
 # GitHub OAuth App
 tolstoy tool auth oauth2 \
   -o my-org \
-  -t github \
+  -t tool-456 \
   -i Iv1.xxxxxxxxxxxx \
   -s xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx \
   -c "https://app.com/auth/callback" \
@@ -119,7 +119,7 @@ tolstoy auth login [OPTIONS]
 ```
 
 **Required Options:**
-- `-t, --tool <toolKey>` - Tool key/identifier
+- `-t, --tool <toolId>` - Tool ID
 - `-u, --user <userId>` - User ID to associate with tokens
 
 **Optional Options:**
@@ -129,10 +129,10 @@ tolstoy auth login [OPTIONS]
 **Examples:**
 ```bash
 # GitHub login (opens browser)
-tolstoy auth login -t github -u user-123 -o my-org
+tolstoy auth login -t tool-123 -u user-123 -o my-org
 
 # Manual URL (no browser)
-tolstoy auth login -t google -u user-456 --no-open
+tolstoy auth login -t tool-456 -u user-456 --no-open
 ```
 
 **Exit Codes:**

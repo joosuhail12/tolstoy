@@ -11,9 +11,11 @@ describe('OAuthController', () => {
   let oauthService: jest.Mocked<OAuthService>;
   let metricsService: jest.Mocked<MetricsService>;
   let mockResponse: jest.Mocked<Response>;
+  let mockRequest: any;
 
   const mockOrgId = 'org_123';
   const mockUserId = 'user_456';
+  const mockToolId = 'tool-123';
   const mockToolKey = 'github';
   const mockState = 'state_abc123';
   const mockCode = 'auth_code_xyz';
@@ -54,6 +56,18 @@ describe('OAuthController', () => {
       json: jest.fn().mockReturnThis(),
       send: jest.fn().mockReturnThis(),
     } as any;
+    
+    // Mock Express Request object  
+    mockRequest = {
+      get: (header: string) => {
+        if (header === 'host') return 'localhost';
+        if (header === 'user-agent') return 'test-agent';
+        if (header === 'referer') return 'https://github.com';
+        return null;
+      },
+      ip: '127.0.0.1',
+      connection: { remoteAddress: '127.0.0.1' }
+    };
   });
 
   afterEach(() => {
@@ -63,25 +77,27 @@ describe('OAuthController', () => {
   });
 
   describe('initiateLogin', () => {
-    const mockParams = { toolKey: mockToolKey };
+    const mockParams = { toolId: mockToolId };
     const mockQuery = { userId: mockUserId };
+    const mockRequest = { get: () => 'localhost' };
 
     it('should redirect to OAuth provider successfully', async () => {
       const mockAuthUrl = 'https://github.com/login/oauth/authorize?client_id=123&...';
       oauthService.getAuthorizeUrl.mockResolvedValue({
         url: mockAuthUrl,
         state: mockState,
+        toolKey: mockToolKey,
       });
 
-      await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockResponse);
+      await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockRequest as any, mockResponse);
 
-      expect(oauthService.getAuthorizeUrl).toHaveBeenCalledWith(mockToolKey, mockOrgId, mockUserId);
+      expect(oauthService.getAuthorizeUrl).toHaveBeenCalledWith(mockToolId, mockOrgId, mockUserId, 'localhost');
       expect(metricsService.incrementOAuthRedirect).toHaveBeenCalledWith({ orgId: mockOrgId, toolKey: mockToolKey });
       expect(mockResponse.redirect).toHaveBeenCalledWith(302, mockAuthUrl);
     });
 
     it('should return 400 for missing X-Org-ID header', async () => {
-      await controller.initiateLogin(mockParams, mockQuery, '', mockResponse);
+      await controller.initiateLogin(mockParams, mockQuery, '', mockRequest as any, mockResponse);
 
       // Metrics are not incremented on validation errors before service call
       expect(mockResponse.status).toHaveBeenCalledWith(400);
@@ -98,7 +114,7 @@ describe('OAuthController', () => {
         new BadRequestException('Tool not configured for OAuth'),
       );
 
-      await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockResponse);
+      await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockRequest as any, mockResponse);
 
       // Metrics are not incremented on service errors
       expect(mockResponse.status).toHaveBeenCalledWith(400);
@@ -112,7 +128,7 @@ describe('OAuthController', () => {
     it('should handle unexpected errors', async () => {
       oauthService.getAuthorizeUrl.mockRejectedValue(new Error('Unexpected error'));
 
-      await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockResponse);
+      await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockRequest as any, mockResponse);
 
       // Metrics are not incremented on unexpected errors
       expect(mockResponse.status).toHaveBeenCalledWith(500);
@@ -127,9 +143,10 @@ describe('OAuthController', () => {
       oauthService.getAuthorizeUrl.mockResolvedValue({
         url: 'https://example.com/oauth',
         state: mockState,
+        toolKey: mockToolKey,
       });
 
-      await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockResponse);
+      await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockRequest as any, mockResponse);
 
       expect(metricsService.incrementOAuthRedirect).toHaveBeenCalledTimes(1);
       expect(metricsService.incrementOAuthRedirect).toHaveBeenCalledWith({ orgId: mockOrgId, toolKey: mockToolKey });
@@ -137,7 +154,6 @@ describe('OAuthController', () => {
   });
 
   describe('handleCallback', () => {
-    const mockParams = { toolKey: mockToolKey };
     const mockQuery = {
       code: mockCode,
       state: mockState,
@@ -147,10 +163,11 @@ describe('OAuthController', () => {
       oauthService.handleCallback.mockResolvedValue({
         credentialId: mockCredentialId,
         toolKey: mockToolKey,
+        toolId: mockToolId,
         orgId: mockOrgId,
       });
 
-      await controller.handleCallback(mockParams, mockQuery, mockResponse);
+      await controller.handleCallback(mockQuery, mockRequest as any, mockResponse);
 
       expect(oauthService.handleCallback).toHaveBeenCalledWith(mockCode, mockState);
       expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
@@ -171,7 +188,7 @@ describe('OAuthController', () => {
         error_description: 'The user denied the request',
       };
 
-      await controller.handleCallback(mockParams, mockErrorQuery, mockResponse);
+      await controller.handleCallback(mockErrorQuery, mockRequest as any, mockResponse);
 
       // Error metrics are not recorded for OAuth provider errors (no orgId available)
       expect(mockResponse.status).toHaveBeenCalledWith(400);
@@ -187,11 +204,11 @@ describe('OAuthController', () => {
         state: mockState,
       };
 
-      await controller.handleCallback(mockParams, mockQueryWithoutCode, mockResponse);
+      await controller.handleCallback(mockQueryWithoutCode, mockRequest as any, mockResponse);
 
       expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
         orgId: 'unknown',
-        toolKey: mockToolKey,
+        toolKey: 'unknown',
         success: 'false',
       });
       expect(mockResponse.status).toHaveBeenCalledWith(500);
@@ -206,11 +223,11 @@ describe('OAuthController', () => {
         state: '',
       };
 
-      await controller.handleCallback(mockParams, mockQueryWithoutState, mockResponse);
+      await controller.handleCallback(mockQueryWithoutState, mockRequest as any, mockResponse);
 
       expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
         orgId: 'unknown',
-        toolKey: mockToolKey,
+        toolKey: 'unknown',
         success: 'false',
       });
       expect(mockResponse.status).toHaveBeenCalledWith(500);
@@ -222,11 +239,11 @@ describe('OAuthController', () => {
     it('should handle service callback errors', async () => {
       oauthService.handleCallback.mockRejectedValue(new Error('Invalid state parameter'));
 
-      await controller.handleCallback(mockParams, mockQuery, mockResponse);
+      await controller.handleCallback(mockQuery, mockRequest as any, mockResponse);
 
       expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
         orgId: 'unknown',
-        toolKey: mockToolKey,
+        toolKey: 'unknown',
         success: 'false',
       });
       expect(mockResponse.status).toHaveBeenCalledWith(500);
@@ -239,10 +256,11 @@ describe('OAuthController', () => {
       oauthService.handleCallback.mockResolvedValue({
         credentialId: mockCredentialId,
         toolKey: mockToolKey,
+        toolId: mockToolId,
         orgId: mockOrgId,
       });
 
-      await controller.handleCallback(mockParams, mockQuery, mockResponse);
+      await controller.handleCallback(mockQuery, mockRequest as any, mockResponse);
 
       expect(metricsService.incrementOAuthCallback).toHaveBeenCalledTimes(1);
       expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
@@ -259,7 +277,7 @@ describe('OAuthController', () => {
         error_description: 'Invalid request parameters',
       };
 
-      await controller.handleCallback(mockParams, mockErrorQuery, mockResponse);
+      await controller.handleCallback(mockErrorQuery, mockRequest as any, mockResponse);
 
       // OAuth provider errors do not increment metrics
     });
@@ -267,12 +285,12 @@ describe('OAuthController', () => {
     it('should increment metrics correctly for processing error', async () => {
       oauthService.handleCallback.mockRejectedValue(new Error('Processing failed'));
 
-      await controller.handleCallback(mockParams, mockQuery, mockResponse);
+      await controller.handleCallback(mockQuery, mockRequest as any, mockResponse);
 
       expect(metricsService.incrementOAuthCallback).toHaveBeenCalledTimes(1);
       expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
         orgId: 'unknown',
-        toolKey: mockToolKey,
+        toolKey: 'unknown',
         success: 'false',
       });
     });
@@ -283,12 +301,13 @@ describe('OAuthController', () => {
       oauthService.handleCallback.mockResolvedValue({
         credentialId: mockCredentialId,
         toolKey: mockToolKey,
+        toolId: mockToolId,
         orgId: mockOrgId,
       });
 
       await controller.handleCallback(
-        { toolKey: mockToolKey },
         { code: mockCode, state: mockState },
+        mockRequest as any,
         mockResponse,
       );
 
@@ -308,12 +327,12 @@ describe('OAuthController', () => {
         error_description: errorMessage,
       };
 
-      await controller.handleCallback({ toolKey: mockToolKey }, mockErrorQuery, mockResponse);
+      await controller.handleCallback(mockErrorQuery, mockRequest as any, mockResponse);
 
       const htmlContent = mockResponse.send.mock.calls[0][0];
       expect(htmlContent).toContain('Authorization Failed');
       expect(htmlContent).toContain(errorMessage);
-      expect(htmlContent).toContain(mockToolKey);
+      expect(htmlContent).toContain('oauth'); // OAuth provider errors use 'oauth' as fallback
       expect(htmlContent).toContain('⚠');
     });
 
@@ -321,12 +340,13 @@ describe('OAuthController', () => {
       oauthService.handleCallback.mockResolvedValue({
         credentialId: mockCredentialId,
         toolKey: mockToolKey,
+        toolId: mockToolId,
         orgId: mockOrgId,
       });
 
       await controller.handleCallback(
-        { toolKey: mockToolKey },
         { code: mockCode, state: mockState },
+        mockRequest as any,
         mockResponse,
       );
 

@@ -7,6 +7,7 @@ import {
   Logger,
   Param,
   Query,
+  Req,
   Res,
   UsePipes,
   ValidationPipe,
@@ -22,7 +23,7 @@ import {
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { OAuthService } from './oauth.service';
 import { MetricsService } from '../metrics/metrics.service';
 import {
@@ -42,16 +43,16 @@ export class OAuthController {
     private readonly metricsService: MetricsService,
   ) {}
 
-  @Get(':toolKey/login')
+  @Get(':toolId/login')
   @ApiOperation({
     summary: 'Initiate OAuth2 login for a user',
     description:
       'Redirects the user to the OAuth provider authorization page. The user must grant permission, after which they will be redirected back to the callback endpoint.',
   })
   @ApiParam({
-    name: 'toolKey',
-    description: 'Tool identifier (e.g., "github", "google")',
-    example: 'github',
+    name: 'toolId',
+    description: 'Tool unique identifier (database ID)',
+    example: 'cme3zjbwc0000uppplgvx1hse',
   })
   @ApiQuery({
     name: 'userId',
@@ -83,6 +84,7 @@ export class OAuthController {
     @Param() params: OAuthToolParamDto,
     @Query() query: OAuthLoginQueryDto,
     @Headers('X-Org-ID') orgId: string,
+    @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
     try {
@@ -90,18 +92,24 @@ export class OAuthController {
         throw new BadRequestException('X-Org-ID header is required');
       }
 
-      const { toolKey } = params;
+      const { toolId } = params;
       const { userId } = query;
 
-      this.logger.log(`Initiating OAuth login for tool ${toolKey}, org ${orgId}, user ${userId}`);
+      this.logger.log(`Initiating OAuth login for tool ${toolId}, org ${orgId}, user ${userId}`);
 
-      // Record metrics
+      // Record metrics (we'll need toolKey for metrics, so we'll get it from the service response)
+      // For now, we'll use toolId for logging and update metrics after getting tool details
+
+      // Extract request host for multi-environment callback support
+      const requestHost = req.get('host') || req.hostname;
+
+      // Generate authorization URL with request context
+      const { url, toolKey } = await this.oauthService.getAuthorizeUrl(toolId, orgId, userId, requestHost);
+
+      // Record metrics using toolKey
       this.metricsService.incrementOAuthRedirect({ orgId, toolKey });
 
-      // Generate authorization URL
-      const { url } = await this.oauthService.getAuthorizeUrl(toolKey, orgId, userId);
-
-      this.logger.log(`Redirecting to OAuth provider for ${toolKey}`);
+      this.logger.log(`Redirecting to OAuth provider for tool ${toolKey} (${toolId})`);
 
       // Redirect to OAuth provider
       res.redirect(HttpStatus.FOUND, url);
@@ -127,16 +135,11 @@ export class OAuthController {
     }
   }
 
-  @Get(':toolKey/callback')
+  @Get('callback')
   @ApiOperation({
     summary: 'Handle OAuth2 callback from provider',
     description:
       'Processes the authorization code returned by the OAuth provider, exchanges it for access tokens, and stores the user credentials.',
-  })
-  @ApiParam({
-    name: 'toolKey',
-    description: 'Tool identifier that matches the login request',
-    example: 'github',
   })
   @ApiQuery({
     name: 'code',
@@ -177,19 +180,32 @@ export class OAuthController {
   })
   @UsePipes(new ValidationPipe({ transform: true }))
   async handleCallback(
-    @Param() params: OAuthToolParamDto,
     @Query() query: OAuthCallbackQueryDto,
+    @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
-    const { toolKey } = params;
 
     try {
-      this.logger.log(`Processing OAuth callback for tool ${toolKey}`);
+      // Security logging - capture key request details for monitoring
+      const requestHost = req.get('host');
+      const userAgent = req.get('user-agent');
+      const referer = req.get('referer');
+      const clientIp = req.ip || req.connection.remoteAddress;
+
+      this.logger.log(
+        `Processing OAuth callback from ${clientIp} (${requestHost})`,
+        {
+          requestHost,
+          userAgent,
+          referer,
+          clientIp,
+        },
+      );
 
       // Check if OAuth provider returned an error
       if (query.error) {
         this.logger.warn(
-          `OAuth provider returned error for ${toolKey}: ${query.error} - ${query.error_description}`,
+          `OAuth provider returned error: ${query.error} - ${query.error_description}`,
         );
 
         // Note: We don't have orgId here for error cases, so we'll record error metrics
@@ -202,7 +218,7 @@ export class OAuthController {
         };
 
         // Return HTML page for user-friendly error display
-        const errorHtml = this.generateErrorPage(response.message, toolKey);
+        const errorHtml = this.generateErrorPage(response.message, 'oauth');
         res.status(HttpStatus.BAD_REQUEST).send(errorHtml);
         return;
       }
@@ -218,7 +234,12 @@ export class OAuthController {
       // Process the callback
       const result = await this.oauthService.handleCallback(query.code, query.state);
 
-      this.logger.log(`Successfully completed OAuth callback for ${toolKey}`);
+      this.logger.log(`Successfully completed OAuth callback for ${result.toolKey} (${result.toolId})`);
+
+      // Basic security check now that we have toolKey
+      if (referer && !this.isValidReferer(referer, result.toolKey)) {
+        this.logger.warn(`Suspicious referer in OAuth callback: ${referer} for ${result.toolKey}`);
+      }
 
       // Record success metrics
       this.metricsService.incrementOAuthCallback({
@@ -228,16 +249,15 @@ export class OAuthController {
       });
 
       // Return user-friendly success page
-      const successHtml = this.generateSuccessPage(toolKey);
+      const successHtml = this.generateSuccessPage(result.toolKey);
       res.status(HttpStatus.OK).send(successHtml);
     } catch (error) {
-      this.logger.error(`OAuth callback failed for ${toolKey}: ${error.message}`, error.stack);
+      this.logger.error(`OAuth callback failed: ${error.message}`, error.stack);
 
-      // Record failure metrics (without orgId since we couldn't parse the state)
-      // For now, we'll use 'unknown' as orgId for error cases
+      // Record failure metrics (without specific tool info since we couldn't parse the state)
       this.metricsService.incrementOAuthCallback({
         orgId: 'unknown',
-        toolKey,
+        toolKey: 'unknown',
         success: 'false',
       });
 
@@ -248,7 +268,7 @@ export class OAuthController {
       };
 
       // Return HTML error page
-      const errorHtml = this.generateErrorPage(errorResponse.message, toolKey);
+      const errorHtml = this.generateErrorPage(errorResponse.message, 'oauth');
       res.status(HttpStatus.INTERNAL_SERVER_ERROR).send(errorHtml);
     }
   }
@@ -358,5 +378,36 @@ export class OAuthController {
 </body>
 </html>
     `;
+  }
+
+  /**
+   * Validate referer to ensure callback is coming from expected OAuth providers
+   */
+  private isValidReferer(referer: string, toolKey: string): boolean {
+    try {
+      const refererUrl = new URL(referer);
+      
+      // List of trusted OAuth provider domains
+      const trustedDomains: Record<string, string[]> = {
+        github: ['github.com'],
+        google: ['accounts.google.com', 'oauth2.googleapis.com'],
+        microsoft: ['login.microsoftonline.com', 'login.live.com'],
+        slack: ['slack.com'],
+        discord: ['discord.com'],
+        linkedin: ['linkedin.com', 'www.linkedin.com'],
+        facebook: ['facebook.com', 'www.facebook.com'],
+      };
+
+      const allowedDomains = trustedDomains[toolKey.toLowerCase()] || [];
+      
+      // Check if referer domain is in the allowed list
+      return allowedDomains.some(domain => 
+        refererUrl.hostname === domain || 
+        refererUrl.hostname.endsWith(`.${domain}`)
+      );
+    } catch {
+      // Invalid URL format
+      return false;
+    }
   }
 }

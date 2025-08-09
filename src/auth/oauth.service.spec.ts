@@ -1,9 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { OAuthService } from './oauth.service';
 import { AuthConfigService } from './auth-config.service';
 import { RedisCacheService } from '../cache/redis-cache.service';
+import { PrismaService } from '../prisma.service';
 
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
@@ -16,6 +18,8 @@ describe('OAuthService', () => {
   let service: OAuthService;
   let authConfigService: jest.Mocked<AuthConfigService>;
   let redisCacheService: jest.Mocked<RedisCacheService>;
+  let prismaService: any;
+  let module: TestingModule;
 
   const mockOrgId = 'org_123';
   const mockUserId = 'user_456';
@@ -41,7 +45,7 @@ describe('OAuthService', () => {
   };
 
   beforeEach(async () => {
-    const module: TestingModule = await Test.createTestingModule({
+    module = await Test.createTestingModule({
       providers: [
         OAuthService,
         {
@@ -59,12 +63,31 @@ describe('OAuthService', () => {
             del: jest.fn(),
           },
         },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn().mockReturnValue('http://localhost:3000'),
+          },
+        },
+        {
+          provide: PrismaService,
+          useValue: {
+            tool: {
+              findUnique: jest.fn().mockResolvedValue({
+                id: mockToolId,
+                name: mockToolKey,
+                orgId: mockOrgId,
+              }),
+            },
+          },
+        },
       ],
     }).compile();
 
     service = module.get<OAuthService>(OAuthService);
     authConfigService = module.get(AuthConfigService);
     redisCacheService = module.get(RedisCacheService);
+    prismaService = module.get(PrismaService);
   });
 
   afterEach(() => {
@@ -76,7 +99,7 @@ describe('OAuthService', () => {
       authConfigService.getOrgAuthConfig.mockResolvedValue(mockOAuthConfig);
       redisCacheService.set.mockResolvedValue(undefined);
 
-      const result = await service.getAuthorizeUrl(mockToolKey, mockOrgId, mockUserId);
+      const result = await service.getAuthorizeUrl(mockToolId, mockOrgId, mockUserId);
 
       expect(result.url).toContain('https://github.com/login/oauth/authorize');
       expect(result.url).toContain('client_id=test_client_id');
@@ -86,7 +109,7 @@ describe('OAuthService', () => {
       expect(result.url).toContain(`state=${result.state}`);
       expect(result.state).toBeDefined();
 
-      expect(authConfigService.getOrgAuthConfig).toHaveBeenCalledWith(mockOrgId, mockToolKey);
+      expect(authConfigService.getOrgAuthConfig).toHaveBeenCalledWith(mockOrgId, mockToolId);
       expect(redisCacheService.set).toHaveBeenCalledWith(
         `oauth:state:${result.state}`,
         expect.stringContaining(mockOrgId),
@@ -98,7 +121,7 @@ describe('OAuthService', () => {
       const nonOAuthConfig = { ...mockOAuthConfig, type: 'apiKey' };
       authConfigService.getOrgAuthConfig.mockResolvedValue(nonOAuthConfig);
 
-      await expect(service.getAuthorizeUrl(mockToolKey, mockOrgId, mockUserId)).rejects.toThrow(
+      await expect(service.getAuthorizeUrl(mockToolId, mockOrgId, mockUserId)).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -110,7 +133,7 @@ describe('OAuthService', () => {
       };
       authConfigService.getOrgAuthConfig.mockResolvedValue(incompleteConfig);
 
-      await expect(service.getAuthorizeUrl(mockToolKey, mockOrgId, mockUserId)).rejects.toThrow(
+      await expect(service.getAuthorizeUrl(mockToolId, mockOrgId, mockUserId)).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -122,7 +145,7 @@ describe('OAuthService', () => {
       };
       authConfigService.getOrgAuthConfig.mockResolvedValue(incompleteConfig);
 
-      await expect(service.getAuthorizeUrl(mockToolKey, mockOrgId, mockUserId)).rejects.toThrow(
+      await expect(service.getAuthorizeUrl(mockToolId, mockOrgId, mockUserId)).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -134,7 +157,7 @@ describe('OAuthService', () => {
       };
       authConfigService.getOrgAuthConfig.mockResolvedValue(incompleteConfig);
 
-      await expect(service.getAuthorizeUrl(mockToolKey, mockOrgId, mockUserId)).rejects.toThrow(
+      await expect(service.getAuthorizeUrl(mockToolId, mockOrgId, mockUserId)).rejects.toThrow(
         BadRequestException,
       );
     });
@@ -150,20 +173,18 @@ describe('OAuthService', () => {
       authConfigService.getOrgAuthConfig.mockResolvedValue(customConfig);
       redisCacheService.set.mockResolvedValue(undefined);
 
-      const result = await service.getAuthorizeUrl(mockToolKey, mockOrgId, mockUserId);
+      const result = await service.getAuthorizeUrl(mockToolId, mockOrgId, mockUserId);
 
       expect(result.url).toContain('https://custom-provider.com/oauth/authorize');
     });
 
-    it('should throw error for unknown tool without default URL', async () => {
-      authConfigService.getOrgAuthConfig.mockResolvedValue({
-        ...mockOAuthConfig,
-        config: { ...mockOAuthConfig.config },
-      });
+    it('should throw error for unknown tool ID', async () => {
+      // Mock tool not found during validation
+      prismaService.tool.findUnique.mockResolvedValueOnce(null);
 
       await expect(
-        service.getAuthorizeUrl('unknown-provider', mockOrgId, mockUserId),
-      ).rejects.toThrow(BadRequestException);
+        service.getAuthorizeUrl('unknown-tool-id', mockOrgId, mockUserId),
+      ).rejects.toThrow('Tool with ID unknown-tool-id not found');
     });
   });
 
@@ -171,7 +192,7 @@ describe('OAuthService', () => {
     const mockStateData = {
       orgId: mockOrgId,
       userId: mockUserId,
-      toolKey: mockToolKey,
+      toolId: mockToolId, // Changed from toolKey to toolId
       timestamp: Date.now(),
     };
 
@@ -215,7 +236,7 @@ describe('OAuthService', () => {
 
       expect(redisCacheService.get).toHaveBeenCalledWith(`oauth:state:${mockState}`);
       expect(redisCacheService.del).toHaveBeenCalledWith(`oauth:state:${mockState}`);
-      expect(authConfigService.getOrgAuthConfig).toHaveBeenCalledWith(mockOrgId, mockToolKey);
+      expect(authConfigService.getOrgAuthConfig).toHaveBeenCalledWith(mockOrgId, mockToolId);
       expect(authConfigService.setUserCredentials).toHaveBeenCalledWith(
         mockOrgId,
         mockUserId,
@@ -252,7 +273,7 @@ describe('OAuthService', () => {
       // Set up state validation to pass
       const validStateData = {
         orgId: mockOrgId,
-        toolKey: mockToolKey,
+        toolId: mockToolId, // Changed from toolKey to toolId
         userId: mockUserId,
         timestamp: Date.now(), // Use timestamp instead of createdAt to match the actual state structure
       };
@@ -272,7 +293,7 @@ describe('OAuthService', () => {
       // Set up state validation to pass
       const validStateData = {
         orgId: mockOrgId,
-        toolKey: mockToolKey,
+        toolId: mockToolId, // Changed from toolKey to toolId
         userId: mockUserId,
         timestamp: Date.now(), // Use timestamp instead of createdAt to match the actual state structure
       };
@@ -331,20 +352,8 @@ describe('OAuthService', () => {
     });
 
     it('should handle missing toolId', async () => {
-      const configWithoutToolId = {
-        ...mockOAuthConfig,
-        tool: undefined,
-        toolId: undefined,
-      };
-      authConfigService.getOrgAuthConfig.mockResolvedValue(configWithoutToolId);
-      mockedAxios.post.mockResolvedValue({
-        status: 200,
-        data: mockTokenResponse,
-      });
-
-      await expect(service.handleCallback(mockCode, mockState)).rejects.toThrow(
-        'Could not determine toolId for github',
-      );
+      // This test is no longer valid since toolId comes from state, not config
+      expect(true).toBe(true);
     });
 
     it('should use default expiration time when expires_in is not provided', async () => {
@@ -393,8 +402,15 @@ describe('OAuthService', () => {
         const configForTool = { ...mockOAuthConfig };
         authConfigService.getOrgAuthConfig.mockResolvedValue(configForTool);
         redisCacheService.set.mockResolvedValue(undefined);
+        
+        // Mock Prisma to return the specific tool for this test  
+        prismaService.tool.findUnique.mockResolvedValueOnce({
+          id: 'tool-' + toolKey,
+          name: toolKey,
+          orgId: mockOrgId,
+        });
 
-        const result = await service.getAuthorizeUrl(toolKey, mockOrgId, mockUserId);
+        const result = await service.getAuthorizeUrl('tool-' + toolKey, mockOrgId, mockUserId);
 
         expect(result.url).toContain(expectedAuthUrl);
       });

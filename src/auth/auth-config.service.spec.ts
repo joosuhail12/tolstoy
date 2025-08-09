@@ -55,7 +55,11 @@ describe('AuthConfigService', () => {
         deleteMany: jest.fn(),
       },
       tool: {
-        findUnique: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'tool-789',
+          name: 'testTool',
+          orgId: 'org-456',
+        }),
       },
     };
 
@@ -104,10 +108,10 @@ describe('AuthConfigService', () => {
       };
       cacheService.get.mockResolvedValue(cachedConfig);
 
-      const result = await service.getOrgAuthConfig('org-456', 'testTool');
+      const result = await service.getOrgAuthConfig('org-456', 'tool-789');
 
       expect(result).toEqual(cachedConfig);
-      expect(cacheService.get).toHaveBeenCalledWith('auth:org:org-456:tool:testTool');
+      expect(cacheService.get).toHaveBeenCalledWith('auth:org:org-456:tool:tool-789');
       expect(prismaService.toolAuthConfig.findFirst).not.toHaveBeenCalled();
     });
 
@@ -120,23 +124,23 @@ describe('AuthConfigService', () => {
       awsSecretsService.secretExists.mockResolvedValue(false);
       awsSecretsService.createSecret.mockResolvedValue(undefined);
 
-      const result = await service.getOrgAuthConfig('org-456', 'testTool');
+      const result = await service.getOrgAuthConfig('org-456', 'tool-789');
 
       expect(result).toEqual(mockOrgAuthConfig);
       expect(prismaService.toolAuthConfig.findFirst).toHaveBeenCalledWith({
-        where: { orgId: 'org-456', tool: { name: 'testTool' } },
+        where: { orgId: 'org-456', toolId: 'tool-789' },
         include: { tool: true },
       });
       expect(awsSecretsService.secretExists).toHaveBeenCalledWith(
-        'tolstoy/org-456/tools/testTool/config',
+        'tolstoy/org-456/tools/tool-789/config',
       );
       expect(awsSecretsService.createSecret).toHaveBeenCalledWith(
-        'tolstoy/org-456/tools/testTool/config',
+        'tolstoy/org-456/tools/tool-789/config',
         JSON.stringify(mockOrgAuthConfig.config),
         'Tolstoy auth configuration',
       );
       expect(cacheService.set).toHaveBeenCalledWith(
-        'auth:org:org-456:tool:testTool',
+        'auth:org:org-456:tool:tool-789',
         mockOrgAuthConfig.config,
         { ttl: 600 },
       );
@@ -146,8 +150,11 @@ describe('AuthConfigService', () => {
       cacheService.get.mockResolvedValue(null);
       prismaService.toolAuthConfig.findFirst.mockResolvedValue(null);
 
-      await expect(service.getOrgAuthConfig('org-456', 'nonexistentTool')).rejects.toThrow(
-        new NotFoundException('No auth config for tool nonexistentTool in organization org-456'),
+      // Mock tool not found
+      prismaService.tool.findUnique.mockResolvedValueOnce(null);
+      
+      await expect(service.getOrgAuthConfig('org-456', 'nonexistent-tool-id')).rejects.toThrow(
+        new NotFoundException('Tool with ID nonexistent-tool-id not found'),
       );
     });
 
@@ -159,7 +166,7 @@ describe('AuthConfigService', () => {
       } as any);
       awsSecretsService.secretExists.mockRejectedValue(new Error('AWS Error'));
 
-      const result = await service.getOrgAuthConfig('org-456', 'testTool');
+      const result = await service.getOrgAuthConfig('org-456', 'tool-789');
 
       expect(result).toEqual(mockOrgAuthConfig);
       expect(cacheService.set).toHaveBeenCalled();
@@ -173,14 +180,14 @@ describe('AuthConfigService', () => {
         tool: mockTool,
       } as any);
 
-      const result = await service.getUserCredentials('org-456', 'user-789', 'testTool');
+      const result = await service.getUserCredentials('org-456', 'user-789', 'tool-789');
 
       expect(result).toEqual({
         ...mockUserCredential,
         tool: mockTool,
       });
       expect(prismaService.userCredential.findFirst).toHaveBeenCalledWith({
-        where: { orgId: 'org-456', userId: 'user-789', tool: { name: 'testTool' } },
+        where: { orgId: 'org-456', userId: 'user-789', toolId: 'tool-789' },
         include: { tool: true },
       });
     });
@@ -188,9 +195,9 @@ describe('AuthConfigService', () => {
     it('should throw NotFoundException when no credentials found', async () => {
       prismaService.userCredential.findFirst.mockResolvedValue(null);
 
-      await expect(service.getUserCredentials('org-456', 'user-789', 'testTool')).rejects.toThrow(
+      await expect(service.getUserCredentials('org-456', 'user-789', 'tool-789')).rejects.toThrow(
         new NotFoundException(
-          'No user credentials for user user-789 & tool testTool in organization org-456',
+          'No user credentials for user user-789 & tool tool-789 in organization org-456',
         ),
       );
     });
@@ -209,15 +216,57 @@ describe('AuthConfigService', () => {
       expect(prismaService.userCredential.update).not.toHaveBeenCalled();
     });
 
-    it('should throw error for expired token (placeholder implementation)', async () => {
+    it('should refresh expired token', async () => {
       const expiredCred = {
         ...mockUserCredential,
         expiresAt: new Date(Date.now() - 3600000), // 1 hour ago
       };
 
-      await expect(service.refreshUserToken(expiredCred)).rejects.toThrow(
-        'OAuth refresh not yet implemented. Please implement based on your OAuth provider.',
-      );
+      // Mock the dependencies for token refresh
+      prismaService.tool.findUnique.mockResolvedValue(mockTool);
+      service.getOrgAuthConfig = jest.fn().mockResolvedValue({
+        ...mockOrgAuthConfig,
+        type: 'oauth2',
+        config: {
+          clientId: 'client123',
+          clientSecret: 'secret456',
+          tokenUrl: 'https://oauth.example.com/token',
+        },
+      });
+
+      // Mock axios for token refresh
+      const mockAxiosResponse = {
+        status: 200,
+        data: {
+          access_token: 'new-access-token',
+          refresh_token: 'new-refresh-token',
+          expires_in: 3600,
+        },
+      };
+
+      const axios = require('axios');
+      axios.post = jest.fn().mockResolvedValue(mockAxiosResponse);
+
+      prismaService.userCredential.update.mockResolvedValue({
+        ...expiredCred,
+        accessToken: 'new-access-token',
+        refreshToken: 'new-refresh-token',
+      });
+
+      cacheService.set.mockResolvedValue(undefined);
+
+      const result = await service.refreshUserToken(expiredCred);
+
+      expect(result).toBe('new-access-token');
+      expect(prismaService.userCredential.update).toHaveBeenCalledWith({
+        where: { id: expiredCred.id },
+        data: {
+          accessToken: 'new-access-token',
+          refreshToken: 'new-refresh-token',
+          expiresAt: expect.any(Date),
+          updatedAt: expect.any(Date),
+        },
+      });
     });
   });
 
@@ -251,7 +300,7 @@ describe('AuthConfigService', () => {
         },
         include: { tool: true },
       });
-      expect(cacheService.del).toHaveBeenCalledWith('auth:org:org-456:tool:testTool');
+      expect(cacheService.del).toHaveBeenCalledWith('auth:org:org-456:tool:tool-789');
     });
   });
 
@@ -310,7 +359,7 @@ describe('AuthConfigService', () => {
       expect(prismaService.toolAuthConfig.deleteMany).toHaveBeenCalledWith({
         where: { orgId: 'org-456', toolId: 'tool-789' },
       });
-      expect(cacheService.del).toHaveBeenCalledWith('auth:org:org-456:tool:testTool');
+      expect(cacheService.del).toHaveBeenCalledWith('auth:org:org-456:tool:tool-789');
     });
 
     it('should throw NotFoundException when no config to delete', async () => {
