@@ -1,0 +1,25 @@
+name: "Tolstoy CodeQL Config"
+
+# Disable default queries and only run security-focused ones
+disable-default-queries: false
+
+# Additional query suites to run
+queries:
+  - uses: security-and-quality
+  - uses: security-extended
+
+# Paths to include in analysis
+paths:
+  - src
+  - tests
+  - cli/src
+
+# Paths to exclude from analysis
+paths-ignore:
+  - node_modules
+  - dist
+  - coverage
+  - docs
+  - "**/*.d.ts"
+  - "**/*.spec.ts"
+  - "**/*.test.ts"

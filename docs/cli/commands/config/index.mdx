@@ -1,0 +1,677 @@
+---
+title: "Configuration Commands"
+description: "Manage CLI configuration, profiles, and authentication settings using the Tolstoy CLI config commands."
+---
+
+# Configuration Commands
+
+The `tolstoy config` command group provides complete configuration management for the Tolstoy CLI. Use these commands to set up authentication, manage multiple environments, and customize CLI behavior.
+
+## Quick Reference
+
+| Command | Description | Usage |
+|---------|-------------|--------|
+| `list` | List all configuration profiles | `tolstoy config list [options]` |
+| `add` | Add new configuration profile | `tolstoy config add <profile> [options]` |
+| `use` | Switch to a configuration profile | `tolstoy config use <profile>` |
+| `get` | Get configuration value | `tolstoy config get <key>` |
+| `set` | Set configuration value | `tolstoy config set <key> <value>` |
+| `unset` | Remove configuration value | `tolstoy config unset <key>` |
+| `delete` | Delete configuration profile | `tolstoy config delete <profile>` |
+| `test` | Test configuration connectivity | `tolstoy config test [profile]` |
+| `export` | Export configuration | `tolstoy config export [profile]` |
+| `import` | Import configuration | `tolstoy config import <file>` |
+
+## Common Usage Patterns
+
+### Initial Setup
+
+```bash
+# Interactive configuration setup
+tolstoy config add default
+
+# You'll be prompted for:
+# - API URL (default: https://tolstoy.getpullse.com)
+# - Organization ID
+# - User ID
+# - API Key (optional, will prompt when needed)
+
+# Set values manually
+tolstoy config add production \
+  --api-url "https://api.tolstoy.com" \
+  --org-id "org_1234567890abcdef" \
+  --user-id "user_abcdef1234567890"
+```
+
+### Multi-Environment Management
+
+```bash
+# Add development environment
+tolstoy config add development \
+  --api-url "https://dev-api.tolstoy.com" \
+  --org-id "org_dev_123456" \
+  --user-id "user_dev_123456"
+
+# Add staging environment
+tolstoy config add staging \
+  --api-url "https://staging-api.tolstoy.com" \
+  --org-id "org_staging_123456" \
+  --user-id "user_staging_123456"
+
+# List all profiles
+tolstoy config list
+
+# Switch between environments
+tolstoy config use development
+tolstoy config use staging
+tolstoy config use production
+
+# Test connection to current profile
+tolstoy config test
+```
+
+### Configuration Management
+
+```bash
+# Get current configuration
+tolstoy config get api-url
+tolstoy config get org-id
+tolstoy config get current-profile
+
+# Set individual values
+tolstoy config set timeout 30s
+tolstoy config set output-format json
+tolstoy config set verbose true
+
+# View all settings
+tolstoy config list --show-values
+
+# Export configuration for backup
+tolstoy config export production > production-config.json
+
+# Import configuration
+tolstoy config import ./staging-config.json
+```
+
+## Profile Management
+
+### Creating Profiles
+
+<CodeGroup>
+```bash Interactive Setup
+# Interactive profile creation with prompts
+tolstoy config add myprofile
+
+# Sample interaction:
+# ? API URL: https://api.tolstoy.com
+# ? Organization ID: org_1234567890abcdef  
+# ? User ID: user_abcdef1234567890
+# ? Save API key? (y/N): n
+# ✅ Profile 'myprofile' created successfully
+```
+
+```bash Non-Interactive Setup
+# Create profile with all values specified
+tolstoy config add production \
+  --api-url "https://api.tolstoy.com" \
+  --org-id "org_1234567890abcdef" \
+  --user-id "user_abcdef1234567890" \
+  --timeout "60s" \
+  --output-format "json" \
+  --non-interactive
+
+# Create profile from environment variables
+TOLSTOY_API_URL="https://api.tolstoy.com" \
+TOLSTOY_ORG_ID="org_1234567890abcdef" \
+TOLSTOY_USER_ID="user_abcdef1234567890" \
+tolstoy config add production --from-env
+```
+
+```bash Template-Based Setup
+# Create profile from template
+cat > profile-template.json << EOF
+{
+  "api_url": "https://api.tolstoy.com",
+  "org_id": "{{ORG_ID}}",
+  "user_id": "{{USER_ID}}",
+  "timeout": "30s",
+  "output_format": "table",
+  "settings": {
+    "verbose": false,
+    "color_output": true,
+    "auto_update_check": true
+  }
+}
+EOF
+
+# Apply template with variables
+ORG_ID="org_1234567890abcdef" \
+USER_ID="user_abcdef1234567890" \
+tolstoy config add production --template profile-template.json
+```
+</CodeGroup>
+
+### Profile Structure
+
+Configuration profiles are stored with the following structure:
+
+```json
+{
+  "name": "production",
+  "api_url": "https://api.tolstoy.com",
+  "org_id": "org_1234567890abcdef",
+  "user_id": "user_abcdef1234567890",
+  "timeout": "30s",
+  "output_format": "table",
+  "created_at": "2024-01-20T10:00:00Z",
+  "last_used": "2024-01-20T15:30:00Z",
+  "settings": {
+    "verbose": false,
+    "color_output": true,
+    "auto_update_check": true,
+    "confirm_destructive": true
+  },
+  "auth": {
+    "method": "api_key",
+    "token_expires_at": "2024-02-20T10:00:00Z"
+  }
+}
+```
+
+## Configuration Options
+
+### Core Settings
+
+| Setting | Description | Default | Example |
+|---------|-------------|---------|---------|
+| `api-url` | API base URL | `https://tolstoy.getpullse.com` | `https://api.tolstoy.com` |
+| `org-id` | Organization identifier | - | `org_1234567890abcdef` |
+| `user-id` | User identifier | - | `user_abcdef1234567890` |
+| `timeout` | Default operation timeout | `30s` | `60s`, `2m` |
+| `output-format` | Default output format | `table` | `json`, `yaml`, `csv` |
+
+### Display Settings
+
+| Setting | Description | Default | Example |
+|---------|-------------|---------|---------|
+| `verbose` | Enable verbose output | `false` | `true`, `false` |
+| `color-output` | Enable colored output | `true` | `true`, `false` |
+| `show-progress` | Show progress indicators | `true` | `true`, `false` |
+| `page-size` | Items per page in lists | `20` | `50`, `100` |
+| `timezone` | Display timezone | `local` | `UTC`, `America/New_York` |
+
+### Behavior Settings
+
+| Setting | Description | Default | Example |
+|---------|-------------|---------|---------|
+| `confirm-destructive` | Confirm dangerous operations | `true` | `true`, `false` |
+| `auto-update-check` | Check for CLI updates | `true` | `true`, `false` |
+| `save-history` | Save command history | `true` | `true`, `false` |
+| `cache-duration` | Cache API responses | `5m` | `10m`, `1h` |
+
+### Advanced Settings
+
+| Setting | Description | Default | Example |
+|---------|-------------|---------|---------|
+| `retry-attempts` | API call retry attempts | `3` | `5`, `10` |
+| `retry-delay` | Delay between retries | `1s` | `2s`, `5s` |
+| `concurrent-requests` | Max concurrent requests | `10` | `5`, `20` |
+| `log-level` | CLI logging level | `info` | `debug`, `error` |
+| `log-file` | Log file path | - | `~/.tolstoy/tolstoy.log` |
+
+## Environment Variables
+
+Configuration can be overridden by environment variables:
+
+```bash
+# Core settings
+export TOLSTOY_API_URL="https://api.tolstoy.com"
+export TOLSTOY_ORG_ID="org_1234567890abcdef"
+export TOLSTOY_USER_ID="user_abcdef1234567890"
+export TOLSTOY_PROFILE="production"
+
+# Authentication
+export TOLSTOY_API_KEY="tk_live_abc123def456"
+
+# Behavior settings
+export TOLSTOY_TIMEOUT="60s"
+export TOLSTOY_OUTPUT_FORMAT="json"
+export TOLSTOY_VERBOSE="true"
+export TOLSTOY_COLOR_OUTPUT="false"
+
+# Advanced settings
+export TOLSTOY_RETRY_ATTEMPTS="5"
+export TOLSTOY_LOG_LEVEL="debug"
+export TOLSTOY_CACHE_DURATION="10m"
+```
+
+### Environment Variable Priority
+
+Configuration values are resolved in this order (highest to lowest priority):
+
+1. Command-line flags (`--org-id`)
+2. Environment variables (`TOLSTOY_ORG_ID`)
+3. Active profile settings
+4. Default values
+
+## Authentication Methods
+
+### API Key Authentication
+
+```bash
+# Set API key for profile
+tolstoy config set api-key "tk_live_abc123def456"
+
+# Set API key from environment
+export TOLSTOY_API_KEY="tk_live_abc123def456"
+tolstoy config set api-key "$TOLSTOY_API_KEY"
+
+# Set API key from file
+tolstoy config set api-key "$(cat ~/.tolstoy/api-key.txt)"
+```
+
+### OAuth Authentication
+
+```bash
+# Initialize OAuth flow
+tolstoy config auth oauth --profile production
+
+# This will:
+# 1. Open browser for OAuth consent
+# 2. Handle callback and store tokens
+# 3. Refresh tokens automatically
+
+# Check OAuth status
+tolstoy config auth status
+
+# Refresh tokens manually
+tolstoy config auth refresh
+```
+
+### Service Account Authentication
+
+```bash
+# Set up service account
+tolstoy config set auth-method service-account
+tolstoy config set service-account-file "./service-account.json"
+
+# Or use service account key directly
+tolstoy config set service-account-key "$(cat ./service-account.json)"
+```
+
+## Configuration Files
+
+### Default Locations
+
+Configuration files are stored in:
+
+- **macOS/Linux**: `~/.tolstoy/config/`
+- **Windows**: `%USERPROFILE%\.tolstoy\config\`
+
+### File Structure
+
+```
+~/.tolstoy/
+├── config/
+│   ├── config.json          # Main configuration
+│   ├── profiles/
+│   │   ├── default.json     # Default profile
+│   │   ├── production.json  # Production profile
+│   │   └── staging.json     # Staging profile
+│   └── auth/
+│       ├── tokens.json      # OAuth tokens
+│       └── api-keys.enc     # Encrypted API keys
+├── cache/
+│   ├── actions.json         # Cached action definitions
+│   └── flows.json           # Cached flow definitions
+└── logs/
+    └── tolstoy.log          # CLI logs
+```
+
+### Configuration File Format
+
+```json
+{
+  "current_profile": "production",
+  "profiles": {
+    "production": {
+      "api_url": "https://api.tolstoy.com",
+      "org_id": "org_1234567890abcdef",
+      "user_id": "user_abcdef1234567890",
+      "timeout": "30s",
+      "output_format": "table"
+    },
+    "staging": {
+      "api_url": "https://staging-api.tolstoy.com",
+      "org_id": "org_staging_123456",
+      "user_id": "user_staging_123456",
+      "timeout": "60s",
+      "output_format": "json"
+    }
+  },
+  "global_settings": {
+    "verbose": false,
+    "color_output": true,
+    "auto_update_check": true,
+    "confirm_destructive": true
+  }
+}
+```
+
+## Advanced Configuration
+
+### Custom Configuration Paths
+
+```bash
+# Use custom configuration directory
+export TOLSTOY_CONFIG_DIR="/path/to/custom/config"
+tolstoy config list
+
+# Use specific config file
+tolstoy config --config-file "/path/to/config.json" list
+
+# Override config location per command
+tolstoy --config-dir "/tmp/test-config" config add test
+```
+
+### Configuration Validation
+
+```bash
+# Validate current configuration
+tolstoy config validate
+
+# Validate specific profile
+tolstoy config validate production
+
+# Validate configuration file
+tolstoy config validate --file ./config.json
+
+# Check configuration security
+tolstoy config security-check
+```
+
+### Configuration Migration
+
+```bash
+# Migrate from older CLI versions
+tolstoy config migrate --from-version 1.0.0
+
+# Export configuration for sharing
+tolstoy config export --secure > team-config.json
+
+# Import team configuration
+tolstoy config import team-config.json --merge
+
+# Backup configuration
+tolstoy config backup --output ./backup-$(date +%Y%m%d).tar.gz
+```
+
+## Team Configuration Management
+
+### Shared Configuration
+
+```bash
+# Create team configuration template
+cat > team-config-template.json << EOF
+{
+  "profiles": {
+    "production": {
+      "api_url": "https://api.tolstoy.com",
+      "org_id": "{{PRODUCTION_ORG_ID}}",
+      "timeout": "30s",
+      "output_format": "table"
+    },
+    "staging": {
+      "api_url": "https://staging-api.tolstoy.com", 
+      "org_id": "{{STAGING_ORG_ID}}",
+      "timeout": "60s",
+      "output_format": "json"
+    }
+  }
+}
+EOF
+
+# Team member setup
+PRODUCTION_ORG_ID="org_prod_123456" \
+STAGING_ORG_ID="org_staging_123456" \
+tolstoy config import team-config-template.json --template
+
+# Each team member sets their own user ID
+tolstoy config set user-id "user_alice_123456" --profile production
+tolstoy config set user-id "user_alice_123456" --profile staging
+```
+
+### Configuration Policies
+
+```bash
+# Set organization-wide policies
+tolstoy config policy set require-confirmation true
+tolstoy config policy set allowed-profiles "production,staging,development"
+tolstoy config policy set max-timeout "300s"
+
+# Validate configuration against policies
+tolstoy config validate --check-policy
+
+# View active policies
+tolstoy config policy list
+```
+
+## Security Best Practices
+
+### API Key Management
+
+```bash
+# Never store API keys in plain text
+# Use environment variables or secure files
+export TOLSTOY_API_KEY="$(cat ~/.tolstoy/secrets/api-key)"
+
+# Rotate API keys regularly
+tolstoy config auth rotate-key --profile production
+
+# List API key permissions
+tolstoy config auth permissions --profile production
+```
+
+### Secure Configuration
+
+```bash
+# Encrypt sensitive configuration
+tolstoy config encrypt --profile production
+
+# Decrypt when needed
+tolstoy config decrypt --profile production
+
+# Set restrictive file permissions
+chmod 600 ~/.tolstoy/config/*
+
+# Audit configuration access
+tolstoy config audit --since 7d
+```
+
+## Troubleshooting
+
+### Common Issues
+
+<details>
+<summary>**Profile not found error**</summary>
+
+**Symptoms**: `Error: Profile 'production' not found`
+
+**Solutions**:
+```bash
+# List available profiles
+tolstoy config list
+
+# Create missing profile
+tolstoy config add production
+
+# Check profile name spelling
+tolstoy config list | grep -i production
+```
+</details>
+
+<details>
+<summary>**Authentication failed**</summary>
+
+**Symptoms**: `Error: Authentication failed: Invalid API key`
+
+**Solutions**:
+```bash
+# Check API key configuration
+tolstoy config get api-key --masked
+
+# Test authentication
+tolstoy config test --verbose
+
+# Rotate API key
+tolstoy config auth rotate-key
+
+# Check API key permissions
+tolstoy config auth permissions
+```
+</details>
+
+<details>
+<summary>**Configuration file corrupted**</summary>
+
+**Symptoms**: `Error: Failed to parse configuration file`
+
+**Solutions**:
+```bash
+# Validate configuration file
+tolstoy config validate --file ~/.tolstoy/config/config.json
+
+# Backup and reset configuration
+cp ~/.tolstoy/config/config.json ~/.tolstoy/config/config.json.backup
+tolstoy config reset
+
+# Restore from backup
+tolstoy config import ~/.tolstoy/config/config.json.backup
+```
+</details>
+
+### Diagnostic Commands
+
+```bash
+# Show detailed configuration information
+tolstoy config debug
+
+# Test all profiles
+tolstoy config test-all
+
+# Show configuration file locations
+tolstoy config paths
+
+# Check configuration permissions
+tolstoy config permissions
+
+# Show environment variable overrides
+tolstoy config env-overrides
+```
+
+## Integration Examples
+
+### CI/CD Configuration
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy with Tolstoy CLI
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Tolstoy CLI
+        run: |
+          npm install -g @tolstoy/cli
+          
+      - name: Configure CLI
+        env:
+          TOLSTOY_ORG_ID: ${{ secrets.TOLSTOY_ORG_ID }}
+          TOLSTOY_USER_ID: ${{ secrets.TOLSTOY_USER_ID }}
+          TOLSTOY_API_KEY: ${{ secrets.TOLSTOY_API_KEY }}
+        run: |
+          tolstoy config add ci \
+            --api-url "https://api.tolstoy.com" \
+            --org-id "$TOLSTOY_ORG_ID" \
+            --user-id "$TOLSTOY_USER_ID" \
+            --timeout "300s" \
+            --output-format "json" \
+            --non-interactive
+          
+          tolstoy config use ci
+          tolstoy config test
+          
+      - name: Deploy Workflows
+        run: |
+          tolstoy flows deploy ./workflows/
+```
+
+### Docker Configuration
+
+```dockerfile
+FROM node:18-alpine
+
+RUN npm install -g @tolstoy/cli
+
+# Copy configuration template
+COPY config-template.json /app/
+
+# Setup script
+COPY setup-config.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/setup-config.sh
+
+CMD ["setup-config.sh"]
+```
+
+```bash
+#!/bin/bash
+# setup-config.sh
+
+# Create configuration from environment
+tolstoy config add production \
+  --api-url "${TOLSTOY_API_URL}" \
+  --org-id "${TOLSTOY_ORG_ID}" \
+  --user-id "${TOLSTOY_USER_ID}" \
+  --timeout "${TOLSTOY_TIMEOUT:-30s}" \
+  --output-format "${TOLSTOY_OUTPUT_FORMAT:-json}" \
+  --non-interactive
+
+# Test configuration
+if tolstoy config test; then
+  echo "✅ Configuration successful"
+else
+  echo "❌ Configuration failed"
+  exit 1
+fi
+
+# Run main application
+exec "$@"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication Guide" icon="key" href="/cli/getting-started/authentication">
+    Learn about different authentication methods
+  </Card>
+  <Card title="Multiple Environments" icon="layers" href="/cli/guides/multi-environment">
+    Manage development, staging, and production environments
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Team Configuration" icon="users" href="/cli/guides/team-setup">
+    Set up shared configuration for teams
+  </Card>
+  <Card title="Security Best Practices" icon="shield" href="/cli/guides/security">
+    Secure your CLI configuration and credentials
+  </Card>
+</CardGroup>
+
+---
+
+*Proper configuration is the foundation of effective CLI usage. Master these commands to set up secure, flexible, and team-friendly CLI environments.*

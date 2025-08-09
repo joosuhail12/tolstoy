@@ -1,3 +1,1220 @@
 ---
-openapi: get /webhooks
+title: "List Webhooks"
+openapi: "GET /webhooks"
 ---
+
+# List Webhooks
+
+Retrieve all webhooks configured for your organization. This endpoint provides comprehensive webhook information including URLs, events, authentication settings, and delivery statistics for monitoring and management purposes.
+
+<RequestExample>
+
+```bash cURL
+curl -X GET "https://tolstoy.getpullse.com/webhooks?limit=50&status=active" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json"
+```
+
+```typescript TypeScript
+interface ListWebhooksParams {
+  limit?: number;
+  cursor?: string;
+  status?: 'active' | 'inactive' | 'failed';
+  event_type?: string;
+  sort_by?: 'created_at' | 'last_delivery' | 'success_rate' | 'name';
+  sort_order?: 'asc' | 'desc';
+  include_stats?: boolean;
+}
+
+const listWebhooks = async (params: ListWebhooksParams = {}) => {
+  const searchParams = new URLSearchParams();
+  
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined) {
+      searchParams.set(key, value.toString());
+    }
+  });
+
+  const response = await fetch(
+    `https://tolstoy.getpullse.com/webhooks?${searchParams}`,
+    {
+      method: 'GET',
+      headers: {
+        'x-org-id': 'org_1234567890abcdef',
+        'x-user-id': 'user_abcdef1234567890',
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  return response.json();
+};
+
+// Get all active webhooks with statistics
+const webhooks = await listWebhooks({
+  status: 'active',
+  include_stats: true,
+  sort_by: 'success_rate',
+  sort_order: 'desc'
+});
+
+console.log(`Found ${webhooks.data.length} active webhooks`);
+webhooks.data.forEach(webhook => {
+  console.log(`${webhook.name}: ${webhook.stats.success_rate}% success rate`);
+});
+```
+
+```python Python
+import requests
+from typing import Optional, List, Dict, Any
+from datetime import datetime, timezone
+
+class WebhooksClient:
+    def __init__(self, org_id: str, user_id: str, base_url: str = "https://tolstoy.getpullse.com"):
+        self.org_id = org_id
+        self.user_id = user_id
+        self.base_url = base_url
+        self.headers = {
+            'x-org-id': org_id,
+            'x-user-id': user_id,
+            'Content-Type': 'application/json'
+        }
+
+    def list_webhooks(
+        self,
+        limit: int = 20,
+        cursor: Optional[str] = None,
+        status: Optional[str] = None,
+        event_type: Optional[str] = None,
+        sort_by: str = 'created_at',
+        sort_order: str = 'desc',
+        include_stats: bool = True
+    ) -> Dict[str, Any]:
+        """List all webhooks with optional filtering."""
+        
+        params = {
+            'limit': limit,
+            'sort_by': sort_by,
+            'sort_order': sort_order,
+            'include_stats': include_stats
+        }
+        
+        if cursor:
+            params['cursor'] = cursor
+        if status:
+            params['status'] = status
+        if event_type:
+            params['event_type'] = event_type
+
+        response = requests.get(
+            f"{self.base_url}/webhooks",
+            headers=self.headers,
+            params=params
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_webhook_health_summary(self) -> Dict[str, Any]:
+        """Get a comprehensive summary of webhook health and performance."""
+        response = self.list_webhooks(
+            limit=100,
+            include_stats=True
+        )
+        
+        webhooks = response['data']
+        
+        summary = {
+            'total_webhooks': len(webhooks),
+            'active_webhooks': len([w for w in webhooks if w['status'] == 'active']),
+            'inactive_webhooks': len([w for w in webhooks if w['status'] == 'inactive']),
+            'failed_webhooks': len([w for w in webhooks if w['status'] == 'failed']),
+            'average_success_rate': 0,
+            'by_event_type': {},
+            'performance_metrics': {},
+            'recommendations': []
+        }
+        
+        if webhooks:
+            # Calculate average success rate
+            total_success_rate = sum(
+                w.get('stats', {}).get('success_rate', 0) 
+                for w in webhooks if w['status'] == 'active'
+            )
+            active_count = summary['active_webhooks']
+            summary['average_success_rate'] = (
+                total_success_rate / active_count if active_count > 0 else 0
+            )
+            
+            # Group by event types
+            for webhook in webhooks:
+                for event_type in webhook.get('events', []):
+                    if event_type not in summary['by_event_type']:
+                        summary['by_event_type'][event_type] = {
+                            'count': 0,
+                            'active_count': 0,
+                            'avg_success_rate': 0
+                        }
+                    
+                    summary['by_event_type'][event_type]['count'] += 1
+                    if webhook['status'] == 'active':
+                        summary['by_event_type'][event_type]['active_count'] += 1
+            
+            # Performance metrics
+            success_rates = [
+                w.get('stats', {}).get('success_rate', 0) 
+                for w in webhooks if w['status'] == 'active'
+            ]
+            
+            if success_rates:
+                summary['performance_metrics'] = {
+                    'min_success_rate': min(success_rates),
+                    'max_success_rate': max(success_rates),
+                    'avg_success_rate': sum(success_rates) / len(success_rates)
+                }
+        
+        # Generate recommendations
+        if summary['failed_webhooks'] > 0:
+            summary['recommendations'].append(
+                f"Review {summary['failed_webhooks']} failed webhooks and fix configuration issues"
+            )
+        
+        if summary['average_success_rate'] < 95:
+            summary['recommendations'].append(
+                f"Average success rate is {summary['average_success_rate']:.1f}% - investigate delivery issues"
+            )
+        
+        if summary['inactive_webhooks'] > 0:
+            summary['recommendations'].append(
+                f"Consider removing {summary['inactive_webhooks']} inactive webhooks to reduce clutter"
+            )
+        
+        return summary
+
+    def analyze_webhook_performance(self, days: int = 7) -> Dict[str, Any]:
+        """Analyze webhook performance over a specific time period."""
+        response = self.list_webhooks(
+            limit=100,
+            include_stats=True
+        )
+        
+        webhooks = response['data']
+        analysis = {
+            'time_period': f"Last {days} days",
+            'high_performers': [],
+            'underperformers': [],
+            'unreliable': [],
+            'trends': {}
+        }
+        
+        for webhook in webhooks:
+            stats = webhook.get('stats', {})
+            success_rate = stats.get('success_rate', 0)
+            total_deliveries = stats.get('total_deliveries', 0)
+            
+            webhook_performance = {
+                'id': webhook['id'],
+                'name': webhook['name'],
+                'url': webhook['url'],
+                'success_rate': success_rate,
+                'total_deliveries': total_deliveries
+            }
+            
+            # Categorize webhooks by performance
+            if success_rate >= 99 and total_deliveries > 0:
+                analysis['high_performers'].append(webhook_performance)
+            elif success_rate < 95 and total_deliveries > 0:
+                analysis['underperformers'].append(webhook_performance)
+            
+            # Check for reliability issues
+            if stats.get('consecutive_failures', 0) > 5:
+                analysis['unreliable'].append({
+                    **webhook_performance,
+                    'consecutive_failures': stats['consecutive_failures']
+                })
+        
+        # Sort by performance
+        analysis['high_performers'].sort(key=lambda x: x['success_rate'], reverse=True)
+        analysis['underperformers'].sort(key=lambda x: x['success_rate'])
+        
+        return analysis
+
+    def export_webhook_config(self, format: str = 'json') -> str:
+        """Export webhook configurations for backup or migration."""
+        response = self.list_webhooks(limit=100)
+        webhooks = response['data']
+        
+        export_data = []
+        for webhook in webhooks:
+            export_data.append({
+                'name': webhook['name'],
+                'url': webhook['url'],
+                'method': webhook.get('method', 'POST'),
+                'events': webhook.get('events', []),
+                'headers': webhook.get('headers', {}),
+                'authentication': webhook.get('authentication', {}),
+                'retry_policy': webhook.get('retry_policy', {}),
+                'timeout_ms': webhook.get('timeout_ms', 30000),
+                'status': webhook['status']
+            })
+        
+        if format == 'csv':
+            import csv
+            import io
+            
+            output = io.StringIO()
+            if export_data:
+                writer = csv.DictWriter(output, fieldnames=export_data[0].keys())
+                writer.writeheader()
+                for row in export_data:
+                    # Convert complex fields to strings for CSV
+                    csv_row = {}
+                    for key, value in row.items():
+                        if isinstance(value, (list, dict)):
+                            csv_row[key] = str(value)
+                        else:
+                            csv_row[key] = value
+                    writer.writerow(csv_row)
+            
+            return output.getvalue()
+        
+        import json
+        return json.dumps(export_data, indent=2)
+
+# Usage examples
+client = WebhooksClient('org_1234567890abcdef', 'user_abcdef1234567890')
+
+# Get webhook health summary
+health = client.get_webhook_health_summary()
+print(f"Total webhooks: {health['total_webhooks']}")
+print(f"Average success rate: {health['average_success_rate']:.1f}%")
+print(f"Event types: {list(health['by_event_type'].keys())}")
+
+# Analyze performance
+performance = client.analyze_webhook_performance(30)
+print(f"\nTop performers ({len(performance['high_performers'])}):")
+for webhook in performance['high_performers'][:3]:
+    print(f"- {webhook['name']}: {webhook['success_rate']}%")
+
+# Export configurations
+config_backup = client.export_webhook_config('json')
+print(f"\nExported {len(client.list_webhooks()['data'])} webhook configurations")
+```
+
+```javascript Node.js
+const axios = require('axios');
+
+class WebhookManager {
+  constructor(orgId, userId, baseUrl = 'https://tolstoy.getpullse.com') {
+    this.orgId = orgId;
+    this.userId = userId;
+    this.baseUrl = baseUrl;
+    this.headers = {
+      'x-org-id': orgId,
+      'x-user-id': userId,
+      'Content-Type': 'application/json'
+    };
+  }
+
+  async listWebhooks(options = {}) {
+    const {
+      limit = 20,
+      cursor,
+      status,
+      event_type,
+      sort_by = 'created_at',
+      sort_order = 'desc',
+      include_stats = true
+    } = options;
+
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      sort_by,
+      sort_order,
+      include_stats: include_stats.toString()
+    });
+
+    if (cursor) params.set('cursor', cursor);
+    if (status) params.set('status', status);
+    if (event_type) params.set('event_type', event_type);
+
+    try {
+      const response = await axios.get(
+        `${this.baseUrl}/webhooks`,
+        {
+          headers: this.headers,
+          params: Object.fromEntries(params)
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(`API Error: ${error.response.status} - ${error.response.data?.error?.message || error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async getAllWebhooks(filters = {}) {
+    const allWebhooks = [];
+    let cursor = null;
+
+    do {
+      const response = await this.listWebhooks({
+        ...filters,
+        cursor,
+        limit: 100
+      });
+
+      allWebhooks.push(...response.data);
+      cursor = response.pagination?.has_more ? response.pagination.cursor : null;
+    } while (cursor);
+
+    return allWebhooks;
+  }
+
+  async generateDeliveryReport(days = 7) {
+    const webhooks = await this.getAllWebhooks({ include_stats: true });
+
+    const report = {
+      report_date: new Date().toISOString(),
+      time_period: `${days} days`,
+      summary: {
+        total_webhooks: webhooks.length,
+        active_webhooks: 0,
+        total_deliveries: 0,
+        successful_deliveries: 0,
+        failed_deliveries: 0,
+        average_success_rate: 0
+      },
+      webhook_performance: [],
+      event_type_breakdown: {},
+      recommendations: []
+    };
+
+    let totalSuccessRate = 0;
+    let activeCount = 0;
+
+    webhooks.forEach(webhook => {
+      const stats = webhook.stats || {};
+      
+      if (webhook.status === 'active') {
+        report.summary.active_webhooks++;
+        activeCount++;
+        totalSuccessRate += stats.success_rate || 0;
+      }
+
+      report.summary.total_deliveries += stats.total_deliveries || 0;
+      report.summary.successful_deliveries += stats.successful_deliveries || 0;
+      report.summary.failed_deliveries += stats.failed_deliveries || 0;
+
+      // Individual webhook performance
+      report.webhook_performance.push({
+        id: webhook.id,
+        name: webhook.name,
+        url: webhook.url,
+        status: webhook.status,
+        success_rate: stats.success_rate || 0,
+        total_deliveries: stats.total_deliveries || 0,
+        avg_response_time: stats.avg_response_time_ms || 0,
+        last_delivery: stats.last_delivery_at,
+        consecutive_failures: stats.consecutive_failures || 0
+      });
+
+      // Event type breakdown
+      (webhook.events || []).forEach(eventType => {
+        if (!report.event_type_breakdown[eventType]) {
+          report.event_type_breakdown[eventType] = {
+            webhook_count: 0,
+            total_deliveries: 0,
+            success_rate: 0
+          };
+        }
+        report.event_type_breakdown[eventType].webhook_count++;
+        report.event_type_breakdown[eventType].total_deliveries += stats.total_deliveries || 0;
+      });
+    });
+
+    // Calculate averages
+    report.summary.average_success_rate = activeCount > 0 ? totalSuccessRate / activeCount : 0;
+
+    // Sort performance by success rate
+    report.webhook_performance.sort((a, b) => b.success_rate - a.success_rate);
+
+    // Generate recommendations
+    const failingWebhooks = report.webhook_performance.filter(w => w.success_rate < 90);
+    const staleWebhooks = report.webhook_performance.filter(w => {
+      const lastDelivery = new Date(w.last_delivery);
+      const daysSince = (Date.now() - lastDelivery.getTime()) / (1000 * 60 * 60 * 24);
+      return daysSince > 30;
+    });
+
+    if (failingWebhooks.length > 0) {
+      report.recommendations.push(
+        `${failingWebhooks.length} webhooks have success rates below 90% - review endpoint availability and configuration`
+      );
+    }
+
+    if (staleWebhooks.length > 0) {
+      report.recommendations.push(
+        `${staleWebhooks.length} webhooks haven't received events in over 30 days - consider deactivating unused webhooks`
+      );
+    }
+
+    if (report.summary.average_success_rate < 95) {
+      report.recommendations.push(
+        `Overall success rate is ${report.summary.average_success_rate.toFixed(1)}% - investigate common failure patterns`
+      );
+    }
+
+    return report;
+  }
+
+  async monitorWebhookHealth() {
+    const webhooks = await this.getAllWebhooks({ 
+      status: 'active',
+      include_stats: true 
+    });
+
+    const healthCheck = {
+      healthy: [],
+      degraded: [],
+      critical: [],
+      recommendations: [],
+      overall_health: 'healthy'
+    };
+
+    webhooks.forEach(webhook => {
+      const stats = webhook.stats || {};
+      const successRate = stats.success_rate || 0;
+      const consecutiveFailures = stats.consecutive_failures || 0;
+      const avgResponseTime = stats.avg_response_time_ms || 0;
+
+      const healthStatus = {
+        id: webhook.id,
+        name: webhook.name,
+        url: webhook.url,
+        success_rate: successRate,
+        consecutive_failures: consecutiveFailures,
+        avg_response_time: avgResponseTime,
+        issues: []
+      };
+
+      // Assess health
+      if (successRate < 90) {
+        healthStatus.issues.push(`Low success rate: ${successRate}%`);
+      }
+      if (consecutiveFailures > 5) {
+        healthStatus.issues.push(`${consecutiveFailures} consecutive failures`);
+      }
+      if (avgResponseTime > 10000) {  // > 10 seconds
+        healthStatus.issues.push(`Slow response time: ${avgResponseTime}ms`);
+      }
+
+      // Categorize by health
+      if (healthStatus.issues.length === 0 && successRate >= 99) {
+        healthCheck.healthy.push(healthStatus);
+      } else if (healthStatus.issues.length > 0 && successRate >= 90) {
+        healthCheck.degraded.push(healthStatus);
+      } else {
+        healthCheck.critical.push(healthStatus);
+      }
+    });
+
+    // Determine overall health
+    if (healthCheck.critical.length > 0) {
+      healthCheck.overall_health = 'critical';
+    } else if (healthCheck.degraded.length > 0) {
+      healthCheck.overall_health = 'degraded';
+    }
+
+    // Generate specific recommendations
+    healthCheck.critical.forEach(webhook => {
+      healthCheck.recommendations.push(
+        `URGENT: Fix critical issues with "${webhook.name}" - ${webhook.issues.join(', ')}`
+      );
+    });
+
+    healthCheck.degraded.forEach(webhook => {
+      healthCheck.recommendations.push(
+        `Review "${webhook.name}" - ${webhook.issues.join(', ')}`
+      );
+    });
+
+    return healthCheck;
+  }
+
+  async exportWebhookMetrics(format = 'json') {
+    const webhooks = await this.getAllWebhooks({ include_stats: true });
+
+    const metrics = webhooks.map(webhook => ({
+      id: webhook.id,
+      name: webhook.name,
+      url: webhook.url,
+      status: webhook.status,
+      events: webhook.events?.join(',') || '',
+      created_at: webhook.created_at,
+      success_rate: webhook.stats?.success_rate || 0,
+      total_deliveries: webhook.stats?.total_deliveries || 0,
+      successful_deliveries: webhook.stats?.successful_deliveries || 0,
+      failed_deliveries: webhook.stats?.failed_deliveries || 0,
+      avg_response_time_ms: webhook.stats?.avg_response_time_ms || 0,
+      consecutive_failures: webhook.stats?.consecutive_failures || 0,
+      last_delivery_at: webhook.stats?.last_delivery_at || null,
+      last_success_at: webhook.stats?.last_success_at || null
+    }));
+
+    if (format === 'csv') {
+      const headers = Object.keys(metrics[0]).join(',');
+      const rows = metrics.map(row => 
+        Object.values(row).map(value => 
+          typeof value === 'string' && value.includes(',') 
+            ? `"${value}"` 
+            : value || ''
+        ).join(',')
+      );
+      return [headers, ...rows].join('\n');
+    }
+
+    return metrics;
+  }
+}
+
+// Usage examples
+const webhookManager = new WebhookManager('org_1234567890abcdef', 'user_abcdef1234567890');
+
+// Generate comprehensive delivery report
+webhookManager.generateDeliveryReport(30)
+  .then(report => {
+    console.log('Webhook Delivery Report:');
+    console.log(`- Total Webhooks: ${report.summary.total_webhooks}`);
+    console.log(`- Active: ${report.summary.active_webhooks}`);
+    console.log(`- Success Rate: ${report.summary.average_success_rate.toFixed(1)}%`);
+    console.log(`- Total Deliveries: ${report.summary.total_deliveries.toLocaleString()}`);
+    
+    console.log('\nTop 3 Performers:');
+    report.webhook_performance.slice(0, 3).forEach((webhook, index) => {
+      console.log(`${index + 1}. ${webhook.name}: ${webhook.success_rate}% success`);
+    });
+
+    if (report.recommendations.length > 0) {
+      console.log('\nRecommendations:');
+      report.recommendations.forEach(rec => console.log(`- ${rec}`));
+    }
+  });
+
+// Monitor webhook health
+webhookManager.monitorWebhookHealth()
+  .then(health => {
+    console.log(`\nWebhook Health Status: ${health.overall_health.toUpperCase()}`);
+    console.log(`- Healthy: ${health.healthy.length}`);
+    console.log(`- Degraded: ${health.degraded.length}`);
+    console.log(`- Critical: ${health.critical.length}`);
+  });
+```
+
+</RequestExample>
+
+## Query Parameters
+
+<ParamField query="limit" type="integer" default="20">
+Number of webhooks to return per page. Maximum value is 100.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+Pagination cursor for retrieving the next page of results.
+</ParamField>
+
+<ParamField query="status" type="string">
+Filter webhooks by status:
+- `active` - Webhooks currently receiving events
+- `inactive` - Webhooks temporarily disabled
+- `failed` - Webhooks with configuration or delivery failures
+</ParamField>
+
+<ParamField query="event_type" type="string">
+Filter webhooks by specific event type they're subscribed to.
+</ParamField>
+
+<ParamField query="sort_by" type="string" default="created_at">
+Sort field. Available options:
+- `created_at` - Sort by creation date
+- `last_delivery` - Sort by most recent delivery attempt
+- `success_rate` - Sort by delivery success rate (requires include_stats=true)
+- `name` - Sort alphabetically by webhook name
+</ParamField>
+
+<ParamField query="sort_order" type="string" default="desc">
+Sort direction: `asc` (ascending) or `desc` (descending)
+</ParamField>
+
+<ParamField query="include_stats" type="boolean" default="false">
+Include delivery statistics and performance metrics for each webhook.
+</ParamField>
+
+<ParamField query="search" type="string">
+Search webhooks by name or URL. Case-insensitive partial matching.
+</ParamField>
+
+## Response
+
+<ResponseExample>
+
+```json Success Response
+{
+  "success": true,
+  "data": [
+    {
+      "id": "webhook_1234567890abcdef",
+      "name": "GitHub Repository Events",
+      "description": "Receives GitHub webhook events for repository activity",
+      "url": "https://myapp.com/webhooks/github",
+      "method": "POST",
+      "status": "active",
+      "events": [
+        "pull_request",
+        "push",
+        "issues",
+        "release"
+      ],
+      "headers": {
+        "User-Agent": "Tolstoy-Webhook/1.0",
+        "X-Webhook-Source": "tolstoy"
+      },
+      "authentication": {
+        "type": "signature",
+        "algorithm": "hmac-sha256",
+        "header": "X-Tolstoy-Signature"
+      },
+      "retry_policy": {
+        "max_attempts": 3,
+        "backoff_strategy": "exponential",
+        "initial_delay_ms": 1000,
+        "max_delay_ms": 30000
+      },
+      "timeout_ms": 30000,
+      "content_type": "application/json",
+      "stats": {
+        "total_deliveries": 1547,
+        "successful_deliveries": 1523,
+        "failed_deliveries": 24,
+        "success_rate": 98.45,
+        "avg_response_time_ms": 245,
+        "consecutive_failures": 0,
+        "last_delivery_at": "2024-01-15T14:30:00Z",
+        "last_success_at": "2024-01-15T14:30:00Z",
+        "last_failure_at": "2024-01-14T09:15:00Z",
+        "daily_stats": [
+          {
+            "date": "2024-01-15",
+            "deliveries": 45,
+            "successes": 44,
+            "failures": 1,
+            "avg_response_time_ms": 267
+          },
+          {
+            "date": "2024-01-14", 
+            "deliveries": 52,
+            "successes": 50,
+            "failures": 2,
+            "avg_response_time_ms": 234
+          }
+        ]
+      },
+      "created_by": {
+        "id": "user_abcdef1234567890",
+        "name": "Sarah Johnson",
+        "email": "sarah@company.com"
+      },
+      "created_at": "2023-12-01T10:00:00Z",
+      "updated_at": "2024-01-15T12:00:00Z",
+      "last_triggered_at": "2024-01-15T14:30:00Z"
+    },
+    {
+      "id": "webhook_fedcba0987654321",
+      "name": "Slack Notifications",
+      "description": "Sends workflow notifications to team Slack channels",
+      "url": "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX",
+      "method": "POST",
+      "status": "active",
+      "events": [
+        "workflow_completed",
+        "workflow_failed",
+        "execution_timeout"
+      ],
+      "headers": {
+        "Content-Type": "application/json",
+        "User-Agent": "Tolstoy-Webhook/1.0"
+      },
+      "authentication": {
+        "type": "none"
+      },
+      "retry_policy": {
+        "max_attempts": 5,
+        "backoff_strategy": "linear",
+        "initial_delay_ms": 2000,
+        "max_delay_ms": 10000
+      },
+      "timeout_ms": 15000,
+      "content_type": "application/json",
+      "stats": {
+        "total_deliveries": 892,
+        "successful_deliveries": 892,
+        "failed_deliveries": 0,
+        "success_rate": 100.0,
+        "avg_response_time_ms": 156,
+        "consecutive_failures": 0,
+        "last_delivery_at": "2024-01-15T13:45:00Z",
+        "last_success_at": "2024-01-15T13:45:00Z",
+        "last_failure_at": null
+      },
+      "created_by": {
+        "id": "user_123456789abcdef0",
+        "name": "Mike Chen",
+        "email": "mike@company.com"
+      },
+      "created_at": "2023-11-15T14:30:00Z",
+      "updated_at": "2024-01-10T09:20:00Z",
+      "last_triggered_at": "2024-01-15T13:45:00Z"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "cursor": "eyJjcmVhdGVkX2F0IjoiMjAyMy0xMS0xNVQxNDozMDowMFoiLCJpZCI6IndlYmhvb2tfZmVkY2JhMDk4NzY1NDMyMSJ9",
+    "has_more": true,
+    "total_count": 47
+  },
+  "metadata": {
+    "request_id": "req_webhooks123def456",
+    "timestamp": "2024-01-15T15:00:00Z",
+    "execution_time_ms": 89
+  }
+}
+```
+
+```json With Performance Analytics
+{
+  "success": true,
+  "data": [
+    {
+      "id": "webhook_analytics_example",
+      "name": "Customer Data Pipeline",
+      "url": "https://api.company.com/webhooks/customer-events",
+      "status": "active",
+      "events": ["customer_created", "customer_updated"],
+      "stats": {
+        "total_deliveries": 5420,
+        "successful_deliveries": 5312,
+        "failed_deliveries": 108,
+        "success_rate": 98.01,
+        "avg_response_time_ms": 1245,
+        "consecutive_failures": 0,
+        "performance_trend": {
+          "last_7_days": {
+            "success_rate": 98.5,
+            "avg_response_time": 1156,
+            "total_deliveries": 456
+          },
+          "last_30_days": {
+            "success_rate": 97.8,
+            "avg_response_time": 1289,
+            "total_deliveries": 1847
+          }
+        },
+        "error_breakdown": {
+          "timeout": 45,
+          "connection_error": 32,
+          "http_4xx": 18,
+          "http_5xx": 13
+        },
+        "response_time_percentiles": {
+          "p50": 856,
+          "p90": 2134,
+          "p95": 3456,
+          "p99": 8923
+        }
+      }
+    }
+  ],
+  "summary_stats": {
+    "total_webhooks": 47,
+    "active_webhooks": 42,
+    "inactive_webhooks": 3,
+    "failed_webhooks": 2,
+    "overall_success_rate": 97.23,
+    "total_deliveries_last_24h": 2156,
+    "avg_response_time_ms": 445
+  }
+}
+```
+
+```json Empty Response
+{
+  "success": true,
+  "data": [],
+  "pagination": {
+    "limit": 20,
+    "cursor": null,
+    "has_more": false,
+    "total_count": 0
+  },
+  "metadata": {
+    "request_id": "req_empty_webhooks_123",
+    "timestamp": "2024-01-15T15:00:00Z",
+    "execution_time_ms": 12
+  }
+}
+```
+
+</ResponseExample>
+
+## Response Fields
+
+### Webhook Object
+
+<ResponseField name="id" type="string">
+Unique webhook identifier (format: `webhook_` + 16 alphanumeric characters)
+</ResponseField>
+
+<ResponseField name="name" type="string">
+Human-readable webhook name
+</ResponseField>
+
+<ResponseField name="description" type="string">
+Optional description of the webhook's purpose
+</ResponseField>
+
+<ResponseField name="url" type="string">
+The destination URL where webhook payloads will be delivered
+</ResponseField>
+
+<ResponseField name="method" type="string">
+HTTP method used for delivery (typically `POST`)
+</ResponseField>
+
+<ResponseField name="status" type="string">
+Current webhook status: `active`, `inactive`, or `failed`
+</ResponseField>
+
+<ResponseField name="events" type="string[]">
+List of event types this webhook is subscribed to receive
+</ResponseField>
+
+<ResponseField name="headers" type="object">
+Custom HTTP headers sent with webhook requests
+</ResponseField>
+
+<ResponseField name="authentication" type="object">
+Authentication configuration for webhook security
+  <Expandable title="Authentication Fields">
+    <ResponseField name="type" type="string">Authentication method: `none`, `signature`, `basic`, or `bearer`</ResponseField>
+    <ResponseField name="algorithm" type="string">Signature algorithm (when type is `signature`)</ResponseField>
+    <ResponseField name="header" type="string">Header name for authentication data</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="retry_policy" type="object">
+Retry configuration for failed deliveries
+  <Expandable title="Retry Policy Fields">
+    <ResponseField name="max_attempts" type="integer">Maximum number of delivery attempts</ResponseField>
+    <ResponseField name="backoff_strategy" type="string">Retry delay strategy: `linear` or `exponential`</ResponseField>
+    <ResponseField name="initial_delay_ms" type="integer">Initial delay before first retry</ResponseField>
+    <ResponseField name="max_delay_ms" type="integer">Maximum delay between retries</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="timeout_ms" type="integer">
+Request timeout in milliseconds
+</ResponseField>
+
+<ResponseField name="content_type" type="string">
+Content-Type header value for webhook requests
+</ResponseField>
+
+<ResponseField name="stats" type="object">
+Delivery statistics and performance metrics (when include_stats=true)
+  <Expandable title="Statistics Fields">
+    <ResponseField name="total_deliveries" type="integer">Total number of delivery attempts</ResponseField>
+    <ResponseField name="successful_deliveries" type="integer">Number of successful deliveries</ResponseField>
+    <ResponseField name="failed_deliveries" type="integer">Number of failed delivery attempts</ResponseField>
+    <ResponseField name="success_rate" type="number">Success rate as percentage</ResponseField>
+    <ResponseField name="avg_response_time_ms" type="number">Average response time in milliseconds</ResponseField>
+    <ResponseField name="consecutive_failures" type="integer">Current consecutive failure count</ResponseField>
+    <ResponseField name="last_delivery_at" type="string">Timestamp of most recent delivery attempt</ResponseField>
+    <ResponseField name="last_success_at" type="string">Timestamp of most recent successful delivery</ResponseField>
+    <ResponseField name="last_failure_at" type="string">Timestamp of most recent delivery failure</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="created_by" type="object">
+User who created the webhook
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+ISO 8601 timestamp when webhook was created
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+ISO 8601 timestamp when webhook was last modified
+</ResponseField>
+
+<ResponseField name="last_triggered_at" type="string">
+ISO 8601 timestamp when webhook last received an event
+</ResponseField>
+
+## Status Codes
+
+<ResponseField name="200" type="Success">
+Webhooks retrieved successfully
+</ResponseField>
+
+<ResponseField name="400" type="Bad Request">
+Invalid query parameters or request format
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+Missing or invalid authentication credentials
+</ResponseField>
+
+<ResponseField name="403" type="Forbidden">
+Insufficient permissions to access webhooks
+</ResponseField>
+
+<ResponseField name="429" type="Too Many Requests">
+Rate limit exceeded
+</ResponseField>
+
+<ResponseField name="500" type="Internal Server Error">
+Server error occurred while retrieving webhooks
+</ResponseField>
+
+## Examples
+
+### Webhook Health Monitoring
+
+<CodeGroup>
+
+```bash Monitor Failed Webhooks
+curl -X GET "https://tolstoy.getpullse.com/webhooks?status=failed&include_stats=true" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890"
+```
+
+```typescript Performance Analysis
+const webhooks = await listWebhooks({
+  include_stats: true,
+  sort_by: 'success_rate',
+  sort_order: 'asc'  // Show worst performers first
+});
+
+// Identify webhooks needing attention
+const problematic = webhooks.data.filter(webhook => {
+  const stats = webhook.stats;
+  return stats.success_rate < 95 || 
+         stats.consecutive_failures > 3 ||
+         stats.avg_response_time_ms > 10000;
+});
+
+console.log(`Found ${problematic.length} webhooks needing attention:`);
+problematic.forEach(webhook => {
+  const stats = webhook.stats;
+  console.log(`- ${webhook.name}:`);
+  console.log(`  Success Rate: ${stats.success_rate}%`);
+  console.log(`  Consecutive Failures: ${stats.consecutive_failures}`);
+  console.log(`  Avg Response Time: ${stats.avg_response_time_ms}ms`);
+});
+```
+
+</CodeGroup>
+
+### Event Type Analysis
+
+<CodeGroup>
+
+```python Event Distribution Analysis
+client = WebhooksClient('org_1234567890abcdef', 'user_abcdef1234567890')
+
+# Get all webhooks with statistics
+response = client.list_webhooks(limit=100, include_stats=True)
+webhooks = response['data']
+
+# Analyze event type distribution
+event_stats = {}
+for webhook in webhooks:
+    for event_type in webhook.get('events', []):
+        if event_type not in event_stats:
+            event_stats[event_type] = {
+                'webhook_count': 0,
+                'total_deliveries': 0,
+                'avg_success_rate': 0,
+                'success_rates': []
+            }
+        
+        stats = webhook.get('stats', {})
+        event_stats[event_type]['webhook_count'] += 1
+        event_stats[event_type]['total_deliveries'] += stats.get('total_deliveries', 0)
+        event_stats[event_type]['success_rates'].append(stats.get('success_rate', 0))
+
+# Calculate averages
+for event_type, data in event_stats.items():
+    if data['success_rates']:
+        data['avg_success_rate'] = sum(data['success_rates']) / len(data['success_rates'])
+
+# Display results
+print("Event Type Analysis:")
+for event_type, data in sorted(event_stats.items(), key=lambda x: x[1]['total_deliveries'], reverse=True):
+    print(f"  {event_type}:")
+    print(f"    Webhooks: {data['webhook_count']}")
+    print(f"    Total Deliveries: {data['total_deliveries']:,}")
+    print(f"    Avg Success Rate: {data['avg_success_rate']:.1f}%")
+```
+
+```javascript Delivery Trend Analysis
+async function analyzeTrends() {
+  const webhooks = await webhookManager.getAllWebhooks({ 
+    include_stats: true 
+  });
+
+  const trendAnalysis = {
+    daily_volume: {},
+    performance_trends: {},
+    recommendations: []
+  };
+
+  webhooks.forEach(webhook => {
+    const stats = webhook.stats;
+    
+    if (stats && stats.daily_stats) {
+      stats.daily_stats.forEach(day => {
+        if (!trendAnalysis.daily_volume[day.date]) {
+          trendAnalysis.daily_volume[day.date] = {
+            total_deliveries: 0,
+            total_successes: 0,
+            webhook_count: 0
+          };
+        }
+        
+        trendAnalysis.daily_volume[day.date].total_deliveries += day.deliveries;
+        trendAnalysis.daily_volume[day.date].total_successes += day.successes;
+        trendAnalysis.daily_volume[day.date].webhook_count++;
+      });
+    }
+
+    // Performance trend analysis
+    if (stats && stats.success_rate) {
+      const trend = {
+        webhook_id: webhook.id,
+        name: webhook.name,
+        current_success_rate: stats.success_rate,
+        consecutive_failures: stats.consecutive_failures,
+        trend: 'stable'
+      };
+
+      if (stats.consecutive_failures > 5) {
+        trend.trend = 'declining';
+      } else if (stats.success_rate > 99) {
+        trend.trend = 'excellent';
+      }
+
+      trendAnalysis.performance_trends[webhook.id] = trend;
+    }
+  });
+
+  // Generate insights
+  const declining = Object.values(trendAnalysis.performance_trends)
+    .filter(t => t.trend === 'declining');
+  
+  if (declining.length > 0) {
+    trendAnalysis.recommendations.push(
+      `${declining.length} webhooks are experiencing performance degradation`
+    );
+  }
+
+  return trendAnalysis;
+}
+```
+
+</CodeGroup>
+
+## Best Practices
+
+### Webhook Management
+
+<Accordion title="Monitoring and Alerting">
+- Set up automated monitoring for webhook success rates below 95%
+- Alert on consecutive failures exceeding 5 attempts
+- Monitor response times and alert on degradation
+- Track delivery volume changes that might indicate issues
+</Accordion>
+
+<Accordion title="Performance Optimization">
+- Use appropriate timeout values based on endpoint requirements
+- Implement exponential backoff for retry policies
+- Monitor and optimize webhook endpoint response times
+- Consider webhook batching for high-volume events
+</Accordion>
+
+### Security Considerations
+
+<Accordion title="Authentication and Security">
+- Always use signature-based authentication for webhook verification
+- Implement proper HTTPS endpoints for webhook URLs
+- Rotate webhook secrets regularly
+- Validate and sanitize all incoming webhook payloads
+</Accordion>
+
+<Accordion title="Error Handling">
+- Implement graceful error handling in webhook endpoints
+- Return appropriate HTTP status codes
+- Log webhook failures for debugging and monitoring
+- Set up alerting for persistent webhook failures
+</Accordion>
+
+## Common Use Cases
+
+### Integration Monitoring
+
+Monitor the health and performance of all third-party integrations through webhook delivery metrics.
+
+### Event-Driven Notifications  
+
+Track notification delivery success rates across different channels (Slack, email, SMS).
+
+### Data Pipeline Monitoring
+
+Monitor data ingestion webhooks to ensure reliable data flow into analytics systems.
+
+### Compliance and Auditing
+
+Track webhook delivery attempts for audit trails and compliance reporting.
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Create Webhook" icon="plus" href="/api/webhooks/post-webhooks">
+    Create a new webhook subscription
+  </Card>
+  <Card title="Get Webhook Details" icon="info" href="/api/webhooks/get-webhooks-1">
+    View detailed information about a specific webhook
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Test Webhook" icon="test-tube" href="/api/webhooks/post-webhooks-test">
+    Test webhook delivery and endpoint connectivity
+  </Card>
+  <Card title="Webhook Event Types" icon="list" href="/api/webhooks/get-webhooksevent-types">
+    View all available webhook event types
+  </Card>
+</CardGroup>
+
+---
+
+<Info>
+**Pro Tip**: Use the `include_stats=true` parameter with performance-based sorting to quickly identify webhooks that need attention or optimization.
+</Info>

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { AwsSecretsService } from '../aws-secrets.service';
 import { RedisCacheService } from '../cache/redis-cache.service';
 import CacheKeys from '../cache/cache-keys';
@@ -40,7 +40,7 @@ export class SecretsResolver {
       const cached = await this.cacheService.get(cacheKey);
       if (cached) {
         this.logger.debug({ toolName, orgId, cached: true }, 'Retrieved credentials from cache');
-        return cached;
+        return typeof cached === 'object' && cached !== null ? (cached as ToolCredentials) : {};
       }
     } catch (error) {
       this.logger.warn(
@@ -132,8 +132,8 @@ export class SecretsResolver {
       accessToken: credentials.accessToken,
       refreshToken: credentials.refreshToken,
       expiresAt: credentials.expiresAt || 0,
-      scope: credentials.scope,
-      tokenType: credentials.tokenType || 'Bearer',
+      scope: typeof credentials.scope === 'string' ? credentials.scope : undefined,
+      tokenType: typeof credentials.tokenType === 'string' ? credentials.tokenType : 'Bearer',
     };
   }
 

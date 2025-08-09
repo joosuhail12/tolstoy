@@ -1,5 +1,6 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus } from '@nestjs/common';
-import { FastifyRequest, FastifyReply } from 'fastify';
+import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common';
+// Reserved for future Fastify-specific error handling
+// import { FastifyReply, FastifyRequest } from 'fastify';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import * as Sentry from '@sentry/nestjs';
 
@@ -12,8 +13,8 @@ export class SentryExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
-    const request = ctx.getRequest() as FastifyRequest;
-    const reply = ctx.getResponse() as FastifyReply;
+    const request = ctx.getRequest();
+    const reply = ctx.getResponse();
 
     // Extract request context for Sentry
     const requestContext = {

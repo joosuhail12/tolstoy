@@ -1,5 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { AppService } from './app.service';
 
 @ApiTags('App')
@@ -42,5 +42,34 @@ export class AppController {
   })
   getHealth(): { status: string; timestamp: string } {
     return this.appService.getHealth();
+  }
+
+  @Get('version')
+  @ApiOperation({
+    summary: 'Version Information',
+    description: 'Get version information including build details and commit hash',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Version information retrieved successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        version: { type: 'string', example: '1.0.0' },
+        commit: { type: 'string', example: 'abc123def456' },
+        buildTime: { type: 'string', example: '2025-08-09T10:30:00.000Z' },
+        nodeVersion: { type: 'string', example: '20.11.0' },
+        environment: { type: 'string', example: 'production' },
+      },
+    },
+  })
+  getVersion(): {
+    version: string;
+    commit: string;
+    buildTime: string;
+    nodeVersion: string;
+    environment: string;
+  } {
+    return this.appService.getVersion();
   }
 }

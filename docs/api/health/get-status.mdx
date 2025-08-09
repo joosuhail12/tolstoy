@@ -1,3 +1,876 @@
 ---
-openapi: get /status
+title: "System Status"
+openapi: "GET /status"
 ---
+
+# System Status
+
+Get comprehensive system status information including uptime, version, and basic health indicators. This endpoint provides essential system information for monitoring dashboards and health checks.
+
+<RequestExample>
+
+```bash cURL
+curl -X GET "https://tolstoy.getpullse.com/status"
+```
+
+```typescript TypeScript
+interface SystemStatus {
+  status: 'ok';
+  timestamp: string;
+  uptime: number;
+  version: string;
+}
+
+const checkSystemStatus = async (): Promise<SystemStatus> => {
+  const response = await fetch('https://tolstoy.getpullse.com/status', {
+    method: 'GET'
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  return response.json();
+};
+
+// Monitor system status
+const monitorStatus = async () => {
+  try {
+    const status = await checkSystemStatus();
+    
+    console.log(`System Status: ${status.status.toUpperCase()}`);
+    console.log(`Version: ${status.version}`);
+    console.log(`Uptime: ${Math.floor(status.uptime / 3600)} hours`);
+    console.log(`Timestamp: ${status.timestamp}`);
+
+    return status;
+  } catch (error) {
+    console.error('Failed to check system status:', error);
+    throw error;
+  }
+};
+
+// Set up status monitoring
+setInterval(async () => {
+  await monitorStatus();
+}, 30000); // Check every 30 seconds
+```
+
+```python Python
+import requests
+import time
+import json
+from typing import Dict, Any, Optional
+from datetime import datetime, timezone
+
+class StatusMonitor:
+    def __init__(self, base_url: str = "https://tolstoy.getpullse.com"):
+        self.base_url = base_url
+        self.last_status = None
+        self.alerts_enabled = True
+        
+    def check_status(self) -> Dict[str, Any]:
+        """Get current system status."""
+        try:
+            response = requests.get(
+                f"{self.base_url}/status",
+                headers={'Content-Type': 'application/json'},
+                timeout=10
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.RequestException as e:
+            return {
+                'status': 'unknown',
+                'error': str(e),
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'check_failed': True
+            }
+
+    def analyze_status(self, status: Dict[str, Any]) -> Dict[str, Any]:
+        """Analyze system status and generate insights."""
+        analysis = {
+            'overall_health': 'good',
+            'issues': [],
+            'warnings': [],
+            'recommendations': []
+        }
+        
+        # Check overall status
+        if status.get('check_failed'):
+            analysis['overall_health'] = 'critical'
+            analysis['issues'].append('Unable to reach status endpoint')
+            return analysis
+            
+        system_status = status.get('status', 'unknown')
+        
+        if system_status == 'outage':
+            analysis['overall_health'] = 'critical'
+            analysis['issues'].append('System is experiencing an outage')
+        elif system_status == 'degraded':
+            analysis['overall_health'] = 'warning'
+            analysis['warnings'].append('System performance is degraded')
+        elif system_status == 'maintenance':
+            analysis['overall_health'] = 'warning'
+            analysis['warnings'].append('System is under maintenance')
+            
+        # Check individual services
+        services = status.get('services', {})
+        unhealthy_services = [
+            service for service, health in services.items()
+            if health.get('status') == 'unhealthy'
+        ]
+        
+        if unhealthy_services:
+            analysis['issues'].extend([
+                f"Service {service} is unhealthy" 
+                for service in unhealthy_services
+            ])
+            if analysis['overall_health'] == 'good':
+                analysis['overall_health'] = 'warning'
+        
+        # Check performance metrics
+        performance = status.get('performance', {})
+        avg_response_time = performance.get('avg_response_time_ms', 0)
+        error_rate = performance.get('error_rate', 0)
+        
+        if avg_response_time > 2000:  # > 2 seconds
+            analysis['warnings'].append(
+                f"High response time: {avg_response_time}ms"
+            )
+            analysis['recommendations'].append(
+                "Monitor system load and consider scaling"
+            )
+            
+        if error_rate > 0.05:  # > 5% error rate
+            analysis['issues'].append(
+                f"High error rate: {error_rate * 100:.1f}%"
+            )
+            if analysis['overall_health'] == 'good':
+                analysis['overall_health'] = 'warning'
+                
+        # Generate recommendations
+        if avg_response_time > 1000 and error_rate < 0.01:
+            analysis['recommendations'].append(
+                "Performance is slow but stable - check resource utilization"
+            )
+            
+        if len(unhealthy_services) > 0:
+            analysis['recommendations'].append(
+                "Investigate unhealthy services and restart if necessary"
+            )
+            
+        return analysis
+
+    def monitor_continuous(self, interval: int = 60, max_checks: Optional[int] = None):
+        """Continuously monitor system status."""
+        check_count = 0
+        
+        print(f"Starting continuous monitoring (interval: {interval}s)")
+        
+        while max_checks is None or check_count < max_checks:
+            try:
+                status = self.check_status()
+                analysis = self.analyze_status(status)
+                
+                timestamp = status.get('timestamp', datetime.now().isoformat())
+                print(f"\n[{timestamp}] System Check #{check_count + 1}")
+                print(f"Overall Status: {status.get('status', 'unknown').upper()}")
+                print(f"Health Assessment: {analysis['overall_health'].upper()}")
+                
+                # Show performance metrics
+                if 'performance' in status:
+                    perf = status['performance']
+                    print(f"Response Time: {perf.get('avg_response_time_ms', 0)}ms")
+                    print(f"Error Rate: {perf.get('error_rate', 0) * 100:.2f}%")
+                    print(f"Requests/min: {perf.get('requests_per_minute', 0)}")
+                
+                # Show issues and warnings
+                if analysis['issues']:
+                    print("🚨 Issues:")
+                    for issue in analysis['issues']:
+                        print(f"  - {issue}")
+                        
+                if analysis['warnings']:
+                    print("⚠️  Warnings:")
+                    for warning in analysis['warnings']:
+                        print(f"  - {warning}")
+                        
+                if analysis['recommendations']:
+                    print("💡 Recommendations:")
+                    for rec in analysis['recommendations']:
+                        print(f"  - {rec}")
+                
+                # Detect status changes
+                if self.last_status and self.alerts_enabled:
+                    self._check_status_changes(self.last_status, status)
+                
+                self.last_status = status
+                check_count += 1
+                
+                if max_checks is None or check_count < max_checks:
+                    time.sleep(interval)
+                    
+            except KeyboardInterrupt:
+                print("\nMonitoring stopped by user")
+                break
+            except Exception as e:
+                print(f"Error during monitoring: {e}")
+                time.sleep(interval)
+                check_count += 1
+
+    def _check_status_changes(self, old_status: Dict, new_status: Dict):
+        """Check for status changes and alert if necessary."""
+        old_system_status = old_status.get('status')
+        new_system_status = new_status.get('status')
+        
+        if old_system_status != new_system_status:
+            if new_system_status in ['outage', 'degraded']:
+                print(f"🚨 ALERT: System status changed from {old_system_status} to {new_system_status}")
+            else:
+                print(f"✅ System status improved from {old_system_status} to {new_system_status}")
+        
+        # Check service health changes
+        old_services = old_status.get('services', {})
+        new_services = new_status.get('services', {})
+        
+        for service, health in new_services.items():
+            old_health = old_services.get(service, {}).get('status')
+            new_health = health.get('status')
+            
+            if old_health != new_health:
+                if new_health == 'unhealthy':
+                    print(f"🚨 Service {service} became unhealthy")
+                elif new_health == 'healthy' and old_health == 'unhealthy':
+                    print(f"✅ Service {service} recovered")
+
+    def export_status_report(self, filename: str = None) -> str:
+        """Export current status as a report."""
+        status = self.check_status()
+        analysis = self.analyze_status(status)
+        
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"tolstoy_status_report_{timestamp}.json"
+        
+        report = {
+            'report_metadata': {
+                'generated_at': datetime.now(timezone.utc).isoformat(),
+                'report_type': 'system_status',
+                'version': '1.0'
+            },
+            'system_status': status,
+            'health_analysis': analysis
+        }
+        
+        with open(filename, 'w') as f:
+            json.dump(report, f, indent=2)
+        
+        print(f"Status report exported to: {filename}")
+        return filename
+
+# Usage examples
+monitor = StatusMonitor()
+
+# Single status check
+status = monitor.check_status()
+analysis = monitor.analyze_status(status)
+
+print(f"System Status: {status.get('status', 'unknown')}")
+print(f"Health: {analysis['overall_health']}")
+
+if analysis['issues']:
+    print("Issues found:", analysis['issues'])
+
+# Continuous monitoring (run for 5 minutes, check every 30 seconds)
+# monitor.monitor_continuous(interval=30, max_checks=10)
+
+# Export status report
+# report_file = monitor.export_status_report()
+```
+
+```javascript Node.js
+const axios = require('axios');
+const EventEmitter = require('events');
+
+class TolstoyStatusMonitor extends EventEmitter {
+  constructor(baseUrl = 'https://tolstoy.getpullse.com') {
+    super();
+    this.baseUrl = baseUrl;
+    this.isMonitoring = false;
+    this.monitoringInterval = null;
+    this.lastStatus = null;
+    this.statusHistory = [];
+    this.maxHistorySize = 100;
+  }
+
+  async checkStatus() {
+    try {
+      const response = await axios.get(`${this.baseUrl}/status`, {
+        timeout: 10000,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const status = {
+        ...response.data,
+        check_timestamp: new Date().toISOString(),
+        check_successful: true
+      };
+
+      this._recordStatus(status);
+      return status;
+
+    } catch (error) {
+      const errorStatus = {
+        status: 'unknown',
+        error: error.message,
+        check_timestamp: new Date().toISOString(),
+        check_successful: false
+      };
+
+      this._recordStatus(errorStatus);
+      this.emit('error', error);
+      return errorStatus;
+    }
+  }
+
+  _recordStatus(status) {
+    // Add to history
+    this.statusHistory.unshift(status);
+    if (this.statusHistory.length > this.maxHistorySize) {
+      this.statusHistory.pop();
+    }
+
+    // Detect changes
+    if (this.lastStatus) {
+      this._detectStatusChanges(this.lastStatus, status);
+    }
+
+    this.lastStatus = status;
+    this.emit('statusUpdate', status);
+  }
+
+  _detectStatusChanges(oldStatus, newStatus) {
+    // System status changes
+    if (oldStatus.status !== newStatus.status) {
+      this.emit('statusChange', {
+        type: 'system',
+        old: oldStatus.status,
+        new: newStatus.status,
+        timestamp: newStatus.check_timestamp
+      });
+    }
+
+    // Service health changes
+    const oldServices = oldStatus.services || {};
+    const newServices = newStatus.services || {};
+
+    Object.keys(newServices).forEach(serviceName => {
+      const oldHealth = oldServices[serviceName]?.status;
+      const newHealth = newServices[serviceName]?.status;
+
+      if (oldHealth !== newHealth) {
+        this.emit('serviceChange', {
+          service: serviceName,
+          old: oldHealth,
+          new: newHealth,
+          timestamp: newStatus.check_timestamp
+        });
+      }
+    });
+  }
+
+  analyzeStatus(status) {
+    const analysis = {
+      overall_health: 'healthy',
+      issues: [],
+      warnings: [],
+      metrics: {},
+      recommendations: []
+    };
+
+    if (!status.check_successful) {
+      analysis.overall_health = 'critical';
+      analysis.issues.push('Unable to connect to status endpoint');
+      return analysis;
+    }
+
+    // Analyze system status
+    switch (status.status) {
+      case 'outage':
+        analysis.overall_health = 'critical';
+        analysis.issues.push('System is experiencing an outage');
+        break;
+      case 'degraded':
+        analysis.overall_health = 'degraded';
+        analysis.warnings.push('System performance is degraded');
+        break;
+      case 'maintenance':
+        analysis.overall_health = 'maintenance';
+        analysis.warnings.push('System is under scheduled maintenance');
+        break;
+    }
+
+    // Analyze services
+    const services = status.services || {};
+    const unhealthyServices = Object.entries(services)
+      .filter(([, health]) => health.status === 'unhealthy')
+      .map(([name]) => name);
+
+    if (unhealthyServices.length > 0) {
+      analysis.issues.push(`Unhealthy services: ${unhealthyServices.join(', ')}`);
+      if (analysis.overall_health === 'healthy') {
+        analysis.overall_health = 'degraded';
+      }
+    }
+
+    // Analyze performance
+    const performance = status.performance || {};
+    const responseTime = performance.avg_response_time_ms || 0;
+    const errorRate = performance.error_rate || 0;
+    const requestRate = performance.requests_per_minute || 0;
+
+    analysis.metrics = {
+      response_time: responseTime,
+      error_rate: errorRate * 100,
+      request_rate: requestRate
+    };
+
+    if (responseTime > 2000) {
+      analysis.warnings.push(`Slow response time: ${responseTime}ms`);
+      analysis.recommendations.push('Investigate system performance and scaling');
+    }
+
+    if (errorRate > 0.05) {
+      analysis.issues.push(`High error rate: ${(errorRate * 100).toFixed(2)}%`);
+      if (analysis.overall_health === 'healthy') {
+        analysis.overall_health = 'degraded';
+      }
+    }
+
+    return analysis;
+  }
+
+  startMonitoring(intervalMs = 30000) {
+    if (this.isMonitoring) {
+      console.log('Monitoring already running');
+      return;
+    }
+
+    this.isMonitoring = true;
+    console.log(`Starting status monitoring (interval: ${intervalMs}ms)`);
+
+    // Initial check
+    this.checkStatus();
+
+    // Set up interval
+    this.monitoringInterval = setInterval(() => {
+      this.checkStatus();
+    }, intervalMs);
+
+    this.emit('monitoringStarted');
+  }
+
+  stopMonitoring() {
+    if (!this.isMonitoring) {
+      return;
+    }
+
+    this.isMonitoring = false;
+    if (this.monitoringInterval) {
+      clearInterval(this.monitoringInterval);
+      this.monitoringInterval = null;
+    }
+
+    console.log('Status monitoring stopped');
+    this.emit('monitoringStopped');
+  }
+
+  getStatusSummary() {
+    if (!this.lastStatus) {
+      return { error: 'No status data available' };
+    }
+
+    const analysis = this.analyzeStatus(this.lastStatus);
+    
+    return {
+      timestamp: this.lastStatus.check_timestamp,
+      system_status: this.lastStatus.status,
+      overall_health: analysis.overall_health,
+      uptime: this.lastStatus.uptime,
+      version: this.lastStatus.version,
+      metrics: analysis.metrics,
+      issues: analysis.issues,
+      warnings: analysis.warnings,
+      service_count: Object.keys(this.lastStatus.services || {}).length,
+      healthy_services: Object.values(this.lastStatus.services || {})
+        .filter(s => s.status === 'healthy').length
+    };
+  }
+
+  generateUptimeReport(hours = 24) {
+    const cutoffTime = new Date(Date.now() - (hours * 60 * 60 * 1000));
+    const recentStatuses = this.statusHistory.filter(status => 
+      new Date(status.check_timestamp) > cutoffTime
+    );
+
+    if (recentStatuses.length === 0) {
+      return { error: 'Insufficient data for uptime report' };
+    }
+
+    const totalChecks = recentStatuses.length;
+    const operationalChecks = recentStatuses.filter(s => s.status === 'operational').length;
+    const uptime = (operationalChecks / totalChecks) * 100;
+
+    const avgResponseTime = recentStatuses
+      .filter(s => s.performance?.avg_response_time_ms)
+      .reduce((sum, s) => sum + s.performance.avg_response_time_ms, 0) / 
+      recentStatuses.length;
+
+    return {
+      timeframe_hours: hours,
+      total_checks: totalChecks,
+      uptime_percentage: parseFloat(uptime.toFixed(2)),
+      avg_response_time_ms: Math.round(avgResponseTime),
+      incidents: recentStatuses.filter(s => s.status === 'outage').length,
+      degraded_periods: recentStatuses.filter(s => s.status === 'degraded').length
+    };
+  }
+}
+
+// Usage examples
+const monitor = new TolstoyStatusMonitor();
+
+// Set up event listeners
+monitor.on('statusUpdate', (status) => {
+  const analysis = monitor.analyzeStatus(status);
+  console.log(`Status: ${status.status} | Health: ${analysis.overall_health}`);
+});
+
+monitor.on('statusChange', (change) => {
+  if (change.new === 'outage') {
+    console.log('🚨 CRITICAL: System outage detected!');
+  } else if (change.old === 'outage' && change.new === 'operational') {
+    console.log('✅ System recovered from outage');
+  }
+});
+
+monitor.on('serviceChange', (change) => {
+  if (change.new === 'unhealthy') {
+    console.log(`⚠️ Service ${change.service} became unhealthy`);
+  } else if (change.new === 'healthy' && change.old === 'unhealthy') {
+    console.log(`✅ Service ${change.service} recovered`);
+  }
+});
+
+// Start monitoring
+monitor.startMonitoring(30000); // Check every 30 seconds
+
+// Get status summary periodically
+setInterval(() => {
+  const summary = monitor.getStatusSummary();
+  console.log('System Summary:', summary);
+}, 300000); // Every 5 minutes
+
+// Generate uptime report
+setTimeout(() => {
+  const uptimeReport = monitor.generateUptimeReport(1); // Last hour
+  console.log('Uptime Report:', uptimeReport);
+}, 60000); // After 1 minute of monitoring
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  monitor.stopMonitoring();
+  process.exit(0);
+});
+```
+
+</RequestExample>
+
+## Response
+
+<ResponseExample>
+
+```json System Status
+{
+  "status": "ok",
+  "timestamp": "2025-01-09T10:00:00.000Z",
+  "uptime": 3600,
+  "version": "1.1.0"
+}
+```
+
+```json Degraded Status
+{
+  "status": "degraded",
+  "version": "2.1.4", 
+  "uptime": 2847691,
+  "timestamp": "2024-01-15T14:30:00Z",
+  "services": {
+    "database": {
+      "status": "healthy",
+      "response_time_ms": 45,
+      "last_check": "2024-01-15T14:29:55Z"
+    },
+    "redis": {
+      "status": "healthy",
+      "response_time_ms": 12,
+      "last_check": "2024-01-15T14:29:55Z"
+    },
+    "workflow_engine": {
+      "status": "unhealthy",
+      "response_time_ms": 3456,
+      "last_check": "2024-01-15T14:29:55Z",
+      "error": "High memory usage causing slow processing"
+    },
+    "api_gateway": {
+      "status": "healthy",
+      "response_time_ms": 89,
+      "last_check": "2024-01-15T14:29:55Z"
+    },
+    "webhook_service": {
+      "status": "healthy",
+      "response_time_ms": 156,
+      "last_check": "2024-01-15T14:29:55Z"
+    },
+    "authentication": {
+      "status": "healthy",
+      "response_time_ms": 67,
+      "last_check": "2024-01-15T14:29:55Z"
+    }
+  },
+  "performance": {
+    "avg_response_time_ms": 1245,
+    "requests_per_minute": 1234,
+    "error_rate": 0.0456,
+    "active_workflows": 234,
+    "queue_depth": 89
+  },
+  "system_metrics": {
+    "memory_usage_percent": 89.2,
+    "cpu_usage_percent": 78.9,
+    "disk_usage_percent": 31.2,
+    "active_connections": 412
+  },
+  "incidents": [
+    {
+      "id": "inc_20240115_001",
+      "title": "Workflow Engine Performance Degradation",
+      "status": "investigating",
+      "started_at": "2024-01-15T14:15:00Z",
+      "description": "Investigating slow response times in workflow processing"
+    }
+  ]
+}
+```
+
+```json Maintenance Status
+{
+  "status": "maintenance",
+  "version": "2.1.4",
+  "uptime": 2847691,
+  "timestamp": "2024-01-15T14:30:00Z",
+  "maintenance": {
+    "title": "Scheduled Database Maintenance",
+    "description": "Routine database optimization and index rebuilding",
+    "started_at": "2024-01-15T14:00:00Z",
+    "expected_end": "2024-01-15T16:00:00Z",
+    "progress": 45,
+    "affected_services": ["workflow_engine", "database"]
+  },
+  "services": {
+    "database": {
+      "status": "maintenance",
+      "last_check": "2024-01-15T14:29:55Z"
+    },
+    "workflow_engine": {
+      "status": "maintenance", 
+      "last_check": "2024-01-15T14:29:55Z"
+    },
+    "api_gateway": {
+      "status": "healthy",
+      "response_time_ms": 23,
+      "last_check": "2024-01-15T14:29:55Z"
+    },
+    "authentication": {
+      "status": "healthy",
+      "response_time_ms": 67,
+      "last_check": "2024-01-15T14:29:55Z"
+    }
+  }
+}
+```
+
+</ResponseExample>
+
+## Status Codes
+
+<ResponseField name="200" type="OK">
+Status information retrieved successfully
+</ResponseField>
+
+<ResponseField name="503" type="Service Unavailable">
+System is experiencing an outage or critical issues
+</ResponseField>
+
+## Response Fields
+
+<ResponseField name="status" type="string">
+Overall system status: `operational`, `degraded`, `maintenance`, or `outage`
+</ResponseField>
+
+<ResponseField name="version" type="string">
+Current version of the Tolstoy platform
+</ResponseField>
+
+<ResponseField name="uptime" type="number">
+System uptime in seconds since last restart
+</ResponseField>
+
+<ResponseField name="timestamp" type="string">
+ISO 8601 timestamp when status was generated
+</ResponseField>
+
+<ResponseField name="services" type="object">
+Health status of individual system services
+  <Expandable title="Service Health Fields">
+    <ResponseField name="services.{service_name}.status" type="string">
+      Service status: `healthy`, `unhealthy`, `unknown`, or `maintenance`
+    </ResponseField>
+    <ResponseField name="services.{service_name}.response_time_ms" type="number">
+      Service response time in milliseconds
+    </ResponseField>
+    <ResponseField name="services.{service_name}.last_check" type="string">
+      Timestamp of last health check
+    </ResponseField>
+    <ResponseField name="services.{service_name}.error" type="string">
+      Error message if service is unhealthy
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="performance" type="object">
+System performance metrics
+  <Expandable title="Performance Metrics">
+    <ResponseField name="avg_response_time_ms" type="number">
+      Average API response time in milliseconds
+    </ResponseField>
+    <ResponseField name="requests_per_minute" type="number">
+      Current request rate per minute
+    </ResponseField>
+    <ResponseField name="error_rate" type="number">
+      Error rate as decimal (0.0023 = 0.23%)
+    </ResponseField>
+    <ResponseField name="active_workflows" type="number">
+      Number of currently executing workflows
+    </ResponseField>
+    <ResponseField name="queue_depth" type="number">
+      Number of queued workflow executions
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="system_metrics" type="object">
+Infrastructure metrics
+  <Expandable title="System Resource Metrics">
+    <ResponseField name="memory_usage_percent" type="number">
+      Memory utilization percentage
+    </ResponseField>
+    <ResponseField name="cpu_usage_percent" type="number">
+      CPU utilization percentage
+    </ResponseField>
+    <ResponseField name="disk_usage_percent" type="number">
+      Disk utilization percentage
+    </ResponseField>
+    <ResponseField name="active_connections" type="number">
+      Number of active database connections
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="maintenance" type="object">
+Maintenance information (when status is `maintenance`)
+  <Expandable title="Maintenance Details">
+    <ResponseField name="title" type="string">
+      Title of maintenance activity
+    </ResponseField>
+    <ResponseField name="description" type="string">
+      Description of maintenance work
+    </ResponseField>
+    <ResponseField name="started_at" type="string">
+      Maintenance start time
+    </ResponseField>
+    <ResponseField name="expected_end" type="string">
+      Expected maintenance completion time
+    </ResponseField>
+    <ResponseField name="progress" type="number">
+      Maintenance progress percentage
+    </ResponseField>
+    <ResponseField name="affected_services" type="string[]">
+      List of services affected by maintenance
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="incidents" type="object[]">
+Active incidents (when status is `degraded` or `outage`)
+  <Expandable title="Incident Information">
+    <ResponseField name="id" type="string">
+      Unique incident identifier
+    </ResponseField>
+    <ResponseField name="title" type="string">
+      Incident title/summary
+    </ResponseField>
+    <ResponseField name="status" type="string">
+      Incident status: `investigating`, `identified`, `monitoring`, `resolved`
+    </ResponseField>
+    <ResponseField name="started_at" type="string">
+      When the incident was first detected
+    </ResponseField>
+    <ResponseField name="description" type="string">
+      Detailed incident description
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Common Use Cases
+
+### Health Check Integration
+
+Monitor system health in your infrastructure monitoring tools:
+
+```bash
+# Simple health check
+curl -f https://tolstoy.getpullse.com/status || exit 1
+```
+
+### Status Page Integration
+
+Build public status pages using the status endpoint data.
+
+### Automated Alerting
+
+Set up alerts based on status changes and performance thresholds.
+
+### Load Balancer Health Checks
+
+Use this endpoint for load balancer health checks and circuit breaker patterns.
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Detailed Status" icon="chart-line" href="/api/health/get-statusdetailed">
+    Get comprehensive system health information
+  </Card>
+  <Card title="System Metrics" icon="gauge" href="/api/metrics/get-metrics">
+    View detailed performance metrics and analytics
+  </Card>
+</CardGroup>
+
+---
+
+<Info>
+**Pro Tip**: Monitor the `error_rate` and `avg_response_time_ms` fields to detect performance degradation before it affects users.
+</Info>

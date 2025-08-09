@@ -1,5 +1,5 @@
-import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { ConfigService } from '@nestjs/config';
 import { PrismaClient } from '@prisma/client';
 import { AwsSecretsService } from './aws-secrets.service';
@@ -52,7 +52,7 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       let databaseUrl: string;
 
       if (this.useSecretsManager) {
-        const secretName = this.configService.get('AWS_SECRET_NAME', 'conductor-db-secret');
+        const secretName = this.configService.get('AWS_SECRET_NAME', 'tolstoy/env');
         this.logger.info({ secretName }, 'Using AWS Secrets Manager for database credentials');
 
         // Validate secret access first

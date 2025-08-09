@@ -1,0 +1,1334 @@
+---
+title: "CI/CD Integration Guide"
+description: "Integrate the Tolstoy CLI into your CI/CD pipelines with GitHub Actions, GitLab CI, Jenkins, and other platforms for automated workflow deployment."
+---
+
+# CI/CD Integration Guide
+
+Learn to integrate the Tolstoy CLI into your CI/CD pipelines for automated workflow deployment, testing, and monitoring. This guide covers popular CI/CD platforms with production-ready examples.
+
+## Integration Overview
+
+### Benefits of CI/CD Integration
+
+- **Automated Deployment**: Deploy workflows automatically on code changes
+- **Version Control**: Track workflow changes with git history
+- **Testing**: Validate workflows before deployment
+- **Rollback**: Quick rollback to previous workflow versions
+- **Environment Management**: Deploy to different environments systematically
+- **Monitoring**: Track deployment success and failures
+
+### Prerequisites
+
+Before integrating with CI/CD, ensure you have:
+
+- Tolstoy CLI credentials (API key or service account)
+- Workflow definitions in version control
+- Environment-specific configurations
+- Testing strategy for workflows
+
+## GitHub Actions
+
+### Basic Workflow Deployment
+
+<CodeGroup>
+```yaml Basic Deployment
+# .github/workflows/deploy-workflows.yml
+name: Deploy Tolstoy Workflows
+
+on:
+  push:
+    branches: [main]
+    paths: ['workflows/**']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Install Tolstoy CLI
+        run: npm install -g @tolstoy/cli
+        
+      - name: Configure Tolstoy CLI
+        env:
+          TOLSTOY_ORG_ID: ${{ secrets.TOLSTOY_ORG_ID }}
+          TOLSTOY_USER_ID: ${{ secrets.TOLSTOY_USER_ID }}
+          TOLSTOY_API_KEY: ${{ secrets.TOLSTOY_API_KEY }}
+        run: |
+          tolstoy config add production \
+            --api-url "https://api.tolstoy.com" \
+            --org-id "$TOLSTOY_ORG_ID" \
+            --user-id "$TOLSTOY_USER_ID" \
+            --timeout "300s" \
+            --output-format "json" \
+            --non-interactive
+          
+          tolstoy config use production
+          
+      - name: Test Configuration
+        run: tolstoy config test --timeout 30s
+        
+      - name: Validate Workflows
+        run: |
+          echo "Validating workflow files..."
+          for workflow in workflows/*.yml workflows/*.yaml; do
+            [[ -f "$workflow" ]] || continue
+            echo "Validating: $workflow"
+            tolstoy flows validate "$workflow"
+          done
+          
+      - name: Deploy Workflows
+        run: |
+          echo "Deploying workflows..."
+          for workflow in workflows/*.yml workflows/*.yaml; do
+            [[ -f "$workflow" ]] || continue
+            
+            workflow_name=$(basename "$workflow" .yml)
+            workflow_name=${workflow_name%.yaml}
+            
+            echo "Processing: $workflow_name"
+            
+            if tolstoy flows get "$workflow_name" --quiet 2>/dev/null; then
+              echo "Updating existing workflow: $workflow_name"
+              tolstoy flows update "$workflow_name" "$workflow"
+            else
+              echo "Creating new workflow: $workflow_name"
+              tolstoy flows create "$workflow"
+            fi
+          done
+          
+      - name: Test Deployed Workflows
+        run: |
+          echo "Testing deployed workflows..."
+          tolstoy flows list --status active --output json | \
+            jq -r '.[].id' | \
+            head -5 | \
+            while read -r flow_id; do
+              echo "Testing: $flow_id"
+              tolstoy flows execute "$flow_id" --input '{}' --dry-run --timeout 30s
+            done
+```
+
+```yaml Multi-Environment Deployment
+# .github/workflows/deploy-multi-env.yml
+name: Multi-Environment Deployment
+
+on:
+  push:
+    branches: [develop, staging, main]
+    paths: ['workflows/**']
+
+jobs:
+  determine-environment:
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      api-url: ${{ steps.env.outputs.api-url }}
+      org-id-secret: ${{ steps.env.outputs.org-id-secret }}
+      user-id-secret: ${{ steps.env.outputs.user-id-secret }}
+    steps:
+      - name: Determine environment
+        id: env
+        run: |
+          case "${{ github.ref_name }}" in
+            "main")
+              echo "environment=production" >> $GITHUB_OUTPUT
+              echo "api-url=https://api.tolstoy.com" >> $GITHUB_OUTPUT
+              echo "org-id-secret=TOLSTOY_PROD_ORG_ID" >> $GITHUB_OUTPUT
+              echo "user-id-secret=TOLSTOY_PROD_USER_ID" >> $GITHUB_OUTPUT
+              ;;
+            "staging")
+              echo "environment=staging" >> $GITHUB_OUTPUT
+              echo "api-url=https://staging-api.tolstoy.com" >> $GITHUB_OUTPUT
+              echo "org-id-secret=TOLSTOY_STAGING_ORG_ID" >> $GITHUB_OUTPUT
+              echo "user-id-secret=TOLSTOY_STAGING_USER_ID" >> $GITHUB_OUTPUT
+              ;;
+            "develop")
+              echo "environment=development" >> $GITHUB_OUTPUT
+              echo "api-url=https://dev-api.tolstoy.com" >> $GITHUB_OUTPUT
+              echo "org-id-secret=TOLSTOY_DEV_ORG_ID" >> $GITHUB_OUTPUT
+              echo "user-id-secret=TOLSTOY_DEV_USER_ID" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: determine-environment
+    environment: ${{ needs.determine-environment.outputs.environment }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup CLI
+        run: |
+          npm install -g @tolstoy/cli
+          
+          tolstoy config add ${{ needs.determine-environment.outputs.environment }} \
+            --api-url "${{ needs.determine-environment.outputs.api-url }}" \
+            --org-id "${{ secrets[needs.determine-environment.outputs.org-id-secret] }}" \
+            --user-id "${{ secrets[needs.determine-environment.outputs.user-id-secret] }}" \
+            --non-interactive
+            
+      - name: Deploy to ${{ needs.determine-environment.outputs.environment }}
+        run: ./scripts/deploy.sh ${{ needs.determine-environment.outputs.environment }}
+```
+</CodeGroup>
+
+### Advanced GitHub Actions with Rollback
+
+```yaml
+# .github/workflows/deploy-with-rollback.yml
+name: Deploy with Rollback Support
+
+on:
+  push:
+    branches: [main]
+    paths: ['workflows/**']
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Fetch current and previous commit
+          
+      - name: Setup Tolstoy CLI
+        run: |
+          npm install -g @tolstoy/cli
+          
+          tolstoy config add production \
+            --api-url "https://api.tolstoy.com" \
+            --org-id "${{ secrets.TOLSTOY_ORG_ID }}" \
+            --user-id "${{ secrets.TOLSTOY_USER_ID }}" \
+            --non-interactive
+            
+      - name: Create Deployment Backup
+        run: |
+          mkdir -p ./backup
+          echo "Creating backup of current workflows..."
+          
+          tolstoy flows list --output json | jq -r '.[].id' | while read -r flow_id; do
+            echo "Backing up: $flow_id"
+            tolstoy flows get "$flow_id" --output yaml > "./backup/${flow_id}.yml"
+          done
+          
+      - name: Deploy Workflows
+        id: deploy
+        run: |
+          echo "DEPLOYMENT_STATUS=success" >> $GITHUB_OUTPUT
+          
+          ./scripts/deploy-workflows.sh || {
+            echo "DEPLOYMENT_STATUS=failed" >> $GITHUB_OUTPUT
+            exit 1
+          }
+          
+      - name: Test Deployment
+        id: test
+        if: steps.deploy.outputs.DEPLOYMENT_STATUS == 'success'
+        run: |
+          echo "Testing deployed workflows..."
+          
+          ./scripts/test-workflows.sh || {
+            echo "TEST_STATUS=failed" >> $GITHUB_OUTPUT
+            echo "Deployment tests failed"
+            exit 1
+          }
+          
+          echo "TEST_STATUS=success" >> $GITHUB_OUTPUT
+          
+      - name: Rollback on Failure
+        if: failure() && steps.deploy.outputs.DEPLOYMENT_STATUS == 'failed'
+        run: |
+          echo "Deployment failed, initiating rollback..."
+          
+          for backup_file in ./backup/*.yml; do
+            [[ -f "$backup_file" ]] || continue
+            
+            workflow_id=$(basename "$backup_file" .yml)
+            echo "Rolling back: $workflow_id"
+            
+            tolstoy flows update "$workflow_id" "$backup_file"
+          done
+          
+          echo "Rollback completed"
+          
+      - name: Notify Deployment Status
+        if: always()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          message: |
+            Tolstoy Workflow Deployment: ${{ job.status }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+```
+
+## GitLab CI
+
+### Basic Pipeline
+
+```yaml
+# .gitlab-ci.yml
+stages:
+  - validate
+  - deploy
+  - test
+
+variables:
+  TOLSTOY_API_URL: "https://api.tolstoy.com"
+  
+before_script:
+  - npm install -g @tolstoy/cli
+  - |
+    tolstoy config add gitlab-ci \
+      --api-url "$TOLSTOY_API_URL" \
+      --org-id "$TOLSTOY_ORG_ID" \
+      --user-id "$TOLSTOY_USER_ID" \
+      --non-interactive
+  - tolstoy config use gitlab-ci
+  - tolstoy config test --timeout 30s
+
+validate_workflows:
+  stage: validate
+  script:
+    - echo "Validating workflow definitions..."
+    - |
+      for workflow in workflows/*.yml; do
+        [[ -f "$workflow" ]] || continue
+        echo "Validating: $workflow"
+        tolstoy flows validate "$workflow"
+      done
+  only:
+    refs:
+      - merge_requests
+      - main
+    changes:
+      - workflows/**
+
+deploy_workflows:
+  stage: deploy
+  script:
+    - echo "Deploying workflows to production..."
+    - |
+      for workflow in workflows/*.yml; do
+        [[ -f "$workflow" ]] || continue
+        
+        workflow_name=$(basename "$workflow" .yml)
+        echo "Processing: $workflow_name"
+        
+        if tolstoy flows get "$workflow_name" --quiet 2>/dev/null; then
+          tolstoy flows update "$workflow_name" "$workflow"
+        else
+          tolstoy flows create "$workflow"
+        fi
+      done
+  only:
+    refs:
+      - main
+    changes:
+      - workflows/**
+      
+test_deployment:
+  stage: test
+  script:
+    - echo "Testing deployed workflows..."
+    - |
+      tolstoy flows list --status active --output json | \
+        jq -r '.[].id' | \
+        head -3 | \
+        while read -r flow_id; do
+          echo "Testing: $flow_id"
+          tolstoy flows execute "$flow_id" --input '{}' --dry-run
+        done
+  only:
+    refs:
+      - main
+    changes:
+      - workflows/**
+```
+
+### Multi-Environment GitLab Pipeline
+
+```yaml
+# .gitlab-ci.yml with multiple environments
+stages:
+  - validate
+  - deploy-dev
+  - deploy-staging
+  - deploy-prod
+
+# Template for deployment jobs
+.deploy_template: &deploy_template
+  before_script:
+    - npm install -g @tolstoy/cli
+    - |
+      tolstoy config add $CI_ENVIRONMENT_NAME \
+        --api-url "$TOLSTOY_API_URL" \
+        --org-id "$TOLSTOY_ORG_ID" \
+        --user-id "$TOLSTOY_USER_ID" \
+        --timeout "${TOLSTOY_TIMEOUT:-300s}" \
+        --non-interactive
+    - tolstoy config use $CI_ENVIRONMENT_NAME
+  script:
+    - tolstoy config test
+    - |
+      echo "Deploying to $CI_ENVIRONMENT_NAME..."
+      ./scripts/deploy.sh $CI_ENVIRONMENT_NAME
+
+validate:
+  stage: validate
+  script:
+    - npm install -g @tolstoy/cli
+    - |
+      for workflow in workflows/*.yml; do
+        tolstoy flows validate "$workflow"
+      done
+
+deploy_development:
+  <<: *deploy_template
+  stage: deploy-dev
+  environment:
+    name: development
+    url: https://dev-api.tolstoy.com
+  variables:
+    TOLSTOY_API_URL: "https://dev-api.tolstoy.com"
+    TOLSTOY_ORG_ID: "$DEV_ORG_ID"
+    TOLSTOY_USER_ID: "$DEV_USER_ID"
+    TOLSTOY_TIMEOUT: "120s"
+  only:
+    - develop
+
+deploy_staging:
+  <<: *deploy_template
+  stage: deploy-staging
+  environment:
+    name: staging
+    url: https://staging-api.tolstoy.com
+  variables:
+    TOLSTOY_API_URL: "https://staging-api.tolstoy.com"
+    TOLSTOY_ORG_ID: "$STAGING_ORG_ID"
+    TOLSTOY_USER_ID: "$STAGING_USER_ID"
+  only:
+    - staging
+
+deploy_production:
+  <<: *deploy_template
+  stage: deploy-prod
+  environment:
+    name: production
+    url: https://api.tolstoy.com
+  variables:
+    TOLSTOY_API_URL: "https://api.tolstoy.com"
+    TOLSTOY_ORG_ID: "$PROD_ORG_ID"
+    TOLSTOY_USER_ID: "$PROD_USER_ID"
+  when: manual  # Require manual approval for production
+  only:
+    - main
+```
+
+## Jenkins
+
+### Basic Jenkins Pipeline
+
+```groovy
+// Jenkinsfile
+pipeline {
+    agent any
+    
+    environment {
+        TOLSTOY_API_URL = 'https://api.tolstoy.com'
+        TOLSTOY_TIMEOUT = '300s'
+    }
+    
+    stages {
+        stage('Setup') {
+            steps {
+                script {
+                    // Install Tolstoy CLI
+                    sh 'npm install -g @tolstoy/cli'
+                    
+                    // Configure CLI
+                    withCredentials([
+                        string(credentialsId: 'tolstoy-org-id', variable: 'TOLSTOY_ORG_ID'),
+                        string(credentialsId: 'tolstoy-user-id', variable: 'TOLSTOY_USER_ID'),
+                        string(credentialsId: 'tolstoy-api-key', variable: 'TOLSTOY_API_KEY')
+                    ]) {
+                        sh """
+                            tolstoy config add jenkins \
+                                --api-url "${TOLSTOY_API_URL}" \
+                                --org-id "${TOLSTOY_ORG_ID}" \
+                                --user-id "${TOLSTOY_USER_ID}" \
+                                --timeout "${TOLSTOY_TIMEOUT}" \
+                                --non-interactive
+                        """
+                    }
+                    
+                    sh 'tolstoy config use jenkins'
+                    sh 'tolstoy config test --timeout 30s'
+                }
+            }
+        }
+        
+        stage('Validate') {
+            steps {
+                script {
+                    echo 'Validating workflow files...'
+                    sh '''
+                        for workflow in workflows/*.yml workflows/*.yaml; do
+                            [[ -f "$workflow" ]] || continue
+                            echo "Validating: $workflow"
+                            tolstoy flows validate "$workflow"
+                        done
+                    '''
+                }
+            }
+        }
+        
+        stage('Deploy') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    echo 'Deploying workflows...'
+                    sh './scripts/deploy-workflows.sh'
+                }
+            }
+        }
+        
+        stage('Test') {
+            when {
+                branch 'main'
+            }
+            steps {
+                script {
+                    echo 'Testing deployed workflows...'
+                    sh '''
+                        tolstoy flows list --status active --output json | \
+                            jq -r '.[].id' | \
+                            head -5 | \
+                            while read -r flow_id; do
+                                echo "Testing: $flow_id"
+                                tolstoy flows execute "$flow_id" --input '{}' --dry-run
+                            done
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            echo 'Deployment completed successfully!'
+            // Send success notification
+            slackSend(
+                channel: '#deployments',
+                color: 'good',
+                message: "✅ Tolstoy workflows deployed successfully - Build ${env.BUILD_NUMBER}"
+            )
+        }
+        
+        failure {
+            echo 'Deployment failed!'
+            // Send failure notification
+            slackSend(
+                channel: '#deployments',
+                color: 'danger',
+                message: "❌ Tolstoy deployment failed - Build ${env.BUILD_NUMBER}"
+            )
+        }
+        
+        always {
+            // Archive deployment logs
+            archiveArtifacts artifacts: 'logs/*.log', allowEmptyArchive: true
+            
+            // Clean up
+            sh 'rm -rf /tmp/tolstoy-*'
+        }
+    }
+}
+```
+
+### Advanced Jenkins Pipeline with Blue/Green Deployment
+
+```groovy
+// Jenkinsfile with blue/green deployment
+pipeline {
+    agent any
+    
+    parameters {
+        booleanParam(name: 'ROLLBACK', defaultValue: false, description: 'Rollback to previous version')
+        choice(name: 'ENVIRONMENT', choices: ['staging', 'production'], description: 'Target environment')
+    }
+    
+    environment {
+        BACKUP_DIR = "backups/${env.BUILD_NUMBER}"
+        TOLSTOY_PROFILE = "${params.ENVIRONMENT}"
+    }
+    
+    stages {
+        stage('Setup') {
+            steps {
+                script {
+                    sh 'mkdir -p ${BACKUP_DIR}'
+                    sh 'npm install -g @tolstoy/cli'
+                    
+                    // Configure environment-specific settings
+                    def apiUrl = params.ENVIRONMENT == 'production' ? 
+                        'https://api.tolstoy.com' : 
+                        'https://staging-api.tolstoy.com'
+                        
+                    withCredentials([
+                        string(credentialsId: "tolstoy-${params.ENVIRONMENT}-org-id", variable: 'TOLSTOY_ORG_ID'),
+                        string(credentialsId: "tolstoy-${params.ENVIRONMENT}-user-id", variable: 'TOLSTOY_USER_ID'),
+                        string(credentialsId: "tolstoy-${params.ENVIRONMENT}-api-key", variable: 'TOLSTOY_API_KEY')
+                    ]) {
+                        sh """
+                            tolstoy config add ${TOLSTOY_PROFILE} \
+                                --api-url "${apiUrl}" \
+                                --org-id "${TOLSTOY_ORG_ID}" \
+                                --user-id "${TOLSTOY_USER_ID}" \
+                                --non-interactive
+                        """
+                    }
+                }
+            }
+        }
+        
+        stage('Rollback') {
+            when {
+                expression { params.ROLLBACK }
+            }
+            steps {
+                script {
+                    echo 'Initiating rollback...'
+                    
+                    // Find latest backup
+                    def latestBackup = sh(
+                        script: 'ls -1t backups/ | head -1',
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (latestBackup) {
+                        echo "Rolling back to: ${latestBackup}"
+                        sh """
+                            for backup_file in backups/${latestBackup}/*.yml; do
+                                [[ -f "\$backup_file" ]] || continue
+                                workflow_id=\$(basename "\$backup_file" .yml)
+                                echo "Restoring: \$workflow_id"
+                                tolstoy flows update "\$workflow_id" "\$backup_file"
+                            done
+                        """
+                    } else {
+                        error 'No backup found for rollback'
+                    }
+                }
+            }
+        }
+        
+        stage('Backup Current State') {
+            when {
+                not { params.ROLLBACK }
+            }
+            steps {
+                script {
+                    echo 'Creating backup of current workflows...'
+                    sh """
+                        tolstoy flows list --output json | jq -r '.[].id' | while read -r flow_id; do
+                            echo "Backing up: \$flow_id"
+                            tolstoy flows get "\$flow_id" --output yaml > "${BACKUP_DIR}/\${flow_id}.yml"
+                        done
+                    """
+                }
+            }
+        }
+        
+        stage('Blue/Green Deploy') {
+            when {
+                not { params.ROLLBACK }
+            }
+            steps {
+                script {
+                    echo 'Starting blue/green deployment...'
+                    
+                    // Deploy to "green" environment first
+                    sh './scripts/blue-green-deploy.sh green'
+                    
+                    // Run smoke tests on green
+                    sh './scripts/smoke-tests.sh green'
+                    
+                    // Switch traffic to green
+                    sh './scripts/switch-traffic.sh green'
+                    
+                    // Cleanup old "blue" environment
+                    sh './scripts/cleanup-blue.sh'
+                }
+            }
+        }
+        
+        stage('Health Check') {
+            steps {
+                script {
+                    echo 'Running post-deployment health checks...'
+                    
+                    retry(3) {
+                        sh '''
+                            sleep 30  # Wait for deployment to stabilize
+                            tolstoy config test --timeout 30s
+                        '''
+                    }
+                    
+                    // Check workflow execution health
+                    sh '''
+                        tolstoy flows list --status active --limit 5 --output json | \
+                            jq -r '.[].id' | \
+                            while read -r flow_id; do
+                                tolstoy flows execute "$flow_id" --input '{}' --dry-run --timeout 60s
+                            done
+                    '''
+                }
+            }
+        }
+    }
+    
+    post {
+        success {
+            script {
+                def message = params.ROLLBACK ? 
+                    "✅ Rollback completed successfully" :
+                    "✅ Blue/Green deployment completed successfully"
+                    
+                slackSend(
+                    channel: '#deployments',
+                    color: 'good',
+                    message: "${message} - ${params.ENVIRONMENT} - Build ${env.BUILD_NUMBER}"
+                )
+            }
+        }
+        
+        failure {
+            script {
+                def message = params.ROLLBACK ? 
+                    "❌ Rollback failed" :
+                    "❌ Blue/Green deployment failed"
+                    
+                slackSend(
+                    channel: '#deployments',
+                    color: 'danger',
+                    message: "${message} - ${params.ENVIRONMENT} - Build ${env.BUILD_NUMBER}"
+                )
+                
+                // Auto-rollback on deployment failure
+                if (!params.ROLLBACK) {
+                    echo 'Deployment failed, initiating automatic rollback...'
+                    sh '''
+                        if [[ -d "${BACKUP_DIR}" ]]; then
+                            for backup_file in ${BACKUP_DIR}/*.yml; do
+                                [[ -f "$backup_file" ]] || continue
+                                workflow_id=$(basename "$backup_file" .yml)
+                                echo "Auto-rolling back: $workflow_id"
+                                tolstoy flows update "$workflow_id" "$backup_file" || true
+                            done
+                        fi
+                    '''
+                }
+            }
+        }
+    }
+}
+```
+
+## Azure DevOps
+
+### Azure Pipeline
+
+```yaml
+# azure-pipelines.yml
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+  paths:
+    include:
+      - workflows/*
+
+variables:
+  - group: tolstoy-credentials
+  - name: nodeVersion
+    value: '18.x'
+
+stages:
+- stage: Validate
+  displayName: 'Validate Workflows'
+  jobs:
+  - job: ValidateWorkflows
+    displayName: 'Validate Workflow Definitions'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '$(nodeVersion)'
+      displayName: 'Install Node.js'
+      
+    - script: |
+        npm install -g @tolstoy/cli
+      displayName: 'Install Tolstoy CLI'
+      
+    - script: |
+        for workflow in workflows/*.yml workflows/*.yaml; do
+          [[ -f "$workflow" ]] || continue
+          echo "Validating: $workflow"
+          tolstoy flows validate "$workflow"
+        done
+      displayName: 'Validate Workflow Files'
+
+- stage: Deploy
+  displayName: 'Deploy Workflows'
+  dependsOn: Validate
+  condition: succeeded()
+  jobs:
+  - deployment: DeployToProduction
+    displayName: 'Deploy to Production'
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - checkout: self
+          
+          - task: NodeTool@0
+            inputs:
+              versionSpec: '$(nodeVersion)'
+            displayName: 'Install Node.js'
+            
+          - script: |
+              npm install -g @tolstoy/cli
+            displayName: 'Install Tolstoy CLI'
+            
+          - script: |
+              tolstoy config add production \
+                --api-url "$(TOLSTOY_API_URL)" \
+                --org-id "$(TOLSTOY_ORG_ID)" \
+                --user-id "$(TOLSTOY_USER_ID)" \
+                --timeout "300s" \
+                --non-interactive
+              
+              tolstoy config use production
+              tolstoy config test --timeout 30s
+            displayName: 'Configure Tolstoy CLI'
+            env:
+              TOLSTOY_API_KEY: $(TOLSTOY_API_KEY)
+              
+          - script: |
+              ./scripts/deploy-workflows.sh production
+            displayName: 'Deploy Workflows'
+            
+          - script: |
+              ./scripts/test-deployment.sh
+            displayName: 'Test Deployment'
+```
+
+## Docker-based CI/CD
+
+### Docker Compose for CI/CD
+
+```yaml
+# docker-compose.ci.yml
+version: '3.8'
+
+services:
+  tolstoy-cli:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+      - tolstoy-cache:/root/.tolstoy
+    environment:
+      - TOLSTOY_API_URL
+      - TOLSTOY_ORG_ID
+      - TOLSTOY_USER_ID
+      - TOLSTOY_API_KEY
+      - CI=true
+    command: /app/scripts/ci-deploy.sh
+    
+  workflow-tests:
+    image: node:18-alpine
+    working_dir: /app
+    volumes:
+      - .:/app
+      - tolstoy-cache:/root/.tolstoy
+    environment:
+      - TOLSTOY_API_URL
+      - TOLSTOY_ORG_ID
+      - TOLSTOY_USER_ID
+      - TOLSTOY_API_KEY
+    command: /app/scripts/test-workflows.sh
+    depends_on:
+      - tolstoy-cli
+
+volumes:
+  tolstoy-cache:
+```
+
+```dockerfile
+# Dockerfile.ci - Custom CI image with Tolstoy CLI
+FROM node:18-alpine
+
+# Install system dependencies
+RUN apk add --no-cache \
+    bash \
+    curl \
+    jq \
+    git
+
+# Install Tolstoy CLI
+RUN npm install -g @tolstoy/cli
+
+# Create app directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy application files
+COPY . .
+
+# Create non-root user
+RUN adduser -D -s /bin/bash tolstoy
+USER tolstoy
+
+# Default command
+CMD ["./scripts/ci-deploy.sh"]
+```
+
+## Best Practices for CI/CD Integration
+
+### Security Best Practices
+
+```yaml
+# Security checklist for CI/CD
+security_checklist:
+  secrets_management:
+    - Store API keys as encrypted secrets
+    - Use different credentials per environment
+    - Rotate credentials regularly
+    - Never log credential values
+    
+  environment_isolation:
+    - Separate CI/CD pipelines per environment
+    - Use environment-specific configurations
+    - Implement proper access controls
+    - Monitor cross-environment access
+    
+  validation:
+    - Validate workflows before deployment
+    - Run security scans on workflow definitions
+    - Check for hardcoded secrets
+    - Verify resource permissions
+```
+
+### Deployment Strategies
+
+<CodeGroup>
+```bash Blue/Green Deployment
+#!/bin/bash
+# blue-green-deploy.sh
+
+ENVIRONMENT="${1:-production}"
+COLOR="${2:-green}"
+
+log() { echo "[$(date)] $*"; }
+error() { log "ERROR: $*" >&2; }
+info() { log "INFO: $*"; }
+
+deploy_workflows() {
+    local color="$1"
+    
+    info "Deploying workflows to $color environment"
+    
+    # Create temporary namespace/profile for new deployment
+    tolstoy config add "${ENVIRONMENT}-${color}" \
+        --api-url "${TOLSTOY_API_URL}" \
+        --org-id "${TOLSTOY_ORG_ID}" \
+        --user-id "${TOLSTOY_USER_ID}"
+    
+    # Deploy workflows
+    for workflow in workflows/*.yml; do
+        [[ -f "$workflow" ]] || continue
+        
+        workflow_name="${color}-$(basename "$workflow" .yml)"
+        info "Deploying: $workflow_name"
+        
+        tolstoy flows create "$workflow" --name "$workflow_name" \
+            --profile "${ENVIRONMENT}-${color}"
+    done
+}
+
+run_smoke_tests() {
+    local color="$1"
+    
+    info "Running smoke tests on $color environment"
+    
+    tolstoy config use "${ENVIRONMENT}-${color}"
+    
+    # Test critical workflows
+    local test_workflows=("user-onboarding" "payment-processing")
+    
+    for workflow in "${test_workflows[@]}"; do
+        workflow_name="${color}-${workflow}"
+        info "Testing: $workflow_name"
+        
+        if ! tolstoy flows execute "$workflow_name" \
+            --input '{}' --dry-run --timeout 60s; then
+            error "Smoke test failed for $workflow_name"
+            return 1
+        fi
+    done
+    
+    info "All smoke tests passed"
+}
+
+switch_traffic() {
+    local color="$1"
+    
+    info "Switching traffic to $color environment"
+    
+    # Update load balancer or routing configuration
+    # This is specific to your infrastructure
+    ./scripts/update-routing.sh "$color"
+    
+    info "Traffic switched to $color"
+}
+
+# Main deployment flow
+main() {
+    deploy_workflows "$COLOR"
+    run_smoke_tests "$COLOR"
+    switch_traffic "$COLOR"
+    
+    info "Blue/Green deployment completed successfully"
+}
+
+main "$@"
+```
+
+```bash Canary Deployment
+#!/bin/bash
+# canary-deploy.sh
+
+ENVIRONMENT="${1:-production}"
+CANARY_PERCENTAGE="${2:-10}"
+
+info() { echo "[$(date)] INFO: $*"; }
+error() { echo "[$(date)] ERROR: $*" >&2; }
+
+deploy_canary() {
+    local percentage="$1"
+    
+    info "Deploying canary with $percentage% traffic"
+    
+    # Deploy new workflows with canary prefix
+    for workflow in workflows/*.yml; do
+        [[ -f "$workflow" ]] || continue
+        
+        workflow_name="canary-$(basename "$workflow" .yml)"
+        info "Deploying canary: $workflow_name"
+        
+        tolstoy flows create "$workflow" --name "$workflow_name"
+    done
+    
+    # Configure traffic splitting
+    ./scripts/configure-traffic-split.sh "$percentage"
+}
+
+monitor_canary() {
+    local duration="${1:-600}"  # 10 minutes
+    
+    info "Monitoring canary for ${duration} seconds"
+    
+    local end_time=$(($(date +%s) + duration))
+    
+    while [[ $(date +%s) -lt $end_time ]]; do
+        # Check error rates
+        local error_rate
+        error_rate=$(tolstoy logs stats --since 5m --filter canary- \
+            --format json | jq -r '.overall.error_rate')
+        
+        if (( $(echo "$error_rate > 0.05" | bc -l) )); then
+            error "Canary error rate too high: $error_rate"
+            return 1
+        fi
+        
+        info "Canary error rate: $error_rate (healthy)"
+        sleep 30
+    done
+    
+    info "Canary monitoring completed successfully"
+}
+
+promote_canary() {
+    info "Promoting canary to full deployment"
+    
+    # Switch 100% traffic to canary
+    ./scripts/configure-traffic-split.sh 100
+    
+    # Clean up old deployments
+    tolstoy flows list --name "prod-*" | while read -r flow_id; do
+        info "Cleaning up old deployment: $flow_id"
+        tolstoy flows delete "$flow_id" --confirm
+    done
+    
+    # Rename canary workflows to production
+    tolstoy flows list --name "canary-*" | while read -r flow_id; do
+        new_name="${flow_id#canary-}"
+        new_name="prod-$new_name"
+        
+        info "Promoting: $flow_id -> $new_name"
+        tolstoy flows update "$flow_id" --name "$new_name"
+    done
+}
+
+rollback_canary() {
+    error "Rolling back canary deployment"
+    
+    # Switch traffic back to stable version
+    ./scripts/configure-traffic-split.sh 0
+    
+    # Clean up canary deployments
+    tolstoy flows list --name "canary-*" | while read -r flow_id; do
+        info "Cleaning up canary: $flow_id"
+        tolstoy flows delete "$flow_id" --confirm
+    done
+}
+
+# Main canary deployment flow
+main() {
+    deploy_canary "$CANARY_PERCENTAGE"
+    
+    if monitor_canary; then
+        promote_canary
+        info "Canary deployment completed successfully"
+    else
+        rollback_canary
+        error "Canary deployment failed and was rolled back"
+        exit 1
+    fi
+}
+
+main "$@"
+```
+</CodeGroup>
+
+### Testing Strategies
+
+```bash
+#!/bin/bash
+# comprehensive-testing.sh
+
+run_unit_tests() {
+    info "Running workflow unit tests"
+    
+    for workflow in workflows/*.yml; do
+        [[ -f "$workflow" ]] || continue
+        
+        # Validate syntax
+        tolstoy flows validate "$workflow"
+        
+        # Test with sample inputs
+        local test_inputs_file="${workflow%.yml}.test.json"
+        if [[ -f "$test_inputs_file" ]]; then
+            info "Testing $workflow with sample inputs"
+            tolstoy flows execute "$workflow" \
+                --input-file "$test_inputs_file" \
+                --dry-run --timeout 60s
+        fi
+    done
+}
+
+run_integration_tests() {
+    info "Running integration tests"
+    
+    # Test critical user journeys
+    local test_scenarios=(
+        "user-onboarding:integration-tests/onboarding.json"
+        "payment-processing:integration-tests/payment.json"
+    )
+    
+    for scenario in "${test_scenarios[@]}"; do
+        IFS=':' read -r workflow input_file <<< "$scenario"
+        
+        info "Integration test: $workflow"
+        
+        if ! tolstoy flows execute "$workflow" \
+            --input-file "$input_file" \
+            --timeout 300s; then
+            error "Integration test failed: $workflow"
+            return 1
+        fi
+    done
+}
+
+run_performance_tests() {
+    info "Running performance tests"
+    
+    # Execute workflows with performance monitoring
+    local workflows=("user-onboarding" "notification-sender")
+    
+    for workflow in "${workflows[@]}"; do
+        info "Performance test: $workflow"
+        
+        local start_time=$(date +%s%N)
+        
+        if tolstoy flows execute "$workflow" \
+            --input '{}' --timeout 120s; then
+            
+            local end_time=$(date +%s%N)
+            local duration=$(( (end_time - start_time) / 1000000 ))
+            
+            info "Performance: $workflow completed in ${duration}ms"
+            
+            # Check if performance is acceptable
+            if [[ $duration -gt 30000 ]]; then
+                error "Performance test failed: $workflow took ${duration}ms"
+                return 1
+            fi
+        else
+            error "Performance test failed: $workflow execution failed"
+            return 1
+        fi
+    done
+}
+
+# Main testing function
+main() {
+    info "Starting comprehensive testing"
+    
+    run_unit_tests
+    run_integration_tests
+    run_performance_tests
+    
+    info "All tests completed successfully"
+}
+
+main "$@"
+```
+
+## Monitoring and Observability
+
+### Deployment Monitoring
+
+```bash
+#!/bin/bash
+# deployment-monitor.sh
+
+monitor_deployment() {
+    local deployment_id="$1"
+    local duration="${2:-1800}"  # 30 minutes
+    
+    info "Monitoring deployment $deployment_id for ${duration} seconds"
+    
+    local end_time=$(($(date +%s) + duration))
+    local alert_sent=false
+    
+    while [[ $(date +%s) -lt $end_time ]]; do
+        # Check system health
+        local health_status
+        health_status=$(tolstoy config test --json | jq -r '.status')
+        
+        if [[ "$health_status" != "ok" ]]; then
+            if [[ "$alert_sent" == "false" ]]; then
+                send_alert "Deployment health check failed: $health_status"
+                alert_sent=true
+            fi
+        fi
+        
+        # Check error rates
+        local error_rate
+        error_rate=$(tolstoy logs stats --since 5m --format json | \
+            jq -r '.overall.error_rate')
+        
+        if (( $(echo "$error_rate > 0.05" | bc -l) )); then
+            send_alert "High error rate detected: $error_rate"
+        fi
+        
+        # Check response times
+        local avg_response_time
+        avg_response_time=$(tolstoy logs stats --since 5m --format json | \
+            jq -r '.overall.avg_response_time_ms')
+        
+        if [[ $avg_response_time -gt 5000 ]]; then
+            send_alert "High response time detected: ${avg_response_time}ms"
+        fi
+        
+        sleep 60
+    done
+    
+    info "Deployment monitoring completed"
+}
+
+send_alert() {
+    local message="$1"
+    
+    error "$message"
+    
+    # Send to Slack
+    if [[ -n "${SLACK_WEBHOOK:-}" ]]; then
+        curl -X POST "$SLACK_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\"🚨 Deployment Alert: $message\"}"
+    fi
+    
+    # Send email
+    if [[ -n "${ALERT_EMAIL:-}" ]]; then
+        echo "$message" | mail -s "Deployment Alert" "$ALERT_EMAIL"
+    fi
+}
+```
+
+## Next Steps
+
+You now have comprehensive CI/CD integration patterns for Tolstoy workflows:
+
+<CardGroup cols={2}>
+  <Card title="Monitoring Guide" icon="chart-line" href="/cli/guides/monitoring-setup">
+    Set up comprehensive monitoring for your deployments
+  </Card>
+  <Card title="Security Guide" icon="shield" href="/cli/guides/security-practices">
+    Implement security best practices for CI/CD
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Troubleshooting" icon="bug" href="/cli/troubleshooting">
+    Troubleshoot common CI/CD integration issues
+  </Card>
+  <Card title="Advanced Patterns" icon="code" href="/cli/guides/advanced-patterns">
+    Learn advanced deployment patterns and strategies
+  </Card>
+</CardGroup>
+
+---
+
+*Effective CI/CD integration ensures reliable, automated deployment of your Tolstoy workflows. Choose the patterns that best fit your infrastructure and team practices.*

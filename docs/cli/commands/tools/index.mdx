@@ -1,0 +1,767 @@
+---
+title: "Tools Commands"
+description: "Manage integrations, configure external services, and handle authentication credentials using the Tolstoy CLI tools commands."
+---
+
+# Tools Commands
+
+The `tolstoy tools` command group provides comprehensive integration management capabilities. Use these commands to configure external services, manage authentication credentials, and monitor tool health across your automation ecosystem.
+
+## Quick Reference
+
+| Command | Description | Usage |
+|---------|-------------|--------|
+| `list` | List all configured tools | `tolstoy tools list [options]` |
+| `get` | Get tool configuration details | `tolstoy tools get <tool-id>` |
+| `create` | Create new tool integration | `tolstoy tools create <file>` |
+| `update` | Update tool configuration | `tolstoy tools update <tool-id> <file>` |
+| `delete` | Delete tool integration | `tolstoy tools delete <tool-id>` |
+| `test` | Test tool connectivity | `tolstoy tools test <tool-id>` |
+| `auth` | Manage tool authentication | `tolstoy tools auth <subcommand>` |
+| `secrets` | Manage tool secrets | `tolstoy tools secrets <subcommand>` |
+| `health` | Check tool health status | `tolstoy tools health [tool-id]` |
+
+## Common Usage Patterns
+
+### Initial Tool Setup
+
+```bash
+# List available tool types
+tolstoy tools types
+
+# Create a new Slack integration
+tolstoy tools create ./integrations/slack-team.yml
+
+# Test the integration
+tolstoy tools test slack-team
+
+# View integration details
+tolstoy tools get slack-team --show-config
+
+# List all configured tools
+tolstoy tools list
+```
+
+### Tool Management
+
+```bash
+# Update tool configuration
+tolstoy tools update slack-team ./integrations/slack-team-updated.yml
+
+# Check tool health
+tolstoy tools health slack-team
+
+# Test all tools
+tolstoy tools test --all
+
+# Delete unused tool
+tolstoy tools delete old-integration --confirm
+```
+
+### Authentication Management
+
+```bash
+# Set up OAuth for a tool
+tolstoy tools auth oauth slack-team
+
+# Update API credentials
+tolstoy tools auth update slack-team --api-key "new-api-key"
+
+# Rotate credentials
+tolstoy tools auth rotate slack-team
+
+# View authentication status
+tolstoy tools auth status --all
+```
+
+## Tool Categories
+
+Tools are organized by their primary function:
+
+### Communication Tools
+- **Slack** - Team messaging and notifications
+- **Microsoft Teams** - Enterprise collaboration
+- **Discord** - Community and team communication
+- **Email (SMTP)** - Email delivery services
+- **SMS** - Text message providers (Twilio, etc.)
+
+### Data & Analytics
+- **Database** - PostgreSQL, MySQL, MongoDB connections
+- **Data Warehouses** - Snowflake, BigQuery, Redshift
+- **Analytics** - Google Analytics, Mixpanel, Amplitude
+- **Business Intelligence** - Tableau, Power BI, Looker
+
+### Development Tools
+- **Version Control** - GitHub, GitLab, Bitbucket
+- **CI/CD** - Jenkins, GitHub Actions, GitLab CI
+- **Monitoring** - DataDog, New Relic, PagerDuty
+- **Issue Tracking** - Jira, Linear, Asana
+
+### Business Applications
+- **CRM** - Salesforce, HubSpot, Pipedrive
+- **Marketing** - Mailchimp, SendGrid, Marketo
+- **Finance** - Stripe, PayPal, QuickBooks
+- **HR** - BambooHR, Workday, Greenhouse
+
+### Cloud Services
+- **AWS** - S3, Lambda, SQS, SNS
+- **Google Cloud** - Cloud Storage, Pub/Sub, BigQuery
+- **Azure** - Blob Storage, Service Bus, Cosmos DB
+- **File Storage** - Dropbox, Box, OneDrive
+
+## Tool Configuration Format
+
+Tools can be configured using YAML or JSON files:
+
+<CodeGroup>
+```yaml Slack Integration (YAML)
+# slack-team.yml
+id: slack-team
+name: Development Team Slack
+description: Main Slack workspace for development team
+type: slack
+version: 1
+
+config:
+  workspace_url: "https://dev-team.slack.com"
+  base_url: "https://slack.com/api"
+  timeout_ms: 15000
+  retry_attempts: 3
+
+auth:
+  method: oauth
+  scopes:
+    - "chat:write"
+    - "chat:write.public"
+    - "channels:read"
+    - "users:read"
+  # OAuth tokens will be stored securely
+
+settings:
+  default_channel: "#general"
+  bot_name: "Tolstoy Bot"
+  bot_emoji: ":robot_face:"
+  thread_replies: true
+  unfurl_links: false
+  
+features:
+  supports_threads: true
+  supports_blocks: true
+  supports_attachments: true
+  rate_limit: 1 # per second
+
+health_check:
+  endpoint: "auth.test"
+  interval: "5m"
+  timeout: "10s"
+
+tags:
+  - communication
+  - team
+  - production
+```
+
+```yaml Database Connection (YAML)
+# postgres-main.yml
+id: postgres-main
+name: Main PostgreSQL Database
+description: Primary application database
+type: postgresql
+version: 1
+
+config:
+  host: "db.company.com"
+  port: 5432
+  database: "production"
+  ssl_mode: "require"
+  connection_pool:
+    max_connections: 10
+    idle_timeout: "5m"
+
+auth:
+  method: username_password
+  username: "tolstoy_app"
+  # Password stored in secrets
+
+settings:
+  query_timeout: "30s"
+  statement_timeout: "60s"
+  lock_timeout: "10s"
+
+health_check:
+  query: "SELECT 1"
+  interval: "2m"
+  timeout: "5s"
+
+tags:
+  - database
+  - postgresql
+  - production
+```
+
+```yaml HTTP API Tool (YAML)
+# custom-api.yml
+id: custom-api
+name: Custom REST API
+description: Company's internal API service
+type: http
+version: 1
+
+config:
+  base_url: "https://api.internal.com"
+  timeout_ms: 30000
+  follow_redirects: true
+  verify_ssl: true
+
+auth:
+  method: api_key
+  api_key_header: "X-API-Key"
+  # API key stored in secrets
+
+settings:
+  default_headers:
+    "Content-Type": "application/json"
+    "User-Agent": "Tolstoy/1.0"
+  retry_policy:
+    max_attempts: 3
+    backoff_factor: 2
+    retry_on: [500, 502, 503, 504]
+
+rate_limiting:
+  requests_per_second: 10
+  burst_capacity: 50
+
+health_check:
+  endpoint: "/health"
+  method: "GET"
+  expected_status: 200
+  interval: "1m"
+
+tags:
+  - http
+  - internal
+  - api
+```
+
+```json AWS S3 Configuration (JSON)
+{
+  "id": "aws-s3-uploads",
+  "name": "AWS S3 File Storage",
+  "description": "S3 bucket for file uploads and storage",
+  "type": "aws_s3",
+  "version": 1,
+  "config": {
+    "region": "us-east-1",
+    "bucket": "company-file-uploads",
+    "endpoint": null,
+    "force_path_style": false
+  },
+  "auth": {
+    "method": "aws_credentials",
+    "access_key_id": "${AWS_ACCESS_KEY_ID}",
+    "secret_access_key": "${AWS_SECRET_ACCESS_KEY}",
+    "session_token": null
+  },
+  "settings": {
+    "default_acl": "private",
+    "server_side_encryption": "AES256",
+    "multipart_threshold": "100MB",
+    "multipart_chunk_size": "10MB"
+  },
+  "health_check": {
+    "operation": "head_bucket",
+    "interval": "5m",
+    "timeout": "10s"
+  },
+  "tags": ["aws", "storage", "s3", "production"]
+}
+```
+</CodeGroup>
+
+## Authentication Methods
+
+### OAuth Authentication
+
+```bash
+# Set up OAuth flow
+tolstoy tools auth oauth slack-team
+
+# This will:
+# 1. Open browser for OAuth consent
+# 2. Handle callback and store tokens
+# 3. Set up automatic token refresh
+
+# Check OAuth status
+tolstoy tools auth status slack-team
+
+# Manually refresh tokens
+tolstoy tools auth refresh slack-team
+```
+
+### API Key Authentication
+
+```bash
+# Set API key from environment variable
+tolstoy tools auth set-api-key github-integration "$GITHUB_TOKEN"
+
+# Set API key interactively (secure prompt)
+tolstoy tools auth set-api-key sendgrid-email
+
+# Store API key from file
+tolstoy tools auth set-api-key stripe-payments --from-file ./stripe-key.txt
+```
+
+### Username/Password Authentication
+
+```bash
+# Set database credentials
+tolstoy tools auth set-credentials postgres-main \
+  --username "tolstoy_app" \
+  --password-prompt
+
+# Set credentials from environment
+tolstoy tools auth set-credentials mysql-analytics \
+  --username "$DB_USERNAME" \
+  --password "$DB_PASSWORD"
+```
+
+### Service Account Authentication
+
+```bash
+# Set up AWS service account
+tolstoy tools auth set-aws-credentials aws-s3-storage \
+  --access-key-id "$AWS_ACCESS_KEY_ID" \
+  --secret-access-key "$AWS_SECRET_ACCESS_KEY"
+
+# Set up Google Cloud service account
+tolstoy tools auth set-gcp-credentials gcp-bigquery \
+  --service-account-file "./service-account.json"
+
+# Set up Azure service principal
+tolstoy tools auth set-azure-credentials azure-storage \
+  --client-id "$AZURE_CLIENT_ID" \
+  --client-secret "$AZURE_CLIENT_SECRET" \
+  --tenant-id "$AZURE_TENANT_ID"
+```
+
+## Secrets Management
+
+### Basic Secrets Operations
+
+```bash
+# List secrets for a tool
+tolstoy tools secrets list slack-team
+
+# Set a secret value
+tolstoy tools secrets set slack-team webhook_url "https://hooks.slack.com/services/..."
+
+# Get secret metadata (not value)
+tolstoy tools secrets get slack-team webhook_url
+
+# Update secret
+tolstoy tools secrets update slack-team api_key --from-env SLACK_API_KEY
+
+# Delete secret
+tolstoy tools secrets delete slack-team old_token --confirm
+```
+
+### Bulk Secrets Management
+
+```bash
+# Import secrets from file
+cat > slack-secrets.env << EOF
+SLACK_BOT_TOKEN=xoxb-your-bot-token
+SLACK_APP_TOKEN=xapp-your-app-token
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/...
+EOF
+
+tolstoy tools secrets import slack-team --file slack-secrets.env
+
+# Export secrets (encrypted)
+tolstoy tools secrets export slack-team --encrypted > slack-secrets-backup.enc
+
+# Rotate all secrets for a tool
+tolstoy tools secrets rotate slack-team --confirm
+```
+
+### Secret Templates
+
+```bash
+# Create secret template for team sharing
+tolstoy tools secrets template create slack-integration \
+  --secrets "bot_token,app_token,webhook_url" \
+  --description "Standard Slack integration secrets"
+
+# Apply template to tool
+tolstoy tools secrets template apply slack-team slack-integration
+
+# List available templates
+tolstoy tools secrets template list
+```
+
+## Tool Health Monitoring
+
+### Individual Tool Health
+
+```bash
+# Check specific tool health
+tolstoy tools health slack-team
+
+# Sample output:
+🏥 Health Status: slack-team
+
+Overall Status: ✅ Healthy
+Last Check: 2024-01-20 15:30:00 UTC
+Response Time: 245ms
+
+Connection Tests:
+✅ Network connectivity
+✅ Authentication valid  
+✅ API endpoints accessible
+✅ Rate limits within bounds
+
+Recent Activity:
+• 15:29 - Auth token refreshed successfully
+• 15:25 - Health check passed (234ms)
+• 15:20 - 47 API calls made (within limits)
+
+Metrics (Last Hour):
+• Success Rate: 99.8%
+• Average Response Time: 267ms
+• API Calls: 1,247
+• Errors: 3 (rate limit warnings)
+```
+
+### All Tools Health Summary
+
+```bash
+# Check all tools health
+tolstoy tools health --all
+
+# Sample output:
+🏥 All Tools Health Summary
+
+┌─────────────────────┬──────────┬─────────────┬─────────────┬────────────┐
+│ Tool Name           │ Status   │ Response    │ Success %   │ Last Check │
+├─────────────────────┼──────────┼─────────────┼─────────────┼────────────┤
+│ slack-team          │ ✅ Good  │ 245ms       │ 99.8%       │ 2min ago   │
+│ github-integration  │ ✅ Good  │ 156ms       │ 100%        │ 1min ago   │
+│ postgres-main       │ ⚠️ Slow  │ 1,234ms     │ 98.2%       │ 30s ago    │
+│ sendgrid-email      │ ✅ Good  │ 189ms       │ 99.5%       │ 45s ago    │
+│ stripe-payments     │ ❌ Down  │ Timeout     │ 0%          │ 5min ago   │
+└─────────────────────┴──────────┴─────────────┴─────────────┴────────────┘
+
+⚠️ Issues Detected:
+• postgres-main: High response times detected
+• stripe-payments: Connection timeout - check network/credentials
+
+📊 Overall Health: 80% (4/5 tools healthy)
+```
+
+### Automated Health Monitoring
+
+```bash
+# Set up continuous health monitoring
+tolstoy tools health monitor --interval 5m --alert-on-failure
+
+# Configure health check alerts
+tolstoy tools health alerts configure \
+  --email "ops@company.com" \
+  --slack "#alerts" \
+  --threshold-response-time 2s \
+  --threshold-success-rate 95%
+
+# View health history
+tolstoy tools health history postgres-main --since 24h
+```
+
+## Advanced Tool Management
+
+### Tool Templates and Cloning
+
+```bash
+# Create template from existing tool
+tolstoy tools template create slack-template \
+  --from-tool slack-team \
+  --exclude-secrets
+
+# Clone tool configuration
+tolstoy tools clone slack-team slack-staging \
+  --update-name "Staging Slack" \
+  --new-secrets
+
+# Create tool from template
+tolstoy tools create --template slack-template \
+  --id slack-production \
+  --name "Production Slack"
+```
+
+### Bulk Operations
+
+```bash
+# Test multiple tools
+tolstoy tools test --tags communication,production
+
+# Update multiple tools
+tolstoy tools update --tags database --config-file ./db-update.yml
+
+# Health check by category
+tolstoy tools health --category communication
+```
+
+### Tool Versioning
+
+```bash
+# Update tool with version tracking
+tolstoy tools update slack-team ./slack-v2.yml \
+  --version 2.0.0 \
+  --changelog "Added thread support and new bot permissions"
+
+# View version history
+tolstoy tools versions slack-team
+
+# Rollback to previous version
+tolstoy tools rollback slack-team --to-version 1.0.0
+```
+
+## Integration Examples
+
+### CI/CD Tool Management
+
+```yaml
+# .github/workflows/update-tools.yml
+name: Update Tool Configurations
+on:
+  push:
+    paths: ['tools/**']
+
+jobs:
+  update-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Tolstoy CLI
+        run: npm install -g @tolstoy/cli
+        
+      - name: Configure CLI
+        run: |
+          tolstoy config add ci \
+            --org-id ${{ secrets.TOLSTOY_ORG_ID }} \
+            --user-id ${{ secrets.TOLSTOY_USER_ID }}
+            
+      - name: Validate Tool Configurations
+        run: |
+          for tool_file in tools/*.yml; do
+            echo "Validating $tool_file"
+            tolstoy tools validate "$tool_file"
+          done
+          
+      - name: Test Tool Connectivity
+        run: |
+          # Test all tools before updating
+          tolstoy tools test --all --timeout 30s
+          
+      - name: Update Tools
+        run: |
+          for tool_file in tools/*.yml; do
+            tool_id=$(basename "$tool_file" .yml)
+            echo "Updating tool: $tool_id"
+            
+            if tolstoy tools get "$tool_id" --quiet; then
+              tolstoy tools update "$tool_id" "$tool_file"
+            else
+              tolstoy tools create "$tool_file"
+            fi
+          done
+          
+      - name: Verify Updates
+        run: |
+          tolstoy tools health --all
+```
+
+### Tool Monitoring Script
+
+```bash
+#!/bin/bash
+# tool-health-monitor.sh
+
+# Configuration
+ALERT_THRESHOLD=80  # Overall health percentage
+EMAIL_ALERT="ops@company.com"
+SLACK_WEBHOOK="${SLACK_WEBHOOK_URL}"
+
+echo "🔍 Starting tool health monitoring..."
+
+# Get overall health status
+HEALTH_OUTPUT=$(tolstoy tools health --all --format json)
+OVERALL_HEALTH=$(echo "$HEALTH_OUTPUT" | jq -r '.overall_health_percentage')
+FAILED_TOOLS=$(echo "$HEALTH_OUTPUT" | jq -r '.failed_tools[]? | .name')
+
+echo "📊 Overall Health: ${OVERALL_HEALTH}%"
+
+# Check if health is below threshold
+if (( $(echo "$OVERALL_HEALTH < $ALERT_THRESHOLD" | bc -l) )); then
+  echo "🚨 Health below threshold ($ALERT_THRESHOLD%)"
+  
+  # Prepare alert message
+  ALERT_MESSAGE="⚠️ Tool Health Alert: ${OVERALL_HEALTH}% overall health"
+  
+  if [ -n "$FAILED_TOOLS" ]; then
+    ALERT_MESSAGE+="\n\nFailed Tools:"
+    echo "$FAILED_TOOLS" | while read -r tool; do
+      ALERT_MESSAGE+="\n• $tool"
+    done
+  fi
+  
+  # Send Slack alert
+  if [ -n "$SLACK_WEBHOOK" ]; then
+    curl -X POST "$SLACK_WEBHOOK" \
+      -H "Content-Type: application/json" \
+      -d "{
+        \"text\": \"$ALERT_MESSAGE\",
+        \"channel\": \"#alerts\",
+        \"username\": \"Tool Monitor\"
+      }"
+  fi
+  
+  # Send email alert
+  echo "$ALERT_MESSAGE" | mail -s "Tool Health Alert" "$EMAIL_ALERT"
+  
+  exit 1
+else
+  echo "✅ All tools healthy"
+fi
+
+# Generate daily report
+if [ "$(date +%H)" = "09" ]; then
+  echo "📊 Generating daily tool report..."
+  
+  tolstoy tools health --all --format markdown > "/tmp/daily-tool-report.md"
+  
+  # Send daily report
+  tolstoy actions execute send-email '{
+    "to": "team@company.com",
+    "subject": "Daily Tool Health Report",
+    "body_file": "/tmp/daily-tool-report.md",
+    "format": "markdown"
+  }'
+fi
+```
+
+## Best Practices
+
+### Tool Configuration Management
+
+1. **Version Control**: Keep tool configurations in version control
+2. **Environment Separation**: Use different tools for dev/staging/production
+3. **Naming Conventions**: Use consistent, descriptive tool IDs
+4. **Documentation**: Include clear descriptions and usage notes
+5. **Regular Updates**: Keep tool configurations and credentials current
+
+### Security Best Practices
+
+1. **Credential Rotation**: Regularly rotate API keys and tokens
+2. **Least Privilege**: Grant minimum required permissions
+3. **Secret Storage**: Never store secrets in configuration files
+4. **Audit Trails**: Monitor tool access and usage
+5. **Encryption**: Use encrypted storage for sensitive data
+
+### Performance Optimization
+
+1. **Connection Pooling**: Configure appropriate connection pools
+2. **Timeout Settings**: Set realistic timeout values
+3. **Rate Limiting**: Respect API rate limits
+4. **Health Checks**: Implement proactive health monitoring
+5. **Caching**: Cache tool responses where appropriate
+
+## Troubleshooting
+
+### Common Issues
+
+<details>
+<summary>**Authentication failures**</summary>
+
+**Symptoms**: `Error: Authentication failed for tool 'slack-team'`
+
+**Solutions**:
+```bash
+# Check authentication status
+tolstoy tools auth status slack-team
+
+# Refresh OAuth tokens
+tolstoy tools auth refresh slack-team
+
+# Update API credentials
+tolstoy tools auth update slack-team --interactive
+
+# Test authentication
+tolstoy tools test slack-team --verbose
+```
+</details>
+
+<details>
+<summary>**Connection timeouts**</summary>
+
+**Symptoms**: `Error: Connection timeout after 30s`
+
+**Solutions**:
+```bash
+# Check network connectivity
+tolstoy tools test tool-name --network-check
+
+# Increase timeout settings
+tolstoy tools update tool-name --timeout 60s
+
+# Check tool health
+tolstoy tools health tool-name --verbose
+
+# Review tool configuration
+tolstoy tools get tool-name --show-config
+```
+</details>
+
+<details>
+<summary>**Rate limiting issues**</summary>
+
+**Symptoms**: `Error: Rate limit exceeded (429)`
+
+**Solutions**:
+```bash
+# Check current rate limit status
+tolstoy tools health tool-name --show-rate-limits
+
+# Configure rate limiting
+tolstoy tools update tool-name --rate-limit 10/second
+
+# Implement exponential backoff
+tolstoy tools update tool-name --retry-policy exponential
+
+# Monitor API usage
+tolstoy tools stats tool-name --metric api-calls --since 1h
+```
+</details>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication Setup" icon="key" href="/cli/guides/tool-authentication">
+    Learn to configure secure authentication for tools
+  </Card>
+  <Card title="Custom Integrations" icon="plug" href="/cli/guides/custom-tools">
+    Build custom tool integrations
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Health Monitoring" icon="heart-pulse" href="/cli/guides/tool-monitoring">
+    Set up comprehensive tool health monitoring
+  </Card>
+  <Card title="Security Guide" icon="shield" href="/cli/guides/tool-security">
+    Implement security best practices for tools
+  </Card>
+</CardGroup>
+
+---
+
+*Tools are the foundation of workflow automation. Master these commands to build reliable, secure, and high-performance integrations with external services.*

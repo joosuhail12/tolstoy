@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { HealthService, HealthCheck, DatabaseHealthCheck } from './health.service';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { DatabaseHealthCheck, HealthCheck, HealthService } from './health.service';
 
 @ApiTags('Health')
 @Controller('status')
@@ -72,8 +72,9 @@ export class HealthController {
     },
   })
   async getDetailedHealth(): Promise<{
-    application: HealthCheck;
+    status: string;
     database: DatabaseHealthCheck;
+    redis: HealthCheck;
     environment: Record<string, unknown>;
     system: Record<string, unknown>;
   }> {

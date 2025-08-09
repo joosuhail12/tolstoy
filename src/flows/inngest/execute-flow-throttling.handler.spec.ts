@@ -266,7 +266,7 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
 
   describe('Event Publishing Configuration', () => {
     it('should return optimized settings for event publishing', () => {
-      const config = (handler as any).getEventPublishingConfiguration();
+      const config = (handler as any)._getEventPublishingConfiguration();
 
       expect(config).toEqual({
         concurrency: 20,

@@ -6,8 +6,10 @@ import { AwsSecretsService } from '../aws-secrets.service';
 import { RedisCacheService } from '../cache/redis-cache.service';
 import { ToolAuthController } from './tool-auth.controller';
 import { OAuthController } from './oauth.controller';
+import { MetricsModule } from '../metrics/metrics.module';
 
 @Module({
+  imports: [MetricsModule],
   providers: [AuthConfigService, OAuthService, PrismaService, AwsSecretsService, RedisCacheService],
   exports: [AuthConfigService, OAuthService],
   controllers: [ToolAuthController, OAuthController],

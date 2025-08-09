@@ -1,0 +1,1135 @@
+---
+title: "Flow Creation SDK"
+description: "Complete guide to creating, managing, and updating flows programmatically with the Tolstoy TypeScript SDK."
+---
+
+# Flow Creation SDK
+
+This comprehensive guide covers everything you need to know about creating and managing flows programmatically using the Tolstoy TypeScript SDK, from basic flow definitions to advanced validation and versioning strategies.
+
+## Quick Start
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient({
+  orgId: process.env.TOLSTOY_ORG_ID!,
+  userId: process.env.TOLSTOY_USER_ID!
+});
+
+// Create a simple flow
+const flow = await client.flows.create({
+  name: 'Welcome New Users',
+  description: 'Automated onboarding flow for new user accounts',
+  inputs: [
+    {
+      name: 'email',
+      type: 'string',
+      required: true,
+      description: 'User email address'
+    },
+    {
+      name: 'name',
+      type: 'string',
+      required: false,
+      description: 'User full name'
+    }
+  ],
+  steps: [
+    {
+      key: 'send-welcome-email',
+      name: 'Send Welcome Email',
+      action: 'send-email',
+      inputs: {
+        to: '{{inputs.email}}',
+        template: 'welcome',
+        variables: {
+          name: '{{inputs.name || "there"}}'
+        }
+      }
+    }
+  ]
+});
+
+console.log('Created flow:', flow.id);
+```
+
+## Flow Definition Structure
+
+### Basic Flow Components
+
+```typescript
+interface FlowDefinition {
+  // Basic information
+  name: string;
+  description?: string;
+  tags?: string[];
+  
+  // Flow structure
+  inputs: FlowInput[];
+  steps: FlowStep[];
+  outputs?: FlowOutput[];
+  
+  // Configuration
+  settings?: FlowSettings;
+  variables?: Record<string, any>;
+  
+  // Metadata
+  metadata?: Record<string, any>;
+}
+
+interface FlowInput {
+  name: string;
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array';
+  required: boolean;
+  description?: string;
+  default?: any;
+  validation?: ValidationRule;
+  sensitive?: boolean; // For passwords, API keys, etc.
+}
+
+interface FlowStep {
+  key: string;
+  name: string;
+  description?: string;
+  action: string;
+  inputs: Record<string, any>;
+  
+  // Conditional execution
+  executeIf?: string;
+  
+  // Error handling
+  onError?: ErrorHandler;
+  continueOnError?: boolean;
+  
+  // Retry configuration
+  retryPolicy?: RetryPolicy;
+  
+  // Timeout
+  timeout?: number;
+}
+
+interface FlowSettings {
+  timeout?: number; // Global timeout in milliseconds
+  retryPolicy?: RetryPolicy;
+  errorHandling?: 'stop' | 'continue' | 'conditional';
+  concurrency?: 'sequential' | 'parallel';
+  maxConcurrentSteps?: number;
+}
+```
+
+### Input Validation Rules
+
+```typescript
+interface ValidationRule {
+  // String validation
+  minLength?: number;
+  maxLength?: number;
+  pattern?: string; // Regex pattern
+  format?: 'email' | 'url' | 'phone' | 'date' | 'uuid';
+  
+  // Number validation
+  min?: number;
+  max?: number;
+  multipleOf?: number;
+  
+  // Array validation
+  minItems?: number;
+  maxItems?: number;
+  uniqueItems?: boolean;
+  
+  // Object validation
+  properties?: Record<string, ValidationRule>;
+  required?: string[];
+  
+  // Custom validation
+  customValidator?: string; // Reference to custom validator function
+  errorMessage?: string;
+}
+
+// Example: Create flow with comprehensive input validation
+const userRegistrationFlow = {
+  name: 'User Registration Flow',
+  description: 'Complete user registration with validation and setup',
+  inputs: [
+    {
+      name: 'email',
+      type: 'string' as const,
+      required: true,
+      description: 'User email address',
+      validation: {
+        format: 'email',
+        maxLength: 255,
+        errorMessage: 'Please provide a valid email address'
+      }
+    },
+    {
+      name: 'password',
+      type: 'string' as const,
+      required: true,
+      description: 'User password',
+      sensitive: true,
+      validation: {
+        minLength: 8,
+        pattern: '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]',
+        errorMessage: 'Password must contain at least 8 characters with uppercase, lowercase, number, and special character'
+      }
+    },
+    {
+      name: 'profile',
+      type: 'object' as const,
+      required: false,
+      description: 'User profile information',
+      validation: {
+        properties: {
+          firstName: {
+            minLength: 1,
+            maxLength: 50
+          },
+          lastName: {
+            minLength: 1,
+            maxLength: 50
+          },
+          age: {
+            min: 13,
+            max: 120
+          }
+        },
+        required: ['firstName', 'lastName']
+      }
+    },
+    {
+      name: 'preferences',
+      type: 'array' as const,
+      required: false,
+      description: 'User preferences',
+      validation: {
+        maxItems: 10,
+        uniqueItems: true
+      }
+    }
+  ],
+  steps: [
+    {
+      key: 'validate-email-uniqueness',
+      name: 'Check Email Uniqueness',
+      action: 'database-query',
+      inputs: {
+        query: 'SELECT COUNT(*) FROM users WHERE email = ?',
+        params: ['{{inputs.email}}']
+      }
+    },
+    {
+      key: 'hash-password',
+      name: 'Hash Password',
+      action: 'crypto-hash',
+      inputs: {
+        value: '{{inputs.password}}',
+        algorithm: 'bcrypt',
+        rounds: 12
+      },
+      executeIf: '{{steps.validate-email-uniqueness.outputs.count}} == 0'
+    },
+    {
+      key: 'create-user-account',
+      name: 'Create User Account',
+      action: 'database-insert',
+      inputs: {
+        table: 'users',
+        data: {
+          email: '{{inputs.email}}',
+          password_hash: '{{steps.hash-password.outputs.hash}}',
+          profile: '{{inputs.profile}}',
+          preferences: '{{inputs.preferences}}',
+          created_at: '{{now()}}'
+        }
+      },
+      executeIf: '{{steps.hash-password.outputs.success}} == true'
+    }
+  ]
+};
+
+const flow = await client.flows.create(userRegistrationFlow);
+```
+
+## Advanced Flow Patterns
+
+### Multi-Step Workflows with Conditional Logic
+
+```typescript
+const orderProcessingFlow = {
+  name: 'E-commerce Order Processing',
+  description: 'Complete order processing pipeline with conditional steps',
+  inputs: [
+    {
+      name: 'orderId',
+      type: 'string' as const,
+      required: true,
+      validation: {
+        pattern: '^order_[a-zA-Z0-9]{8}$'
+      }
+    },
+    {
+      name: 'customerId',
+      type: 'string' as const,
+      required: true
+    },
+    {
+      name: 'items',
+      type: 'array' as const,
+      required: true,
+      validation: {
+        minItems: 1,
+        maxItems: 50
+      }
+    },
+    {
+      name: 'shippingAddress',
+      type: 'object' as const,
+      required: true
+    },
+    {
+      name: 'paymentMethod',
+      type: 'object' as const,
+      required: true
+    }
+  ],
+  steps: [
+    // Step 1: Validate order data
+    {
+      key: 'validate-order',
+      name: 'Validate Order Data',
+      action: 'order-validator',
+      inputs: {
+        orderId: '{{inputs.orderId}}',
+        customerId: '{{inputs.customerId}}',
+        items: '{{inputs.items}}'
+      },
+      retryPolicy: {
+        maxRetries: 2,
+        retryDelay: 1000
+      }
+    },
+    
+    // Step 2: Check inventory (parallel for all items)
+    {
+      key: 'check-inventory',
+      name: 'Check Item Availability',
+      action: 'inventory-check',
+      inputs: {
+        items: '{{inputs.items}}'
+      },
+      executeIf: '{{steps.validate-order.outputs.valid}} == true'
+    },
+    
+    // Step 3: Calculate totals and taxes
+    {
+      key: 'calculate-totals',
+      name: 'Calculate Order Totals',
+      action: 'order-calculator',
+      inputs: {
+        items: '{{steps.check-inventory.outputs.availableItems}}',
+        shippingAddress: '{{inputs.shippingAddress}}',
+        customerId: '{{inputs.customerId}}'
+      },
+      executeIf: '{{steps.check-inventory.outputs.allAvailable}} == true'
+    },
+    
+    // Step 4: Process payment
+    {
+      key: 'process-payment',
+      name: 'Process Payment',
+      action: 'payment-processor',
+      inputs: {
+        amount: '{{steps.calculate-totals.outputs.grandTotal}}',
+        paymentMethod: '{{inputs.paymentMethod}}',
+        orderId: '{{inputs.orderId}}'
+      },
+      executeIf: '{{steps.calculate-totals.outputs.totalCalculated}} == true',
+      onError: {
+        action: 'payment-failed-handler',
+        inputs: {
+          orderId: '{{inputs.orderId}}',
+          error: '{{error}}'
+        }
+      },
+      retryPolicy: {
+        maxRetries: 3,
+        retryDelay: 2000,
+        backoffMultiplier: 1.5
+      }
+    },
+    
+    // Step 5: Reserve inventory (only if payment succeeded)
+    {
+      key: 'reserve-inventory',
+      name: 'Reserve Inventory',
+      action: 'inventory-reserver',
+      inputs: {
+        items: '{{steps.check-inventory.outputs.availableItems}}',
+        orderId: '{{inputs.orderId}}'
+      },
+      executeIf: '{{steps.process-payment.outputs.status}} == "succeeded"',
+      timeout: 30000
+    },
+    
+    // Step 6: Create shipment (conditional based on item type)
+    {
+      key: 'create-shipment',
+      name: 'Create Shipment',
+      action: 'shipment-creator',
+      inputs: {
+        orderId: '{{inputs.orderId}}',
+        items: '{{steps.reserve-inventory.outputs.reservedItems}}',
+        shippingAddress: '{{inputs.shippingAddress}}',
+        expedited: '{{steps.calculate-totals.outputs.expeditedShipping}}'
+      },
+      executeIf: '{{steps.reserve-inventory.outputs.success}} == true && {{steps.calculate-totals.outputs.hasPhysicalItems}} == true'
+    },
+    
+    // Step 7: Process digital items separately
+    {
+      key: 'deliver-digital-items',
+      name: 'Deliver Digital Items',
+      action: 'digital-delivery',
+      inputs: {
+        orderId: '{{inputs.orderId}}',
+        digitalItems: '{{steps.calculate-totals.outputs.digitalItems}}',
+        customerId: '{{inputs.customerId}}'
+      },
+      executeIf: '{{steps.calculate-totals.outputs.hasDigitalItems}} == true'
+    },
+    
+    // Step 8: Send confirmation email
+    {
+      key: 'send-confirmation',
+      name: 'Send Order Confirmation',
+      action: 'send-email',
+      inputs: {
+        to: '{{steps.validate-order.outputs.customerEmail}}',
+        template: 'order-confirmation',
+        variables: {
+          orderId: '{{inputs.orderId}}',
+          items: '{{steps.reserve-inventory.outputs.reservedItems}}',
+          total: '{{steps.calculate-totals.outputs.grandTotal}}',
+          trackingNumber: '{{steps.create-shipment.outputs.trackingNumber}}',
+          digitalDownloads: '{{steps.deliver-digital-items.outputs.downloadLinks}}'
+        }
+      },
+      executeIf: '{{steps.process-payment.outputs.status}} == "succeeded"',
+      continueOnError: true // Don't fail the entire order if email fails
+    },
+    
+    // Step 9: Update order status
+    {
+      key: 'update-order-status',
+      name: 'Update Order Status',
+      action: 'database-update',
+      inputs: {
+        table: 'orders',
+        where: { id: '{{inputs.orderId}}' },
+        data: {
+          status: 'processing',
+          payment_status: '{{steps.process-payment.outputs.status}}',
+          tracking_number: '{{steps.create-shipment.outputs.trackingNumber}}',
+          updated_at: '{{now()}}'
+        }
+      }
+    }
+  ],
+  
+  // Define flow outputs
+  outputs: [
+    {
+      name: 'orderStatus',
+      value: '{{steps.update-order-status.outputs.status}}'
+    },
+    {
+      name: 'paymentStatus',
+      value: '{{steps.process-payment.outputs.status}}'
+    },
+    {
+      name: 'trackingNumber',
+      value: '{{steps.create-shipment.outputs.trackingNumber}}'
+    },
+    {
+      name: 'totalAmount',
+      value: '{{steps.calculate-totals.outputs.grandTotal}}'
+    }
+  ],
+  
+  // Global flow settings
+  settings: {
+    timeout: 600000, // 10 minutes
+    errorHandling: 'conditional',
+    concurrency: 'sequential', // Process steps in order
+    retryPolicy: {
+      maxRetries: 1,
+      retryDelay: 5000
+    }
+  },
+  
+  // Flow variables (constants available to all steps)
+  variables: {
+    maxProcessingTime: 600000,
+    supportEmail: 'support@company.com',
+    defaultCurrency: 'USD'
+  }
+};
+
+const orderFlow = await client.flows.create(orderProcessingFlow);
+console.log('Created order processing flow:', orderFlow.id);
+```
+
+### Parallel Processing Workflows
+
+```typescript
+const dataProcessingFlow = {
+  name: 'Parallel Data Processing',
+  description: 'Process large datasets using parallel execution',
+  inputs: [
+    {
+      name: 'datasetId',
+      type: 'string' as const,
+      required: true
+    },
+    {
+      name: 'processingOptions',
+      type: 'object' as const,
+      required: false,
+      default: {}
+    }
+  ],
+  steps: [
+    // Step 1: Load and partition data
+    {
+      key: 'load-dataset',
+      name: 'Load Dataset',
+      action: 'data-loader',
+      inputs: {
+        datasetId: '{{inputs.datasetId}}',
+        partitionSize: 1000
+      }
+    },
+    
+    // Steps 2-5: Process partitions in parallel
+    {
+      key: 'process-partition-1',
+      name: 'Process Partition 1',
+      action: 'data-processor',
+      inputs: {
+        partition: '{{steps.load-dataset.outputs.partition1}}',
+        options: '{{inputs.processingOptions}}'
+      },
+      executeIf: '{{steps.load-dataset.outputs.partition1}} != null'
+    },
+    {
+      key: 'process-partition-2',
+      name: 'Process Partition 2',
+      action: 'data-processor',
+      inputs: {
+        partition: '{{steps.load-dataset.outputs.partition2}}',
+        options: '{{inputs.processingOptions}}'
+      },
+      executeIf: '{{steps.load-dataset.outputs.partition2}} != null'
+    },
+    {
+      key: 'process-partition-3',
+      name: 'Process Partition 3',
+      action: 'data-processor',
+      inputs: {
+        partition: '{{steps.load-dataset.outputs.partition3}}',
+        options: '{{inputs.processingOptions}}'
+      },
+      executeIf: '{{steps.load-dataset.outputs.partition3}} != null'
+    },
+    {
+      key: 'process-partition-4',
+      name: 'Process Partition 4',
+      action: 'data-processor',
+      inputs: {
+        partition: '{{steps.load-dataset.outputs.partition4}}',
+        options: '{{inputs.processingOptions}}'
+      },
+      executeIf: '{{steps.load-dataset.outputs.partition4}} != null'
+    },
+    
+    // Step 6: Merge results
+    {
+      key: 'merge-results',
+      name: 'Merge Processed Data',
+      action: 'data-merger',
+      inputs: {
+        results: [
+          '{{steps.process-partition-1.outputs.result}}',
+          '{{steps.process-partition-2.outputs.result}}',
+          '{{steps.process-partition-3.outputs.result}}',
+          '{{steps.process-partition-4.outputs.result}}'
+        ]
+      },
+      // This step depends on all partition processing steps
+      executeIf: '{{steps.process-partition-1.status}} == "completed" || {{steps.process-partition-2.status}} == "completed" || {{steps.process-partition-3.status}} == "completed" || {{steps.process-partition-4.status}} == "completed"'
+    },
+    
+    // Step 7: Generate report
+    {
+      key: 'generate-report',
+      name: 'Generate Processing Report',
+      action: 'report-generator',
+      inputs: {
+        datasetId: '{{inputs.datasetId}}',
+        processedData: '{{steps.merge-results.outputs.mergedData}}',
+        processingStats: '{{steps.merge-results.outputs.stats}}'
+      }
+    }
+  ],
+  
+  settings: {
+    concurrency: 'parallel',
+    maxConcurrentSteps: 4, // Limit parallel execution
+    timeout: 1800000 // 30 minutes for large datasets
+  }
+};
+
+const parallelFlow = await client.flows.create(dataProcessingFlow);
+```
+
+## Flow Validation and Testing
+
+### Pre-deployment Validation
+
+```typescript
+class FlowValidator {
+  constructor(private client: TolstoyClient) {}
+  
+  async validateFlow(flowDefinition: any): Promise<ValidationResult> {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    
+    try {
+      // Use the built-in validation
+      const validationResult = await this.client.flows.validate(flowDefinition);
+      
+      if (validationResult.errors) {
+        errors.push(...validationResult.errors);
+      }
+      
+      if (validationResult.warnings) {
+        warnings.push(...validationResult.warnings);
+      }
+      
+      // Custom validation logic
+      const customValidation = this.performCustomValidation(flowDefinition);
+      errors.push(...customValidation.errors);
+      warnings.push(...customValidation.warnings);
+      
+      return {
+        valid: errors.length === 0,
+        errors,
+        warnings,
+        details: validationResult.details
+      };
+      
+    } catch (error) {
+      return {
+        valid: false,
+        errors: [`Validation failed: ${error.message}`],
+        warnings: [],
+        details: null
+      };
+    }
+  }
+  
+  private performCustomValidation(flowDefinition: any): { errors: string[], warnings: string[] } {
+    const errors: string[] = [];
+    const warnings: string[] = [];
+    
+    // Check for required fields
+    if (!flowDefinition.name || flowDefinition.name.trim().length === 0) {
+      errors.push('Flow name is required');
+    }
+    
+    if (!flowDefinition.steps || flowDefinition.steps.length === 0) {
+      errors.push('Flow must have at least one step');
+    }
+    
+    // Validate step dependencies
+    if (flowDefinition.steps) {
+      const stepKeys = new Set(flowDefinition.steps.map(s => s.key));
+      
+      flowDefinition.steps.forEach((step, index) => {
+        // Check for duplicate step keys
+        const duplicateCount = flowDefinition.steps.filter(s => s.key === step.key).length;
+        if (duplicateCount > 1) {
+          errors.push(`Duplicate step key: ${step.key}`);
+        }
+        
+        // Check for valid executeIf conditions
+        if (step.executeIf) {
+          const referencedSteps = this.extractStepReferences(step.executeIf);
+          referencedSteps.forEach(ref => {
+            if (!stepKeys.has(ref) && !ref.startsWith('inputs.')) {
+              errors.push(`Step '${step.key}' references unknown step: ${ref}`);
+            }
+          });
+        }
+        
+        // Check for valid input references
+        if (step.inputs) {
+          const inputRefs = this.extractInputReferences(step.inputs);
+          inputRefs.forEach(ref => {
+            if (ref.startsWith('inputs.')) {
+              const inputName = ref.split('.')[1];
+              const inputExists = flowDefinition.inputs?.some(input => input.name === inputName);
+              if (!inputExists) {
+                errors.push(`Step '${step.key}' references unknown input: ${inputName}`);
+              }
+            }
+          });
+        }
+        
+        // Performance warnings
+        if (!step.timeout && step.action.includes('external-api')) {
+          warnings.push(`Step '${step.key}' calls external API without timeout`);
+        }
+        
+        if (step.retryPolicy?.maxRetries > 5) {
+          warnings.push(`Step '${step.key}' has high retry count (${step.retryPolicy.maxRetries})`);
+        }
+      });
+    }
+    
+    // Security warnings
+    if (flowDefinition.inputs) {
+      flowDefinition.inputs.forEach(input => {
+        if (input.sensitive && !input.validation) {
+          warnings.push(`Sensitive input '${input.name}' lacks validation rules`);
+        }
+      });
+    }
+    
+    return { errors, warnings };
+  }
+  
+  private extractStepReferences(expression: string): string[] {
+    const stepRegex = /steps\.([a-zA-Z0-9_-]+)/g;
+    const matches = [];
+    let match;
+    while ((match = stepRegex.exec(expression)) !== null) {
+      matches.push(match[1]);
+    }
+    return matches;
+  }
+  
+  private extractInputReferences(inputs: any): string[] {
+    const inputRefs: string[] = [];
+    const traverse = (obj: any) => {
+      if (typeof obj === 'string') {
+        const matches = obj.match(/\{\{([^}]+)\}\}/g);
+        if (matches) {
+          matches.forEach(match => {
+            const ref = match.slice(2, -2).trim();
+            inputRefs.push(ref);
+          });
+        }
+      } else if (Array.isArray(obj)) {
+        obj.forEach(traverse);
+      } else if (obj && typeof obj === 'object') {
+        Object.values(obj).forEach(traverse);
+      }
+    };
+    traverse(inputs);
+    return inputRefs;
+  }
+  
+  async testFlow(flowDefinition: any, testInputs: any[]): Promise<TestResult[]> {
+    const results: TestResult[] = [];
+    
+    // Create a temporary flow for testing
+    const testFlow = await this.client.flows.create({
+      ...flowDefinition,
+      name: `TEST_${flowDefinition.name}_${Date.now()}`,
+      tags: [...(flowDefinition.tags || []), 'test']
+    });
+    
+    try {
+      // Run test cases
+      for (let i = 0; i < testInputs.length; i++) {
+        const testInput = testInputs[i];
+        
+        try {
+          console.log(`Running test case ${i + 1}/${testInputs.length}`);
+          
+          const execution = await this.client.flows.execute(testFlow.id, testInput);
+          const result = await this.client.flows.waitForCompletion(execution.id, {
+            timeout: 60000 // 1 minute timeout for tests
+          });
+          
+          results.push({
+            testCase: i + 1,
+            inputs: testInput,
+            success: result.status === 'completed',
+            outputs: result.outputs,
+            error: result.error?.message,
+            duration: result.duration_ms
+          });
+          
+        } catch (error) {
+          results.push({
+            testCase: i + 1,
+            inputs: testInput,
+            success: false,
+            outputs: null,
+            error: error.message,
+            duration: null
+          });
+        }
+      }
+      
+    } finally {
+      // Clean up test flow
+      await this.client.flows.delete(testFlow.id);
+    }
+    
+    return results;
+  }
+}
+
+interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  details: any;
+}
+
+interface TestResult {
+  testCase: number;
+  inputs: any;
+  success: boolean;
+  outputs: any;
+  error?: string;
+  duration?: number;
+}
+
+// Usage
+const validator = new FlowValidator(client);
+
+// Validate flow definition
+const validation = await validator.validateFlow(orderProcessingFlow);
+
+if (!validation.valid) {
+  console.error('Flow validation failed:');
+  validation.errors.forEach(error => console.error(`  ❌ ${error}`));
+  validation.warnings.forEach(warning => console.warn(`  ⚠️  ${warning}`));
+} else {
+  console.log('✅ Flow validation passed');
+  
+  if (validation.warnings.length > 0) {
+    console.log('Warnings:');
+    validation.warnings.forEach(warning => console.warn(`  ⚠️  ${warning}`));
+  }
+  
+  // Run test cases
+  const testCases = [
+    {
+      orderId: 'order_test001',
+      customerId: 'cust_12345',
+      items: [
+        { id: 'item_1', quantity: 2, price: 29.99 },
+        { id: 'item_2', quantity: 1, price: 49.99 }
+      ],
+      shippingAddress: {
+        street: '123 Test St',
+        city: 'Test City',
+        state: 'TS',
+        zip: '12345',
+        country: 'US'
+      },
+      paymentMethod: {
+        type: 'credit_card',
+        token: 'test_token_123'
+      }
+    }
+    // Add more test cases as needed
+  ];
+  
+  console.log('Running flow tests...');
+  const testResults = await validator.testFlow(orderProcessingFlow, testCases);
+  
+  testResults.forEach(result => {
+    if (result.success) {
+      console.log(`✅ Test case ${result.testCase} passed (${result.duration}ms)`);
+    } else {
+      console.error(`❌ Test case ${result.testCase} failed: ${result.error}`);
+    }
+  });
+}
+```
+
+## Flow Versioning and Management
+
+### Version Control System
+
+```typescript
+class FlowVersionManager {
+  constructor(private client: TolstoyClient) {}
+  
+  async createVersionedFlow(
+    flowDefinition: any,
+    versionInfo: {
+      version: string;
+      changelog: string;
+      breakingChanges?: string[];
+      deprecations?: string[];
+    }
+  ) {
+    // Add version metadata
+    const versionedDefinition = {
+      ...flowDefinition,
+      version: versionInfo.version,
+      metadata: {
+        ...flowDefinition.metadata,
+        version: versionInfo.version,
+        changelog: versionInfo.changelog,
+        breakingChanges: versionInfo.breakingChanges || [],
+        deprecations: versionInfo.deprecations || [],
+        createdAt: new Date().toISOString()
+      },
+      tags: [...(flowDefinition.tags || []), `v${versionInfo.version}`]
+    };
+    
+    const flow = await this.client.flows.create(versionedDefinition);
+    
+    console.log(`📦 Created flow version ${versionInfo.version}: ${flow.id}`);
+    return flow;
+  }
+  
+  async updateFlowVersion(
+    flowId: string,
+    updates: any,
+    versionInfo: {
+      version: string;
+      changelog: string;
+      breakingChanges?: string[];
+      deprecations?: string[];
+    }
+  ) {
+    // Get existing flow
+    const existingFlow = await this.client.flows.get(flowId);
+    
+    // Create updated definition
+    const updatedDefinition = {
+      ...existingFlow,
+      ...updates,
+      version: versionInfo.version,
+      metadata: {
+        ...existingFlow.metadata,
+        ...updates.metadata,
+        version: versionInfo.version,
+        changelog: versionInfo.changelog,
+        breakingChanges: versionInfo.breakingChanges || [],
+        deprecations: versionInfo.deprecations || [],
+        updatedAt: new Date().toISOString(),
+        previousVersion: existingFlow.version || existingFlow.metadata?.version
+      }
+    };
+    
+    const flow = await this.client.flows.update(flowId, updatedDefinition);
+    
+    console.log(`🔄 Updated flow to version ${versionInfo.version}: ${flowId}`);
+    return flow;
+  }
+  
+  async deployFlowGradually(
+    flowId: string,
+    deploymentConfig: {
+      strategy: 'blue-green' | 'canary' | 'rolling';
+      stages: DeploymentStage[];
+      rollbackOnError?: boolean;
+      healthCheck?: {
+        endpoint: string;
+        expectedStatus: number;
+        timeout: number;
+      };
+    }
+  ) {
+    console.log(`🚀 Starting ${deploymentConfig.strategy} deployment for flow ${flowId}`);
+    
+    for (let i = 0; i < deploymentConfig.stages.length; i++) {
+      const stage = deploymentConfig.stages[i];
+      
+      console.log(`📋 Stage ${i + 1}/${deploymentConfig.stages.length}: ${stage.name}`);
+      
+      try {
+        // Deploy to stage
+        await this.deployToStage(flowId, stage);
+        
+        // Run health checks
+        if (deploymentConfig.healthCheck) {
+          await this.runHealthCheck(deploymentConfig.healthCheck);
+        }
+        
+        // Wait for stage duration
+        if (stage.duration) {
+          console.log(`⏳ Monitoring stage for ${stage.duration}ms...`);
+          await new Promise(resolve => setTimeout(resolve, stage.duration));
+        }
+        
+        console.log(`✅ Stage ${i + 1} completed successfully`);
+        
+      } catch (error) {
+        console.error(`❌ Stage ${i + 1} failed: ${error.message}`);
+        
+        if (deploymentConfig.rollbackOnError) {
+          console.log('🔄 Rolling back deployment...');
+          await this.rollbackDeployment(flowId, i);
+        }
+        
+        throw error;
+      }
+    }
+    
+    console.log('🎉 Deployment completed successfully');
+  }
+  
+  private async deployToStage(flowId: string, stage: DeploymentStage) {
+    // Implementation depends on your deployment infrastructure
+    console.log(`Deploying to ${stage.environment} (${stage.trafficPercentage}% traffic)`);
+    
+    // Example: Update flow configuration for this stage
+    await this.client.flows.update(flowId, {
+      settings: {
+        ...stage.settings,
+        deployment: {
+          stage: stage.name,
+          trafficPercentage: stage.trafficPercentage,
+          environment: stage.environment
+        }
+      }
+    });
+  }
+  
+  private async runHealthCheck(healthCheck: any) {
+    // Simple health check implementation
+    const response = await fetch(healthCheck.endpoint, {
+      method: 'GET',
+      timeout: healthCheck.timeout
+    });
+    
+    if (response.status !== healthCheck.expectedStatus) {
+      throw new Error(`Health check failed: expected ${healthCheck.expectedStatus}, got ${response.status}`);
+    }
+    
+    console.log('✅ Health check passed');
+  }
+  
+  private async rollbackDeployment(flowId: string, failedStage: number) {
+    // Implementation depends on your rollback strategy
+    console.log(`Rolling back deployment at stage ${failedStage + 1}`);
+    
+    // Example: Revert to previous version
+    const flow = await this.client.flows.get(flowId);
+    const previousVersion = flow.metadata?.previousVersion;
+    
+    if (previousVersion) {
+      // Find and restore previous version
+      console.log(`Restoring to previous version: ${previousVersion}`);
+    }
+  }
+}
+
+interface DeploymentStage {
+  name: string;
+  environment: 'dev' | 'staging' | 'production';
+  trafficPercentage: number;
+  duration?: number;
+  settings?: any;
+}
+
+// Usage
+const versionManager = new FlowVersionManager(client);
+
+// Create a new versioned flow
+const newFlow = await versionManager.createVersionedFlow(orderProcessingFlow, {
+  version: '1.0.0',
+  changelog: 'Initial release of order processing flow',
+  breakingChanges: [],
+  deprecations: []
+});
+
+// Update existing flow with new version
+const updatedFlow = await versionManager.updateFlowVersion(newFlow.id, {
+  steps: [
+    ...orderProcessingFlow.steps,
+    {
+      key: 'send-receipt',
+      name: 'Send Receipt',
+      action: 'send-receipt',
+      inputs: {
+        orderId: '{{inputs.orderId}}',
+        customerId: '{{inputs.customerId}}'
+      }
+    }
+  ]
+}, {
+  version: '1.1.0',
+  changelog: 'Added receipt sending functionality',
+  breakingChanges: [],
+  deprecations: []
+});
+
+// Deploy with gradual rollout
+await versionManager.deployFlowGradually(updatedFlow.id, {
+  strategy: 'canary',
+  stages: [
+    {
+      name: 'canary-5-percent',
+      environment: 'production',
+      trafficPercentage: 5,
+      duration: 300000 // 5 minutes
+    },
+    {
+      name: 'canary-25-percent',
+      environment: 'production',
+      trafficPercentage: 25,
+      duration: 600000 // 10 minutes
+    },
+    {
+      name: 'full-rollout',
+      environment: 'production',
+      trafficPercentage: 100,
+      duration: 0
+    }
+  ],
+  rollbackOnError: true,
+  healthCheck: {
+    endpoint: 'https://api.yourcompany.com/health',
+    expectedStatus: 200,
+    timeout: 5000
+  }
+});
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Flow Execution" icon="play" href="/sdk/resources/flows/execute">
+    Learn how to execute and monitor flows programmatically
+  </Card>
+  <Card title="Flow Overview" icon="workflow" href="/sdk/resources/flows/overview">
+    Complete guide to the Flows SDK capabilities
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Validation Guide" icon="shield-check" href="/sdk/guides/validation">
+    Best practices for flow validation and testing
+  </Card>
+  <Card title="Error Handling" icon="shield-exclamation" href="/sdk/guides/error-handling">
+    Implement robust error handling for production flows
+  </Card>
+</CardGroup>
+
+---
+
+*Create robust, scalable workflows with comprehensive validation, versioning, and deployment strategies. The Flow Creation SDK provides all the tools you need for enterprise-grade flow management.*

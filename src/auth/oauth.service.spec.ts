@@ -8,6 +8,10 @@ import { RedisCacheService } from '../cache/redis-cache.service';
 jest.mock('axios');
 const mockedAxios = axios as jest.Mocked<typeof axios>;
 
+// Mock axios.isAxiosError function
+const mockedIsAxiosError = jest.fn();
+(axios as any).isAxiosError = mockedIsAxiosError;
+
 describe('OAuthService', () => {
   let service: OAuthService;
   let authConfigService: jest.Mocked<AuthConfigService>;
@@ -21,6 +25,9 @@ describe('OAuthService', () => {
   const mockCode = 'auth_code_xyz';
 
   const mockOAuthConfig = {
+    id: 'oauth-config-123',
+    orgId: mockOrgId,
+    toolId: mockToolId,
     type: 'oauth2',
     config: {
       clientId: 'test_client_id',
@@ -29,7 +36,8 @@ describe('OAuthService', () => {
       scope: 'read:user',
     },
     tool: { id: mockToolId },
-    toolId: mockToolId,
+    createdAt: new Date(),
+    updatedAt: new Date(),
   };
 
   beforeEach(async () => {
@@ -241,6 +249,18 @@ describe('OAuthService', () => {
     });
 
     it('should handle token exchange failure', async () => {
+      // Set up state validation to pass
+      const validStateData = {
+        orgId: mockOrgId,
+        toolKey: mockToolKey,
+        userId: mockUserId,
+        timestamp: Date.now(), // Use timestamp instead of createdAt to match the actual state structure
+      };
+      redisCacheService.get.mockResolvedValue(JSON.stringify(validStateData));
+
+      // Set up OAuth config
+      authConfigService.getOrgAuthConfig.mockResolvedValue(mockOAuthConfig);
+
       mockedAxios.post.mockRejectedValue(new Error('Token exchange failed'));
 
       await expect(service.handleCallback(mockCode, mockState)).rejects.toThrow(
@@ -249,17 +269,27 @@ describe('OAuthService', () => {
     });
 
     it('should handle HTTP error in token exchange', async () => {
-      const errorResponse = {
-        response: {
-          status: 400,
-          data: { error: 'invalid_grant', error_description: 'Invalid authorization code' },
-        },
+      // Set up state validation to pass
+      const validStateData = {
+        orgId: mockOrgId,
+        toolKey: mockToolKey,
+        userId: mockUserId,
+        timestamp: Date.now(), // Use timestamp instead of createdAt to match the actual state structure
       };
-      mockedAxios.post.mockRejectedValue({
-        ...errorResponse,
-        isAxiosError: true,
-        message: 'Request failed with status code 400',
-      });
+      redisCacheService.get.mockResolvedValue(JSON.stringify(validStateData));
+
+      // Set up OAuth config
+      authConfigService.getOrgAuthConfig.mockResolvedValue(mockOAuthConfig);
+
+      const axiosError = new Error('Request failed with status code 400');
+      (axiosError as any).response = {
+        status: 400,
+        data: { error: 'invalid_grant', error_description: 'Invalid authorization code' },
+      };
+      
+      // Mock axios.isAxiosError to return true for our error
+      mockedIsAxiosError.mockReturnValueOnce(true);
+      mockedAxios.post.mockRejectedValue(axiosError);
 
       await expect(service.handleCallback(mockCode, mockState)).rejects.toThrow(
         'Failed to exchange authorization code: invalid_grant',

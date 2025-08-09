@@ -1,4 +1,4 @@
-import { Module, Global } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { RedisCacheService } from './redis-cache.service';
 import { AwsSecretsService } from '../aws-secrets.service';

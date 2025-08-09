@@ -1,191 +1,1020 @@
 ---
-openapi: "post /flows/{id}/execute"
+title: "Execute Flow"
+openapi: "POST /flows/{id}/execute"
 ---
 
-# Execute Workflow
+# Execute Flow
 
-Execute a workflow with custom variables and configuration. This is the primary endpoint for triggering workflow automation in Tolstoy.
+Start execution of a workflow with provided input data. Executions can be run synchronously (blocking) or asynchronously (non-blocking) based on your requirements.
 
-## Overview
+<RequestExample>
 
-The workflow execution endpoint allows you to:
-- ⚡ **Execute workflows** synchronously or asynchronously
-- 📊 **Pass custom variables** for workflow personalization  
-- 🔄 **Choose execution modes** based on workflow complexity
-- 🎯 **Get immediate execution tracking** with unique execution IDs
+```bash cURL
+curl -X POST "https://tolstoy.getpullse.com/flows/flow_abc123def456/execute" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputs": {
+      "customer_email": "john@company.com",
+      "plan_type": "premium",
+      "customer_name": "John Smith"
+    },
+    "mode": "async",
+    "tags": ["customer-onboarding", "priority"]
+  }'
+```
+
+```typescript TypeScript
+interface ExecuteFlowRequest {
+  inputs: Record<string, any>;
+  mode?: 'sync' | 'async';
+  tags?: string[];
+  webhook_url?: string;
+  timeout_ms?: number;
+}
+
+const executionRequest: ExecuteFlowRequest = {
+  inputs: {
+    customer_email: "john@company.com",
+    plan_type: "premium", 
+    customer_name: "John Smith"
+  },
+  mode: "async",
+  tags: ["customer-onboarding", "priority"],
+  webhook_url: "https://your-app.com/webhooks/flow-completion"
+};
+
+const response = await fetch('https://tolstoy.getpullse.com/flows/flow_abc123def456/execute', {
+  method: 'POST',
+  headers: {
+    'x-org-id': 'org_1234567890abcdef',
+    'x-user-id': 'user_abcdef1234567890',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(executionRequest)
+});
+
+const execution = await response.json();
+console.log('Execution started:', execution.data.id);
+
+// For async executions, poll for completion
+if (execution.data.status === 'running') {
+  const pollExecution = async () => {
+    const statusResponse = await fetch(
+      `https://tolstoy.getpullse.com/flows/flow_abc123def456/executions/${execution.data.id}`,
+      { headers: { 'x-org-id': 'org_1234567890abcdef', 'x-user-id': 'user_abcdef1234567890' }}
+    );
+    return statusResponse.json();
+  };
+  
+  // Poll every 5 seconds until completion
+  const interval = setInterval(async () => {
+    const status = await pollExecution();
+    if (status.data.status !== 'running') {
+      console.log('Execution completed:', status.data);
+      clearInterval(interval);
+    }
+  }, 5000);
+}
+```
+
+```python Python
+import requests
+import time
+
+execution_data = {
+    "inputs": {
+        "customer_email": "john@company.com",
+        "plan_type": "premium",
+        "customer_name": "John Smith"
+    },
+    "mode": "async",
+    "tags": ["customer-onboarding", "priority"],
+    "webhook_url": "https://your-app.com/webhooks/flow-completion"
+}
+
+headers = {
+    'x-org-id': 'org_1234567890abcdef',
+    'x-user-id': 'user_abcdef1234567890',
+    'Content-Type': 'application/json'
+}
+
+# Start execution
+response = requests.post(
+    'https://tolstoy.getpullse.com/flows/flow_abc123def456/execute',
+    headers=headers,
+    json=execution_data
+)
+
+if response.status_code == 202:
+    execution = response.json()
+    execution_id = execution['data']['id']
+    print(f"Execution started: {execution_id}")
+    
+    # Poll for async completion
+    if execution['data']['status'] == 'running':
+        while True:
+            status_response = requests.get(
+                f'https://tolstoy.getpullse.com/flows/flow_abc123def456/executions/{execution_id}',
+                headers=headers
+            )
+            
+            status_data = status_response.json()
+            if status_data['data']['status'] != 'running':
+                print(f"Execution completed: {status_data['data']['status']}")
+                break
+                
+            time.sleep(5)  # Wait 5 seconds before next poll
+else:
+    print(f"Error: {response.json()}")
+```
+
+```javascript Node.js
+const axios = require('axios');
+
+async function executeFlow(flowId, inputs) {
+  const executionData = {
+    inputs: {
+      customer_email: "john@company.com",
+      plan_type: "premium",
+      customer_name: "John Smith"
+    },
+    mode: "sync", // Use sync for immediate results
+    timeout_ms: 300000 // 5 minute timeout
+  };
+
+  const headers = {
+    'x-org-id': 'org_1234567890abcdef',
+    'x-user-id': 'user_abcdef1234567890',
+    'Content-Type': 'application/json'
+  };
+
+  try {
+    const response = await axios.post(
+      `https://tolstoy.getpullse.com/flows/${flowId}/execute`,
+      executionData,
+      { headers }
+    );
+
+    if (response.data.success) {
+      console.log('Flow executed successfully:');
+      console.log('Status:', response.data.data.status);
+      console.log('Results:', response.data.data.results);
+      return response.data.data;
+    }
+  } catch (error) {
+    console.error('Execution failed:', error.response?.data || error.message);
+    throw error;
+  }
+}
+
+// Usage
+executeFlow('flow_abc123def456')
+  .then(result => console.log('Final result:', result))
+  .catch(err => console.error('Failed:', err));
+```
+
+</RequestExample>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+Unique flow identifier to execute (format: `flow_` + 15 alphanumeric characters)
+</ParamField>
+
+## Request Body
+
+<ParamField body="inputs" type="object" required>
+Input data for the flow execution. Must provide values for all required flow inputs.
+
+**Format:** Key-value pairs where keys match the flow's input parameter names.
+
+**Example:**
+```json
+{
+  "customer_email": "john@company.com",
+  "plan_type": "premium",
+  "order_id": "ord_12345"
+}
+```
+</ParamField>
+
+<ParamField body="mode" type="string" default="async">
+Execution mode determining how the request is processed.
+
+**Available modes:**
+- `async` - Start execution and return immediately (non-blocking)
+- `sync` - Wait for execution completion before returning (blocking)
+
+**Recommendations:**
+- Use `async` for long-running flows or high-throughput scenarios
+- Use `sync` for quick flows or when you need immediate results
+</ParamField>
+
+<ParamField body="tags" type="string[]">
+Optional tags to categorize this execution for tracking and filtering.
+
+**Constraints:**
+- Maximum 10 tags per execution
+- Each tag: 1-50 characters
+</ParamField>
+
+<ParamField body="webhook_url" type="string">
+Optional webhook URL to receive execution completion notifications (async mode only).
+
+**Format:** Valid HTTPS URL that can receive POST requests
+
+**Webhook Payload:** Standard execution object with completion status and results
+</ParamField>
+
+<ParamField body="timeout_ms" type="integer">
+Optional timeout for execution in milliseconds.
+
+**Constraints:**
+- Minimum: 1000ms (1 second)
+- Maximum: 600000ms (10 minutes) for sync mode
+- Maximum: 36000000ms (10 hours) for async mode
+- Default: 120000ms (2 minutes) for sync, unlimited for async
+</ParamField>
+
+<ParamField body="priority" type="string" default="normal">
+Execution priority level for queue management.
+
+**Available priorities:**
+- `low` - Lower priority in execution queue
+- `normal` - Standard priority (default)
+- `high` - Higher priority in execution queue
+- `critical` - Highest priority (enterprise only)
+</ParamField>
+
+<ParamField body="dry_run" type="boolean" default="false">
+When true, validates inputs and returns execution plan without actually running the flow.
+
+**Use cases:**
+- Testing flow definitions
+- Validating input data
+- Debugging flow logic
+</ParamField>
+
+## Response
+
+<ResponseExample>
+
+```json Async Execution Response
+{
+  "success": true,
+  "data": {
+    "id": "exec_abc123def456ghi789",
+    "flow_id": "flow_abc123def456", 
+    "status": "running",
+    "mode": "async",
+    "priority": "normal",
+    "inputs": {
+      "customer_email": "john@company.com",
+      "plan_type": "premium",
+      "customer_name": "John Smith"
+    },
+    "tags": ["customer-onboarding", "priority"],
+    "progress": {
+      "current_step": "send_welcome_email",
+      "completed_steps": 0,
+      "total_steps": 3,
+      "percentage": 0
+    },
+    "webhook_url": "https://your-app.com/webhooks/flow-completion",
+    "created_by": {
+      "id": "user_abcdef1234567890",
+      "name": "John Smith",
+      "email": "john@company.com"
+    },
+    "started_at": "2024-01-15T14:30:00Z",
+    "estimated_completion": "2024-01-15T14:35:00Z"
+  },
+  "metadata": {
+    "request_id": "req_abc123def456",
+    "timestamp": "2024-01-15T14:30:00Z"
+  }
+}
+```
+
+```json Sync Execution Success Response
+{
+  "success": true,
+  "data": {
+    "id": "exec_xyz789abc123def456",
+    "flow_id": "flow_abc123def456",
+    "status": "completed",
+    "mode": "sync", 
+    "priority": "normal",
+    "inputs": {
+      "customer_email": "john@company.com",
+      "plan_type": "premium",
+      "customer_name": "John Smith"
+    },
+    "results": {
+      "send_welcome_email": {
+        "status": "completed",
+        "message_id": "msg_abc123",
+        "delivered_at": "2024-01-15T14:30:15Z"
+      },
+      "create_account": {
+        "status": "completed", 
+        "account_id": "acc_xyz789",
+        "created_at": "2024-01-15T14:30:30Z"
+      },
+      "send_confirmation": {
+        "status": "completed",
+        "confirmation_sent": true,
+        "tracking_id": "track_def456"
+      }
+    },
+    "execution_summary": {
+      "total_steps": 3,
+      "completed_steps": 3,
+      "failed_steps": 0,
+      "skipped_steps": 0,
+      "success_rate": 1.0
+    },
+    "performance": {
+      "duration_ms": 4580,
+      "steps_duration_ms": {
+        "send_welcome_email": 1200,
+        "create_account": 2100,
+        "send_confirmation": 800
+      }
+    },
+    "created_by": {
+      "id": "user_abcdef1234567890",
+      "name": "John Smith",
+      "email": "john@company.com"
+    },
+    "started_at": "2024-01-15T14:30:00Z",
+    "completed_at": "2024-01-15T14:30:04Z"
+  },
+  "metadata": {
+    "request_id": "req_sync123",
+    "timestamp": "2024-01-15T14:30:04Z"
+  }
+}
+```
+
+```json Execution Failure Response
+{
+  "success": true,
+  "data": {
+    "id": "exec_failed123abc456",
+    "flow_id": "flow_abc123def456",
+    "status": "failed",
+    "mode": "sync",
+    "inputs": {
+      "customer_email": "invalid-email",
+      "plan_type": "premium"
+    },
+    "error": {
+      "code": "VALIDATION_ERROR", 
+      "message": "Email validation failed in step 'send_welcome_email'",
+      "step_key": "send_welcome_email",
+      "details": {
+        "field": "to",
+        "value": "invalid-email",
+        "reason": "Invalid email format"
+      }
+    },
+    "results": {
+      "send_welcome_email": {
+        "status": "failed",
+        "error": "Invalid email format: invalid-email",
+        "attempted_at": "2024-01-15T14:30:05Z"
+      }
+    },
+    "execution_summary": {
+      "total_steps": 3,
+      "completed_steps": 0,
+      "failed_steps": 1,
+      "skipped_steps": 2,
+      "success_rate": 0.0
+    },
+    "started_at": "2024-01-15T14:30:00Z",
+    "failed_at": "2024-01-15T14:30:05Z"
+  },
+  "metadata": {
+    "request_id": "req_failed123",
+    "timestamp": "2024-01-15T14:30:05Z"
+  }
+}
+```
+
+```json Dry Run Response
+{
+  "success": true,
+  "data": {
+    "dry_run": true,
+    "flow_id": "flow_abc123def456",
+    "validation": {
+      "inputs_valid": true,
+      "steps_valid": true,
+      "dependencies_valid": true
+    },
+    "execution_plan": {
+      "steps": [
+        {
+          "key": "send_welcome_email",
+          "name": "Send Welcome Email",
+          "action": "email-send",
+          "resolved_inputs": {
+            "to": "john@company.com",
+            "subject": "Welcome to our platform!",
+            "template": "welcome-template"
+          },
+          "estimated_duration_ms": 1200,
+          "dependencies": []
+        },
+        {
+          "key": "create_account",
+          "name": "Create Account",
+          "action": "http-request",
+          "resolved_inputs": {
+            "method": "POST",
+            "url": "https://api.company.com/accounts",
+            "body": {
+              "email": "john@company.com",
+              "plan": "premium"
+            }
+          },
+          "estimated_duration_ms": 2100,
+          "dependencies": ["send_welcome_email"]
+        }
+      ],
+      "estimated_total_duration_ms": 4500,
+      "variable_resolution": {
+        "customer_email": "john@company.com",
+        "plan_type": "premium",
+        "customer_name": "John Smith"
+      }
+    }
+  },
+  "metadata": {
+    "request_id": "req_dryrun123",
+    "timestamp": "2024-01-15T14:30:00Z"
+  }
+}
+```
+
+```json Input Validation Error
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Required input parameter missing",
+    "details": {
+      "field": "customer_email",
+      "reason": "Required input parameter 'customer_email' was not provided"
+    }
+  },
+  "metadata": {
+    "request_id": "req_error123",
+    "timestamp": "2024-01-15T14:30:00Z"
+  }
+}
+```
+
+```json Flow Not Found Error
+{
+  "success": false,
+  "error": {
+    "code": "RESOURCE_NOT_FOUND",
+    "message": "Flow not found or not accessible",
+    "details": {
+      "resource_type": "flow",
+      "resource_id": "flow_nonexistent123"
+    }
+  },
+  "metadata": {
+    "request_id": "req_notfound123",
+    "timestamp": "2024-01-15T14:30:00Z"
+  }
+}
+```
+
+</ResponseExample>
+
+## Response Fields
+
+### Execution Object
+
+<ResponseField name="id" type="string">
+Unique execution identifier (format: `exec_` + 24 alphanumeric characters)
+</ResponseField>
+
+<ResponseField name="flow_id" type="string">
+ID of the flow that was executed
+</ResponseField>
+
+<ResponseField name="status" type="string">
+Current execution status:
+- `queued` - Waiting to start execution
+- `running` - Currently executing steps
+- `completed` - All steps completed successfully
+- `failed` - Execution failed on one or more steps
+- `cancelled` - Execution was cancelled by user
+- `timeout` - Execution exceeded timeout limit
+</ResponseField>
+
+<ResponseField name="mode" type="string">
+Execution mode: `sync` or `async`
+</ResponseField>
+
+<ResponseField name="priority" type="string">
+Execution priority level
+</ResponseField>
+
+<ResponseField name="inputs" type="object">
+Input data provided for the execution
+</ResponseField>
+
+<ResponseField name="results" type="object">
+Results from completed steps (available when execution completes or fails)
+  <Expandable title="Step Result Fields">
+    <ResponseField name="{step_key}.status" type="string">Status of individual step: `completed`, `failed`, `skipped`</ResponseField>
+    <ResponseField name="{step_key}.*" type="any">Step-specific output data and results</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="progress" type="object">
+Current execution progress (async executions only)
+  <Expandable title="Progress Fields">
+    <ResponseField name="current_step" type="string">Key of currently executing step</ResponseField>
+    <ResponseField name="completed_steps" type="integer">Number of completed steps</ResponseField>
+    <ResponseField name="total_steps" type="integer">Total number of steps in flow</ResponseField>
+    <ResponseField name="percentage" type="number">Completion percentage (0-100)</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="execution_summary" type="object">
+Summary statistics (completed executions only)
+  <Expandable title="Summary Fields">
+    <ResponseField name="total_steps" type="integer">Total steps in the flow</ResponseField>
+    <ResponseField name="completed_steps" type="integer">Successfully completed steps</ResponseField>
+    <ResponseField name="failed_steps" type="integer">Steps that failed</ResponseField>
+    <ResponseField name="skipped_steps" type="integer">Steps that were skipped</ResponseField>
+    <ResponseField name="success_rate" type="number">Success rate (0.0 to 1.0)</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="performance" type="object">
+Performance metrics (completed executions only)
+  <Expandable title="Performance Fields">
+    <ResponseField name="duration_ms" type="integer">Total execution duration in milliseconds</ResponseField>
+    <ResponseField name="steps_duration_ms" type="object">Duration breakdown by step</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="error" type="object">
+Error information (failed executions only)
+  <Expandable title="Error Fields">
+    <ResponseField name="code" type="string">Error code</ResponseField>
+    <ResponseField name="message" type="string">Human-readable error message</ResponseField>
+    <ResponseField name="step_key" type="string">Step where error occurred</ResponseField>
+    <ResponseField name="details" type="object">Additional error context</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="tags" type="string[]">
+Tags associated with this execution
+</ResponseField>
+
+<ResponseField name="webhook_url" type="string">
+Webhook URL for completion notifications (if provided)
+</ResponseField>
+
+<ResponseField name="created_by" type="object">
+User who started the execution
+</ResponseField>
+
+<ResponseField name="started_at" type="string">
+ISO 8601 timestamp when execution started
+</ResponseField>
+
+<ResponseField name="completed_at" type="string">
+ISO 8601 timestamp when execution completed (if completed)
+</ResponseField>
+
+<ResponseField name="failed_at" type="string">
+ISO 8601 timestamp when execution failed (if failed)
+</ResponseField>
+
+<ResponseField name="estimated_completion" type="string">
+Estimated completion time (async executions only)
+</ResponseField>
+
+## Status Codes
+
+<ResponseField name="200" type="Success - Sync Mode">
+Synchronous execution completed (success or failure)
+</ResponseField>
+
+<ResponseField name="202" type="Accepted - Async Mode">
+Asynchronous execution started successfully
+</ResponseField>
+
+<ResponseField name="400" type="Bad Request">
+Invalid request format or parameters
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+Missing or invalid authentication headers
+</ResponseField>
+
+<ResponseField name="403" type="Forbidden">
+Insufficient permissions to execute flow
+</ResponseField>
+
+<ResponseField name="404" type="Not Found">
+Flow not found or not accessible
+</ResponseField>
+
+<ResponseField name="409" type="Conflict">
+Flow is not in executable state (e.g., status is 'draft')
+</ResponseField>
+
+<ResponseField name="422" type="Unprocessable Entity">
+Input validation failed or flow definition errors
+</ResponseField>
+
+<ResponseField name="429" type="Too Many Requests">
+Rate limit exceeded or execution queue full
+</ResponseField>
+
+<ResponseField name="500" type="Internal Server Error">
+Server error during execution setup
+</ResponseField>
 
 ## Execution Modes
 
-### Asynchronous Execution (Recommended)
-Use `useDurable: true` for:
-- Long-running workflows (>30 seconds)
-- Workflows with external API calls
-- Multi-step automation processes
-- Production workflows
+### Synchronous Execution
 
-### Synchronous Execution  
-Use `useDurable: false` for:
-- Simple, fast workflows (<10 seconds)
-- Testing and development
-- Immediate response requirements
+<Accordion title="When to Use Sync Mode">
+- Quick flows that complete in under 2 minutes
+- When you need immediate results in your application
+- Testing and debugging flows
+- Simple automation tasks
+- Real-time user interactions
+</Accordion>
 
-## Common Use Cases
+<Accordion title="Sync Mode Limitations">
+- Maximum timeout: 10 minutes
+- Higher resource usage (keeps connection open)
+- Less suitable for high-throughput scenarios
+- No intermediate progress updates
+- Request may timeout if client connection is lost
+</Accordion>
 
-### User Onboarding
-```json
-{
-  "variables": {
-    "user": {
-      "email": "john@example.com",
-      "name": "John Doe",
-      "plan": "pro"
+### Asynchronous Execution
+
+<Accordion title="When to Use Async Mode">
+- Long-running workflows (>2 minutes)
+- High-throughput batch processing
+- Background automation tasks  
+- When you want to decouple execution from API response
+- Workflows that may experience variable execution times
+</Accordion>
+
+<Accordion title="Async Mode Benefits">
+- No timeout limits (up to 10 hours)
+- Better resource utilization
+- Progress tracking available
+- Webhook notifications for completion
+- Suitable for high-throughput scenarios
+- Can survive temporary connection issues
+</Accordion>
+
+## Examples
+
+### Simple Sync Execution
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "https://tolstoy.getpullse.com/flows/flow_abc123/execute" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputs": {
+      "email": "user@example.com",
+      "name": "John Doe"
     },
-    "source": "web_signup",
-    "timestamp": "2024-01-15T10:30:00Z"
+    "mode": "sync"
+  }'
+```
+
+```typescript TypeScript
+const result = await fetch('/flows/flow_abc123/execute', {
+  method: 'POST',
+  headers: {
+    'x-org-id': 'org_1234567890abcdef',
+    'x-user-id': 'user_abcdef1234567890',
+    'Content-Type': 'application/json'
   },
-  "useDurable": true
+  body: JSON.stringify({
+    inputs: {
+      email: "user@example.com",
+      name: "John Doe"
+    },
+    mode: "sync"
+  })
+});
+
+const execution = await result.json();
+if (execution.success && execution.data.status === 'completed') {
+  console.log('Flow completed:', execution.data.results);
 }
 ```
 
-### Order Processing
-```json
-{
-  "variables": {
-    "order": {
-      "id": "order_123",
-      "customerId": "cust_456",
-      "items": [{"sku": "PROD-001", "quantity": 2}],
-      "totalAmount": 99.99
+</CodeGroup>
+
+### Async Execution with Webhook
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "https://tolstoy.getpullse.com/flows/flow_longrunning/execute" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "inputs": {
+      "batch_data": ["item1", "item2", "item3"],
+      "process_type": "standard"
     },
+    "mode": "async",
+    "webhook_url": "https://your-app.com/webhooks/execution-complete",
+    "tags": ["batch-processing", "standard"],
     "priority": "high"
-  },
-  "useDurable": true
-}
+  }'
 ```
 
-### Marketing Campaign
-```json
-{
-  "variables": {
-    "campaign": {
-      "name": "Welcome Series",
-      "audience": ["user_123", "user_456"],
-      "template": "welcome_email_v2"
+```typescript Webhook Handler
+// Webhook endpoint to receive completion notifications
+app.post('/webhooks/execution-complete', (req, res) => {
+  const execution = req.body; // Same format as execution response
+  
+  console.log('Execution completed:', execution.id);
+  console.log('Status:', execution.status);
+  
+  if (execution.status === 'completed') {
+    console.log('Results:', execution.results);
+    // Process successful execution
+  } else if (execution.status === 'failed') {
+    console.error('Execution failed:', execution.error);
+    // Handle failure
+  }
+  
+  res.status(200).send('OK');
+});
+```
+
+</CodeGroup>
+
+### Dry Run Validation
+
+<CodeGroup>
+
+```typescript Dry Run
+const dryRunResult = await fetch('/flows/flow_abc123/execute', {
+  method: 'POST',
+  headers: {
+    'x-org-id': 'org_1234567890abcdef',
+    'x-user-id': 'user_abcdef1234567890',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    inputs: {
+      email: "test@example.com",
+      name: "Test User"
     },
-    "personalization": {
-      "dynamicContent": true,
-      "timezone": "America/New_York"
-    }
-  },
-  "useDurable": true
+    dry_run: true
+  })
+});
+
+const validation = await dryRunResult.json();
+if (validation.success) {
+  console.log('Validation passed:', validation.data.validation);
+  console.log('Execution plan:', validation.data.execution_plan);
+  console.log('Estimated duration:', validation.data.execution_plan.estimated_total_duration_ms, 'ms');
 }
 ```
 
-## Response Details
+</CodeGroup>
 
-### Successful Execution Response
-```json
-{
-  "executionId": "exec_abc123def456",
-  "status": "running",
-  "flowId": "flow_123",
-  "createdAt": "2024-01-15T10:30:00Z",
-  "estimatedDuration": 180000,
-  "variables": {
-    "userId": "user_123"
+### Batch Execution Pattern
+
+<CodeGroup>
+
+```typescript Batch Processing
+async function processBatch(items: any[]) {
+  const executions = [];
+  
+  // Start multiple async executions
+  for (const item of items) {
+    const response = await fetch('/flows/flow_process_item/execute', {
+      method: 'POST',
+      headers: {
+        'x-org-id': 'org_1234567890abcdef',
+        'x-user-id': 'user_abcdef1234567890',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        inputs: { item_data: item },
+        mode: "async",
+        tags: ["batch-processing"]
+      })
+    });
+    
+    const execution = await response.json();
+    executions.push(execution.data);
+  }
+  
+  // Wait for all to complete
+  const completed = await Promise.all(
+    executions.map(exec => pollForCompletion(exec.id))
+  );
+  
+  return completed;
+}
+
+async function pollForCompletion(executionId: string) {
+  while (true) {
+    const response = await fetch(`/flows/executions/${executionId}`, {
+      headers: {
+        'x-org-id': 'org_1234567890abcdef',
+        'x-user-id': 'user_abcdef1234567890'
+      }
+    });
+    
+    const execution = await response.json();
+    if (execution.data.status !== 'running') {
+      return execution.data;
+    }
+    
+    await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
   }
 }
 ```
 
-### Error Responses
+</CodeGroup>
 
-#### Flow Not Found (404)
+## Error Handling
+
+### Common Error Patterns
+
+<Accordion title="Input Validation Errors">
 ```json
 {
   "success": false,
   "error": {
-    "code": "NOT_FOUND",
-    "message": "Flow with ID 'flow_123' not found",
+    "code": "VALIDATION_ERROR",
+    "message": "Input validation failed",
     "details": {
-      "flowId": "flow_123",
-      "orgId": "org_abc123"
+      "field": "email",
+      "value": "invalid-email",
+      "reason": "Must be a valid email address"
     }
   }
 }
 ```
 
-#### Invalid Variables (400)
+**Resolution:** Validate input data client-side before sending requests.
+</Accordion>
+
+<Accordion title="Flow Not Active Errors">
 ```json
 {
   "success": false,
   "error": {
-    "code": "VALIDATION_ERROR", 
-    "message": "Required variable 'userId' is missing",
+    "code": "FLOW_NOT_EXECUTABLE",
+    "message": "Flow is not in executable state",
     "details": {
-      "missingFields": ["userId"],
-      "providedFields": ["email"]
+      "current_status": "draft",
+      "required_status": "active"
     }
   }
 }
 ```
+
+**Resolution:** Ensure flow status is `active` before attempting execution.
+</Accordion>
+
+<Accordion title="Rate Limit Errors">
+```json
+{
+  "success": false,
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "Execution rate limit exceeded",
+    "details": {
+      "retry_after": 60,
+      "current_limit": 100,
+      "period": "hour"
+    }
+  }
+}
+```
+
+**Resolution:** Implement exponential backoff and respect rate limits.
+</Accordion>
+
+<Accordion title="Queue Full Errors">
+```json
+{
+  "success": false,
+  "error": {
+    "code": "QUEUE_FULL",
+    "message": "Execution queue is at capacity",
+    "details": {
+      "queue_size": 1000,
+      "estimated_wait_time": "5 minutes"
+    }
+  }
+}
+```
+
+**Resolution:** Retry after the estimated wait time or use higher priority.
+</Accordion>
 
 ## Best Practices
 
-### 🔒 Security
-- Always validate input variables before sending
-- Use organization and user context headers
-- Never expose sensitive data in variables
+### Input Handling
 
-### ⚡ Performance  
-- Use async execution for workflows longer than 10 seconds
-- Batch similar executions when possible
-- Monitor execution status with polling intervals
+<Accordion title="Input Validation">
+- Always validate inputs client-side before sending
+- Use dry_run mode to test input compatibility  
+- Provide clear error messages for invalid inputs
+- Consider input size limits (max 10MB per execution)
+</Accordion>
 
-### 🎯 Reliability
-- Implement retry logic for network failures
-- Store execution IDs for tracking and debugging
-- Use webhooks for completion notifications
+<Accordion title="Data Types">
+- Ensure input data types match flow expectations
+- Use proper JSON serialization for objects and arrays
+- Handle special characters in string inputs
+- Consider timezone handling for date inputs
+</Accordion>
 
-## Monitoring Execution
+### Execution Strategy
 
-After triggering a workflow, monitor its progress:
+<Accordion title="Mode Selection">
+- Use `sync` for flows completing in <2 minutes
+- Use `async` for longer flows or high-throughput scenarios
+- Consider user experience when choosing modes
+- Plan for timeout handling in both modes
+</Accordion>
 
-```bash
-# Check execution status
-curl "https://tolstoy.getpullse.com/flows/{flowId}/executions/{executionId}" \
-  -H "x-org-id: your-org-id" \
-  -H "x-user-id: your-user-id"
-```
+<Accordion title="Error Recovery">
+- Implement retry logic for transient failures
+- Use webhooks for reliable async completion notifications
+- Monitor execution status for long-running flows
+- Have fallback strategies for critical workflows
+</Accordion>
 
-## SDK Integration
+### Performance Optimization
 
-The TypeScript SDK provides a simplified interface:
+<Accordion title="Concurrency">
+- Batch multiple executions for better throughput
+- Use appropriate priority levels for different use cases
+- Monitor queue depths during peak usage
+- Consider execution scheduling for non-time-critical flows
+</Accordion>
 
-```typescript
-import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
-
-const client = new TolstoyClient(
-  'https://tolstoy.getpullse.com',
-  'your-org-id',
-  'your-user-id'
-);
-
-// Execute with helper method
-const execution = await client.runFlow('flow_123', {
-  userId: 'user_456',
-  email: 'user@example.com'
-});
-
-console.log(`Started execution: ${execution.data.executionId}`);
-```
+<Accordion title="Resource Management">
+- Monitor execution resource usage
+- Use tags for execution categorization and analysis
+- Clean up completed executions periodically
+- Monitor webhook delivery reliability
+</Accordion>
 
 ## Related Endpoints
 
-- **[Get Execution Status](/api/flows/get-flows-executions-1)** - Monitor workflow progress
-- **[List Flow Executions](/api/flows/get-flows-executions)** - View execution history  
-- **[Cancel Execution](/api/flows/post-flows-executions-cancel)** - Stop running workflow
-- **[Retry Execution](/api/flows/post-flows-executions-retry)** - Retry failed workflow
+<CardGroup cols={2}>
+  <Card title="Get Execution Status" icon="clock" href="/api/flows/get-flows-executions-1">
+    Check status and results of running executions
+  </Card>
+  <Card title="Cancel Execution" icon="stop" href="/api/flows/post-flows-executions-cancel">
+    Stop running executions
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Retry Execution" icon="refresh" href="/api/flows/post-flows-executions-retry">
+    Retry failed executions
+  </Card>
+  <Card title="List Executions" icon="list" href="/api/flows/get-flows-executions">
+    View execution history and analytics
+  </Card>
+</CardGroup>
 
 ---
 
-*This endpoint supports the interactive playground below with live testing and auto-generated code samples.*
+<Info>
+**Tip**: Use dry_run mode to validate your flow and inputs before actual execution. This can help catch issues early and save on execution costs.
+</Info>

@@ -93,7 +93,15 @@ describe('AuthConfigService', () => {
 
   describe('getOrgAuthConfig', () => {
     it('should return cached config when available', async () => {
-      const cachedConfig = { apiKey: 'cached-key' };
+      const cachedConfig = {
+        id: 'cached-config-123',
+        orgId: 'org-456',
+        toolId: 'testTool',
+        type: 'apiKey',
+        config: { apiKey: 'cached-key' },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
       cacheService.get.mockResolvedValue(cachedConfig);
 
       const result = await service.getOrgAuthConfig('org-456', 'testTool');
@@ -114,7 +122,7 @@ describe('AuthConfigService', () => {
 
       const result = await service.getOrgAuthConfig('org-456', 'testTool');
 
-      expect(result).toEqual(mockOrgAuthConfig.config);
+      expect(result).toEqual(mockOrgAuthConfig);
       expect(prismaService.toolAuthConfig.findFirst).toHaveBeenCalledWith({
         where: { orgId: 'org-456', tool: { name: 'testTool' } },
         include: { tool: true },
@@ -153,7 +161,7 @@ describe('AuthConfigService', () => {
 
       const result = await service.getOrgAuthConfig('org-456', 'testTool');
 
-      expect(result).toEqual(mockOrgAuthConfig.config);
+      expect(result).toEqual(mockOrgAuthConfig);
       expect(cacheService.set).toHaveBeenCalled();
     });
   });
@@ -226,7 +234,6 @@ describe('AuthConfigService', () => {
 
       expect(result).toEqual({
         ...mockOrgAuthConfig,
-        tool: mockTool,
         config: newConfig,
       });
       expect(prismaService.toolAuthConfig.upsert).toHaveBeenCalledWith({
@@ -342,7 +349,7 @@ describe('AuthConfigService', () => {
   describe('private helper methods', () => {
     it('should generate correct cache keys', () => {
       const orgKey = service['orgConfigKey']('org-123', 'tool-456');
-      const userKey = service['userCredKey']('org-123', 'user-456', 'tool-789');
+      const userKey = service['_userCredKey']('org-123', 'user-456', 'tool-789');
 
       expect(orgKey).toBe('auth:org:org-123:tool:tool-456');
       expect(userKey).toBe('auth:user:org-123:user-456:tool:tool-789');

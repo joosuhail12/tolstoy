@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
-import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { ConfigService } from '@nestjs/config';
 import { Realtime } from 'ably';
 import { AwsSecretsService } from '../aws-secrets.service';
@@ -284,7 +284,7 @@ export class AblyService implements OnModuleDestroy {
 
     try {
       await this.publishWithRetry(channel, eventName, {
-        ...data,
+        ...(typeof data === 'object' && data !== null ? data : {}),
         timestamp: new Date().toISOString(),
         orgId,
         executionId,

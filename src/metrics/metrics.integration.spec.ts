@@ -8,7 +8,7 @@ describe('MetricsService - Integration', () => {
   beforeEach(async () => {
     // Clear all metrics before each test
     register.clear();
-    
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [MetricsService],
     }).compile();
@@ -32,7 +32,7 @@ describe('MetricsService - Integration', () => {
 
     // Get metrics output
     const metrics = await register.metrics();
-    
+
     expect(metrics).toContain('tool_auth_config_requests_total');
     expect(metrics).toContain('orgId="org-123"');
     expect(metrics).toContain('toolKey="github"');
@@ -48,7 +48,7 @@ describe('MetricsService - Integration', () => {
     service.incrementOAuthRedirect(labels);
 
     const metrics = await register.metrics();
-    
+
     expect(metrics).toContain('oauth_redirects_total');
     expect(metrics).toContain('orgId="org-456"');
     expect(metrics).toContain('toolKey="google"');
@@ -64,7 +64,7 @@ describe('MetricsService - Integration', () => {
     service.incrementOAuthCallback(labels);
 
     const metrics = await register.metrics();
-    
+
     expect(metrics).toContain('oauth_callbacks_total');
     expect(metrics).toContain('orgId="org-789"');
     expect(metrics).toContain('toolKey="slack"');
@@ -82,7 +82,7 @@ describe('MetricsService - Integration', () => {
     service.incrementValidationErrors(labels);
 
     const metrics = await register.metrics();
-    
+
     expect(metrics).toContain('validation_errors_total');
     expect(metrics).toContain('orgId="org-111"');
     expect(metrics).toContain('actionKey="send-email"');
@@ -102,7 +102,7 @@ describe('MetricsService - Integration', () => {
     service.incrementAuthInjection(labels);
 
     const metrics = await register.metrics();
-    
+
     expect(metrics).toContain('auth_injection_total');
     expect(metrics).toContain('orgId="org-222"');
     expect(metrics).toContain('stepId="step-333"');
@@ -117,16 +117,16 @@ describe('MetricsService - Integration', () => {
     service.incrementOAuthRedirect({ orgId: 'test', toolKey: 'test' });
     service.incrementOAuthCallback({ orgId: 'test', toolKey: 'test', success: 'true' });
     service.incrementValidationErrors({ orgId: 'test', context: 'test', errorType: 'test' });
-    service.incrementAuthInjection({ 
-      orgId: 'test', 
-      stepId: 'test', 
-      stepType: 'test', 
-      toolName: 'test', 
-      authType: 'test' 
+    service.incrementAuthInjection({
+      orgId: 'test',
+      stepId: 'test',
+      stepType: 'test',
+      toolName: 'test',
+      authType: 'test',
     });
 
     const metrics = await register.metrics();
-    
+
     // Verify all new metrics are present
     const expectedMetrics = [
       'tool_auth_config_requests_total',

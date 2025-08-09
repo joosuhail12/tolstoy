@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException } from '@nestjs/common';
-import { InputValidatorService, ValidationErrorDetail } from './input-validator.service';
+import { InputValidatorService } from './input-validator.service';
 import { MetricsService } from '../../metrics/metrics.service';
 import { ActionInputParam, InputParam } from '../../actions/types';
 
@@ -14,10 +14,7 @@ describe('InputValidatorService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        InputValidatorService,
-        { provide: MetricsService, useValue: mockMetricsService },
-      ],
+      providers: [InputValidatorService, { provide: MetricsService, useValue: mockMetricsService }],
     }).compile();
 
     service = module.get<InputValidatorService>(InputValidatorService);

@@ -1,4 +1,4 @@
-import { Module, MiddlewareConsumer, NestModule, OnModuleInit } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule, OnModuleInit } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { LoggerModule } from 'nestjs-pino';
 import { IncomingMessage, ServerResponse } from 'http';
@@ -78,12 +78,12 @@ import { AuthModule } from './auth/auth.module';
         },
         customSuccessMessage: (
           req: IncomingMessage,
-          res: ServerResponse<IncomingMessage>,
+          _res: ServerResponse<IncomingMessage>,
           responseTime: number,
         ) => `${req.method || 'UNKNOWN'} ${req.url || 'unknown'} completed in ${responseTime}ms`,
         customErrorMessage: (
           req: IncomingMessage,
-          res: ServerResponse<IncomingMessage>,
+          _res: ServerResponse<IncomingMessage>,
           error: Error,
         ) =>
           `Error on ${req.method || 'UNKNOWN'} ${req.url || 'unknown'}: ${error instanceof Error ? error.message : 'Unknown error'}`,

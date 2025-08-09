@@ -129,7 +129,10 @@ export class InngestExecutionService {
   /**
    * Get execution status and details
    */
-  async getExecutionStatus(executionId: string, tenant: TenantContext): Promise<Record<string, unknown>> {
+  async getExecutionStatus(
+    executionId: string,
+    tenant: TenantContext,
+  ): Promise<Record<string, unknown>> {
     const executionLog = await this.prisma.executionLog.findUnique({
       where: {
         id: executionId,
@@ -325,15 +328,19 @@ export class InngestExecutionService {
       where: whereClause,
     });
 
-    const statusCounts = executions.reduce((acc, item) => {
-      acc[item.status] = item._count.status;
-      return acc;
-    }, {} as Record<string, unknown>);
+    const statusCounts = executions.reduce(
+      (acc, item) => {
+        acc[item.status] = Number(item._count.status) || 0;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     return {
       totalExecutions: totalCount,
       statusBreakdown: statusCounts,
-      successRate: statusCounts.completed ? (statusCounts.completed / totalCount) * 100 : 0,
+      successRate:
+        statusCounts.completed && totalCount > 0 ? (statusCounts.completed / totalCount) * 100 : 0,
     };
   }
 

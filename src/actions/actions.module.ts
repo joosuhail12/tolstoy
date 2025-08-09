@@ -4,9 +4,10 @@ import { ActionsService } from './actions.service';
 import { CommonModule } from '../common/common.module';
 import { AuthModule } from '../auth/auth.module';
 import { MetricsModule } from '../metrics/metrics.module';
+import { DaytonaModule } from '../daytona/daytona.module';
 
 @Module({
-  imports: [CommonModule, AuthModule, MetricsModule],
+  imports: [CommonModule, AuthModule, MetricsModule, DaytonaModule],
   controllers: [ActionsController],
   providers: [ActionsService],
   exports: [ActionsService],

@@ -1,10 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
+import { RedisCacheService } from '../cache/redis-cache.service';
 
 export interface HealthCheck {
-  status: 'healthy' | 'unhealthy';
-  message: string;
+  status: 'healthy' | 'unhealthy' | 'ok';
+  message?: string;
   timestamp: string;
+  uptime?: number;
+  version?: string;
   details?: Record<string, unknown>;
 }
 
@@ -20,7 +23,10 @@ export interface DatabaseHealthCheck extends HealthCheck {
 
 @Injectable()
 export class HealthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redisCache: RedisCacheService,
+  ) {}
 
   async getHealthStatus(): Promise<HealthCheck> {
     try {
@@ -31,35 +37,42 @@ export class HealthService {
           status: 'unhealthy',
           message: 'Database connection failed',
           timestamp: new Date().toISOString(),
+          uptime: process.uptime(),
           details: { database: dbCheck },
         };
       }
 
       return {
-        status: 'healthy',
-        message: 'All systems operational',
+        status: 'ok',
         timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        version: process.env.npm_package_version || '1.0.0',
       };
     } catch (error) {
       return {
         status: 'unhealthy',
         message: 'Health check failed',
         timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
         details: { error: error instanceof Error ? error.message : 'Unknown error' },
       };
     }
   }
 
   async getDetailedHealthStatus(): Promise<{
-    application: HealthCheck;
+    status: string;
     database: DatabaseHealthCheck;
+    redis: HealthCheck;
     environment: Record<string, unknown>;
     system: Record<string, unknown>;
   }> {
     const timestamp = new Date().toISOString();
 
     try {
-      const [dbCheck] = await Promise.allSettled([this.checkDatabaseConnection()]);
+      const [dbCheck, redisCheck] = await Promise.allSettled([
+        this.checkDatabaseConnection(),
+        this.checkRedisConnection(),
+      ]);
 
       const databaseResult =
         dbCheck.status === 'fulfilled'
@@ -73,32 +86,42 @@ export class HealthService {
               },
             };
 
-      const applicationStatus: HealthCheck = {
-        status: databaseResult.status === 'healthy' ? 'healthy' : 'unhealthy',
-        message:
-          databaseResult.status === 'healthy'
-            ? 'Application is running properly'
-            : 'Application has issues',
-        timestamp,
-      };
+      const redisResult =
+        redisCheck.status === 'fulfilled'
+          ? redisCheck.value
+          : {
+              status: 'unhealthy' as const,
+              message: 'Redis check failed',
+              timestamp,
+              details: {
+                error:
+                  redisCheck.reason instanceof Error ? redisCheck.reason.message : 'Unknown error',
+              },
+            };
+
+      const overallStatus =
+        databaseResult.status === 'healthy' && redisResult.status === 'healthy'
+          ? 'ok'
+          : 'unhealthy';
 
       return {
-        application: applicationStatus,
+        status: overallStatus,
         database: databaseResult,
+        redis: redisResult,
         environment: this.getEnvironmentInfo(),
         system: this.getSystemInfo(),
       };
-    } catch (error) {
+    } catch {
       return {
-        application: {
-          status: 'unhealthy',
-          message: 'Detailed health check failed',
-          timestamp,
-          details: { error: error instanceof Error ? error.message : 'Unknown error' },
-        },
+        status: 'unhealthy',
         database: {
           status: 'unhealthy',
           message: 'Unable to check database',
+          timestamp,
+        },
+        redis: {
+          status: 'unhealthy',
+          message: 'Unable to check Redis',
           timestamp,
         },
         environment: this.getEnvironmentInfo(),
@@ -143,6 +166,51 @@ export class HealthService {
         timestamp: new Date().toISOString(),
         connectionTime: Date.now() - startTime,
         details: { error: error instanceof Error ? error.message : 'Unknown error' },
+      };
+    }
+  }
+
+  private async checkRedisConnection(): Promise<HealthCheck> {
+    const startTime = Date.now();
+
+    try {
+      // Test Redis connection with a simple ping-like operation
+      const testKey = 'health-check-test';
+      const testValue = `health-check-${Date.now()}`;
+
+      await this.redisCache.set(testKey, testValue, { ttl: 10 }); // 10 second TTL
+      const retrievedValue = await this.redisCache.get(testKey);
+
+      if (retrievedValue === testValue) {
+        // Clean up test key
+        await this.redisCache.del(testKey);
+
+        const connectionTime = Date.now() - startTime;
+        return {
+          status: 'healthy',
+          message: 'Redis connection successful',
+          timestamp: new Date().toISOString(),
+          details: {
+            connectionTime,
+            operation: 'set/get/del',
+          },
+        };
+      } else {
+        return {
+          status: 'unhealthy',
+          message: 'Redis data integrity check failed',
+          timestamp: new Date().toISOString(),
+        };
+      }
+    } catch (error) {
+      return {
+        status: 'unhealthy',
+        message: 'Redis connection failed',
+        timestamp: new Date().toISOString(),
+        details: {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          connectionTime: Date.now() - startTime,
+        },
       };
     }
   }

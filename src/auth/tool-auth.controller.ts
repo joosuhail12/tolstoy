@@ -1,25 +1,25 @@
 import {
-  Controller,
-  Post,
-  Get,
-  Delete,
+  BadRequestException,
   Body,
-  Param,
+  Controller,
+  Delete,
+  Get,
   Headers,
   HttpCode,
   HttpStatus,
-  BadRequestException,
   Logger,
+  Param,
+  Post,
 } from '@nestjs/common';
 import {
-  ApiTags,
-  ApiBearerAuth,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
-  ApiHeader,
   ApiBadRequestResponse,
+  ApiBearerAuth,
+  ApiHeader,
   ApiNotFoundResponse,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
+  ApiTags,
 } from '@nestjs/swagger';
 import { AuthConfigService } from './auth-config.service';
 import { CreateAuthConfigDto } from './dto/create-auth-config.dto';
@@ -116,7 +116,10 @@ export class ToolAuthController {
   @ApiNotFoundResponse({
     description: 'Auth configuration not found for this tool and organization',
   })
-  async get(@Headers('X-Org-ID') orgId: string, @Param('toolId') toolId: string): Promise<AuthConfigResponseDto> {
+  async get(
+    @Headers('X-Org-ID') orgId: string,
+    @Param('toolId') toolId: string,
+  ): Promise<AuthConfigResponseDto> {
     if (!orgId) {
       throw new BadRequestException('X-Org-ID header is required');
     }
@@ -137,7 +140,17 @@ export class ToolAuthController {
     this.logger.log(`Successfully retrieved auth config for tool ${toolId}`);
 
     // Mask sensitive values in the response
-    return this.maskSensitiveValues(config);
+    const maskedConfig = this.maskSensitiveValues(config.config);
+
+    return {
+      id: config.id,
+      orgId: config.orgId,
+      toolId: config.toolId,
+      type: config.type,
+      config: maskedConfig,
+      createdAt: config.createdAt,
+      updatedAt: config.updatedAt,
+    };
   }
 
   @Delete()
@@ -198,7 +211,7 @@ export class ToolAuthController {
    */
   private maskSensitiveValues(config: Record<string, unknown>): Record<string, unknown> {
     if (!config || typeof config !== 'object') {
-      return config;
+      return {};
     }
 
     const sensitiveFields = [
@@ -213,7 +226,7 @@ export class ToolAuthController {
       'refreshToken',
     ];
 
-    const masked = { ...config };
+    const masked = { ...config } as Record<string, unknown>;
 
     for (const [key, value] of Object.entries(masked)) {
       if (
@@ -226,7 +239,7 @@ export class ToolAuthController {
             ? '*'.repeat(value.length - 4) + value.slice(-4)
             : '*'.repeat(value.length);
       } else if (typeof value === 'object' && value !== null) {
-        masked[key] = this.maskSensitiveValues(value);
+        masked[key] = this.maskSensitiveValues(value as Record<string, unknown>);
       }
     }
 

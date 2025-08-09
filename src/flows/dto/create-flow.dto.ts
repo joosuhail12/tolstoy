@@ -1,4 +1,4 @@
-import { IsObject, IsNotEmpty, IsNumber, IsOptional, Min } from 'class-validator';
+import { IsNotEmpty, IsNumber, IsObject, IsOptional, Min } from 'class-validator';
 
 interface RetryPolicy {
   maxRetries: number;

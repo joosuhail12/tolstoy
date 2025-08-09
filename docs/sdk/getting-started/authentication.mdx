@@ -1,0 +1,895 @@
+---
+title: "Authentication & Configuration"
+description: "Complete guide to setting up secure authentication and configuration for the Tolstoy SDK with multiple auth methods and best practices."
+sidebar_position: 2
+---
+
+# Authentication & Configuration
+
+Learn how to securely authenticate and configure the Tolstoy SDK for your applications with comprehensive examples and best practices.
+
+## Overview
+
+The Tolstoy SDK supports multiple authentication methods to fit different use cases:
+
+- **API Keys** - Simple token-based authentication (recommended for server-side)
+- **OAuth2** - User-based authentication with token refresh
+- **Service Accounts** - Machine-to-machine authentication for automated systems
+- **Environment-based** - Configuration via environment variables
+
+## API Key Authentication
+
+### Basic Setup
+
+The simplest and most common authentication method for server-side applications:
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+// Initialize with API key
+const client = new TolstoyClient(
+  'https://tolstoy.getpullse.com',  // API URL
+  'org_1234567890abcdef',           // Organization ID
+  'user_abcdef1234567890',          // User ID
+  'tk_live_abc123xyz789...'         // API Key
+);
+
+// Test connection
+try {
+  const health = await client.raw.health.healthControllerGetHealth();
+  console.log('✅ Authentication successful:', health.data.status);
+} catch (error) {
+  console.error('❌ Authentication failed:', error.message);
+}
+```
+
+### Environment Variables (Recommended)
+
+Store sensitive credentials in environment variables for security:
+
+```bash
+# .env file
+TOLSTOY_API_URL=https://tolstoy.getpullse.com
+TOLSTOY_ORG_ID=org_1234567890abcdef
+TOLSTOY_USER_ID=user_abcdef1234567890
+TOLSTOY_API_KEY=tk_live_abc123xyz789...
+```
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+// Load from environment variables
+const client = new TolstoyClient(
+  process.env.TOLSTOY_API_URL!,
+  process.env.TOLSTOY_ORG_ID!,
+  process.env.TOLSTOY_USER_ID!,
+  process.env.TOLSTOY_API_KEY!
+);
+
+// Verify required environment variables
+function validateConfig() {
+  const required = [
+    'TOLSTOY_API_URL',
+    'TOLSTOY_ORG_ID', 
+    'TOLSTOY_USER_ID',
+    'TOLSTOY_API_KEY'
+  ];
+  
+  const missing = required.filter(key => !process.env[key]);
+  
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+  }
+  
+  console.log('✅ All required configuration found');
+}
+
+validateConfig();
+```
+
+### API Key Management
+
+```typescript
+class TolstoyClientManager {
+  private client: TolstoyClient;
+  private apiKey: string;
+  
+  constructor() {
+    this.apiKey = this.loadApiKey();
+    this.client = this.createClient();
+  }
+  
+  private loadApiKey(): string {
+    // Try multiple sources for API key
+    const apiKey = process.env.TOLSTOY_API_KEY || 
+                   process.env.TOLSTOY_TOKEN ||
+                   this.loadFromSecretManager();
+    
+    if (!apiKey) {
+      throw new Error('No API key found in environment or secret manager');
+    }
+    
+    // Validate API key format
+    if (!apiKey.match(/^tk_(live|test)_[a-zA-Z0-9]{40,}$/)) {
+      throw new Error('Invalid API key format');
+    }
+    
+    return apiKey;
+  }
+  
+  private loadFromSecretManager(): string | null {
+    // Example: Load from AWS Secrets Manager, Azure Key Vault, etc.
+    // Implementation depends on your cloud provider
+    try {
+      // const secret = await secretsManager.getSecret('tolstoy-api-key');
+      // return secret.value;
+      return null; // Placeholder
+    } catch (error) {
+      console.warn('Could not load API key from secret manager:', error.message);
+      return null;
+    }
+  }
+  
+  private createClient(): TolstoyClient {
+    return new TolstoyClient(
+      process.env.TOLSTOY_API_URL || 'https://tolstoy.getpullse.com',
+      process.env.TOLSTOY_ORG_ID!,
+      process.env.TOLSTOY_USER_ID!,
+      this.apiKey
+    );
+  }
+  
+  // Rotate API key when needed
+  async rotateApiKey(newApiKey: string): Promise<void> {
+    const oldClient = this.client;
+    
+    try {
+      // Test new API key
+      const testClient = new TolstoyClient(
+        process.env.TOLSTOY_API_URL!,
+        process.env.TOLSTOY_ORG_ID!,
+        process.env.TOLSTOY_USER_ID!,
+        newApiKey
+      );
+      
+      await testClient.raw.health.healthControllerGetHealth();
+      
+      // If test succeeds, update
+      this.apiKey = newApiKey;
+      this.client = testClient;
+      
+      console.log('✅ API key rotated successfully');
+    } catch (error) {
+      console.error('❌ API key rotation failed:', error.message);
+      throw error;
+    }
+  }
+  
+  getClient(): TolstoyClient {
+    return this.client;
+  }
+}
+
+// Usage
+const clientManager = new TolstoyClientManager();
+const client = clientManager.getClient();
+```
+
+## OAuth2 Authentication
+
+### Setup OAuth2 Flow
+
+For applications that need user-specific authentication:
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+class TolstoyOAuthClient {
+  private baseUrl: string;
+  private orgId: string;
+  private clientId: string;
+  private clientSecret: string;
+  private redirectUri: string;
+  
+  constructor(config: {
+    baseUrl: string;
+    orgId: string;
+    clientId: string;
+    clientSecret: string;
+    redirectUri: string;
+  }) {
+    this.baseUrl = config.baseUrl;
+    this.orgId = config.orgId;
+    this.clientId = config.clientId;
+    this.clientSecret = config.clientSecret;
+    this.redirectUri = config.redirectUri;
+  }
+  
+  // Step 1: Generate authorization URL
+  getAuthorizationUrl(userId: string, scopes: string[] = ['workflows:execute', 'tools:manage']): string {
+    const params = new URLSearchParams({
+      response_type: 'code',
+      client_id: this.clientId,
+      redirect_uri: this.redirectUri,
+      scope: scopes.join(' '),
+      state: userId, // Use user ID as state for security
+      org_id: this.orgId
+    });
+    
+    return `${this.baseUrl}/oauth/authorize?${params.toString()}`;
+  }
+  
+  // Step 2: Exchange authorization code for access token
+  async exchangeCodeForToken(code: string, state: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: Date;
+    userId: string;
+  }> {
+    const response = await fetch(`${this.baseUrl}/oauth/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64')}`
+      },
+      body: JSON.stringify({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: this.redirectUri,
+        org_id: this.orgId
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`OAuth token exchange failed: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token,
+      expiresAt: new Date(Date.now() + data.expires_in * 1000),
+      userId: state
+    };
+  }
+  
+  // Step 3: Create authenticated client
+  createClient(userId: string, accessToken: string): TolstoyClient {
+    return new TolstoyClient(
+      this.baseUrl,
+      this.orgId,
+      userId,
+      accessToken
+    );
+  }
+  
+  // Token refresh
+  async refreshToken(refreshToken: string): Promise<{
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: Date;
+  }> {
+    const response = await fetch(`${this.baseUrl}/oauth/token`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${Buffer.from(`${this.clientId}:${this.clientSecret}`).toString('base64')}`
+      },
+      body: JSON.stringify({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+        org_id: this.orgId
+      })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Token refresh failed: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
+    
+    return {
+      accessToken: data.access_token,
+      refreshToken: data.refresh_token || refreshToken,
+      expiresAt: new Date(Date.now() + data.expires_in * 1000)
+    };
+  }
+}
+
+// Usage example with Express.js
+import express from 'express';
+
+const app = express();
+const oauthClient = new TolstoyOAuthClient({
+  baseUrl: process.env.TOLSTOY_API_URL!,
+  orgId: process.env.TOLSTOY_ORG_ID!,
+  clientId: process.env.TOLSTOY_OAUTH_CLIENT_ID!,
+  clientSecret: process.env.TOLSTOY_OAUTH_CLIENT_SECRET!,
+  redirectUri: process.env.TOLSTOY_OAUTH_REDIRECT_URI!
+});
+
+// OAuth login route
+app.get('/auth/login/:userId', (req, res) => {
+  const { userId } = req.params;
+  const authUrl = oauthClient.getAuthorizationUrl(userId);
+  res.redirect(authUrl);
+});
+
+// OAuth callback route
+app.get('/auth/callback', async (req, res) => {
+  try {
+    const { code, state } = req.query;
+    
+    if (!code || !state) {
+      return res.status(400).json({ error: 'Missing code or state parameter' });
+    }
+    
+    const tokens = await oauthClient.exchangeCodeForToken(code as string, state as string);
+    
+    // Store tokens securely (database, session, etc.)
+    // In production, encrypt tokens before storing
+    req.session.tolstoyTokens = tokens;
+    
+    res.json({ success: true, userId: tokens.userId });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+```
+
+## Service Account Authentication
+
+### For Automated Systems
+
+Service accounts provide machine-to-machine authentication for CI/CD, background jobs, and automated systems:
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+import fs from 'fs/promises';
+
+interface ServiceAccount {
+  id: string;
+  orgId: string;
+  privateKey: string;
+  algorithm: 'RS256';
+  issuer: string;
+  audience: string;
+  expiresIn: number;
+}
+
+class TolstoyServiceAccountClient {
+  private serviceAccount: ServiceAccount;
+  
+  constructor(serviceAccountPath: string) {
+    this.serviceAccount = this.loadServiceAccount(serviceAccountPath);
+  }
+  
+  private async loadServiceAccount(path: string): Promise<ServiceAccount> {
+    try {
+      const content = await fs.readFile(path, 'utf8');
+      const serviceAccount = JSON.parse(content) as ServiceAccount;
+      
+      // Validate service account structure
+      const required = ['id', 'orgId', 'privateKey', 'algorithm', 'issuer', 'audience'];
+      const missing = required.filter(key => !serviceAccount[key]);
+      
+      if (missing.length > 0) {
+        throw new Error(`Invalid service account: missing ${missing.join(', ')}`);
+      }
+      
+      return serviceAccount;
+    } catch (error) {
+      throw new Error(`Failed to load service account: ${error.message}`);
+    }
+  }
+  
+  private async generateJWT(): Promise<string> {
+    const jwt = require('jsonwebtoken');
+    
+    const payload = {
+      iss: this.serviceAccount.issuer,
+      aud: this.serviceAccount.audience,
+      sub: this.serviceAccount.id,
+      org: this.serviceAccount.orgId,
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + (this.serviceAccount.expiresIn || 3600)
+    };
+    
+    return jwt.sign(payload, this.serviceAccount.privateKey, {
+      algorithm: this.serviceAccount.algorithm
+    });
+  }
+  
+  async createClient(): Promise<TolstoyClient> {
+    const token = await this.generateJWT();
+    
+    return new TolstoyClient(
+      process.env.TOLSTOY_API_URL || 'https://tolstoy.getpullse.com',
+      this.serviceAccount.orgId,
+      this.serviceAccount.id,
+      token
+    );
+  }
+  
+  // Auto-refresh token when needed
+  async createAutoRefreshClient(): Promise<TolstoyClient> {
+    let client = await this.createClient();
+    let tokenExpiresAt = Date.now() + (this.serviceAccount.expiresIn || 3600) * 1000;
+    
+    // Wrap client methods to auto-refresh token
+    const originalRunFlow = client.runFlow.bind(client);
+    client.runFlow = async (flowId: string, inputs: any) => {
+      // Refresh token if expires in next 5 minutes
+      if (Date.now() + 300000 > tokenExpiresAt) {
+        console.log('🔄 Refreshing service account token...');
+        client = await this.createClient();
+        tokenExpiresAt = Date.now() + (this.serviceAccount.expiresIn || 3600) * 1000;
+      }
+      
+      return originalRunFlow(flowId, inputs);
+    };
+    
+    return client;
+  }
+}
+
+// Usage
+const serviceAccountClient = new TolstoyServiceAccountClient('./service-account.json');
+const client = await serviceAccountClient.createAutoRefreshClient();
+
+// Use client normally - token refresh is automatic
+const execution = await client.runFlow('automated-workflow', {
+  triggeredBy: 'cron-job',
+  timestamp: new Date().toISOString()
+});
+```
+
+## Advanced Configuration
+
+### Client Options
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+// Advanced client configuration
+const client = new TolstoyClient(
+  process.env.TOLSTOY_API_URL!,
+  process.env.TOLSTOY_ORG_ID!,
+  process.env.TOLSTOY_USER_ID!,
+  process.env.TOLSTOY_API_KEY!,
+  {
+    // Request timeout (default: 30000ms)
+    timeout: 60000,
+    
+    // Retry configuration
+    retries: {
+      attempts: 5,
+      delay: 1000,
+      exponentialBackoff: true,
+      maxDelay: 30000
+    },
+    
+    // HTTP client options
+    httpOptions: {
+      headers: {
+        'User-Agent': 'MyApp/1.0.0',
+        'X-Client-Version': '2.1.0'
+      },
+      keepAlive: true,
+      maxSockets: 10
+    },
+    
+    // Debug options
+    debug: process.env.NODE_ENV === 'development',
+    logRequests: true,
+    logResponses: false,
+    
+    // Cache configuration
+    cache: {
+      enabled: true,
+      ttl: 300000, // 5 minutes
+      maxSize: 100
+    }
+  }
+);
+```
+
+### Multi-Environment Setup
+
+```typescript
+// config/environments.ts
+export interface EnvironmentConfig {
+  apiUrl: string;
+  orgId: string;
+  userId: string;
+  apiKey: string;
+  timeout?: number;
+  retries?: number;
+}
+
+export const environments: Record<string, EnvironmentConfig> = {
+  development: {
+    apiUrl: 'https://api-dev.tolstoy.com',
+    orgId: process.env.DEV_TOLSTOY_ORG_ID!,
+    userId: process.env.DEV_TOLSTOY_USER_ID!,
+    apiKey: process.env.DEV_TOLSTOY_API_KEY!,
+    timeout: 60000,
+    retries: 1
+  },
+  
+  staging: {
+    apiUrl: 'https://api-staging.tolstoy.com',
+    orgId: process.env.STAGING_TOLSTOY_ORG_ID!,
+    userId: process.env.STAGING_TOLSTOY_USER_ID!,
+    apiKey: process.env.STAGING_TOLSTOY_API_KEY!,
+    timeout: 45000,
+    retries: 3
+  },
+  
+  production: {
+    apiUrl: 'https://tolstoy.getpullse.com',
+    orgId: process.env.PROD_TOLSTOY_ORG_ID!,
+    userId: process.env.PROD_TOLSTOY_USER_ID!,
+    apiKey: process.env.PROD_TOLSTOY_API_KEY!,
+    timeout: 30000,
+    retries: 5
+  }
+};
+
+// client-factory.ts
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+import { environments, EnvironmentConfig } from './environments';
+
+export class TolstoyClientFactory {
+  static create(environment: string = process.env.NODE_ENV || 'development'): TolstoyClient {
+    const config = environments[environment];
+    
+    if (!config) {
+      throw new Error(`Unknown environment: ${environment}`);
+    }
+    
+    // Validate configuration
+    const required: (keyof EnvironmentConfig)[] = ['apiUrl', 'orgId', 'userId', 'apiKey'];
+    const missing = required.filter(key => !config[key]);
+    
+    if (missing.length > 0) {
+      throw new Error(`Missing configuration for ${environment}: ${missing.join(', ')}`);
+    }
+    
+    console.log(`🌍 Creating Tolstoy client for ${environment} environment`);
+    
+    return new TolstoyClient(
+      config.apiUrl,
+      config.orgId,
+      config.userId,
+      config.apiKey,
+      {
+        timeout: config.timeout,
+        retries: { attempts: config.retries || 3 },
+        debug: environment === 'development'
+      }
+    );
+  }
+}
+
+// Usage
+const client = TolstoyClientFactory.create(); // Uses NODE_ENV
+const prodClient = TolstoyClientFactory.create('production');
+```
+
+## Security Best Practices
+
+### 1. Secure Credential Storage
+
+```typescript
+// ❌ Don't: Hardcode credentials
+const client = new TolstoyClient(
+  'https://tolstoy.getpullse.com',
+  'org_1234567890abcdef',
+  'user_abcdef1234567890',
+  'tk_live_abc123xyz789...' // Exposed in code!
+);
+
+// ✅ Do: Use environment variables
+const client = new TolstoyClient(
+  process.env.TOLSTOY_API_URL!,
+  process.env.TOLSTOY_ORG_ID!,
+  process.env.TOLSTOY_USER_ID!,
+  process.env.TOLSTOY_API_KEY!
+);
+
+// ✅ Better: Use secret management
+import { SecretManagerServiceClient } from '@google-cloud/secret-manager';
+
+async function getSecureCredentials() {
+  const secretClient = new SecretManagerServiceClient();
+  const [accessResponse] = await secretClient.accessSecretVersion({
+    name: 'projects/my-project/secrets/tolstoy-api-key/versions/latest',
+  });
+  
+  return accessResponse.payload?.data?.toString();
+}
+```
+
+### 2. Token Rotation
+
+```typescript
+class SecureTolstoyClient {
+  private client: TolstoyClient;
+  private tokenExpiresAt: Date;
+  
+  constructor() {
+    this.refreshClient();
+    
+    // Auto-rotate tokens every 23 hours (tokens expire in 24h)
+    setInterval(() => {
+      this.refreshClient();
+    }, 23 * 60 * 60 * 1000);
+  }
+  
+  private async refreshClient() {
+    try {
+      const apiKey = await this.getRotatedApiKey();
+      
+      this.client = new TolstoyClient(
+        process.env.TOLSTOY_API_URL!,
+        process.env.TOLSTOY_ORG_ID!,
+        process.env.TOLSTOY_USER_ID!,
+        apiKey
+      );
+      
+      this.tokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      console.log('🔄 Tolstoy client token refreshed');
+    } catch (error) {
+      console.error('❌ Failed to refresh Tolstoy token:', error.message);
+    }
+  }
+  
+  private async getRotatedApiKey(): Promise<string> {
+    // Implement your token rotation logic
+    // This could involve calling your auth service, secret manager, etc.
+    return process.env.TOLSTOY_API_KEY!;
+  }
+  
+  getClient(): TolstoyClient {
+    if (Date.now() > this.tokenExpiresAt.getTime() - 300000) { // 5 min buffer
+      throw new Error('Token expired, please wait for refresh');
+    }
+    
+    return this.client;
+  }
+}
+```
+
+### 3. Request Logging & Monitoring
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+class MonitoredTolstoyClient {
+  private client: TolstoyClient;
+  
+  constructor() {
+    this.client = new TolstoyClient(
+      process.env.TOLSTOY_API_URL!,
+      process.env.TOLSTOY_ORG_ID!,
+      process.env.TOLSTOY_USER_ID!,
+      process.env.TOLSTOY_API_KEY!
+    );
+    
+    this.setupRequestMonitoring();
+  }
+  
+  private setupRequestMonitoring() {
+    // Log all API requests (without sensitive data)
+    const originalFetch = global.fetch;
+    global.fetch = async (url: RequestInfo | URL, init?: RequestInit) => {
+      const startTime = Date.now();
+      
+      try {
+        const response = await originalFetch(url, init);
+        const duration = Date.now() - startTime;
+        
+        console.log(`📊 API Request: ${init?.method || 'GET'} ${url} - ${response.status} (${duration}ms)`);
+        
+        // Log errors for monitoring
+        if (!response.ok) {
+          console.error(`❌ API Error: ${response.status} ${response.statusText}`, {
+            url: url.toString(),
+            method: init?.method,
+            duration,
+            headers: init?.headers
+          });
+        }
+        
+        return response;
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        console.error(`💥 Network Error: ${error.message}`, {
+          url: url.toString(),
+          method: init?.method,
+          duration
+        });
+        throw error;
+      }
+    };
+  }
+  
+  getClient(): TolstoyClient {
+    return this.client;
+  }
+}
+```
+
+## Testing Authentication
+
+### Unit Tests
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+import { jest } from '@jest/globals';
+
+describe('TolstoyClient Authentication', () => {
+  it('should authenticate successfully with valid API key', async () => {
+    const client = new TolstoyClient(
+      'https://api-test.tolstoy.com',
+      'test_org',
+      'test_user',
+      'tk_test_validkey123'
+    );
+    
+    // Mock successful health check
+    jest.spyOn(client.raw.health, 'healthControllerGetHealth')
+        .mockResolvedValue({ data: { status: 'ok' } });
+    
+    const health = await client.raw.health.healthControllerGetHealth();
+    expect(health.data.status).toBe('ok');
+  });
+  
+  it('should reject invalid API key', async () => {
+    const client = new TolstoyClient(
+      'https://api-test.tolstoy.com',
+      'test_org',
+      'test_user',
+      'invalid_key'
+    );
+    
+    // Mock authentication failure
+    jest.spyOn(client.raw.health, 'healthControllerGetHealth')
+        .mockRejectedValue(new Error('Authentication failed'));
+    
+    await expect(client.raw.health.healthControllerGetHealth())
+      .rejects.toThrow('Authentication failed');
+  });
+});
+```
+
+### Integration Tests
+
+```typescript
+describe('TolstoyClient Integration', () => {
+  let client: TolstoyClient;
+  
+  beforeAll(() => {
+    client = new TolstoyClient(
+      process.env.TEST_TOLSTOY_API_URL!,
+      process.env.TEST_TOLSTOY_ORG_ID!,
+      process.env.TEST_TOLSTOY_USER_ID!,
+      process.env.TEST_TOLSTOY_API_KEY!
+    );
+  });
+  
+  it('should connect to test environment', async () => {
+    const health = await client.raw.health.healthControllerGetHealth();
+    expect(health.data).toBeDefined();
+    expect(health.data.status).toBeTruthy();
+  });
+  
+  it('should list workflows with proper authentication', async () => {
+    const flows = await client.listFlows();
+    expect(Array.isArray(flows.data)).toBe(true);
+  });
+});
+```
+
+## Troubleshooting
+
+### Common Authentication Issues
+
+#### Invalid API Key Format
+
+```typescript
+// Validate API key format
+function validateApiKey(apiKey: string): boolean {
+  const pattern = /^tk_(live|test)_[a-zA-Z0-9]{40,}$/;
+  return pattern.test(apiKey);
+}
+
+// Usage
+const apiKey = process.env.TOLSTOY_API_KEY!;
+if (!validateApiKey(apiKey)) {
+  throw new Error('Invalid API key format. Expected: tk_live_xxxxx or tk_test_xxxxx');
+}
+```
+
+#### Token Expiration
+
+```typescript
+async function handleAuthError(error: any, client: TolstoyClient) {
+  if (error.response?.status === 401) {
+    console.log('🔄 Token expired, attempting refresh...');
+    
+    // Implement token refresh logic
+    const newToken = await refreshAuthToken();
+    
+    // Create new client with fresh token
+    return new TolstoyClient(
+      process.env.TOLSTOY_API_URL!,
+      process.env.TOLSTOY_ORG_ID!,
+      process.env.TOLSTOY_USER_ID!,
+      newToken
+    );
+  }
+  
+  throw error;
+}
+```
+
+#### Network Issues
+
+```typescript
+async function createResilientClient(): Promise<TolstoyClient> {
+  const client = new TolstoyClient(
+    process.env.TOLSTOY_API_URL!,
+    process.env.TOLSTOY_ORG_ID!,
+    process.env.TOLSTOY_USER_ID!,
+    process.env.TOLSTOY_API_KEY!,
+    {
+      timeout: 30000,
+      retries: {
+        attempts: 3,
+        delay: 1000,
+        exponentialBackoff: true
+      }
+    }
+  );
+  
+  // Test connection with retry
+  for (let i = 0; i < 3; i++) {
+    try {
+      await client.raw.health.healthControllerGetHealth();
+      console.log('✅ Connection established');
+      return client;
+    } catch (error) {
+      console.log(`⚠️  Connection attempt ${i + 1} failed:`, error.message);
+      if (i === 2) throw error;
+      await new Promise(resolve => setTimeout(resolve, 2000 * (i + 1)));
+    }
+  }
+  
+  throw new Error('Failed to establish connection after 3 attempts');
+}
+```
+
+## Next Steps
+
+Now that you have authentication configured:
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+  <div className="border rounded-lg p-4">
+    <h3 className="text-lg font-semibold mb-2">🚀 First Workflow</h3>
+    <p className="text-sm text-gray-600 mb-3">Execute your first workflow with the authenticated client.</p>
+    <a href="/sdk/getting-started/first-workflow" className="text-blue-600 font-medium">Run First Workflow →</a>
+  </div>
+  
+  <div className="border rounded-lg p-4">
+    <h3 className="text-lg font-semibold mb-2">🔧 Core Features</h3>
+    <p className="text-sm text-gray-600 mb-3">Explore workflows, tools, webhooks, and advanced patterns.</p>
+    <a href="/sdk/core-features" className="text-blue-600 font-medium">Core Features →</a>
+  </div>
+</div>
+
+---
+
+*Secure authentication is the foundation of reliable workflow automation. Choose the authentication method that best fits your use case and follow security best practices.*

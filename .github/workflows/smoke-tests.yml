@@ -43,11 +43,8 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Build application (for CLI tools)
-        run: |
-          yarn build
-          # Make CLI globally available for tests
-          npm link
+      - name: Build application
+        run: yarn build
 
       - name: Wait for deployment to be ready
         run: |

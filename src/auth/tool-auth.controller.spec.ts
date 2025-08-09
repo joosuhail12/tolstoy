@@ -46,11 +46,11 @@ describe('ToolAuthController', () => {
         type: 'apiKey',
         config: { apiKey: 'test-key', header: 'Authorization' },
       };
-      const mockResult = { 
-        id: 'config-123', 
-        orgId, 
-        toolId, 
-        type: 'apiKey', 
+      const mockResult = {
+        id: 'config-123',
+        orgId,
+        toolId,
+        type: 'apiKey',
         config: dto.config,
         createdAt: new Date(),
         updatedAt: new Date(),
@@ -74,7 +74,7 @@ describe('ToolAuthController', () => {
       };
 
       await expect(controller.upsert('', 'github', dto)).rejects.toThrow(BadRequestException);
-      
+
       // Metrics should not be called if validation fails early
       expect(metricsService.incrementToolAuthConfig).not.toHaveBeenCalled();
     });
@@ -84,7 +84,15 @@ describe('ToolAuthController', () => {
     it('should increment tool auth config metrics with get action', async () => {
       const orgId = 'org-123';
       const toolId = 'github';
-      const mockConfig = { id: 'config-123', type: 'apiKey', config: { apiKey: 'masked****' } };
+      const mockConfig = { 
+        id: 'config-123', 
+        orgId: 'org-123', 
+        toolId: 'github', 
+        type: 'apiKey', 
+        config: { apiKey: 'masked****' },
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
 
       authConfigService.getOrgAuthConfig.mockResolvedValue(mockConfig);
 

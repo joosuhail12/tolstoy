@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { Redis } from '@upstash/redis';
 import { AwsSecretsService } from '../aws-secrets.service';
 import { CacheKeys } from './cache-keys';
@@ -59,17 +59,10 @@ export class RedisCacheService {
       let redisToken: string | undefined;
 
       try {
-        redisUrl = await this.awsSecretsService.getSecret(
-          'conductor-db-secret',
-          'UPSTASH_REDIS_REST_URL',
-        );
-        redisToken = await this.awsSecretsService.getSecret(
-          'conductor-db-secret',
-          'UPSTASH_REDIS_REST_TOKEN',
-        );
-        this.logger.info(
-          'Retrieved Redis credentials from AWS Secrets Manager (conductor-db-secret)',
-        );
+        const redisConfig = await this.awsSecretsService.getRedisConfig();
+        redisUrl = redisConfig.url;
+        redisToken = redisConfig.token;
+        this.logger.info('Retrieved Redis credentials from AWS Secrets Manager (tolstoy/env)');
       } catch {
         // Fallback to environment variables
         redisUrl = this.configService.get('UPSTASH_REDIS_REST_URL');
@@ -117,7 +110,7 @@ export class RedisCacheService {
     try {
       this.metrics.operations.get++;
 
-      const value = await this.redis!.get(key);
+      const value = await this.redis.get(key);
 
       if (value !== null) {
         this.metrics.hits++;
@@ -157,13 +150,13 @@ export class RedisCacheService {
 
       // Build Redis set options - use explicit conditional calls for better type safety
       if (px && nx) {
-        await this.redis!.set(key, value, { px, nx: true });
+        await this.redis.set(key, value, { px, nx: true });
       } else if (px) {
-        await this.redis!.set(key, value, { px });
+        await this.redis.set(key, value, { px });
       } else if (nx) {
-        await this.redis!.set(key, value, { ex: ttl, nx: true });
+        await this.redis.set(key, value, { ex: ttl, nx: true });
       } else {
-        await this.redis!.set(key, value, { ex: ttl });
+        await this.redis.set(key, value, { ex: ttl });
       }
 
       this.logger.debug(
@@ -194,7 +187,7 @@ export class RedisCacheService {
     try {
       this.metrics.operations.delete++;
 
-      await this.redis!.del(key);
+      await this.redis.del(key);
 
       this.logger.debug({ key }, 'Cache key deleted');
     } catch (error) {
@@ -214,7 +207,7 @@ export class RedisCacheService {
 
     try {
       // Get all keys matching the pattern
-      const keys = await this.redis!.keys(pattern);
+      const keys = await this.redis.keys(pattern);
 
       if (keys.length === 0) {
         this.logger.debug({ pattern }, 'No keys found for pattern');
@@ -222,7 +215,7 @@ export class RedisCacheService {
       }
 
       // Delete all matching keys
-      const deletedCount = await this.redis!.del(...keys);
+      const deletedCount = await this.redis.del(...keys);
 
       this.logger.info(
         {
@@ -253,7 +246,7 @@ export class RedisCacheService {
     }
 
     try {
-      const exists = await this.redis!.exists(key);
+      const exists = await this.redis.exists(key);
       return exists === 1;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown Redis EXISTS error';
@@ -273,7 +266,7 @@ export class RedisCacheService {
     }
 
     try {
-      await this.redis!.expire(key, ttl);
+      await this.redis.expire(key, ttl);
       this.logger.debug({ key, ttl }, 'TTL updated for cache key');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown Redis EXPIRE error';
@@ -286,7 +279,7 @@ export class RedisCacheService {
    * @param keys Array of cache keys
    * @returns Array of values (null for missing keys)
    */
-  async mget(keys: string[]): Promise<(any | null)[]> {
+  async mget(keys: string[]): Promise<Array<any | null>> {
     if (!this.isRedisAvailable() || keys.length === 0) {
       return new Array(keys.length).fill(null);
     }
@@ -294,7 +287,7 @@ export class RedisCacheService {
     try {
       this.metrics.operations.get += keys.length;
 
-      const values = await this.redis!.mget(...keys);
+      const values = await this.redis.mget(...keys);
 
       // Count hits and misses
       const hits = values.filter(v => v !== null).length;
@@ -327,14 +320,14 @@ export class RedisCacheService {
    * Set multiple key-value pairs at once
    * @param keyValuePairs Array of [key, value, ttl?] tuples
    */
-  async mset(keyValuePairs: [string, unknown, number?][]): Promise<void> {
+  async mset(keyValuePairs: Array<[string, unknown, number?]>): Promise<void> {
     if (!this.isRedisAvailable() || keyValuePairs.length === 0) {
       return;
     }
 
     try {
       // Use pipeline for better performance
-      const pipeline = this.redis!.pipeline();
+      const pipeline = this.redis.pipeline();
 
       keyValuePairs.forEach(([key, value, ttl]) => {
         if (ttl) {

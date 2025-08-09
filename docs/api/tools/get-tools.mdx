@@ -1,3 +1,965 @@
 ---
-openapi: get /tools
+title: "List Tools"
+openapi: "GET /tools"
 ---
+
+# List Tools
+
+Retrieve all tools configured in your organization. Tools represent external services, APIs, or systems that your workflows can interact with, such as email services, databases, communication platforms, and custom APIs.
+
+<RequestExample>
+
+```bash cURL
+curl -X GET "https://tolstoy.getpullse.com/tools?limit=50&type=email&status=active" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json"
+```
+
+```typescript TypeScript
+interface ListToolsParams {
+  limit?: number;
+  cursor?: string;
+  type?: string;
+  status?: 'active' | 'inactive' | 'error';
+  search?: string;
+  sort_by?: 'name' | 'type' | 'created_at' | 'last_used';
+  sort_order?: 'asc' | 'desc';
+}
+
+const listTools = async (params: ListToolsParams = {}) => {
+  const searchParams = new URLSearchParams();
+  
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined) {
+      searchParams.set(key, value.toString());
+    }
+  });
+
+  const response = await fetch(
+    `https://tolstoy.getpullse.com/tools?${searchParams}`,
+    {
+      method: 'GET',
+      headers: {
+        'x-org-id': 'org_1234567890abcdef',
+        'x-user-id': 'user_abcdef1234567890',
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  return response.json();
+};
+
+// Get all active email tools
+const emailTools = await listTools({
+  type: 'email',
+  status: 'active',
+  limit: 20
+});
+
+console.log(`Found ${emailTools.data.length} email tools`);
+
+// Get recently created tools
+const recentTools = await listTools({
+  sort_by: 'created_at',
+  sort_order: 'desc',
+  limit: 10
+});
+
+console.log('Recent tools:', recentTools.data);
+```
+
+```python Python
+import requests
+from typing import Optional, List, Dict, Any
+
+class ToolsClient:
+    def __init__(self, org_id: str, user_id: str, base_url: str = "https://tolstoy.getpullse.com"):
+        self.org_id = org_id
+        self.user_id = user_id
+        self.base_url = base_url
+        self.headers = {
+            'x-org-id': org_id,
+            'x-user-id': user_id,
+            'Content-Type': 'application/json'
+        }
+
+    def list_tools(
+        self,
+        limit: int = 20,
+        cursor: Optional[str] = None,
+        tool_type: Optional[str] = None,
+        status: Optional[str] = None,
+        search: Optional[str] = None,
+        sort_by: str = 'name',
+        sort_order: str = 'asc'
+    ) -> Dict[str, Any]:
+        """List all tools in the organization."""
+        
+        params = {
+            'limit': limit,
+            'sort_by': sort_by,
+            'sort_order': sort_order
+        }
+        
+        if cursor:
+            params['cursor'] = cursor
+        if tool_type:
+            params['type'] = tool_type
+        if status:
+            params['status'] = status
+        if search:
+            params['search'] = search
+
+        response = requests.get(
+            f"{self.base_url}/tools",
+            headers=self.headers,
+            params=params
+        )
+        response.raise_for_status()
+        return response.json()
+
+    def get_tools_by_type(self, tool_type: str) -> List[Dict[str, Any]]:
+        """Get all tools of a specific type."""
+        all_tools = []
+        cursor = None
+
+        while True:
+            response = self.list_tools(
+                tool_type=tool_type,
+                cursor=cursor,
+                limit=100
+            )
+            
+            all_tools.extend(response['data'])
+            
+            pagination = response.get('pagination', {})
+            if not pagination.get('has_more', False):
+                break
+                
+            cursor = pagination.get('cursor')
+
+        return all_tools
+
+    def get_integration_summary(self) -> Dict[str, Any]:
+        """Get a summary of all tool integrations."""
+        response = self.list_tools(limit=500)
+        tools = response['data']
+        
+        if not tools:
+            return {'total': 0, 'by_type': {}, 'by_status': {}}
+
+        # Group by type
+        by_type = {}
+        by_status = {}
+        
+        for tool in tools:
+            tool_type = tool.get('type', 'unknown')
+            status = tool.get('status', 'unknown')
+            
+            by_type[tool_type] = by_type.get(tool_type, 0) + 1
+            by_status[status] = by_status.get(status, 0) + 1
+
+        return {
+            'total_tools': len(tools),
+            'by_type': by_type,
+            'by_status': by_status,
+            'active_tools': by_status.get('active', 0),
+            'inactive_tools': by_status.get('inactive', 0),
+            'error_tools': by_status.get('error', 0),
+            'most_common_type': max(by_type, key=by_type.get) if by_type else None
+        }
+
+# Usage examples
+client = ToolsClient('org_1234567890abcdef', 'user_abcdef1234567890')
+
+# Get all tools
+all_tools = client.list_tools()
+print(f"Total tools: {len(all_tools['data'])}")
+
+# Get only email tools
+email_tools = client.get_tools_by_type('email')
+print(f"Email integrations: {len(email_tools)}")
+
+# Get integration summary
+summary = client.get_integration_summary()
+print(f"Integration Summary:")
+print(f"- Total: {summary['total_tools']}")
+print(f"- Active: {summary['active_tools']}")
+print(f"- By type: {summary['by_type']}")
+```
+
+```javascript Node.js
+const axios = require('axios');
+
+class ToolsManager {
+  constructor(orgId, userId, baseUrl = 'https://tolstoy.getpullse.com') {
+    this.orgId = orgId;
+    this.userId = userId;
+    this.baseUrl = baseUrl;
+    this.headers = {
+      'x-org-id': orgId,
+      'x-user-id': userId,
+      'Content-Type': 'application/json'
+    };
+  }
+
+  async listTools(options = {}) {
+    const {
+      limit = 20,
+      cursor,
+      type,
+      status,
+      search,
+      sort_by = 'name',
+      sort_order = 'asc'
+    } = options;
+
+    const params = new URLSearchParams({
+      limit: limit.toString(),
+      sort_by,
+      sort_order
+    });
+
+    if (cursor) params.set('cursor', cursor);
+    if (type) params.set('type', type);
+    if (status) params.set('status', status);
+    if (search) params.set('search', search);
+
+    try {
+      const response = await axios.get(
+        `${this.baseUrl}/tools`,
+        {
+          headers: this.headers,
+          params: Object.fromEntries(params)
+        }
+      );
+
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(`API Error: ${error.response.status} - ${error.response.data?.error?.message || error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async getAllTools(filters = {}) {
+    const allTools = [];
+    let cursor = null;
+
+    do {
+      const response = await this.listTools({
+        ...filters,
+        cursor,
+        limit: 100
+      });
+
+      allTools.push(...response.data);
+      cursor = response.pagination?.has_more ? response.pagination.cursor : null;
+    } while (cursor);
+
+    return allTools;
+  }
+
+  async analyzeToolHealth() {
+    const tools = await this.getAllTools();
+    
+    const analysis = {
+      total: tools.length,
+      healthy: 0,
+      unhealthy: 0,
+      untested: 0,
+      by_type: {},
+      recommendations: []
+    };
+
+    tools.forEach(tool => {
+      const status = tool.status || 'unknown';
+      const type = tool.type || 'unknown';
+      
+      // Count by status
+      if (status === 'active') analysis.healthy++;
+      else if (status === 'error') analysis.unhealthy++;
+      else analysis.untested++;
+
+      // Count by type
+      analysis.by_type[type] = (analysis.by_type[type] || 0) + 1;
+
+      // Generate recommendations
+      if (status === 'error') {
+        analysis.recommendations.push({
+          tool_id: tool.id,
+          tool_name: tool.name,
+          issue: 'Tool connection failed',
+          suggestion: 'Check credentials and test connection'
+        });
+      }
+
+      if (tool.last_used && this.daysSince(tool.last_used) > 30) {
+        analysis.recommendations.push({
+          tool_id: tool.id,
+          tool_name: tool.name,
+          issue: 'Tool unused for 30+ days',
+          suggestion: 'Consider removing or updating tool configuration'
+        });
+      }
+    });
+
+    return analysis;
+  }
+
+  daysSince(dateString) {
+    const date = new Date(dateString);
+    const now = new Date();
+    return Math.floor((now - date) / (1000 * 60 * 60 * 24));
+  }
+
+  async getToolsByCategory() {
+    const tools = await this.getAllTools();
+    
+    const categories = {
+      communication: [],
+      data: [],
+      development: [],
+      productivity: [],
+      custom: []
+    };
+
+    tools.forEach(tool => {
+      const type = tool.type?.toLowerCase();
+      
+      if (['slack', 'email', 'sms', 'webhook'].includes(type)) {
+        categories.communication.push(tool);
+      } else if (['database', 'api', 'http'].includes(type)) {
+        categories.data.push(tool);
+      } else if (['github', 'gitlab', 'jira'].includes(type)) {
+        categories.development.push(tool);
+      } else if (['google-sheets', 'notion', 'airtable'].includes(type)) {
+        categories.productivity.push(tool);
+      } else {
+        categories.custom.push(tool);
+      }
+    });
+
+    return categories;
+  }
+}
+
+// Usage examples
+const toolsManager = new ToolsManager('org_1234567890abcdef', 'user_abcdef1234567890');
+
+// Analyze tool health
+toolsManager.analyzeToolHealth()
+  .then(analysis => {
+    console.log('Tool Health Analysis:');
+    console.log(`- Total tools: ${analysis.total}`);
+    console.log(`- Healthy: ${analysis.healthy}`);
+    console.log(`- Issues: ${analysis.unhealthy}`);
+    
+    if (analysis.recommendations.length > 0) {
+      console.log('\nRecommendations:');
+      analysis.recommendations.forEach((rec, index) => {
+        console.log(`${index + 1}. ${rec.tool_name}: ${rec.suggestion}`);
+      });
+    }
+  });
+
+// Get tools by category
+toolsManager.getToolsByCategory()
+  .then(categories => {
+    console.log('\nTools by Category:');
+    Object.entries(categories).forEach(([category, tools]) => {
+      if (tools.length > 0) {
+        console.log(`${category}: ${tools.length} tools`);
+      }
+    });
+  });
+```
+
+</RequestExample>
+
+## Query Parameters
+
+<ParamField query="limit" type="integer" default="20">
+Number of tools to return per page. Maximum value is 100.
+</ParamField>
+
+<ParamField query="cursor" type="string">
+Pagination cursor for retrieving the next page of results.
+</ParamField>
+
+<ParamField query="type" type="string">
+Filter tools by type. Common types include:
+- `email` - Email service integrations (SendGrid, Mailgun, SMTP)
+- `slack` - Slack workspace integrations
+- `database` - Database connections (PostgreSQL, MySQL, MongoDB)
+- `api` - Generic REST API integrations
+- `webhook` - Webhook endpoints
+- `http` - HTTP request tools
+- `custom` - Custom tool implementations
+</ParamField>
+
+<ParamField query="status" type="string">
+Filter tools by connection status:
+- `active` - Tool is connected and functioning
+- `inactive` - Tool is configured but not active
+- `error` - Tool has connection or authentication issues
+</ParamField>
+
+<ParamField query="search" type="string">
+Search tools by name, description, or type. Case-insensitive full-text search.
+</ParamField>
+
+<ParamField query="sort_by" type="string" default="name">
+Sort field. Available options:
+- `name` - Sort by tool name
+- `type` - Sort by tool type
+- `created_at` - Sort by creation date
+- `last_used` - Sort by last usage timestamp
+- `status` - Sort by connection status
+</ParamField>
+
+<ParamField query="sort_order" type="string" default="asc">
+Sort direction: `asc` (ascending) or `desc` (descending)
+</ParamField>
+
+<ParamField query="include_secrets" type="boolean" default="false">
+Include tool secret configuration status in response (admin access required).
+</ParamField>
+
+## Response
+
+<ResponseExample>
+
+```json Success Response
+{
+  "success": true,
+  "data": [
+    {
+      "id": "tool_abc123def456",
+      "name": "SendGrid Email Service",
+      "description": "Primary email service for transactional emails",
+      "type": "email",
+      "provider": "sendgrid",
+      "status": "active",
+      "version": "v3",
+      "configuration": {
+        "base_url": "https://api.sendgrid.com",
+        "auth_type": "api_key",
+        "timeout_ms": 30000,
+        "retry_attempts": 3
+      },
+      "settings": {
+        "from_email": "noreply@company.com",
+        "from_name": "Company Notifications",
+        "track_opens": true,
+        "track_clicks": true
+      },
+      "capabilities": [
+        "send_email",
+        "send_bulk_email", 
+        "email_templates",
+        "delivery_tracking"
+      ],
+      "health_check": {
+        "last_checked": "2024-01-15T14:30:00Z",
+        "status": "healthy",
+        "response_time_ms": 245,
+        "error_rate_percent": 0.1
+      },
+      "usage_stats": {
+        "last_used": "2024-01-15T14:25:00Z",
+        "total_executions": 1247,
+        "successful_executions": 1246,
+        "failed_executions": 1,
+        "avg_execution_time_ms": 892
+      },
+      "secrets_configured": true,
+      "secrets_count": 1,
+      "created_by": {
+        "id": "user_abcdef1234567890",
+        "name": "John Smith",
+        "email": "john@company.com"
+      },
+      "created_at": "2024-01-10T09:00:00Z",
+      "updated_at": "2024-01-14T16:45:00Z"
+    },
+    {
+      "id": "tool_def456ghi789",
+      "name": "Company Slack Workspace",
+      "description": "Main Slack workspace for team communications",
+      "type": "slack",
+      "provider": "slack",
+      "status": "active", 
+      "version": "1.0",
+      "configuration": {
+        "base_url": "https://hooks.slack.com",
+        "auth_type": "webhook",
+        "timeout_ms": 15000,
+        "retry_attempts": 2
+      },
+      "settings": {
+        "workspace_name": "company-team",
+        "default_channel": "#general",
+        "bot_name": "Tolstoy Bot",
+        "bot_emoji": ":robot_face:"
+      },
+      "capabilities": [
+        "send_message",
+        "upload_file",
+        "create_channel",
+        "invite_user"
+      ],
+      "health_check": {
+        "last_checked": "2024-01-15T14:28:00Z", 
+        "status": "healthy",
+        "response_time_ms": 156,
+        "error_rate_percent": 0.0
+      },
+      "usage_stats": {
+        "last_used": "2024-01-15T14:20:00Z",
+        "total_executions": 892,
+        "successful_executions": 890,
+        "failed_executions": 2,
+        "avg_execution_time_ms": 234
+      },
+      "secrets_configured": true,
+      "secrets_count": 1,
+      "created_by": {
+        "id": "user_fedcba0987654321",
+        "name": "Sarah Johnson", 
+        "email": "sarah@company.com"
+      },
+      "created_at": "2024-01-08T14:20:00Z",
+      "updated_at": "2024-01-13T11:30:00Z"
+    },
+    {
+      "id": "tool_ghi789abc123",
+      "name": "Customer Database",
+      "description": "PostgreSQL database for customer data",
+      "type": "database",
+      "provider": "postgresql",
+      "status": "error",
+      "version": "14.2",
+      "configuration": {
+        "host": "db.company.com",
+        "port": 5432,
+        "database": "customers",
+        "ssl_mode": "require",
+        "timeout_ms": 10000,
+        "max_connections": 10
+      },
+      "settings": {
+        "read_only": false,
+        "query_timeout_ms": 30000,
+        "connection_pool_size": 5
+      },
+      "capabilities": [
+        "execute_query",
+        "execute_stored_procedure",
+        "bulk_insert",
+        "transaction_support"
+      ],
+      "health_check": {
+        "last_checked": "2024-01-15T14:30:00Z",
+        "status": "unhealthy",
+        "response_time_ms": null,
+        "error_rate_percent": 100.0,
+        "last_error": "Connection timeout: unable to connect to database server"
+      },
+      "usage_stats": {
+        "last_used": "2024-01-14T09:15:00Z",
+        "total_executions": 156,
+        "successful_executions": 143,
+        "failed_executions": 13,
+        "avg_execution_time_ms": 2340
+      },
+      "secrets_configured": true,
+      "secrets_count": 2,
+      "created_by": {
+        "id": "user_abcdef1234567890",
+        "name": "John Smith",
+        "email": "john@company.com"
+      },
+      "created_at": "2024-01-05T16:00:00Z",
+      "updated_at": "2024-01-15T10:00:00Z"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "cursor": "eyJ0eXBlIjoiZW1haWwiLCJjcmVhdGVkX2F0IjoiMjAyNC0wMS0xMFQwOTowMDowMFoifQ",
+    "has_more": true,
+    "total_count": 47
+  },
+  "metadata": {
+    "request_id": "req_tools123def456",
+    "timestamp": "2024-01-15T14:35:00Z",
+    "execution_time_ms": 134
+  }
+}
+```
+
+```json Filtered by Type
+{
+  "success": true,
+  "data": [
+    {
+      "id": "tool_email123abc456",
+      "name": "SendGrid Email Service",
+      "type": "email",
+      "provider": "sendgrid",
+      "status": "active",
+      "usage_stats": {
+        "total_executions": 1247,
+        "successful_executions": 1246,
+        "success_rate": 99.9
+      },
+      "health_check": {
+        "status": "healthy",
+        "last_checked": "2024-01-15T14:30:00Z"
+      }
+    },
+    {
+      "id": "tool_email456def789", 
+      "name": "Mailgun Backup Service",
+      "type": "email",
+      "provider": "mailgun",
+      "status": "inactive",
+      "usage_stats": {
+        "total_executions": 23,
+        "successful_executions": 22,
+        "success_rate": 95.7
+      },
+      "health_check": {
+        "status": "untested",
+        "last_checked": null
+      }
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "cursor": null,
+    "has_more": false,
+    "total_count": 2
+  },
+  "metadata": {
+    "request_id": "req_email_tools_789",
+    "timestamp": "2024-01-15T14:35:00Z",
+    "execution_time_ms": 67,
+    "filters_applied": {
+      "type": "email",
+      "status": null
+    }
+  }
+}
+```
+
+```json Empty Response
+{
+  "success": true,
+  "data": [],
+  "pagination": {
+    "limit": 20,
+    "cursor": null,
+    "has_more": false,
+    "total_count": 0
+  },
+  "metadata": {
+    "request_id": "req_empty_tools_123",
+    "timestamp": "2024-01-15T14:35:00Z", 
+    "execution_time_ms": 23,
+    "filters_applied": {
+      "type": "nonexistent",
+      "status": null
+    }
+  }
+}
+```
+
+</ResponseExample>
+
+## Response Fields
+
+### Tool Object
+
+<ResponseField name="id" type="string">
+Unique tool identifier (format: `tool_` + 15 alphanumeric characters)
+</ResponseField>
+
+<ResponseField name="name" type="string">
+Human-readable tool name
+</ResponseField>
+
+<ResponseField name="description" type="string">
+Tool description and purpose
+</ResponseField>
+
+<ResponseField name="type" type="string">
+Tool type category (e.g., `email`, `slack`, `database`, `api`)
+</ResponseField>
+
+<ResponseField name="provider" type="string">
+Specific service provider (e.g., `sendgrid`, `slack`, `postgresql`)
+</ResponseField>
+
+<ResponseField name="status" type="string">
+Current tool status: `active`, `inactive`, or `error`
+</ResponseField>
+
+<ResponseField name="version" type="string">
+Tool or API version
+</ResponseField>
+
+<ResponseField name="configuration" type="object">
+Tool connection and behavior settings
+  <Expandable title="Configuration Fields">
+    <ResponseField name="base_url" type="string">API base URL</ResponseField>
+    <ResponseField name="auth_type" type="string">Authentication method</ResponseField>
+    <ResponseField name="timeout_ms" type="integer">Request timeout in milliseconds</ResponseField>
+    <ResponseField name="retry_attempts" type="integer">Number of retry attempts on failure</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="settings" type="object">
+Provider-specific settings and defaults
+</ResponseField>
+
+<ResponseField name="capabilities" type="string[]">
+List of operations this tool supports
+</ResponseField>
+
+<ResponseField name="health_check" type="object">
+Tool health monitoring information
+  <Expandable title="Health Check Fields">
+    <ResponseField name="last_checked" type="string">Last health check timestamp</ResponseField>
+    <ResponseField name="status" type="string">Health status: `healthy`, `unhealthy`, or `untested`</ResponseField>
+    <ResponseField name="response_time_ms" type="integer">Average response time</ResponseField>
+    <ResponseField name="error_rate_percent" type="number">Error rate percentage</ResponseField>
+    <ResponseField name="last_error" type="string">Most recent error message</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="usage_stats" type="object">
+Tool usage statistics and performance metrics
+  <Expandable title="Usage Statistics">
+    <ResponseField name="last_used" type="string">Last usage timestamp</ResponseField>
+    <ResponseField name="total_executions" type="integer">Total number of executions</ResponseField>
+    <ResponseField name="successful_executions" type="integer">Number of successful executions</ResponseField>
+    <ResponseField name="failed_executions" type="integer">Number of failed executions</ResponseField>
+    <ResponseField name="avg_execution_time_ms" type="number">Average execution time</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="secrets_configured" type="boolean">
+Whether required secrets are properly configured
+</ResponseField>
+
+<ResponseField name="secrets_count" type="integer">
+Number of secrets associated with this tool
+</ResponseField>
+
+<ResponseField name="created_by" type="object">
+User who created the tool
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+ISO 8601 timestamp when tool was created
+</ResponseField>
+
+<ResponseField name="updated_at" type="string">
+ISO 8601 timestamp when tool was last updated
+</ResponseField>
+
+## Status Codes
+
+<ResponseField name="200" type="Success">
+Tools retrieved successfully
+</ResponseField>
+
+<ResponseField name="400" type="Bad Request">
+Invalid query parameters
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+Missing or invalid authentication
+</ResponseField>
+
+<ResponseField name="403" type="Forbidden">
+Insufficient permissions to access tools
+</ResponseField>
+
+<ResponseField name="429" type="Too Many Requests">
+Rate limit exceeded
+</ResponseField>
+
+<ResponseField name="500" type="Internal Server Error">
+Server error occurred
+</ResponseField>
+
+## Examples
+
+### Filter by Tool Type
+
+<CodeGroup>
+
+```bash Email Tools
+curl -X GET "https://tolstoy.getpullse.com/tools?type=email&status=active" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890"
+```
+
+```typescript Get Communication Tools
+const communicationTools = await listTools({
+  type: 'slack',
+  status: 'active',
+  sort_by: 'last_used',
+  sort_order: 'desc'
+});
+
+console.log('Active Slack integrations:');
+communicationTools.data.forEach(tool => {
+  console.log(`- ${tool.name}: last used ${tool.usage_stats.last_used}`);
+});
+```
+
+</CodeGroup>
+
+### Tool Health Monitoring
+
+<CodeGroup>
+
+```python Health Check Analysis
+client = ToolsClient('org_1234567890abcdef', 'user_abcdef1234567890')
+
+# Get all tools and analyze health
+all_tools = client.list_tools(limit=100)
+tools = all_tools['data']
+
+healthy_tools = [t for t in tools if t['health_check']['status'] == 'healthy']
+unhealthy_tools = [t for t in tools if t['health_check']['status'] == 'unhealthy']
+
+print(f"Tool Health Summary:")
+print(f"- Total tools: {len(tools)}")
+print(f"- Healthy: {len(healthy_tools)} ({len(healthy_tools)/len(tools)*100:.1f}%)")
+print(f"- Unhealthy: {len(unhealthy_tools)}")
+
+if unhealthy_tools:
+    print(f"\nTools needing attention:")
+    for tool in unhealthy_tools:
+        error = tool['health_check'].get('last_error', 'Unknown error')
+        print(f"  - {tool['name']}: {error}")
+```
+
+```javascript Usage Analysis
+async function analyzeToolUsage() {
+  const tools = await toolsManager.getAllTools();
+  
+  // Find unused tools
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const unusedTools = tools.filter(tool => {
+    if (!tool.usage_stats.last_used) return true;
+    return new Date(tool.usage_stats.last_used) < thirtyDaysAgo;
+  });
+
+  // Find high-error-rate tools  
+  const problematicTools = tools.filter(tool => {
+    const stats = tool.usage_stats;
+    const errorRate = stats.failed_executions / stats.total_executions;
+    return errorRate > 0.05; // More than 5% error rate
+  });
+
+  console.log('Usage Analysis:');
+  console.log(`- Unused tools (30+ days): ${unusedTools.length}`);
+  console.log(`- High error rate tools: ${problematicTools.length}`);
+  
+  return {
+    unused: unusedTools,
+    problematic: problematicTools
+  };
+}
+```
+
+</CodeGroup>
+
+## Best Practices
+
+### Tool Organization
+
+<Accordion title="Naming Conventions">
+- Use descriptive names that indicate purpose: "Production SendGrid" vs "SendGrid"
+- Include environment indicators: "Slack - Development" vs "Slack - Production"
+- Use consistent naming patterns across similar tools
+</Accordion>
+
+<Accordion title="Health Monitoring">
+- Regularly monitor tool health status
+- Set up alerts for tools that go unhealthy
+- Review unused tools periodically for cleanup
+- Monitor error rates and performance metrics
+</Accordion>
+
+### Security Best Practices
+
+<Accordion title="Access Control">
+- Limit tool access to necessary team members
+- Use environment-specific tools for different stages
+- Regularly rotate authentication credentials
+- Monitor tool usage for unauthorized access
+</Accordion>
+
+<Accordion title="Configuration Management">
+- Use descriptive tool names and documentation
+- Keep tool configurations up to date
+- Test tool connections after configuration changes
+- Maintain backup tools for critical integrations
+</Accordion>
+
+## Common Use Cases
+
+### Integration Management
+
+Monitor and manage all your external service integrations in one place.
+
+### Tool Health Monitoring
+
+Track the health and performance of your integrations to ensure reliable workflow execution.
+
+### Usage Analytics
+
+Understand which tools are being used most frequently and identify optimization opportunities.
+
+### Security Auditing
+
+Review tool configurations and access patterns for security compliance.
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Get Tool" icon="info" href="/api/tools/get-tools-1">
+    View detailed information about a specific tool
+  </Card>
+  <Card title="Create Tool" icon="plus" href="/api/tools/post-tools">
+    Add a new tool integration
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Tool Secrets" icon="key" href="/api/toolsecrets/get-tools-secrets">
+    Manage authentication credentials for tools
+  </Card>
+  <Card title="Test Tool" icon="flask" href="/api/tools/post-tools-test">
+    Test tool connectivity and configuration
+  </Card>
+</CardGroup>
+
+---
+
+<Info>
+**Pro Tip**: Use the `sort_by=last_used` parameter to quickly identify unused tools that might be candidates for cleanup or optimization.
+</Info>

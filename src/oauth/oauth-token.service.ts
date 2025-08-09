@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
-import { SecretsResolver, OAuthTokens } from '../secrets/secrets-resolver.service';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { OAuthTokens, SecretsResolver } from '../secrets/secrets-resolver.service';
 import axios, { AxiosResponse } from 'axios';
 
 export interface OAuthConfig {
@@ -62,10 +62,22 @@ export class OAuthTokenService {
         throw new Error(`OAuth client credentials not found for ${toolName}`);
       }
 
+      // Get token endpoint with fallback
+      let tokenEndpoint = '';
+      if (credentials.tokenEndpoint) {
+        tokenEndpoint = credentials.tokenEndpoint as string;
+      } else {
+        try {
+          tokenEndpoint = this.getDefaultTokenEndpoint(toolName);
+        } catch {
+          throw new Error(`No token endpoint configured for ${toolName}`);
+        }
+      }
+
       const oauthConfig: OAuthConfig = {
         clientId: credentials.clientId,
         clientSecret: credentials.clientSecret,
-        tokenEndpoint: credentials.tokenEndpoint || this.getDefaultTokenEndpoint(toolName),
+        tokenEndpoint,
       };
 
       const refreshedTokens = await this.performTokenRefresh(
@@ -201,7 +213,7 @@ export class OAuthTokenService {
 
       if (revokeEndpoint) {
         try {
-          await axios.post(revokeEndpoint, {
+          await axios.post(typeof revokeEndpoint === 'string' ? revokeEndpoint : '', {
             token: tokens.accessToken,
             client_id: credentials.clientId,
             client_secret: credentials.clientSecret,

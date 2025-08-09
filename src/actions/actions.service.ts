@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Action, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { CreateActionDto } from './dto/create-action.dto';
@@ -7,6 +7,8 @@ import { TenantContext } from '../common/interfaces/tenant-context.interface';
 import { InputValidatorService } from '../common/services/input-validator.service';
 import { AuthConfigService } from '../auth/auth-config.service';
 import { MetricsService } from '../metrics/metrics.service';
+import { DaytonaService } from '../daytona/daytona.service';
+import { InputParam } from './types';
 
 @Injectable()
 export class ActionsService {
@@ -17,6 +19,7 @@ export class ActionsService {
     private readonly inputValidator: InputValidatorService,
     private readonly authConfig: AuthConfigService,
     private readonly metrics: MetricsService,
+    private readonly daytonaService: DaytonaService,
   ) {}
 
   async create(createActionDto: CreateActionDto, tenant: TenantContext): Promise<Action> {
@@ -193,7 +196,7 @@ export class ActionsService {
 
       // 2. Validate inputs against enhanced schema
       const validInputs = await this.inputValidator.validateEnhanced(
-        action.inputSchema as InputParam[],
+        action.inputSchema as unknown as InputParam[],
         inputs,
         {
           orgId,
@@ -212,8 +215,9 @@ export class ActionsService {
         const orgAuth = await this.authConfig.getOrgAuthConfig(orgId, toolName);
 
         if (orgAuth?.type === 'apiKey') {
-          const headerName = orgAuth.config.headerName || 'Authorization';
-          const headerValue = orgAuth.config.headerValue || orgAuth.config.apiKey;
+          const headerName = (orgAuth.config.headerName as string) || 'Authorization';
+          const headerValue =
+            (orgAuth.config.headerValue as string) || (orgAuth.config.apiKey as string);
           headers[headerName] = headerValue;
         } else if (orgAuth?.type === 'oauth2') {
           if (userId) {
@@ -252,20 +256,20 @@ export class ActionsService {
         requestOptions.body = JSON.stringify(validInputs);
       }
 
-      // Make HTTP request
-      const response = await fetch(url, requestOptions);
-      const responseText = await response.text();
+      // Execute HTTP request through Daytona sandbox
+      this.logger.log(`Executing HTTP request via Daytona: ${action.method} ${url}`);
 
-      let responseData;
-      try {
-        responseData = JSON.parse(responseText);
-      } catch {
-        responseData = responseText;
-      }
+      const httpResponse = await this.daytonaService.executeHttpRequest({
+        url,
+        method: action.method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
+        headers,
+        body: requestOptions.body as string,
+        timeout: 30000, // 30 second timeout
+      });
 
-      const duration = Date.now() - startTime;
+      const duration = httpResponse.duration || Date.now() - startTime;
 
-      if (response.ok) {
+      if (httpResponse.success) {
         // Update metrics with success
         this.metrics.actionExecutionCounter.inc({
           orgId,
@@ -282,20 +286,23 @@ export class ActionsService {
         // 5. Return result
         return {
           success: true,
-          executionId: `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          executionId: httpResponse.executionId,
           duration,
-          data: responseData,
+          data: httpResponse.data,
           outputs: {
             orgId,
             actionKey,
             toolKey: toolName,
             timestamp: new Date().toISOString(),
-            statusCode: response.status,
+            statusCode: httpResponse.statusCode,
             url,
+            executedInSandbox: true,
+            sandboxDuration: httpResponse.duration,
           },
         };
       } else {
-        throw new Error(`HTTP ${response.status}: ${responseText}`);
+        const errorMessage = httpResponse.error?.message || `HTTP ${httpResponse.statusCode}`;
+        throw new Error(errorMessage);
       }
     } catch (error) {
       const duration = Date.now() - startTime;

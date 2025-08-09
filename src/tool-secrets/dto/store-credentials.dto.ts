@@ -1,4 +1,4 @@
-import { IsObject, IsNotEmpty, ValidateNested, IsString } from 'class-validator';
+import { IsNotEmpty, IsObject, IsString, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class StoreCredentialsDto {

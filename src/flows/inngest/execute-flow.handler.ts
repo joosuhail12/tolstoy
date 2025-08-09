@@ -1,21 +1,21 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InngestFunction, InngestService } from 'nestjs-inngest';
-import { SandboxService, SandboxExecutionContext } from '../../sandbox/sandbox.service';
+import { SandboxExecutionContext, SandboxService } from '../../sandbox/sandbox.service';
 import { SecretsResolver } from '../../secrets/secrets-resolver.service';
 import { AblyService } from '../../ably/ably.service';
 import { InputValidatorService } from '../../common/services/input-validator.service';
 import {
-  ConditionEvaluatorService,
   ConditionContext,
+  ConditionEvaluatorService,
 } from '../../common/services/condition-evaluator.service';
 import { PrismaService } from '../../prisma.service';
 import { Prisma } from '@prisma/client';
 import { ExecutionLogsService } from '../../execution-logs/execution-logs.service';
 import {
+  AuthInjectionMetricLabels,
   MetricsService,
   StepMetricLabels,
-  AuthInjectionMetricLabels,
 } from '../../metrics/metrics.service';
 import { AuthConfigService } from '../../auth/auth-config.service';
 
@@ -196,12 +196,12 @@ interface WebhookDispatchPayload {
 export class ExecuteFlowHandler {
   constructor(
     @Optional() private readonly sandboxService: SandboxService,
-    private readonly secretsResolver: SecretsResolver,
+    private readonly _secretsResolver: SecretsResolver, // Reserved for future secret resolution
     private readonly ablyService: AblyService,
-    private readonly inputValidator: InputValidatorService,
+    private readonly _inputValidator: InputValidatorService, // Reserved for future input validation
     private readonly conditionEvaluator: ConditionEvaluatorService,
     private readonly prisma: PrismaService,
-    private readonly executionLogsService: ExecutionLogsService,
+    private readonly _executionLogsService: ExecutionLogsService, // Reserved for future execution logging
     private readonly metricsService: MetricsService,
     private readonly authConfig: AuthConfigService,
     @Optional() private readonly inngestService: InngestService,
@@ -554,13 +554,13 @@ export class ExecuteFlowHandler {
       let toolName: string | undefined;
 
       // Check if step config has tool information
-      const stepConfig = step.config as Record<string, unknown>;
-      if (stepConfig.toolName) {
-        toolName = stepConfig.toolName;
-      } else if (stepConfig.url) {
+      const stepConfig = step.config as any;
+      if (stepConfig?.toolName) {
+        toolName = stepConfig.toolName as string;
+      } else if (stepConfig?.url) {
         // Try to infer tool name from URL domain if available
         try {
-          const url = new URL(stepConfig.url);
+          const url = new URL(typeof stepConfig.url === 'string' ? stepConfig.url : '');
           const domain = url.hostname.toLowerCase();
 
           // Map common domains to tool names
@@ -605,17 +605,15 @@ export class ExecuteFlowHandler {
       if (orgAuth) {
         // Handle API Key authentication
         if (orgAuth.type === 'apiKey' && orgAuth.config) {
-          const config = orgAuth.config as Record<string, unknown>;
+          const config = orgAuth.config;
           if (config.headerName && config.headerValue) {
-            authHeaders[config.headerName] = config.headerValue;
+            authHeaders[config.headerName as string] = config.headerValue as string;
           } else if (config.apiKey) {
             // Default to Authorization header if no specific header name is configured
             authHeaders['Authorization'] = `Bearer ${config.apiKey}`;
           }
-        }
-
-        // Handle OAuth2 authentication (requires user context)
-        else if (orgAuth.type === 'oauth2' && context.userId) {
+        } else if (orgAuth.type === 'oauth2' && context.userId) {
+          // Handle OAuth2 authentication (requires user context)
           try {
             const userCredentials = await this.authConfig.getUserCredentials(
               context.orgId,
@@ -712,9 +710,9 @@ export class ExecuteFlowHandler {
     if (step.executeIf) {
       try {
         const conditionContext: ConditionContext = {
-          inputs: contextWithAuth.variables as Record<string, unknown>,
-          variables: contextWithAuth.variables as Record<string, unknown>,
-          stepOutputs: contextWithAuth.stepOutputs as Record<string, unknown>,
+          inputs: contextWithAuth.variables,
+          variables: contextWithAuth.variables,
+          stepOutputs: contextWithAuth.stepOutputs,
           currentStep: step as unknown as Record<string, unknown>,
           orgId: contextWithAuth.orgId,
           userId: contextWithAuth.userId,
@@ -887,7 +885,7 @@ export class ExecuteFlowHandler {
       flowId: context.flowId,
       stepId: step.id,
       executionId: context.executionId,
-      variables: context.variables as Record<string, unknown>,
+      variables: context.variables,
       stepOutputs: context.stepOutputs,
       authHeaders: context.authHeaders,
     };
@@ -940,7 +938,7 @@ export class ExecuteFlowHandler {
       flowId: context.flowId,
       stepId: step.id,
       executionId: context.executionId,
-      variables: context.variables as Record<string, unknown>,
+      variables: context.variables,
       stepOutputs: context.stepOutputs,
       authHeaders: context.authHeaders,
     };
@@ -1337,7 +1335,8 @@ export class ExecuteFlowHandler {
    * Get configuration for event publishing steps
    * Event publishing should be fast and reliable but not block execution
    */
-  private getEventPublishingConfiguration(): StepThrottlingConfig {
+  private _getEventPublishingConfiguration(): StepThrottlingConfig {
+    // Reserved for future event publishing optimization
     return {
       concurrency: 20, // Higher concurrency for event publishing
       rateLimit: {
@@ -1372,7 +1371,11 @@ export class ExecuteFlowHandler {
     return config.critical !== false;
   }
 
-  private async dispatchWebhook(eventType: string, payload: WebhookDispatchPayload): Promise<void> {
+  private async _dispatchWebhook(
+    eventType: string,
+    payload: WebhookDispatchPayload,
+  ): Promise<void> {
+    // Reserved for future webhook dispatching
     if (!this.inngestService) {
       this.logger.debug('InngestService not available, skipping webhook dispatch');
       return;

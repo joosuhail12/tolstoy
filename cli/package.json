@@ -1,6 +1,6 @@
 {
   "name": "@tolstoy/cli",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Official CLI for Tolstoy workflow automation platform - featuring tool authentication, action execution, and OAuth2 flows",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

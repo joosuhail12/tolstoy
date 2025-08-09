@@ -3,12 +3,12 @@ import { HttpService } from '@nestjs/axios';
 import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { InngestFunction } from 'nestjs-inngest';
 import { WebhooksService } from './webhooks.service';
-import { WebhookSignatureService, WebhookPayload } from './webhook-signature.service';
+import { WebhookPayload, WebhookSignatureService } from './webhook-signature.service';
 import { WebhookDispatchLogService } from './webhook-dispatch-log.service';
 import {
   MetricsService,
-  WebhookMetricLabels,
   WebhookCounterLabels,
+  WebhookMetricLabels,
 } from '../metrics/metrics.service';
 import { firstValueFrom } from 'rxjs';
 

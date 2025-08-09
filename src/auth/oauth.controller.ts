@@ -1,39 +1,36 @@
 import {
+  BadRequestException,
   Controller,
   Get,
-  Query,
-  Param,
   Headers,
-  Res,
-  BadRequestException,
-  Logger,
   HttpStatus,
-  ValidationPipe,
+  Logger,
+  Param,
+  Query,
+  Res,
   UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import {
-  ApiTags,
+  ApiBadRequestResponse,
   ApiBearerAuth,
+  ApiHeader,
   ApiOperation,
-  ApiResponse,
   ApiParam,
   ApiQuery,
-  ApiHeader,
-  ApiBadRequestResponse,
+  ApiResponse,
+  ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { Response } from 'express';
 import { OAuthService } from './oauth.service';
 import { MetricsService } from '../metrics/metrics.service';
 import {
-  OAuthLoginQueryDto,
   OAuthCallbackQueryDto,
-  OAuthToolParamDto
+  OAuthLoginQueryDto,
+  OAuthToolParamDto,
 } from './dto/oauth-request.dto';
-import {
-  OAuthCallbackResponseDto,
-  OAuthErrorResponseDto
-} from './dto/oauth-response.dto';
+import { OAuthCallbackResponseDto, OAuthErrorResponseDto } from './dto/oauth-response.dto';
 
 @ApiTags('OAuth Authentication')
 @Controller('auth')
@@ -195,7 +192,7 @@ export class OAuthController {
           `OAuth provider returned error for ${toolKey}: ${query.error} - ${query.error_description}`,
         );
 
-        // Note: We don't have orgId here for error cases, so we'll record error metrics 
+        // Note: We don't have orgId here for error cases, so we'll record error metrics
         // without orgId or skip error metrics for simplicity
 
         const response: OAuthErrorResponseDto = {
@@ -229,12 +226,6 @@ export class OAuthController {
         toolKey: result.toolKey,
         success: 'true',
       });
-
-      const response: OAuthCallbackResponseDto = {
-        success: true,
-        message: 'OAuth authorization completed successfully',
-        credentialId: result.credentialId,
-      };
 
       // Return user-friendly success page
       const successHtml = this.generateSuccessPage(toolKey);

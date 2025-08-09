@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AwsSecretsService } from '../aws-secrets.service';
 import { RedisCacheService } from '../cache/redis-cache.service';
@@ -45,7 +45,8 @@ export class AuthConfigService {
     return `auth:org:${orgId}:tool:${toolKey}`;
   }
 
-  private userCredKey(orgId: string, userId: string, toolKey: string): string {
+  private _userCredKey(orgId: string, userId: string, toolKey: string): string {
+    // Reserved for future user credential caching
     return `auth:user:${orgId}:${userId}:tool:${toolKey}`;
   }
 
@@ -53,16 +54,16 @@ export class AuthConfigService {
    * Load org-level auth config (apiKey or oauth2)
    * First checks cache, then database, then syncs to AWS Secrets Manager
    */
-  async getOrgAuthConfig(orgId: string, toolKey: string): Promise<ToolAuthConfig> {
+  async getOrgAuthConfig(orgId: string, toolKey: string): Promise<OrgAuthConfig> {
     const cacheKey = this.orgConfigKey(orgId, toolKey);
 
     this.logger.debug(`Loading org auth config for ${orgId}:${toolKey}`);
 
     // Check cache first
     const cached = await this.cache.get(cacheKey);
-    if (cached) {
+    if (cached && typeof cached === 'object' && 'id' in cached) {
       this.logger.debug(`Found cached auth config for ${orgId}:${toolKey}`);
-      return cached;
+      return cached as OrgAuthConfig;
     }
 
     // Load from database with tool relation
@@ -85,7 +86,11 @@ export class AuthConfigService {
 
     // Persist in AWS Secrets Manager as well for backup/sync
     try {
-      await this.syncToSecretsManager(`tolstoy/${orgId}/tools/${toolKey}/config`, config);
+      const configToSync =
+        config && typeof config === 'object' && config !== null
+          ? (config as Record<string, unknown>)
+          : {};
+      await this.syncToSecretsManager(`tolstoy/${orgId}/tools/${toolKey}/config`, configToSync);
       this.logger.debug(`Synced auth config to AWS Secrets Manager for ${orgId}:${toolKey}`);
     } catch (error) {
       this.logger.warn(`Failed to sync auth config to AWS Secrets Manager: ${error.message}`);
@@ -96,7 +101,15 @@ export class AuthConfigService {
     await this.cache.set(cacheKey, config, { ttl: 600 });
 
     this.logger.debug(`Loaded and cached auth config for ${orgId}:${toolKey}`);
-    return config;
+    return {
+      id: record.id,
+      orgId: record.orgId,
+      toolId: record.toolId,
+      type: record.type,
+      config: record.config as Record<string, unknown>,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    };
   }
 
   /**
@@ -190,7 +203,6 @@ export class AuthConfigService {
 
       return refreshed.accessToken;
       */
-
     } catch (error) {
       this.logger.error(`Failed to refresh token for credential ${cred.id}: ${error.message}`);
       throw error;
@@ -216,11 +228,11 @@ export class AuthConfigService {
         orgId,
         toolId,
         type,
-        config,
+        config: config as any,
       },
       update: {
         type,
-        config,
+        config: config as any,
         updatedAt: new Date(),
       },
       include: {
@@ -229,11 +241,19 @@ export class AuthConfigService {
     });
 
     // Invalidate cache
-    const cacheKey = this.orgConfigKey(orgId, authConfig.tool.name);
+    const cacheKey = this.orgConfigKey(orgId, (authConfig as any).tool.name);
     await this.cache.del(cacheKey);
 
     this.logger.debug(`Successfully set auth config for ${orgId}:${toolId}`);
-    return authConfig;
+    return {
+      id: authConfig.id,
+      orgId: authConfig.orgId,
+      toolId: authConfig.toolId,
+      type: authConfig.type,
+      config: authConfig.config as Record<string, unknown>,
+      createdAt: authConfig.createdAt,
+      updatedAt: authConfig.updatedAt,
+    };
   }
 
   /**
@@ -319,7 +339,10 @@ export class AuthConfigService {
   /**
    * Helper method to create or update a secret in AWS Secrets Manager
    */
-  private async syncToSecretsManager(secretName: string, value: Record<string, unknown>): Promise<void> {
+  private async syncToSecretsManager(
+    secretName: string,
+    value: Record<string, unknown>,
+  ): Promise<void> {
     const secretValue = typeof value === 'string' ? value : JSON.stringify(value);
 
     try {

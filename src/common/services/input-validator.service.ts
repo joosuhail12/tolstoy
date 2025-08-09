@@ -1,5 +1,5 @@
-import { Injectable, BadRequestException, Optional } from '@nestjs/common';
-import { z, ZodObject, ZodSchema } from 'zod';
+import { BadRequestException, Injectable, Optional } from '@nestjs/common';
+import { ZodObject, ZodSchema, z } from 'zod';
 import * as Sentry from '@sentry/nestjs';
 import * as jsonLogic from 'json-logic-js';
 import {
@@ -78,8 +78,11 @@ export class InputValidatorService {
 
     try {
       // Pre-filter parameters based on visibility conditions
-      const visibleParams = this.filterVisibleParams(enhancedParams, inputData || {});
-      
+      const visibleParams = this.filterVisibleParams(
+        enhancedParams,
+        (inputData as Record<string, unknown>) || {},
+      );
+
       const schema = this.buildEnhancedZodSchema(visibleParams);
       const validated = schema.parse(inputData || {}) as ValidatedInputData;
 
@@ -100,7 +103,7 @@ export class InputValidatorService {
     params: ActionInputParam[],
     inputData: Record<string, unknown>,
   ): ActionInputParam[] {
-    return params.filter((param) => {
+    return params.filter(param => {
       if (!param.visibleIf) {
         return true; // Always visible if no condition
       }
@@ -256,7 +259,6 @@ export class InputValidatorService {
 
     return numberSchema;
   }
-
 
   /**
    * Handle validation errors with enhanced error reporting

@@ -1,5 +1,5 @@
-import { Injectable, NestMiddleware, BadRequestException } from '@nestjs/common';
-import { Response, NextFunction } from 'express';
+import { BadRequestException, Injectable, NestMiddleware } from '@nestjs/common';
+import { NextFunction, Response } from 'express';
 import { IncomingHttpHeaders } from 'http';
 import { randomUUID } from 'crypto';
 import { RequestWithTenant } from '../interfaces/tenant-context.interface';
@@ -46,8 +46,8 @@ export class TenantMiddleware implements NestMiddleware {
         logContext: { orgId: string; userId: string; requestId: string };
       }
     ).logContext = {
-      orgId: orgId!.toString(),
-      userId: userId!.toString(),
+      orgId: orgId.toString(),
+      userId: userId.toString(),
       requestId,
     };
 

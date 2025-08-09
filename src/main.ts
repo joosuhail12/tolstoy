@@ -6,7 +6,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Logger } from 'nestjs-pino';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AppModule } from './app.module';
@@ -108,7 +108,7 @@ async function bootstrap() {
     await fastifyInstance.route({
       method: 'GET',
       url: '/openapi.json',
-      handler: async (request: FastifyRequest, reply: FastifyReply) => {
+      handler: async (_request: FastifyRequest, reply: FastifyReply) => {
         reply.header('Access-Control-Allow-Origin', '*');
         reply.header('Access-Control-Allow-Methods', 'GET');
         reply.header('Access-Control-Allow-Headers', 'Content-Type');

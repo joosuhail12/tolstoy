@@ -1,5 +1,5 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import * as jsonLogic from 'json-logic-js';
 
 export type ConditionValue =
@@ -229,7 +229,7 @@ export class ConditionEvaluatorService {
 
       // Handle custom DSL format
       if (this.isCustomDSLRule(rule)) {
-        return this.evaluateCustomDSL(rule, context);
+        return this.evaluateCustomDSL(rule as Record<string, unknown>, context);
       }
 
       // Default: treat as JSONLogic
@@ -297,8 +297,13 @@ export class ConditionEvaluatorService {
    * Check if rule is a simple comparison
    */
   private isSimpleComparisonRule(rule: unknown): boolean {
-    return (
-      rule && typeof rule === 'object' && 'field' in rule && 'operator' in rule && 'value' in rule
+    return !!(
+      rule &&
+      typeof rule === 'object' &&
+      rule !== null &&
+      'field' in rule &&
+      'operator' in rule &&
+      'value' in rule
     );
   }
 
@@ -306,7 +311,13 @@ export class ConditionEvaluatorService {
    * Check if rule is custom DSL format
    */
   private isCustomDSLRule(rule: unknown): boolean {
-    return rule && typeof rule === 'object' && 'type' in rule && rule.type === 'custom';
+    return !!(
+      rule &&
+      typeof rule === 'object' &&
+      rule !== null &&
+      'type' in rule &&
+      (rule as any).type === 'custom'
+    );
   }
 
   /**
@@ -388,8 +399,8 @@ export class ConditionEvaluatorService {
     let value: unknown = context;
 
     for (const part of parts) {
-      if (value && typeof value === 'object' && part in value) {
-        value = value[part];
+      if (value && typeof value === 'object' && value !== null && part in value) {
+        value = (value as Record<string, unknown>)[part];
       } else {
         return undefined;
       }
@@ -448,7 +459,10 @@ export class ConditionEvaluatorService {
   /**
    * Custom DSL: Time window evaluation
    */
-  private evaluateTimeWindow(_config: Record<string, unknown>, _context: ConditionContext): boolean {
+  private evaluateTimeWindow(
+    _config: Record<string, unknown>,
+    _context: ConditionContext,
+  ): boolean {
     // Implementation would depend on specific time window logic
     // This is a placeholder for custom time-based conditions
     return true;
@@ -471,7 +485,7 @@ export class ConditionEvaluatorService {
     context: ConditionContext,
   ): boolean {
     const { stepId, condition } = config as { stepId: string; condition: ConditionRuleValue };
-    const stepOutput = context.stepOutputs?.[stepId as string];
+    const stepOutput = context.stepOutputs?.[stepId];
     if (!stepOutput || typeof stepOutput !== 'object') {
       return false;
     }

@@ -1,6 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
-import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
-import { Flow, ExecutionLog, Prisma } from '@prisma/client';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
+import { ExecutionLog, Flow, Prisma } from '@prisma/client';
 import * as Sentry from '@sentry/nestjs';
 import { PrismaService } from '../prisma.service';
 import { AblyService } from '../ably/ably.service';
@@ -10,11 +10,11 @@ import { OAuthTokenService } from '../oauth/oauth-token.service';
 import { InputValidatorService } from '../common/services/input-validator.service';
 import { InputParam } from '../actions/types';
 import {
-  ConditionEvaluatorService,
   ConditionContext,
+  ConditionEvaluatorService,
   ConditionValue,
 } from '../common/services/condition-evaluator.service';
-import { SandboxService, SandboxExecutionContext } from '../sandbox/sandbox.service';
+import { SandboxExecutionContext, SandboxService } from '../sandbox/sandbox.service';
 import { InngestService } from 'nestjs-inngest';
 import { ExecutionLogsService } from '../execution-logs/execution-logs.service';
 import { MetricsService, StepMetricLabels } from '../metrics/metrics.service';
@@ -89,7 +89,7 @@ export class FlowExecutorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ablyService: AblyService,
-    private readonly secretsResolver: SecretsResolver,
+    private readonly _secretsResolver: SecretsResolver, // Reserved for future secret resolution features
     private readonly oauthService: OAuthTokenService,
     private readonly inputValidator: InputValidatorService,
     private readonly conditionEvaluator: ConditionEvaluatorService,
@@ -866,7 +866,7 @@ export class FlowExecutorService {
       if (action.inputSchema && Array.isArray(action.inputSchema)) {
         try {
           validatedInputs = this.inputValidator.validateEnhanced(
-            action.inputSchema as InputParam[],
+            action.inputSchema as unknown as InputParam[],
             inputs,
             {
               orgId: context.orgId,
@@ -920,18 +920,15 @@ export class FlowExecutorService {
     for (const [key, value] of Object.entries(inputs)) {
       if (typeof value === 'string' && value.includes('{{')) {
         if (typeof resolved === 'object' && resolved !== null && !Array.isArray(resolved)) {
-          (resolved as Record<string, unknown>)[key] = this.resolveTemplate(value, context);
+          resolved[key] = this.resolveTemplate(value, context);
         }
       } else if (typeof value === 'object' && value !== null) {
         if (typeof resolved === 'object' && resolved !== null && !Array.isArray(resolved)) {
-          (resolved as Record<string, unknown>)[key] = await this.resolveActionInputs(
-            value,
-            context,
-          );
+          resolved[key] = await this.resolveActionInputs(value, context);
         }
       } else {
         if (typeof resolved === 'object' && resolved !== null && !Array.isArray(resolved)) {
-          (resolved as Record<string, unknown>)[key] = value;
+          resolved[key] = value;
         }
       }
     }
@@ -1315,7 +1312,8 @@ export class FlowExecutorService {
       {
         stepName: step.name,
         skipReason,
-        executeIf: step.executeIf,
+        executeIf:
+          typeof step.executeIf === 'string' ? { condition: step.executeIf } : step.executeIf,
       },
     );
 
@@ -1336,7 +1334,7 @@ export class FlowExecutorService {
 
   private async publishExecutionStarted(
     context: FlowExecutionContext,
-    flow: Flow,
+    _flow: Flow, // Reserved for future flow metadata usage
     totalSteps: number,
   ): Promise<void> {
     const event = await this.ablyService.createExecutionEvent(
@@ -1352,7 +1350,7 @@ export class FlowExecutorService {
 
   private async publishExecutionCompleted(
     context: FlowExecutionContext,
-    flow: Flow,
+    _flow: Flow, // Reserved for future flow metadata usage
     status: 'completed' | 'failed' | 'cancelled',
     options: {
       totalSteps: number;

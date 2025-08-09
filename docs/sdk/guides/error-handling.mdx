@@ -1,0 +1,1533 @@
+---
+title: "Error Handling Guide"
+description: "Comprehensive guide to robust error handling patterns and best practices when using the Tolstoy TypeScript SDK."
+---
+
+# Error Handling Guide
+
+Proper error handling is crucial for building reliable automation systems. This guide covers comprehensive error handling patterns, retry strategies, and recovery mechanisms for the Tolstoy TypeScript SDK.
+
+## Error Types and Classification
+
+### SDK Error Hierarchy
+
+```typescript
+// Base error class for all Tolstoy SDK errors
+class TolstoyError extends Error {
+  public readonly code: string;
+  public readonly retriable: boolean;
+  public readonly statusCode?: number;
+  public readonly details?: Record<string, any>;
+  public readonly timestamp: Date;
+
+  constructor(
+    message: string,
+    code: string,
+    retriable = false,
+    statusCode?: number,
+    details?: Record<string, any>
+  ) {
+    super(message);
+    this.name = 'TolstoyError';
+    this.code = code;
+    this.retriable = retriable;
+    this.statusCode = statusCode;
+    this.details = details;
+    this.timestamp = new Date();
+  }
+}
+
+// Network and API errors
+class NetworkError extends TolstoyError {
+  constructor(message: string, statusCode?: number, details?: any) {
+    super(message, 'NETWORK_ERROR', true, statusCode, details);
+    this.name = 'NetworkError';
+  }
+}
+
+class RateLimitError extends TolstoyError {
+  public readonly retryAfter?: number;
+
+  constructor(message: string, retryAfter?: number) {
+    super(message, 'RATE_LIMIT_EXCEEDED', true, 429);
+    this.name = 'RateLimitError';
+    this.retryAfter = retryAfter;
+  }
+}
+
+class AuthenticationError extends TolstoyError {
+  constructor(message: string) {
+    super(message, 'AUTHENTICATION_ERROR', false, 401);
+    this.name = 'AuthenticationError';
+  }
+}
+
+class AuthorizationError extends TolstoyError {
+  constructor(message: string, resource?: string) {
+    super(message, 'AUTHORIZATION_ERROR', false, 403, { resource });
+    this.name = 'AuthorizationError';
+  }
+}
+
+// Execution errors
+class ExecutionError extends TolstoyError {
+  public readonly executionId?: string;
+  public readonly flowId?: string;
+  public readonly stepKey?: string;
+
+  constructor(
+    message: string, 
+    code: string,
+    retriable: boolean,
+    context?: {
+      executionId?: string;
+      flowId?: string;
+      stepKey?: string;
+    }
+  ) {
+    super(message, code, retriable, undefined, context);
+    this.name = 'ExecutionError';
+    this.executionId = context?.executionId;
+    this.flowId = context?.flowId;
+    this.stepKey = context?.stepKey;
+  }
+}
+
+class ValidationError extends TolstoyError {
+  public readonly field?: string;
+  public readonly value?: any;
+
+  constructor(message: string, field?: string, value?: any) {
+    super(message, 'VALIDATION_ERROR', false, 400, { field, value });
+    this.name = 'ValidationError';
+    this.field = field;
+    this.value = value;
+  }
+}
+
+class TimeoutError extends TolstoyError {
+  public readonly timeoutMs: number;
+
+  constructor(message: string, timeoutMs: number) {
+    super(message, 'TIMEOUT_ERROR', true, 408, { timeoutMs });
+    this.name = 'TimeoutError';
+    this.timeoutMs = timeoutMs;
+  }
+}
+
+class ResourceNotFoundError extends TolstoyError {
+  public readonly resourceType: string;
+  public readonly resourceId: string;
+
+  constructor(resourceType: string, resourceId: string) {
+    super(
+      `${resourceType} with ID '${resourceId}' not found`,
+      'RESOURCE_NOT_FOUND',
+      false,
+      404,
+      { resourceType, resourceId }
+    );
+    this.name = 'ResourceNotFoundError';
+    this.resourceType = resourceType;
+    this.resourceId = resourceId;
+  }
+}
+```
+
+### Error Detection Patterns
+
+```typescript
+// Type guards for error classification
+function isRetriableError(error: any): boolean {
+  if (error instanceof TolstoyError) {
+    return error.retriable;
+  }
+  
+  // Check for specific network conditions
+  if (error.code === 'ECONNRESET' || 
+      error.code === 'ENOTFOUND' || 
+      error.code === 'ETIMEDOUT') {
+    return true;
+  }
+  
+  // Check HTTP status codes
+  if (error.statusCode) {
+    return [408, 429, 500, 502, 503, 504].includes(error.statusCode);
+  }
+  
+  return false;
+}
+
+function isAuthenticationError(error: any): error is AuthenticationError {
+  return error instanceof AuthenticationError ||
+         error.code === 'AUTHENTICATION_ERROR' ||
+         error.statusCode === 401;
+}
+
+function isRateLimitError(error: any): error is RateLimitError {
+  return error instanceof RateLimitError ||
+         error.code === 'RATE_LIMIT_EXCEEDED' ||
+         error.statusCode === 429;
+}
+
+function isValidationError(error: any): error is ValidationError {
+  return error instanceof ValidationError ||
+         error.code === 'VALIDATION_ERROR' ||
+         error.statusCode === 400;
+}
+
+// Error context extraction
+function extractErrorContext(error: any): Record<string, any> {
+  return {
+    name: error.name || 'Unknown Error',
+    message: error.message,
+    code: error.code,
+    statusCode: error.statusCode,
+    stack: error.stack,
+    timestamp: error.timestamp || new Date().toISOString(),
+    retriable: error.retriable || false,
+    details: error.details || {},
+    // Add any custom context
+    userAgent: typeof window !== 'undefined' ? navigator.userAgent : process.version,
+    environment: process.env.NODE_ENV || 'unknown'
+  };
+}
+```
+
+## Retry Strategies and Patterns
+
+### Configurable Retry Mechanism
+
+```typescript
+interface RetryConfig {
+  maxAttempts: number;
+  baseDelay: number;
+  maxDelay: number;
+  backoffMultiplier: number;
+  jitter: boolean;
+  retryCondition?: (error: any, attempt: number) => boolean;
+  onRetry?: (error: any, attempt: number) => void | Promise<void>;
+  abortSignal?: AbortSignal;
+}
+
+interface RetryResult<T> {
+  success: boolean;
+  result?: T;
+  error?: any;
+  attempts: number;
+  totalDuration: number;
+  retryHistory: RetryAttempt[];
+}
+
+interface RetryAttempt {
+  attempt: number;
+  error: any;
+  delay: number;
+  timestamp: Date;
+}
+
+class RetryManager {
+  private defaultConfig: RetryConfig = {
+    maxAttempts: 3,
+    baseDelay: 1000,
+    maxDelay: 30000,
+    backoffMultiplier: 2,
+    jitter: true,
+    retryCondition: isRetriableError
+  };
+  
+  async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    config?: Partial<RetryConfig>
+  ): Promise<RetryResult<T>> {
+    const finalConfig = { ...this.defaultConfig, ...config };
+    const retryHistory: RetryAttempt[] = [];
+    const startTime = Date.now();
+    
+    let lastError: any;
+    
+    for (let attempt = 1; attempt <= finalConfig.maxAttempts; attempt++) {
+      try {
+        // Check for abort signal
+        if (finalConfig.abortSignal?.aborted) {
+          throw new Error('Operation aborted');
+        }
+        
+        const result = await operation();
+        
+        return {
+          success: true,
+          result,
+          attempts: attempt,
+          totalDuration: Date.now() - startTime,
+          retryHistory
+        };
+        
+      } catch (error) {
+        lastError = error;
+        
+        // Log the attempt
+        retryHistory.push({
+          attempt,
+          error: extractErrorContext(error),
+          delay: 0,
+          timestamp: new Date()
+        });
+        
+        // Check if we should retry
+        const shouldRetry = attempt < finalConfig.maxAttempts && 
+                          (finalConfig.retryCondition?.(error, attempt) ?? isRetriableError(error));
+        
+        if (!shouldRetry) {
+          break;
+        }
+        
+        // Calculate delay
+        const baseDelay = finalConfig.baseDelay * Math.pow(finalConfig.backoffMultiplier, attempt - 1);
+        let delay = Math.min(baseDelay, finalConfig.maxDelay);
+        
+        // Add jitter to prevent thundering herd
+        if (finalConfig.jitter) {
+          delay = delay * (0.5 + Math.random() * 0.5);
+        }
+        
+        // Handle rate limiting
+        if (isRateLimitError(error) && error.retryAfter) {
+          delay = Math.max(delay, error.retryAfter * 1000);
+        }
+        
+        retryHistory[retryHistory.length - 1].delay = delay;
+        
+        // Call retry callback
+        if (finalConfig.onRetry) {
+          await finalConfig.onRetry(error, attempt);
+        }
+        
+        // Wait before retry
+        await this.sleep(delay);
+      }
+    }
+    
+    return {
+      success: false,
+      error: lastError,
+      attempts: finalConfig.maxAttempts,
+      totalDuration: Date.now() - startTime,
+      retryHistory
+    };
+  }
+  
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  
+  // Specialized retry strategies
+  async exponentialBackoff<T>(
+    operation: () => Promise<T>,
+    maxAttempts = 5
+  ): Promise<T> {
+    const result = await this.executeWithRetry(operation, {
+      maxAttempts,
+      baseDelay: 1000,
+      backoffMultiplier: 2,
+      jitter: true
+    });
+    
+    if (result.success) {
+      return result.result!;
+    } else {
+      throw result.error;
+    }
+  }
+  
+  async linearBackoff<T>(
+    operation: () => Promise<T>,
+    maxAttempts = 3,
+    delay = 1000
+  ): Promise<T> {
+    const result = await this.executeWithRetry(operation, {
+      maxAttempts,
+      baseDelay: delay,
+      backoffMultiplier: 1,
+      jitter: false
+    });
+    
+    if (result.success) {
+      return result.result!;
+    } else {
+      throw result.error;
+    }
+  }
+  
+  async fixedDelay<T>(
+    operation: () => Promise<T>,
+    maxAttempts = 3,
+    delay = 1000
+  ): Promise<T> {
+    const result = await this.executeWithRetry(operation, {
+      maxAttempts,
+      baseDelay: delay,
+      backoffMultiplier: 1,
+      maxDelay: delay,
+      jitter: false
+    });
+    
+    if (result.success) {
+      return result.result!;
+    } else {
+      throw result.error;
+    }
+  }
+}
+
+// Usage examples
+const retryManager = new RetryManager();
+
+// Basic retry with exponential backoff
+const result = await retryManager.exponentialBackoff(
+  () => client.flows.execute('flow_id', inputs)
+);
+
+// Custom retry configuration
+const customResult = await retryManager.executeWithRetry(
+  () => client.actions.execute('action_id', inputs),
+  {
+    maxAttempts: 5,
+    baseDelay: 500,
+    backoffMultiplier: 1.5,
+    onRetry: async (error, attempt) => {
+      console.log(`Retry attempt ${attempt}: ${error.message}`);
+      
+      // Custom logic based on error type
+      if (isRateLimitError(error)) {
+        console.log('Rate limited, waiting longer...');
+      }
+    },
+    retryCondition: (error, attempt) => {
+      // Custom retry logic
+      if (isAuthenticationError(error)) {
+        return false; // Don't retry auth errors
+      }
+      
+      if (attempt >= 3 && error.statusCode === 500) {
+        return false; // Stop retrying server errors after 3 attempts
+      }
+      
+      return isRetriableError(error);
+    }
+  }
+);
+```
+
+### Circuit Breaker Pattern
+
+```typescript
+interface CircuitBreakerConfig {
+  failureThreshold: number;
+  resetTimeout: number;
+  monitoringWindow: number;
+  minimumRequests: number;
+}
+
+type CircuitState = 'CLOSED' | 'OPEN' | 'HALF_OPEN';
+
+interface CircuitMetrics {
+  requests: number;
+  failures: number;
+  successes: number;
+  lastFailureTime?: number;
+  lastSuccessTime?: number;
+}
+
+class CircuitBreaker {
+  private state: CircuitState = 'CLOSED';
+  private metrics: CircuitMetrics = {
+    requests: 0,
+    failures: 0,
+    successes: 0
+  };
+  private nextAttempt: number = 0;
+  private readonly config: CircuitBreakerConfig;
+  
+  constructor(config: Partial<CircuitBreakerConfig> = {}) {
+    this.config = {
+      failureThreshold: 5,
+      resetTimeout: 60000, // 1 minute
+      monitoringWindow: 60000, // 1 minute
+      minimumRequests: 3,
+      ...config
+    };
+  }
+  
+  async execute<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.state === 'OPEN') {
+      if (Date.now() < this.nextAttempt) {
+        throw new Error(`Circuit breaker is OPEN. Next attempt in ${this.nextAttempt - Date.now()}ms`);
+      } else {
+        this.state = 'HALF_OPEN';
+        console.log('Circuit breaker moved to HALF_OPEN state');
+      }
+    }
+    
+    try {
+      const result = await operation();
+      this.onSuccess();
+      return result;
+      
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+  
+  private onSuccess(): void {
+    this.metrics.successes++;
+    this.metrics.lastSuccessTime = Date.now();
+    
+    if (this.state === 'HALF_OPEN') {
+      this.state = 'CLOSED';
+      this.resetMetrics();
+      console.log('Circuit breaker moved to CLOSED state');
+    }
+  }
+  
+  private onFailure(): void {
+    this.metrics.failures++;
+    this.metrics.lastFailureTime = Date.now();
+    this.metrics.requests++;
+    
+    if (this.shouldOpenCircuit()) {
+      this.state = 'OPEN';
+      this.nextAttempt = Date.now() + this.config.resetTimeout;
+      console.log(`Circuit breaker moved to OPEN state for ${this.config.resetTimeout}ms`);
+    }
+  }
+  
+  private shouldOpenCircuit(): boolean {
+    if (this.metrics.requests < this.config.minimumRequests) {
+      return false;
+    }
+    
+    const failureRate = this.metrics.failures / this.metrics.requests;
+    return failureRate >= this.config.failureThreshold / 100;
+  }
+  
+  private resetMetrics(): void {
+    this.metrics = {
+      requests: 0,
+      failures: 0,
+      successes: 0
+    };
+  }
+  
+  getState(): CircuitState {
+    return this.state;
+  }
+  
+  getMetrics(): CircuitMetrics {
+    return { ...this.metrics };
+  }
+  
+  reset(): void {
+    this.state = 'CLOSED';
+    this.resetMetrics();
+    this.nextAttempt = 0;
+  }
+}
+
+// Usage with Tolstoy SDK
+class RobustTolstoyClient {
+  private client: TolstoyClient;
+  private retryManager: RetryManager;
+  private circuitBreaker: CircuitBreaker;
+  
+  constructor(
+    client: TolstoyClient,
+    retryConfig?: Partial<RetryConfig>,
+    circuitConfig?: Partial<CircuitBreakerConfig>
+  ) {
+    this.client = client;
+    this.retryManager = new RetryManager();
+    this.circuitBreaker = new CircuitBreaker(circuitConfig);
+  }
+  
+  async executeFlow(flowId: string, inputs: any, options?: any) {
+    return this.circuitBreaker.execute(async () => {
+      return this.retryManager.exponentialBackoff(async () => {
+        return this.client.flows.execute(flowId, inputs, options);
+      });
+    });
+  }
+  
+  async executeAction(actionId: string, inputs: any, options?: any) {
+    return this.circuitBreaker.execute(async () => {
+      return this.retryManager.exponentialBackoff(async () => {
+        return this.client.actions.execute(actionId, inputs, options);
+      });
+    });
+  }
+  
+  getCircuitState() {
+    return this.circuitBreaker.getState();
+  }
+  
+  getMetrics() {
+    return this.circuitBreaker.getMetrics();
+  }
+}
+```
+
+## Error Recovery Strategies
+
+### Graceful Degradation
+
+```typescript
+interface FallbackStrategy<T> {
+  name: string;
+  execute: () => Promise<T>;
+  condition?: (error: any) => boolean;
+  priority: number;
+}
+
+class FallbackManager<T> {
+  private strategies: FallbackStrategy<T>[] = [];
+  
+  addFallback(strategy: FallbackStrategy<T>): void {
+    this.strategies.push(strategy);
+    this.strategies.sort((a, b) => a.priority - b.priority);
+  }
+  
+  async executeWithFallbacks(
+    primaryOperation: () => Promise<T>,
+    context?: string
+  ): Promise<{ result: T; strategy: string; attempts: number }> {
+    const attempts = [{ name: 'primary', execute: primaryOperation }];
+    
+    // Try primary operation first
+    try {
+      const result = await primaryOperation();
+      return { result, strategy: 'primary', attempts: 1 };
+      
+    } catch (primaryError) {
+      console.log(`Primary operation failed${context ? ` (${context})` : ''}: ${primaryError.message}`);
+      
+      // Try fallback strategies
+      for (let i = 0; i < this.strategies.length; i++) {
+        const strategy = this.strategies[i];
+        
+        // Check if strategy applies to this error
+        if (strategy.condition && !strategy.condition(primaryError)) {
+          continue;
+        }
+        
+        try {
+          console.log(`Attempting fallback strategy: ${strategy.name}`);
+          const result = await strategy.execute();
+          
+          return { 
+            result, 
+            strategy: strategy.name, 
+            attempts: i + 2 
+          };
+          
+        } catch (fallbackError) {
+          console.log(`Fallback strategy '${strategy.name}' failed: ${fallbackError.message}`);
+        }
+      }
+      
+      // All strategies failed
+      throw new Error(`All fallback strategies failed. Primary error: ${primaryError.message}`);
+    }
+  }
+}
+
+// Example: Email sending with fallbacks
+class EmailService {
+  private fallbackManager = new FallbackManager<{ sent: boolean; provider: string }>();
+  
+  constructor(private client: TolstoyClient) {
+    this.setupFallbacks();
+  }
+  
+  private setupFallbacks() {
+    // Fallback 1: Use backup email service
+    this.fallbackManager.addFallback({
+      name: 'backup-email-service',
+      priority: 1,
+      execute: async () => {
+        // Switch to backup email provider
+        const result = await this.client.actions.execute('backup-email-sender', {
+          to: this.lastEmailRequest.to,
+          subject: this.lastEmailRequest.subject,
+          body: this.lastEmailRequest.body
+        });
+        
+        return { sent: true, provider: 'backup' };
+      },
+      condition: (error) => error.code === 'EMAIL_SERVICE_UNAVAILABLE'
+    });
+    
+    // Fallback 2: Queue email for later
+    this.fallbackManager.addFallback({
+      name: 'queue-for-later',
+      priority: 2,
+      execute: async () => {
+        await this.client.actions.execute('queue-email', {
+          ...this.lastEmailRequest,
+          retryAt: new Date(Date.now() + 300000).toISOString() // Retry in 5 minutes
+        });
+        
+        return { sent: false, provider: 'queued' };
+      }
+    });
+    
+    // Fallback 3: Send notification to admin
+    this.fallbackManager.addFallback({
+      name: 'admin-notification',
+      priority: 3,
+      execute: async () => {
+        await this.client.actions.execute('slack-notification', {
+          channel: '#alerts',
+          message: `Failed to send email to ${this.lastEmailRequest.to}. Manual intervention required.`
+        });
+        
+        return { sent: false, provider: 'admin-notified' };
+      }
+    });
+  }
+  
+  private lastEmailRequest: any;
+  
+  async sendEmail(to: string, subject: string, body: string) {
+    this.lastEmailRequest = { to, subject, body };
+    
+    const result = await this.fallbackManager.executeWithFallbacks(
+      async () => {
+        const execution = await this.client.actions.execute('primary-email-sender', {
+          to, subject, body
+        });
+        
+        return { sent: true, provider: 'primary' };
+      },
+      `email to ${to}`
+    );
+    
+    console.log(`Email handled by strategy: ${result.strategy} (${result.attempts} attempts)`);
+    return result.result;
+  }
+}
+```
+
+### Compensation Patterns
+
+```typescript
+interface CompensationAction {
+  name: string;
+  execute: (context: any) => Promise<void>;
+  condition?: (error: any, context: any) => boolean;
+}
+
+class CompensationManager {
+  private actions: CompensationAction[] = [];
+  private executionHistory: Array<{ name: string; context: any; timestamp: Date }> = [];
+  
+  addCompensation(action: CompensationAction): void {
+    this.actions.push(action);
+  }
+  
+  async executeCompensations(error: any, context: any): Promise<void> {
+    console.log('🔄 Executing compensation actions...');
+    
+    const applicableActions = this.actions.filter(action => 
+      !action.condition || action.condition(error, context)
+    );
+    
+    for (const action of applicableActions.reverse()) { // Execute in reverse order
+      try {
+        console.log(`🔧 Executing compensation: ${action.name}`);
+        await action.execute(context);
+        
+        this.executionHistory.push({
+          name: action.name,
+          context,
+          timestamp: new Date()
+        });
+        
+      } catch (compensationError) {
+        console.error(`❌ Compensation '${action.name}' failed: ${compensationError.message}`);
+        // Continue with other compensations
+      }
+    }
+    
+    console.log('✅ Compensation actions completed');
+  }
+  
+  getExecutionHistory() {
+    return [...this.executionHistory];
+  }
+  
+  clearHistory() {
+    this.executionHistory = [];
+  }
+}
+
+// Example: Order processing with compensations
+class OrderProcessor {
+  private compensationManager = new CompensationManager();
+  
+  constructor(private client: TolstoyClient) {
+    this.setupCompensations();
+  }
+  
+  private setupCompensations() {
+    // Compensation 1: Refund payment if order fails
+    this.compensationManager.addCompensation({
+      name: 'refund-payment',
+      execute: async (context) => {
+        if (context.paymentId) {
+          await this.client.actions.execute('refund-payment', {
+            paymentId: context.paymentId,
+            reason: 'Order processing failed'
+          });
+          
+          console.log(`💰 Refunded payment: ${context.paymentId}`);
+        }
+      },
+      condition: (error, context) => !!context.paymentId
+    });
+    
+    // Compensation 2: Release inventory hold
+    this.compensationManager.addCompensation({
+      name: 'release-inventory',
+      execute: async (context) => {
+        if (context.inventoryHoldId) {
+          await this.client.actions.execute('release-inventory-hold', {
+            holdId: context.inventoryHoldId
+          });
+          
+          console.log(`📦 Released inventory hold: ${context.inventoryHoldId}`);
+        }
+      },
+      condition: (error, context) => !!context.inventoryHoldId
+    });
+    
+    // Compensation 3: Cancel shipment
+    this.compensationManager.addCompensation({
+      name: 'cancel-shipment',
+      execute: async (context) => {
+        if (context.shipmentId) {
+          await this.client.actions.execute('cancel-shipment', {
+            shipmentId: context.shipmentId,
+            reason: 'Order processing failed'
+          });
+          
+          console.log(`🚚 Cancelled shipment: ${context.shipmentId}`);
+        }
+      },
+      condition: (error, context) => !!context.shipmentId
+    });
+    
+    // Compensation 4: Send failure notification
+    this.compensationManager.addCompensation({
+      name: 'notify-customer',
+      execute: async (context) => {
+        if (context.customerEmail) {
+          await this.client.actions.execute('send-email', {
+            to: context.customerEmail,
+            template: 'order-failed',
+            variables: {
+              orderId: context.orderId,
+              reason: 'Technical difficulties'
+            }
+          });
+          
+          console.log(`📧 Notified customer: ${context.customerEmail}`);
+        }
+      }
+    });
+  }
+  
+  async processOrder(orderData: any) {
+    const context: any = {
+      orderId: orderData.id,
+      customerEmail: orderData.customerEmail
+    };
+    
+    try {
+      // Step 1: Validate order
+      console.log('1. Validating order...');
+      const validation = await this.client.actions.execute('validate-order', orderData);
+      
+      if (!validation.outputs.valid) {
+        throw new ValidationError('Order validation failed', 'order', orderData);
+      }
+      
+      // Step 2: Hold inventory
+      console.log('2. Holding inventory...');
+      const inventoryHold = await this.client.actions.execute('hold-inventory', {
+        items: orderData.items
+      });
+      context.inventoryHoldId = inventoryHold.outputs.holdId;
+      
+      // Step 3: Process payment
+      console.log('3. Processing payment...');
+      const payment = await this.client.actions.execute('process-payment', {
+        amount: orderData.total,
+        paymentMethod: orderData.paymentMethod
+      });
+      context.paymentId = payment.outputs.paymentId;
+      
+      // Step 4: Create shipment
+      console.log('4. Creating shipment...');
+      const shipment = await this.client.actions.execute('create-shipment', {
+        items: orderData.items,
+        address: orderData.shippingAddress
+      });
+      context.shipmentId = shipment.outputs.shipmentId;
+      
+      // Step 5: Update order status
+      console.log('5. Updating order status...');
+      await this.client.actions.execute('update-order-status', {
+        orderId: context.orderId,
+        status: 'processing'
+      });
+      
+      console.log('✅ Order processed successfully');
+      return { success: true, orderId: context.orderId };
+      
+    } catch (error) {
+      console.error(`❌ Order processing failed: ${error.message}`);
+      
+      // Execute compensations
+      await this.compensationManager.executeCompensations(error, context);
+      
+      throw error;
+    }
+  }
+}
+```
+
+## Error Monitoring and Alerting
+
+### Error Tracking and Analysis
+
+```typescript
+interface ErrorEvent {
+  id: string;
+  timestamp: Date;
+  error: any;
+  context: Record<string, any>;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  resolved: boolean;
+  tags: string[];
+}
+
+interface ErrorPattern {
+  signature: string;
+  count: number;
+  firstSeen: Date;
+  lastSeen: Date;
+  examples: ErrorEvent[];
+}
+
+class ErrorMonitor {
+  private events: Map<string, ErrorEvent> = new Map();
+  private patterns: Map<string, ErrorPattern> = new Map();
+  private alertRules: Array<{
+    name: string;
+    condition: (event: ErrorEvent) => boolean;
+    action: (event: ErrorEvent) => Promise<void>;
+  }> = [];
+  
+  constructor(private client: TolstoyClient) {
+    this.setupDefaultAlerts();
+  }
+  
+  private setupDefaultAlerts() {
+    // Alert for critical errors
+    this.addAlert({
+      name: 'critical-error-alert',
+      condition: (event) => event.severity === 'critical',
+      action: async (event) => {
+        await this.client.actions.execute('send-slack-alert', {
+          channel: '#critical-alerts',
+          message: `🚨 CRITICAL ERROR: ${event.error.message}`,
+          details: {
+            errorId: event.id,
+            timestamp: event.timestamp,
+            context: event.context
+          }
+        });
+      }
+    });
+    
+    // Alert for error patterns
+    this.addAlert({
+      name: 'error-pattern-alert',
+      condition: (event) => {
+        const pattern = this.patterns.get(this.getErrorSignature(event.error));
+        return pattern ? pattern.count >= 5 : false;
+      },
+      action: async (event) => {
+        const signature = this.getErrorSignature(event.error);
+        const pattern = this.patterns.get(signature);
+        
+        await this.client.actions.execute('send-email', {
+          to: 'engineering@company.com',
+          subject: 'Error Pattern Detected',
+          template: 'error-pattern',
+          variables: {
+            signature,
+            count: pattern?.count,
+            firstSeen: pattern?.firstSeen,
+            lastSeen: pattern?.lastSeen
+          }
+        });
+      }
+    });
+  }
+  
+  recordError(error: any, context: Record<string, any> = {}): ErrorEvent {
+    const event: ErrorEvent = {
+      id: this.generateId(),
+      timestamp: new Date(),
+      error: extractErrorContext(error),
+      context,
+      severity: this.determineSeverity(error),
+      resolved: false,
+      tags: this.generateTags(error, context)
+    };
+    
+    // Store event
+    this.events.set(event.id, event);
+    
+    // Update patterns
+    this.updatePatterns(event);
+    
+    // Check alert rules
+    this.checkAlerts(event);
+    
+    return event;
+  }
+  
+  private determineSeverity(error: any): ErrorEvent['severity'] {
+    if (error instanceof AuthenticationError || 
+        error instanceof AuthorizationError) {
+      return 'high';
+    }
+    
+    if (error instanceof ValidationError) {
+      return 'low';
+    }
+    
+    if (error instanceof NetworkError || 
+        error instanceof TimeoutError) {
+      return 'medium';
+    }
+    
+    if (error.statusCode >= 500) {
+      return 'high';
+    }
+    
+    if (error.code === 'EXECUTION_FAILED') {
+      return 'high';
+    }
+    
+    return 'medium';
+  }
+  
+  private generateTags(error: any, context: Record<string, any>): string[] {
+    const tags = [error.name || 'unknown-error'];
+    
+    if (error.code) {
+      tags.push(`code:${error.code}`);
+    }
+    
+    if (error.statusCode) {
+      tags.push(`status:${error.statusCode}`);
+    }
+    
+    if (context.flowId) {
+      tags.push(`flow:${context.flowId}`);
+    }
+    
+    if (context.actionId) {
+      tags.push(`action:${context.actionId}`);
+    }
+    
+    if (context.environment) {
+      tags.push(`env:${context.environment}`);
+    }
+    
+    return tags;
+  }
+  
+  private getErrorSignature(error: any): string {
+    // Create a signature for error pattern detection
+    const components = [
+      error.name || 'unknown',
+      error.code || 'no-code',
+      error.statusCode || 'no-status'
+    ];
+    
+    // Add normalized message (remove variable parts)
+    let normalizedMessage = error.message || '';
+    normalizedMessage = normalizedMessage
+      .replace(/\d+/g, 'N')  // Replace numbers with N
+      .replace(/[a-f0-9-]{36}/g, 'UUID')  // Replace UUIDs
+      .replace(/[a-f0-9]{32}/g, 'HASH');  // Replace hashes
+    
+    components.push(normalizedMessage);
+    
+    return components.join('|');
+  }
+  
+  private updatePatterns(event: ErrorEvent): void {
+    const signature = this.getErrorSignature(event.error);
+    
+    if (this.patterns.has(signature)) {
+      const pattern = this.patterns.get(signature)!;
+      pattern.count++;
+      pattern.lastSeen = event.timestamp;
+      pattern.examples.push(event);
+      
+      // Keep only recent examples
+      if (pattern.examples.length > 10) {
+        pattern.examples = pattern.examples.slice(-10);
+      }
+    } else {
+      this.patterns.set(signature, {
+        signature,
+        count: 1,
+        firstSeen: event.timestamp,
+        lastSeen: event.timestamp,
+        examples: [event]
+      });
+    }
+  }
+  
+  private async checkAlerts(event: ErrorEvent): Promise<void> {
+    for (const rule of this.alertRules) {
+      try {
+        if (rule.condition(event)) {
+          await rule.action(event);
+        }
+      } catch (alertError) {
+        console.error(`Alert rule '${rule.name}' failed:`, alertError);
+      }
+    }
+  }
+  
+  addAlert(rule: {
+    name: string;
+    condition: (event: ErrorEvent) => boolean;
+    action: (event: ErrorEvent) => Promise<void>;
+  }): void {
+    this.alertRules.push(rule);
+  }
+  
+  getErrorPatterns(): ErrorPattern[] {
+    return Array.from(this.patterns.values())
+      .sort((a, b) => b.count - a.count);
+  }
+  
+  getRecentErrors(limit = 50): ErrorEvent[] {
+    return Array.from(this.events.values())
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
+      .slice(0, limit);
+  }
+  
+  resolveError(errorId: string): boolean {
+    const event = this.events.get(errorId);
+    if (event) {
+      event.resolved = true;
+      return true;
+    }
+    return false;
+  }
+  
+  private generateId(): string {
+    return `error_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+  
+  // Analysis methods
+  getErrorStats(timeframe = 3600000): { // Default: 1 hour
+    total: number;
+    bySeverity: Record<string, number>;
+    byType: Record<string, number>;
+    trends: Array<{ time: Date; count: number }>;
+  } {
+    const cutoff = new Date(Date.now() - timeframe);
+    const recentEvents = Array.from(this.events.values())
+      .filter(event => event.timestamp >= cutoff);
+    
+    const bySeverity: Record<string, number> = {};
+    const byType: Record<string, number> = {};
+    
+    recentEvents.forEach(event => {
+      bySeverity[event.severity] = (bySeverity[event.severity] || 0) + 1;
+      const errorType = event.error.name || 'unknown';
+      byType[errorType] = (byType[errorType] || 0) + 1;
+    });
+    
+    // Simple trend calculation (hourly buckets)
+    const trends: Array<{ time: Date; count: number }> = [];
+    const bucketSize = Math.min(timeframe / 10, 3600000); // Max 1-hour buckets
+    const buckets = Math.ceil(timeframe / bucketSize);
+    
+    for (let i = 0; i < buckets; i++) {
+      const bucketStart = new Date(Date.now() - timeframe + (i * bucketSize));
+      const bucketEnd = new Date(bucketStart.getTime() + bucketSize);
+      
+      const count = recentEvents.filter(event => 
+        event.timestamp >= bucketStart && event.timestamp < bucketEnd
+      ).length;
+      
+      trends.push({ time: bucketStart, count });
+    }
+    
+    return {
+      total: recentEvents.length,
+      bySeverity,
+      byType,
+      trends
+    };
+  }
+  
+  generateReport(): string {
+    const stats = this.getErrorStats();
+    const patterns = this.getErrorPatterns().slice(0, 10);
+    
+    let report = '📊 ERROR MONITORING REPORT\n';
+    report += '=' .repeat(40) + '\n\n';
+    
+    report += `📈 STATISTICS (Last Hour)\n`;
+    report += `Total Errors: ${stats.total}\n`;
+    report += `By Severity:\n`;
+    Object.entries(stats.bySeverity).forEach(([severity, count]) => {
+      report += `  ${severity}: ${count}\n`;
+    });
+    
+    report += `\n🔍 TOP ERROR PATTERNS\n`;
+    patterns.forEach((pattern, index) => {
+      report += `${index + 1}. ${pattern.signature} (${pattern.count} times)\n`;
+      report += `   First seen: ${pattern.firstSeen.toISOString()}\n`;
+      report += `   Last seen: ${pattern.lastSeen.toISOString()}\n\n`;
+    });
+    
+    return report;
+  }
+}
+
+// Integration with Tolstoy SDK
+class MonitoredTolstoyClient {
+  private errorMonitor: ErrorMonitor;
+  
+  constructor(private client: TolstoyClient) {
+    this.errorMonitor = new ErrorMonitor(client);
+    this.setupGlobalErrorHandling();
+  }
+  
+  private setupGlobalErrorHandling() {
+    // Wrap all client methods to automatically record errors
+    const originalExecute = this.client.flows.execute.bind(this.client.flows);
+    
+    this.client.flows.execute = async (flowId: string, inputs: any, options?: any) => {
+      try {
+        return await originalExecute(flowId, inputs, options);
+      } catch (error) {
+        this.errorMonitor.recordError(error, {
+          operation: 'flow.execute',
+          flowId,
+          inputs: JSON.stringify(inputs).slice(0, 1000), // Truncate large inputs
+          environment: process.env.NODE_ENV
+        });
+        throw error;
+      }
+    };
+    
+    // Similar wrapping for other methods...
+  }
+  
+  getErrorMonitor(): ErrorMonitor {
+    return this.errorMonitor;
+  }
+  
+  async executeFlowWithMonitoring(flowId: string, inputs: any, options?: any) {
+    const startTime = Date.now();
+    
+    try {
+      const result = await this.client.flows.execute(flowId, inputs, options);
+      
+      // Record success metrics
+      console.log(`✅ Flow executed successfully in ${Date.now() - startTime}ms`);
+      
+      return result;
+      
+    } catch (error) {
+      const errorEvent = this.errorMonitor.recordError(error, {
+        operation: 'flow.execute',
+        flowId,
+        duration: Date.now() - startTime,
+        inputs: JSON.stringify(inputs).slice(0, 500)
+      });
+      
+      console.error(`❌ Flow execution failed (${errorEvent.id}): ${error.message}`);
+      throw error;
+    }
+  }
+}
+```
+
+## Best Practices and Recommendations
+
+### Error Handling Checklist
+
+```typescript
+// ✅ Comprehensive Error Handling Checklist
+
+class ErrorHandlingBestPractices {
+  // 1. Always classify and handle errors appropriately
+  static handleError(error: any, context: string): never {
+    // Log error with context
+    console.error(`Error in ${context}:`, extractErrorContext(error));
+    
+    // Handle specific error types
+    if (isAuthenticationError(error)) {
+      throw new Error('Authentication required. Please log in again.');
+    }
+    
+    if (isValidationError(error)) {
+      throw new ValidationError(`Invalid input: ${error.field}`, error.field, error.value);
+    }
+    
+    if (isRateLimitError(error)) {
+      const retryAfter = error.retryAfter || 60;
+      throw new Error(`Rate limited. Please retry after ${retryAfter} seconds.`);
+    }
+    
+    // Default handling
+    if (isRetriableError(error)) {
+      throw new Error('Temporary service issue. Please try again.');
+    } else {
+      throw new Error('An unexpected error occurred. Please contact support.');
+    }
+  }
+  
+  // 2. Use structured error responses
+  static createErrorResponse(error: any, requestId?: string) {
+    return {
+      success: false,
+      error: {
+        code: error.code || 'UNKNOWN_ERROR',
+        message: error.message,
+        details: error.details,
+        retriable: error.retriable || false,
+        timestamp: new Date().toISOString(),
+        requestId
+      }
+    };
+  }
+  
+  // 3. Implement proper timeout handling
+  static async withTimeout<T>(
+    operation: Promise<T>, 
+    timeoutMs: number, 
+    timeoutMessage = 'Operation timed out'
+  ): Promise<T> {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new TimeoutError(timeoutMessage, timeoutMs)), timeoutMs);
+    });
+    
+    return Promise.race([operation, timeoutPromise]);
+  }
+  
+  // 4. Use proper error boundaries in async operations
+  static async safeExecute<T>(
+    operation: () => Promise<T>,
+    errorHandler: (error: any) => T | Promise<T>,
+    context?: string
+  ): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      console.error(`Safe execute failed${context ? ` in ${context}` : ''}:`, error);
+      return await errorHandler(error);
+    }
+  }
+  
+  // 5. Validate inputs before operations
+  static validateRequired<T>(value: T, name: string): NonNullable<T> {
+    if (value == null) {
+      throw new ValidationError(`${name} is required`, name, value);
+    }
+    return value as NonNullable<T>;
+  }
+  
+  // 6. Use proper error propagation
+  static wrapWithContext<T extends any[], R>(
+    fn: (...args: T) => Promise<R>,
+    context: string
+  ) {
+    return async (...args: T): Promise<R> => {
+      try {
+        return await fn(...args);
+      } catch (error) {
+        // Add context to error without losing original stack trace
+        const contextualError = new Error(`${context}: ${error.message}`);
+        contextualError.name = error.name;
+        contextualError.stack = error.stack;
+        (contextualError as any).originalError = error;
+        throw contextualError;
+      }
+    };
+  }
+}
+
+// Example usage of best practices
+class RobustWorkflowService {
+  constructor(private client: TolstoyClient) {}
+  
+  async executeWorkflow(workflowId: string, inputs: any): Promise<any> {
+    // Validate inputs
+    ErrorHandlingBestPractices.validateRequired(workflowId, 'workflowId');
+    ErrorHandlingBestPractices.validateRequired(inputs, 'inputs');
+    
+    return ErrorHandlingBestPractices.safeExecute(
+      async () => {
+        // Execute with timeout
+        return ErrorHandlingBestPractices.withTimeout(
+          this.client.flows.execute(workflowId, inputs),
+          300000, // 5 minutes
+          `Workflow ${workflowId} execution timed out`
+        );
+      },
+      async (error) => {
+        // Handle error with context
+        ErrorHandlingBestPractices.handleError(error, `executeWorkflow(${workflowId})`);
+      },
+      'workflow execution'
+    );
+  }
+}
+```
+
+## Testing Error Scenarios
+
+```typescript
+// Error simulation for testing
+class ErrorSimulator {
+  private errorScenarios: Map<string, () => Error> = new Map();
+  
+  constructor() {
+    this.setupScenarios();
+  }
+  
+  private setupScenarios() {
+    this.errorScenarios.set('network-timeout', () => 
+      new TimeoutError('Network timeout', 5000)
+    );
+    
+    this.errorScenarios.set('rate-limit', () => 
+      new RateLimitError('Rate limit exceeded', 60)
+    );
+    
+    this.errorScenarios.set('auth-failure', () => 
+      new AuthenticationError('Invalid credentials')
+    );
+    
+    this.errorScenarios.set('validation-error', () => 
+      new ValidationError('Invalid email format', 'email', 'invalid-email')
+    );
+    
+    this.errorScenarios.set('server-error', () => {
+      const error = new Error('Internal server error');
+      (error as any).statusCode = 500;
+      return error;
+    });
+  }
+  
+  simulateError(scenario: string): Error {
+    const errorFactory = this.errorScenarios.get(scenario);
+    if (!errorFactory) {
+      throw new Error(`Unknown error scenario: ${scenario}`);
+    }
+    return errorFactory();
+  }
+  
+  async testErrorHandling(
+    operation: () => Promise<any>,
+    scenario: string,
+    expectedBehavior: (error: any) => boolean
+  ): Promise<boolean> {
+    try {
+      // This would typically be done with dependency injection or mocking
+      throw this.simulateError(scenario);
+    } catch (error) {
+      return expectedBehavior(error);
+    }
+  }
+}
+
+// Test suite for error handling
+describe('Error Handling', () => {
+  const simulator = new ErrorSimulator();
+  const retryManager = new RetryManager();
+  
+  test('should retry on network timeout', async () => {
+    let attempts = 0;
+    
+    const result = await retryManager.executeWithRetry(
+      async () => {
+        attempts++;
+        if (attempts < 3) {
+          throw simulator.simulateError('network-timeout');
+        }
+        return 'success';
+      },
+      { maxAttempts: 3 }
+    );
+    
+    expect(result.success).toBe(true);
+    expect(result.attempts).toBe(3);
+    expect(result.result).toBe('success');
+  });
+  
+  test('should not retry on validation error', async () => {
+    const result = await retryManager.executeWithRetry(
+      async () => {
+        throw simulator.simulateError('validation-error');
+      },
+      { maxAttempts: 3 }
+    );
+    
+    expect(result.success).toBe(false);
+    expect(result.attempts).toBe(1);
+    expect(result.error).toBeInstanceOf(ValidationError);
+  });
+});
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Monitoring Guide" icon="chart-line" href="/sdk/guides/monitoring">
+    Learn how to monitor your applications effectively
+  </Card>
+  <Card title="Performance Optimization" icon="performance" href="/sdk/guides/performance">
+    Optimize your SDK usage for better performance
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Best Practices" icon="shield-check" href="/sdk/guides/best-practices">
+    Follow industry best practices for robust applications
+  </Card>
+  <Card title="Testing Guide" icon="test-tube" href="/sdk/guides/testing">
+    Test your error handling thoroughly
+  </Card>
+</CardGroup>
+
+---
+
+*Robust error handling is the foundation of reliable automation systems. Use these patterns and strategies to build resilient applications that gracefully handle failures and provide excellent user experiences.*

@@ -1,0 +1,679 @@
+---
+title: "Users Commands"
+description: "Manage users, permissions, and team access using the Tolstoy CLI user management commands."
+---
+
+# Users Commands
+
+The `tolstoy users` command group provides comprehensive user management capabilities. Use these commands to manage team members, configure permissions, and monitor user activity within your Tolstoy organization.
+
+## Quick Reference
+
+| Command | Description | Usage |
+|---------|-------------|--------|
+| `list` | List all users in organization | `tolstoy users list [options]` |
+| `get` | Get user details and permissions | `tolstoy users get <user-id>` |
+| `create` | Create new user account | `tolstoy users create [options]` |
+| `update` | Update user information | `tolstoy users update <user-id> [options]` |
+| `delete` | Delete user account | `tolstoy users delete <user-id>` |
+| `invite` | Invite new users to organization | `tolstoy users invite <email> [options]` |
+| `permissions` | Manage user permissions | `tolstoy users permissions <subcommand>` |
+| `activity` | View user activity logs | `tolstoy users activity <user-id>` |
+| `whoami` | Show current user information | `tolstoy users whoami` |
+
+## Common Usage Patterns
+
+### User Management
+
+```bash
+# List all users in your organization
+tolstoy users list
+
+# Get detailed user information
+tolstoy users get user_alice_123456
+
+# Show current user (yourself)
+tolstoy users whoami
+
+# View user activity
+tolstoy users activity user_alice_123456 --since 7d
+
+# Search for users
+tolstoy users list --search "alice" --role developer
+```
+
+### Team Management
+
+```bash
+# Invite new team member
+tolstoy users invite alice@company.com \
+  --role developer \
+  --teams "frontend,api" \
+  --send-welcome-email
+
+# Create user account directly
+tolstoy users create \
+  --name "Bob Smith" \
+  --email "bob@company.com" \
+  --role developer \
+  --teams "backend"
+
+# Update user role
+tolstoy users update user_bob_456789 --role "senior-developer"
+
+# Bulk update users
+tolstoy users bulk-update --file ./user-updates.csv
+```
+
+### Permission Management
+
+```bash
+# View user permissions
+tolstoy users permissions show user_alice_123456
+
+# Grant specific permissions
+tolstoy users permissions grant user_alice_123456 \
+  --actions "flows.create,flows.execute" \
+  --resources "flow_production_*"
+
+# Revoke permissions
+tolstoy users permissions revoke user_alice_123456 \
+  --actions "users.delete"
+
+# Create custom role
+tolstoy users roles create "workflow-admin" \
+  --permissions "flows.*,actions.*,executions.read"
+
+# Assign role to user
+tolstoy users update user_alice_123456 --role "workflow-admin"
+```
+
+## User Roles and Permissions
+
+### Built-in Roles
+
+| Role | Description | Permissions |
+|------|-------------|-------------|
+| `owner` | Organization owner | Full access to all resources |
+| `admin` | Administrator | Manage users, tools, and workflows |
+| `developer` | Developer | Create and execute workflows |
+| `operator` | Operations user | Execute workflows, view logs |
+| `viewer` | Read-only access | View workflows and execution history |
+
+### Permission Categories
+
+#### Flow Permissions
+- `flows.create` - Create new workflows
+- `flows.read` - View workflow definitions
+- `flows.update` - Modify existing workflows
+- `flows.delete` - Delete workflows
+- `flows.execute` - Execute workflows
+
+#### Action Permissions
+- `actions.create` - Create custom actions
+- `actions.read` - View action definitions
+- `actions.update` - Modify actions
+- `actions.delete` - Delete actions
+- `actions.execute` - Execute individual actions
+
+#### User Management Permissions
+- `users.create` - Create user accounts
+- `users.read` - View user information
+- `users.update` - Modify user details
+- `users.delete` - Delete user accounts
+- `users.invite` - Invite new users
+
+#### Tool Management Permissions
+- `tools.create` - Create tool integrations
+- `tools.read` - View tool configurations
+- `tools.update` - Modify tools
+- `tools.delete` - Delete tools
+- `tools.manage_secrets` - Manage tool credentials
+
+## User Management Operations
+
+### Creating Users
+
+<CodeGroup>
+```bash Interactive Creation
+# Interactive user creation with prompts
+tolstoy users create --interactive
+
+# Sample interaction:
+# ? Full Name: Alice Johnson
+# ? Email Address: alice@company.com
+# ? Role: developer
+# ? Teams (comma-separated): frontend, api
+# ? Send welcome email? (Y/n): y
+# ✅ User created successfully: user_alice_123456
+```
+
+```bash Batch Creation
+# Create multiple users from CSV file
+cat > new-users.csv << EOF
+name,email,role,teams
+"Bob Smith","bob@company.com","developer","backend"
+"Carol White","carol@company.com","operator","support"
+"Dave Brown","dave@company.com","viewer","management"
+EOF
+
+tolstoy users create --batch new-users.csv
+```
+
+```bash API-Based Creation
+# Create user with specific configuration
+tolstoy users create \
+  --name "Alice Johnson" \
+  --email "alice@company.com" \
+  --role "developer" \
+  --teams "frontend,api" \
+  --timezone "America/New_York" \
+  --send-welcome-email \
+  --require-password-change
+```
+</CodeGroup>
+
+### User Invitations
+
+```bash
+# Simple invitation
+tolstoy users invite alice@company.com
+
+# Invitation with role and teams
+tolstoy users invite bob@company.com \
+  --role developer \
+  --teams "backend,database" \
+  --message "Welcome to our automation team!"
+
+# Bulk invitations
+cat > invitations.json << EOF
+[
+  {
+    "email": "alice@company.com",
+    "role": "developer", 
+    "teams": ["frontend"],
+    "message": "Welcome Alice!"
+  },
+  {
+    "email": "bob@company.com",
+    "role": "operator",
+    "teams": ["support"],
+    "message": "Welcome Bob!"
+  }
+]
+EOF
+
+tolstoy users invite --batch invitations.json
+```
+
+### User Updates
+
+```bash
+# Update user information
+tolstoy users update user_alice_123456 \
+  --name "Alice Smith" \
+  --role "senior-developer" \
+  --teams "frontend,api,architecture"
+
+# Update user preferences
+tolstoy users update user_alice_123456 \
+  --timezone "America/Los_Angeles" \
+  --email-notifications true \
+  --slack-notifications false
+
+# Deactivate user (without deletion)
+tolstoy users update user_alice_123456 --status inactive
+
+# Reactivate user
+tolstoy users update user_alice_123456 --status active
+```
+
+## Permission Management
+
+### Role-Based Access Control
+
+```bash
+# View available roles
+tolstoy users roles list
+
+# Create custom role
+tolstoy users roles create "automation-specialist" \
+  --description "Specialist for automation workflows" \
+  --permissions "flows.create,flows.execute,actions.create,tools.read"
+
+# Update role permissions
+tolstoy users roles update "automation-specialist" \
+  --add-permissions "logs.read,executions.read" \
+  --remove-permissions "tools.read"
+
+# Assign role to multiple users
+tolstoy users roles assign "automation-specialist" \
+  --users "user_alice_123,user_bob_456,user_carol_789"
+
+# View role assignments
+tolstoy users roles assignments
+```
+
+### Granular Permissions
+
+```bash
+# Grant specific permissions to user
+tolstoy users permissions grant user_alice_123456 \
+  --resource "flow_production_payment" \
+  --actions "read,execute" \
+  --conditions "time_range=business_hours"
+
+# Grant permissions with resource patterns
+tolstoy users permissions grant user_alice_123456 \
+  --resource-pattern "flow_staging_*" \
+  --actions "create,read,update,execute"
+
+# View effective permissions
+tolstoy users permissions effective user_alice_123456
+
+# Audit user permissions
+tolstoy users permissions audit user_alice_123456 \
+  --include-inherited \
+  --show-conditions
+```
+
+### Team-Based Access
+
+```bash
+# Create team
+tolstoy users teams create "frontend-team" \
+  --description "Frontend development team" \
+  --default-permissions "flows.read,flows.execute"
+
+# Add users to team
+tolstoy users teams add-members "frontend-team" \
+  --users "user_alice_123,user_bob_456"
+
+# Grant team permissions
+tolstoy users teams permissions grant "frontend-team" \
+  --resource-pattern "flow_frontend_*" \
+  --actions "create,read,update,execute,delete"
+
+# View team structure
+tolstoy users teams list --show-members
+```
+
+## User Activity Monitoring
+
+### Activity Tracking
+
+```bash
+# View user activity summary
+tolstoy users activity user_alice_123456 --since 30d
+
+# Sample output:
+📊 User Activity: Alice Johnson (user_alice_123456)
+Period: Last 30 days
+
+Activity Summary:
+┌─────────────────────────┬─────────┬─────────────┬─────────────┐
+│ Activity Type           │ Count   │ Success %   │ Last Action │
+├─────────────────────────┼─────────┼─────────────┼─────────────┤
+│ Workflow Executions     │ 147     │ 96.6%       │ 2 hours ago │
+│ Workflow Modifications  │ 23      │ 100%        │ 1 day ago   │
+│ Tool Configurations     │ 8       │ 100%        │ 3 days ago  │
+│ Login Sessions         │ 45      │ 100%        │ 30 mins ago │
+└─────────────────────────┴─────────┴─────────────┴─────────────┘
+
+Top Workflows Used:
+• user-onboarding (47 executions)
+• payment-processing (32 executions) 
+• notification-sender (28 executions)
+
+Recent Failed Actions:
+• 2024-01-19 14:30 - Workflow execution timeout (payment-processing)
+• 2024-01-18 09:15 - Action creation failed (validation error)
+```
+
+### Detailed Activity Logs
+
+```bash
+# Get detailed activity logs
+tolstoy users activity user_alice_123456 \
+  --since 7d \
+  --activity-types "executions,modifications" \
+  --include-details \
+  --format json > alice-activity.json
+
+# Filter by specific actions
+tolstoy users activity user_alice_123456 \
+  --actions "flows.execute,flows.create" \
+  --since 24h
+
+# Export activity report
+tolstoy users activity user_alice_123456 \
+  --since 30d \
+  --format csv \
+  --output alice-activity-report.csv
+```
+
+### Login and Session Management
+
+```bash
+# View active sessions
+tolstoy users sessions list user_alice_123456
+
+# Terminate specific session
+tolstoy users sessions terminate session_abc123def456
+
+# Terminate all user sessions
+tolstoy users sessions terminate-all user_alice_123456
+
+# View login history
+tolstoy users login-history user_alice_123456 --since 30d
+
+# Configure session policies
+tolstoy users sessions policy set \
+  --max-sessions 3 \
+  --idle-timeout 8h \
+  --require-reauth-for-sensitive-actions
+```
+
+## Bulk Operations and Automation
+
+### CSV-Based User Management
+
+```bash
+# Prepare user data CSV
+cat > user-updates.csv << EOF
+user_id,name,email,role,teams,status
+user_alice_123,Alice Smith,alice.smith@company.com,senior-developer,"frontend,api",active
+user_bob_456,Bob Johnson,bob@company.com,developer,"backend",active
+user_carol_789,Carol White,carol@company.com,operator,"support,ops",inactive
+EOF
+
+# Apply bulk updates
+tolstoy users bulk-update --file user-updates.csv --confirm
+
+# Bulk role changes
+tolstoy users bulk-update \
+  --filter "role=developer" \
+  --set "role=senior-developer" \
+  --teams-add "architecture"
+```
+
+### Automated User Provisioning
+
+```bash
+#!/bin/bash
+# auto-provision-users.sh
+
+# Read new hires from HR system API
+NEW_HIRES=$(curl -s "https://hr.company.com/api/new-hires" | jq -r '.employees[]')
+
+echo "$NEW_HIRES" | jq -r '. | @csv' | while IFS=, read -r name email department start_date; do
+  # Remove quotes from CSV values
+  name=$(echo "$name" | tr -d '"')
+  email=$(echo "$email" | tr -d '"')
+  department=$(echo "$department" | tr -d '"')
+  
+  echo "Provisioning user: $name ($email) in $department"
+  
+  # Determine role and teams based on department
+  case "$department" in
+    "Engineering")
+      role="developer"
+      teams="engineering,development"
+      ;;
+    "Operations")
+      role="operator"  
+      teams="operations,support"
+      ;;
+    "Management")
+      role="viewer"
+      teams="management"
+      ;;
+    *)
+      role="viewer"
+      teams="general"
+      ;;
+  esac
+  
+  # Create user
+  tolstoy users invite "$email" \
+    --name "$name" \
+    --role "$role" \
+    --teams "$teams" \
+    --send-welcome-email \
+    --message "Welcome to Tolstoy automation platform!"
+    
+  if [ $? -eq 0 ]; then
+    echo "✅ Successfully provisioned $name"
+  else
+    echo "❌ Failed to provision $name"
+  fi
+done
+```
+
+## Security and Compliance
+
+### User Security Policies
+
+```bash
+# Configure password policies
+tolstoy users security policy set \
+  --min-password-length 12 \
+  --require-uppercase \
+  --require-lowercase \
+  --require-numbers \
+  --require-special-chars \
+  --password-expiry 90d
+
+# Configure MFA requirements
+tolstoy users security mfa require \
+  --roles "admin,owner" \
+  --methods "totp,sms"
+
+# Set up login restrictions
+tolstoy users security restrictions set \
+  --allowed-ip-ranges "10.0.0.0/8,192.168.0.0/16" \
+  --max-failed-logins 5 \
+  --lockout-duration 30m
+```
+
+### Access Reviews and Auditing
+
+```bash
+# Generate access review report
+tolstoy users audit access-review \
+  --output access-review-$(date +%Y%m%d).csv
+
+# Review inactive users
+tolstoy users audit inactive \
+  --threshold 30d \
+  --include-last-activity
+
+# Check for over-privileged users
+tolstoy users audit over-privileged \
+  --check-unused-permissions \
+  --days-threshold 60
+
+# Generate compliance report
+tolstoy users audit compliance \
+  --framework SOX \
+  --include-permissions \
+  --include-activity
+```
+
+### User Offboarding
+
+```bash
+# Comprehensive user offboarding
+tolstoy users offboard user_alice_123456 \
+  --transfer-ownership-to user_manager_789 \
+  --revoke-all-permissions \
+  --terminate-sessions \
+  --backup-activity \
+  --send-notification
+
+# Bulk offboarding from CSV
+cat > offboarding-list.csv << EOF
+user_id,transfer_to,reason
+user_alice_123,user_manager_789,"Left company"
+user_bob_456,user_manager_789,"Role change"
+EOF
+
+tolstoy users offboard --batch offboarding-list.csv
+```
+
+## Integration Examples
+
+### LDAP/Active Directory Sync
+
+```bash
+# Configure LDAP sync
+tolstoy users sync configure ldap \
+  --server "ldap://ldap.company.com" \
+  --base-dn "ou=users,dc=company,dc=com" \
+  --bind-user "cn=tolstoy,ou=service,dc=company,dc=com" \
+  --attribute-mapping "name=displayName,email=mail"
+
+# Run manual sync
+tolstoy users sync run --dry-run
+
+# Schedule automatic sync
+tolstoy users sync schedule --frequency daily --time "02:00"
+```
+
+### Single Sign-On (SSO) Integration
+
+```bash
+# Configure SAML SSO
+tolstoy users sso configure saml \
+  --provider "okta" \
+  --metadata-url "https://company.okta.com/app/metadata" \
+  --auto-provision true \
+  --default-role "developer"
+
+# Configure OAuth SSO  
+tolstoy users sso configure oauth \
+  --provider "google" \
+  --client-id "$GOOGLE_CLIENT_ID" \
+  --client-secret "$GOOGLE_CLIENT_SECRET" \
+  --domain "company.com"
+
+# Test SSO configuration
+tolstoy users sso test
+```
+
+## Best Practices
+
+### User Management Guidelines
+
+1. **Principle of Least Privilege**: Grant minimum required permissions
+2. **Regular Access Reviews**: Audit user permissions quarterly
+3. **Automated Provisioning**: Use scripts for consistent user setup
+4. **Clear Naming Conventions**: Use consistent user ID patterns
+5. **Documentation**: Maintain role and permission documentation
+
+### Security Best Practices
+
+1. **Multi-Factor Authentication**: Require MFA for privileged users
+2. **Password Policies**: Enforce strong password requirements
+3. **Session Management**: Configure appropriate session timeouts
+4. **Activity Monitoring**: Monitor user activity for anomalies
+5. **Regular Audits**: Conduct periodic security audits
+
+### Team Management Tips
+
+1. **Team Structure**: Organize users into logical teams
+2. **Role Hierarchy**: Create clear role progression paths
+3. **Permission Inheritance**: Use teams for consistent permissions
+4. **Onboarding Process**: Standardize new user onboarding
+5. **Offboarding Checklist**: Follow comprehensive offboarding process
+
+## Troubleshooting
+
+### Common Issues
+
+<details>
+<summary>**User cannot access resources**</summary>
+
+**Symptoms**: `Error: Access denied for user 'alice@company.com'`
+
+**Solutions**:
+```bash
+# Check user permissions
+tolstoy users permissions effective user_alice_123456
+
+# Verify user status
+tolstoy users get user_alice_123456 --show-status
+
+# Check team memberships
+tolstoy users teams memberships user_alice_123456
+
+# Review recent permission changes
+tolstoy users activity user_alice_123456 --activity-types permissions --since 7d
+```
+</details>
+
+<details>
+<summary>**Invitation emails not received**</summary>
+
+**Symptoms**: New users report not receiving invitation emails
+
+**Solutions**:
+```bash
+# Check invitation status
+tolstoy users invitations list --status pending
+
+# Resend invitation
+tolstoy users invite resend alice@company.com
+
+# Check email configuration
+tolstoy tools test email-provider
+
+# Verify domain settings
+tolstoy users invitations check-deliverability alice@company.com
+```
+</details>
+
+<details>
+<summary>**SSO authentication failures**</summary>
+
+**Symptoms**: Users cannot login via SSO
+
+**Solutions**:
+```bash
+# Test SSO configuration
+tolstoy users sso test --verbose
+
+# Check SSO logs
+tolstoy users sso logs --since 1h
+
+# Verify SSO metadata
+tolstoy users sso metadata validate
+
+# Check user provisioning
+tolstoy users sso provision test alice@company.com
+```
+</details>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Permission Management" icon="key" href="/cli/guides/permission-management">
+    Learn advanced permission and role configuration
+  </Card>
+  <Card title="Team Organization" icon="users" href="/cli/guides/team-organization">
+    Organize users into effective team structures
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="SSO Integration" icon="fingerprint" href="/cli/guides/sso-integration">
+    Configure Single Sign-On for seamless access
+  </Card>
+  <Card title="User Automation" icon="robot" href="/cli/guides/user-automation">
+    Automate user lifecycle management
+  </Card>
+</CardGroup>
+
+---
+
+*Effective user management is crucial for team collaboration and security. Master these commands to build secure, scalable user access patterns.*

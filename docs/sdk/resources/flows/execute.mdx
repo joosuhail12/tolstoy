@@ -1,0 +1,1069 @@
+---
+title: "Flow Execution SDK"
+description: "Master flow execution patterns, monitoring, and advanced automation with the Tolstoy TypeScript SDK."
+---
+
+# Flow Execution SDK
+
+This guide covers everything you need to know about executing flows programmatically using the Tolstoy TypeScript SDK, from basic execution patterns to advanced monitoring and automation strategies.
+
+## Quick Start
+
+```typescript
+import { TolstoyClient } from '@joosuhail/tolstoy-sdk';
+
+const client = new TolstoyClient({
+  orgId: process.env.TOLSTOY_ORG_ID!,
+  userId: process.env.TOLSTOY_USER_ID!
+});
+
+// Basic flow execution
+const execution = await client.flows.execute('flow_abc123', {
+  email: 'user@example.com',
+  name: 'John Doe'
+});
+
+console.log('Execution started:', execution.id);
+console.log('Status:', execution.status);
+```
+
+## Execution Methods
+
+### Synchronous Execution
+
+Best for flows that complete quickly (under 30 seconds) and when you need immediate results.
+
+```typescript
+async function executeSyncFlow() {
+  try {
+    const result = await client.flows.executeSync('quick-validation-flow', {
+      email: 'user@example.com',
+      data: { score: 85 }
+    }, {
+      timeout: 30000 // 30 second timeout
+    });
+    
+    if (result.status === 'completed') {
+      console.log('✅ Flow completed successfully');
+      console.log('Results:', result.outputs);
+      return result.outputs;
+    } else {
+      throw new Error(`Flow failed: ${result.error?.message}`);
+    }
+    
+  } catch (error) {
+    if (error.code === 'EXECUTION_TIMEOUT') {
+      console.log('⏰ Flow is taking longer than expected');
+      // Handle timeout - flow might still be running
+    } else {
+      console.error('❌ Flow execution failed:', error.message);
+    }
+    throw error;
+  }
+}
+```
+
+### Asynchronous Execution
+
+Ideal for long-running flows or when you want to execute multiple flows concurrently.
+
+```typescript
+async function executeAsyncFlow() {
+  // Start the flow
+  const execution = await client.flows.executeAsync('user-onboarding-flow', {
+    email: 'user@example.com',
+    name: 'Jane Smith',
+    company: 'Acme Corp'
+  });
+  
+  console.log(`🚀 Started execution: ${execution.id}`);
+  
+  // Option 1: Wait for completion
+  const result = await client.flows.waitForCompletion(execution.id, {
+    timeout: 300000, // 5 minutes
+    pollInterval: 2000 // Check every 2 seconds
+  });
+  
+  return result;
+}
+
+// Option 2: Check status manually
+async function checkExecutionStatus(executionId: string) {
+  const execution = await client.flows.getExecution(executionId);
+  
+  console.log(`Status: ${execution.status}`);
+  
+  if (execution.current_step) {
+    console.log(`Current step: ${execution.current_step}`);
+  }
+  
+  if (execution.status === 'completed') {
+    console.log('Final outputs:', execution.outputs);
+  } else if (execution.status === 'failed') {
+    console.error('Execution failed:', execution.error);
+  }
+  
+  return execution;
+}
+```
+
+### Batch Execution
+
+Execute multiple flows efficiently with proper error handling and progress tracking.
+
+```typescript
+interface BatchExecutionOptions {
+  concurrency?: number;
+  retryFailures?: boolean;
+  progressCallback?: (progress: BatchProgress) => void;
+}
+
+interface BatchProgress {
+  completed: number;
+  total: number;
+  successful: number;
+  failed: number;
+}
+
+class BatchFlowExecutor {
+  constructor(private client: TolstoyClient) {}
+  
+  async executeBatch(
+    requests: Array<{ flowId: string; inputs: any; id?: string }>,
+    options: BatchExecutionOptions = {}
+  ) {
+    const {
+      concurrency = 5,
+      retryFailures = true,
+      progressCallback
+    } = options;
+    
+    const results = new Map();
+    const errors = new Map();
+    let completed = 0;
+    
+    // Execute in batches with controlled concurrency
+    for (let i = 0; i < requests.length; i += concurrency) {
+      const batch = requests.slice(i, i + concurrency);
+      
+      const batchPromises = batch.map(async (request) => {
+        const requestId = request.id || `${request.flowId}-${i}`;
+        
+        try {
+          const execution = await this.client.flows.execute(
+            request.flowId, 
+            request.inputs
+          );
+          
+          // Wait for completion
+          const result = await this.client.flows.waitForCompletion(execution.id);
+          
+          results.set(requestId, result);
+          
+          if (result.status === 'failed' && retryFailures) {
+            // Retry once on failure
+            console.log(`Retrying failed execution: ${requestId}`);
+            const retryExecution = await this.client.flows.retryExecution(execution.id);
+            const retryResult = await this.client.flows.waitForCompletion(retryExecution.id);
+            results.set(requestId, retryResult);
+          }
+          
+        } catch (error) {
+          errors.set(requestId, error);
+        } finally {
+          completed++;
+          
+          if (progressCallback) {
+            const successful = Array.from(results.values())
+              .filter(r => r.status === 'completed').length;
+            const failed = errors.size + Array.from(results.values())
+              .filter(r => r.status === 'failed').length;
+              
+            progressCallback({
+              completed,
+              total: requests.length,
+              successful,
+              failed
+            });
+          }
+        }
+      });
+      
+      await Promise.allSettled(batchPromises);
+      
+      // Small delay between batches to avoid overwhelming the system
+      if (i + concurrency < requests.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    return {
+      results,
+      errors,
+      summary: {
+        total: requests.length,
+        successful: Array.from(results.values()).filter(r => r.status === 'completed').length,
+        failed: errors.size + Array.from(results.values()).filter(r => r.status === 'failed').length
+      }
+    };
+  }
+}
+
+// Usage
+const executor = new BatchFlowExecutor(client);
+
+const batchResults = await executor.executeBatch([
+  { flowId: 'welcome-flow', inputs: { email: 'user1@example.com' }, id: 'user1' },
+  { flowId: 'welcome-flow', inputs: { email: 'user2@example.com' }, id: 'user2' },
+  { flowId: 'welcome-flow', inputs: { email: 'user3@example.com' }, id: 'user3' }
+], {
+  concurrency: 3,
+  progressCallback: (progress) => {
+    console.log(`Progress: ${progress.completed}/${progress.total} (${progress.successful} successful, ${progress.failed} failed)`);
+  }
+});
+
+console.log(`Batch complete: ${batchResults.summary.successful}/${batchResults.summary.total} successful`);
+```
+
+## Real-time Monitoring
+
+### Execution Streaming
+
+Monitor flow execution in real-time with detailed step-by-step progress.
+
+```typescript
+async function streamFlowExecution(flowId: string, inputs: any) {
+  // Start the execution
+  const execution = await client.flows.executeAsync(flowId, inputs);
+  
+  console.log(`🎬 Starting execution: ${execution.id}`);
+  console.log('=' .repeat(50));
+  
+  const startTime = Date.now();
+  const stepTimes = new Map<string, number>();
+  
+  try {
+    // Stream real-time updates
+    for await (const update of client.flows.streamExecution(execution.id)) {
+      const timestamp = new Date().toISOString().slice(11, 23);
+      
+      switch (update.type) {
+        case 'execution_started':
+          console.log(`[${timestamp}] 🚀 Execution started`);
+          break;
+          
+        case 'step_started':
+          stepTimes.set(update.step.key, Date.now());
+          console.log(`[${timestamp}] 🏃 Started: ${update.step.name}`);
+          if (update.step.inputs) {
+            console.log(`    Inputs:`, JSON.stringify(update.step.inputs, null, 2));
+          }
+          break;
+          
+        case 'step_completed':
+          const stepStartTime = stepTimes.get(update.step.key);
+          const stepDuration = stepStartTime ? Date.now() - stepStartTime : update.step.duration_ms;
+          console.log(`[${timestamp}] ✅ Completed: ${update.step.name} (${stepDuration}ms)`);
+          if (update.step.outputs) {
+            console.log(`    Outputs:`, JSON.stringify(update.step.outputs, null, 2));
+          }
+          break;
+          
+        case 'step_failed':
+          console.log(`[${timestamp}] ❌ Failed: ${update.step.name}`);
+          console.log(`    Error: ${update.step.error?.message}`);
+          if (update.step.error?.details) {
+            console.log(`    Details:`, JSON.stringify(update.step.error.details, null, 2));
+          }
+          break;
+          
+        case 'step_skipped':
+          console.log(`[${timestamp}] ⏭️  Skipped: ${update.step.name}`);
+          console.log(`    Reason: ${update.step.skip_reason}`);
+          break;
+          
+        case 'execution_completed':
+          const totalDuration = Date.now() - startTime;
+          console.log('=' .repeat(50));
+          console.log(`[${timestamp}] 🎉 Execution completed in ${totalDuration}ms`);
+          
+          if (update.execution.outputs) {
+            console.log('Final outputs:');
+            console.log(JSON.stringify(update.execution.outputs, null, 2));
+          }
+          
+          return update.execution;
+          
+        case 'execution_failed':
+          console.log('=' .repeat(50));
+          console.log(`[${timestamp}] 💥 Execution failed: ${update.execution.error?.message}`);
+          
+          if (update.execution.error?.details) {
+            console.log('Error details:');
+            console.log(JSON.stringify(update.execution.error.details, null, 2));
+          }
+          
+          throw new Error(update.execution.error?.message || 'Execution failed');
+          
+        case 'execution_cancelled':
+          console.log('=' .repeat(50));
+          console.log(`[${timestamp}] 🛑 Execution cancelled`);
+          return update.execution;
+      }
+    }
+  } catch (error) {
+    console.error('Streaming error:', error);
+    throw error;
+  }
+}
+
+// Usage with error handling
+try {
+  const result = await streamFlowExecution('complex-workflow', {
+    userId: '12345',
+    operation: 'full-sync'
+  });
+  
+  console.log('🎊 Flow completed successfully!');
+} catch (error) {
+  console.error('🔥 Flow execution failed:', error.message);
+}
+```
+
+### Progress Dashboard
+
+Create a comprehensive monitoring dashboard for multiple executions.
+
+```typescript
+interface ExecutionDashboard {
+  executions: Map<string, ExecutionStatus>;
+  stats: DashboardStats;
+}
+
+interface ExecutionStatus {
+  id: string;
+  flowId: string;
+  status: string;
+  progress: number;
+  startTime: number;
+  currentStep?: string;
+  error?: string;
+}
+
+interface DashboardStats {
+  total: number;
+  running: number;
+  completed: number;
+  failed: number;
+  avgDuration: number;
+}
+
+class ExecutionDashboard {
+  private executions = new Map<string, ExecutionStatus>();
+  private updateCallbacks = new Set<(dashboard: ExecutionDashboard) => void>();
+  
+  constructor(private client: TolstoyClient) {}
+  
+  addExecution(executionId: string, flowId: string) {
+    this.executions.set(executionId, {
+      id: executionId,
+      flowId,
+      status: 'pending',
+      progress: 0,
+      startTime: Date.now()
+    });
+    
+    // Start monitoring this execution
+    this.monitorExecution(executionId);
+    this.notifyUpdate();
+  }
+  
+  private async monitorExecution(executionId: string) {
+    try {
+      for await (const update of this.client.flows.streamExecution(executionId)) {
+        const execution = this.executions.get(executionId);
+        if (!execution) continue;
+        
+        // Update execution status
+        execution.status = update.execution.status;
+        execution.currentStep = update.execution.current_step;
+        
+        // Calculate progress
+        if (update.execution.steps) {
+          const completed = update.execution.steps.filter(s => 
+            ['completed', 'skipped'].includes(s.status)
+          ).length;
+          execution.progress = (completed / update.execution.steps.length) * 100;
+        }
+        
+        // Handle errors
+        if (update.execution.error) {
+          execution.error = update.execution.error.message;
+        }
+        
+        this.notifyUpdate();
+        
+        // Stop monitoring when execution is done
+        if (['completed', 'failed', 'cancelled'].includes(update.execution.status)) {
+          break;
+        }
+      }
+    } catch (error) {
+      const execution = this.executions.get(executionId);
+      if (execution) {
+        execution.status = 'failed';
+        execution.error = error.message;
+        this.notifyUpdate();
+      }
+    }
+  }
+  
+  onUpdate(callback: (dashboard: ExecutionDashboard) => void) {
+    this.updateCallbacks.add(callback);
+    return () => this.updateCallbacks.delete(callback);
+  }
+  
+  private notifyUpdate() {
+    const dashboard = this.getDashboard();
+    this.updateCallbacks.forEach(callback => callback(dashboard));
+  }
+  
+  getDashboard(): ExecutionDashboard {
+    const executions = Array.from(this.executions.values());
+    const now = Date.now();
+    
+    const running = executions.filter(e => e.status === 'running').length;
+    const completed = executions.filter(e => e.status === 'completed').length;
+    const failed = executions.filter(e => e.status === 'failed').length;
+    
+    const completedExecutions = executions.filter(e => e.status === 'completed');
+    const avgDuration = completedExecutions.length > 0
+      ? completedExecutions.reduce((sum, e) => sum + (now - e.startTime), 0) / completedExecutions.length
+      : 0;
+    
+    return {
+      executions: this.executions,
+      stats: {
+        total: executions.length,
+        running,
+        completed,
+        failed,
+        avgDuration
+      }
+    };
+  }
+  
+  printDashboard() {
+    const dashboard = this.getDashboard();
+    
+    console.clear();
+    console.log('🎛️  Execution Dashboard');
+    console.log('=' .repeat(60));
+    
+    // Stats
+    const { stats } = dashboard;
+    console.log(`📊 Total: ${stats.total} | Running: ${stats.running} | Completed: ${stats.completed} | Failed: ${stats.failed}`);
+    console.log(`⏱️  Average Duration: ${(stats.avgDuration / 1000).toFixed(1)}s`);
+    console.log('');
+    
+    // Executions
+    Array.from(dashboard.executions.values())
+      .sort((a, b) => b.startTime - a.startTime)
+      .slice(0, 10) // Show latest 10
+      .forEach(exec => {
+        const duration = ((Date.now() - exec.startTime) / 1000).toFixed(1);
+        const progressBar = '█'.repeat(Math.floor(exec.progress / 5)) + 
+                           '░'.repeat(20 - Math.floor(exec.progress / 5));
+        
+        const statusEmoji = {
+          pending: '⏳',
+          running: '🔄',
+          completed: '✅',
+          failed: '❌',
+          cancelled: '🛑'
+        }[exec.status] || '❓';
+        
+        console.log(`${statusEmoji} ${exec.id.slice(-8)} | ${exec.flowId.slice(0, 20).padEnd(20)} | ${progressBar} ${exec.progress.toFixed(0).padStart(3)}% | ${duration}s`);
+        
+        if (exec.currentStep) {
+          console.log(`   └─ Current: ${exec.currentStep}`);
+        }
+        
+        if (exec.error) {
+          console.log(`   └─ Error: ${exec.error.slice(0, 50)}${exec.error.length > 50 ? '...' : ''}`);
+        }
+      });
+  }
+}
+
+// Usage
+const dashboard = new ExecutionDashboard(client);
+
+// Update dashboard every second
+const unsubscribe = dashboard.onUpdate(() => {
+  dashboard.printDashboard();
+});
+
+// Add multiple executions to monitor
+const executionIds = [];
+for (let i = 0; i < 5; i++) {
+  const execution = await client.flows.executeAsync('batch-process-flow', {
+    batchId: `batch-${i}`,
+    items: generateBatchItems(100)
+  });
+  
+  dashboard.addExecution(execution.id, 'batch-process-flow');
+  executionIds.push(execution.id);
+}
+
+// Clean up after all executions complete
+setTimeout(() => {
+  unsubscribe();
+  console.log('Dashboard monitoring stopped');
+}, 300000); // Stop after 5 minutes
+```
+
+## Advanced Patterns
+
+### Conditional Execution
+
+Execute flows based on dynamic conditions and data validation.
+
+```typescript
+interface ConditionalExecutionRule {
+  condition: (data: any) => boolean;
+  flowId: string;
+  inputs?: (data: any) => any;
+  priority?: number;
+}
+
+class ConditionalFlowExecutor {
+  private rules: ConditionalExecutionRule[] = [];
+  
+  constructor(private client: TolstoyClient) {}
+  
+  addRule(rule: ConditionalExecutionRule) {
+    this.rules.push(rule);
+    // Sort by priority (higher first)
+    this.rules.sort((a, b) => (b.priority || 0) - (a.priority || 0));
+  }
+  
+  async evaluateAndExecute(data: any) {
+    const matchingRules = this.rules.filter(rule => rule.condition(data));
+    
+    if (matchingRules.length === 0) {
+      throw new Error('No matching rules found for the provided data');
+    }
+    
+    console.log(`Found ${matchingRules.length} matching rule(s)`);
+    
+    // Execute all matching rules
+    const executions = await Promise.allSettled(
+      matchingRules.map(async (rule) => {
+        const inputs = rule.inputs ? rule.inputs(data) : data;
+        return this.client.flows.execute(rule.flowId, inputs);
+      })
+    );
+    
+    return executions;
+  }
+}
+
+// Setup conditional execution
+const conditionalExecutor = new ConditionalFlowExecutor(client);
+
+// Rule 1: New user registration
+conditionalExecutor.addRule({
+  condition: (data) => data.event === 'user_registered' && data.user.isNew,
+  flowId: 'new-user-onboarding',
+  inputs: (data) => ({
+    email: data.user.email,
+    name: data.user.name,
+    source: data.source
+  }),
+  priority: 10
+});
+
+// Rule 2: Premium user upgrade
+conditionalExecutor.addRule({
+  condition: (data) => data.event === 'subscription_upgraded' && data.plan === 'premium',
+  flowId: 'premium-welcome-flow',
+  inputs: (data) => ({
+    userId: data.userId,
+    planType: data.plan,
+    features: data.newFeatures
+  }),
+  priority: 8
+});
+
+// Rule 3: High-value transaction
+conditionalExecutor.addRule({
+  condition: (data) => data.event === 'transaction_completed' && data.amount > 1000,
+  flowId: 'high-value-transaction-flow',
+  inputs: (data) => ({
+    transactionId: data.transactionId,
+    amount: data.amount,
+    customerId: data.customerId
+  }),
+  priority: 9
+});
+
+// Usage
+const eventData = {
+  event: 'user_registered',
+  user: {
+    email: 'newuser@example.com',
+    name: 'Alice Johnson',
+    isNew: true
+  },
+  source: 'landing_page'
+};
+
+const results = await conditionalExecutor.evaluateAndExecute(eventData);
+console.log(`Executed ${results.length} flows based on conditions`);
+```
+
+### Flow Orchestration
+
+Orchestrate multiple related flows with dependencies and data passing.
+
+```typescript
+interface OrchestrationStep {
+  id: string;
+  flowId: string;
+  inputs: (previousResults: Map<string, any>) => any;
+  dependsOn?: string[];
+  optional?: boolean;
+  retryOnFailure?: boolean;
+}
+
+class FlowOrchestrator {
+  constructor(private client: TolstoyClient) {}
+  
+  async orchestrate(steps: OrchestrationStep[]): Promise<Map<string, any>> {
+    const results = new Map<string, any>();
+    const errors = new Map<string, Error>();
+    const completed = new Set<string>();
+    const remaining = new Set(steps.map(s => s.id));
+    
+    console.log(`🎼 Starting orchestration of ${steps.length} steps`);
+    
+    while (remaining.size > 0) {
+      const readySteps = Array.from(remaining).filter(stepId => {
+        const step = steps.find(s => s.id === stepId)!;
+        
+        if (!step.dependsOn || step.dependsOn.length === 0) {
+          return true;
+        }
+        
+        return step.dependsOn.every(depId => 
+          completed.has(depId) || (step.optional && errors.has(depId))
+        );
+      });
+      
+      if (readySteps.length === 0) {
+        const blockedSteps = Array.from(remaining);
+        throw new Error(`Orchestration deadlock: steps ${blockedSteps.join(', ')} are blocked`);
+      }
+      
+      // Execute ready steps in parallel
+      const stepPromises = readySteps.map(async (stepId) => {
+        const step = steps.find(s => s.id === stepId)!;
+        
+        try {
+          console.log(`🔄 Executing step: ${step.id} (${step.flowId})`);
+          
+          const inputs = step.inputs(results);
+          const execution = await this.client.flows.execute(step.flowId, inputs);
+          
+          let result;
+          if (execution.status === 'completed') {
+            result = execution;
+          } else {
+            result = await this.client.flows.waitForCompletion(execution.id);
+          }
+          
+          if (result.status === 'completed') {
+            results.set(stepId, result.outputs);
+            completed.add(stepId);
+            console.log(`✅ Step completed: ${step.id}`);
+          } else if (result.status === 'failed') {
+            throw new Error(`Step failed: ${result.error?.message}`);
+          }
+          
+        } catch (error) {
+          console.log(`❌ Step failed: ${step.id} - ${error.message}`);
+          
+          if (step.retryOnFailure) {
+            console.log(`🔄 Retrying step: ${step.id}`);
+            // Simple retry logic - in production, you might want exponential backoff
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            return stepId; // Return stepId to retry
+          }
+          
+          errors.set(stepId, error);
+          
+          if (!step.optional) {
+            throw error;
+          }
+        }
+        
+        remaining.delete(stepId);
+        return null;
+      });
+      
+      const retrySteps = (await Promise.allSettled(stepPromises))
+        .map(result => result.status === 'fulfilled' ? result.value : null)
+        .filter(stepId => stepId !== null);
+      
+      // Add retry steps back to remaining
+      retrySteps.forEach(stepId => remaining.add(stepId));
+    }
+    
+    console.log(`🎊 Orchestration completed. ${completed.size} successful, ${errors.size} failed`);
+    return results;
+  }
+}
+
+// Example orchestration: E-commerce order processing
+const orchestrator = new FlowOrchestrator(client);
+
+const orderProcessingSteps: OrchestrationStep[] = [
+  {
+    id: 'validate-order',
+    flowId: 'order-validation-flow',
+    inputs: (results) => ({ orderId: 'order_12345' })
+  },
+  {
+    id: 'check-inventory',
+    flowId: 'inventory-check-flow',
+    inputs: (results) => ({
+      items: results.get('validate-order')?.items || []
+    }),
+    dependsOn: ['validate-order']
+  },
+  {
+    id: 'calculate-shipping',
+    flowId: 'shipping-calculation-flow',
+    inputs: (results) => ({
+      items: results.get('validate-order')?.items || [],
+      address: results.get('validate-order')?.shippingAddress
+    }),
+    dependsOn: ['validate-order'],
+    optional: true // Shipping calculation can fail
+  },
+  {
+    id: 'process-payment',
+    flowId: 'payment-processing-flow',
+    inputs: (results) => ({
+      amount: results.get('validate-order')?.total,
+      paymentMethod: results.get('validate-order')?.paymentMethod
+    }),
+    dependsOn: ['validate-order', 'check-inventory']
+  },
+  {
+    id: 'update-inventory',
+    flowId: 'inventory-update-flow',
+    inputs: (results) => ({
+      items: results.get('check-inventory')?.availableItems
+    }),
+    dependsOn: ['process-payment'],
+    retryOnFailure: true
+  },
+  {
+    id: 'send-confirmation',
+    flowId: 'order-confirmation-flow',
+    inputs: (results) => ({
+      orderId: 'order_12345',
+      customerEmail: results.get('validate-order')?.customerEmail,
+      trackingInfo: results.get('calculate-shipping')?.trackingNumber
+    }),
+    dependsOn: ['process-payment'],
+    optional: true
+  }
+];
+
+// Execute orchestration
+try {
+  const orchestrationResults = await orchestrator.orchestrate(orderProcessingSteps);
+  console.log('Order processing completed successfully');
+  
+  // Access results from specific steps
+  const paymentResult = orchestrationResults.get('process-payment');
+  const confirmationResult = orchestrationResults.get('send-confirmation');
+  
+} catch (error) {
+  console.error('Order processing failed:', error.message);
+}
+```
+
+## Error Handling and Recovery
+
+### Comprehensive Error Handling
+
+```typescript
+interface ExecutionError {
+  code: string;
+  message: string;
+  retriable: boolean;
+  step?: string;
+  details?: any;
+}
+
+class RobustFlowExecutor {
+  constructor(
+    private client: TolstoyClient,
+    private options: {
+      maxRetries?: number;
+      retryDelay?: number;
+      backoffMultiplier?: number;
+      timeoutMs?: number;
+    } = {}
+  ) {}
+  
+  async executeWithRecovery(
+    flowId: string, 
+    inputs: any,
+    recoveryOptions: {
+      onStepFailure?: (step: string, error: any) => Promise<boolean>; // Return true to continue
+      onTimeout?: () => Promise<'retry' | 'cancel' | 'continue'>;
+      onRetryableError?: (attempt: number, error: any) => Promise<boolean>; // Return true to retry
+    } = {}
+  ): Promise<any> {
+    const {
+      maxRetries = 3,
+      retryDelay = 1000,
+      backoffMultiplier = 2,
+      timeoutMs = 300000
+    } = this.options;
+    
+    let attempt = 0;
+    let currentDelay = retryDelay;
+    
+    while (attempt <= maxRetries) {
+      try {
+        console.log(`🔄 Attempt ${attempt + 1}/${maxRetries + 1}: Executing ${flowId}`);
+        
+        // Start execution with timeout
+        const execution = await this.executeWithTimeout(flowId, inputs, timeoutMs);
+        
+        // Monitor for step failures
+        if (recoveryOptions.onStepFailure) {
+          const result = await this.monitorWithStepRecovery(
+            execution.id, 
+            recoveryOptions.onStepFailure
+          );
+          return result;
+        } else {
+          const result = await this.client.flows.waitForCompletion(execution.id);
+          
+          if (result.status === 'completed') {
+            return result;
+          } else {
+            throw new ExecutionError(
+              'EXECUTION_FAILED',
+              result.error?.message || 'Execution failed',
+              true,
+              result.current_step,
+              result.error
+            );
+          }
+        }
+        
+      } catch (error) {
+        console.log(`❌ Attempt ${attempt + 1} failed:`, error.message);
+        
+        // Handle timeout specifically
+        if (error.code === 'EXECUTION_TIMEOUT' && recoveryOptions.onTimeout) {
+          const action = await recoveryOptions.onTimeout();
+          
+          if (action === 'retry') {
+            attempt++;
+            continue;
+          } else if (action === 'cancel') {
+            throw error;
+          } else {
+            // Continue waiting
+            continue;
+          }
+        }
+        
+        // Check if error is retriable
+        if (error.retriable !== false && attempt < maxRetries) {
+          if (recoveryOptions.onRetryableError) {
+            const shouldRetry = await recoveryOptions.onRetryableError(attempt, error);
+            if (!shouldRetry) {
+              throw error;
+            }
+          }
+          
+          console.log(`⏳ Retrying in ${currentDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, currentDelay));
+          
+          currentDelay *= backoffMultiplier;
+          attempt++;
+          
+        } else {
+          throw error;
+        }
+      }
+    }
+    
+    throw new Error(`Max retries (${maxRetries}) exceeded`);
+  }
+  
+  private async executeWithTimeout(
+    flowId: string, 
+    inputs: any, 
+    timeoutMs: number
+  ) {
+    return Promise.race([
+      this.client.flows.executeAsync(flowId, inputs),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new ExecutionError(
+          'EXECUTION_TIMEOUT',
+          `Execution timed out after ${timeoutMs}ms`,
+          true
+        )), timeoutMs)
+      )
+    ]) as Promise<any>;
+  }
+  
+  private async monitorWithStepRecovery(
+    executionId: string,
+    onStepFailure: (step: string, error: any) => Promise<boolean>
+  ) {
+    for await (const update of this.client.flows.streamExecution(executionId)) {
+      if (update.type === 'step_failed') {
+        const shouldContinue = await onStepFailure(
+          update.step.name, 
+          update.step.error
+        );
+        
+        if (!shouldContinue) {
+          await this.client.flows.cancelExecution(executionId);
+          throw new Error(`Execution cancelled due to step failure: ${update.step.name}`);
+        }
+        
+        // If continuing, you might want to modify the flow or retry the step
+        // This depends on your specific requirements
+      }
+      
+      if (['completed', 'failed', 'cancelled'].includes(update.execution.status)) {
+        return update.execution;
+      }
+    }
+  }
+}
+
+// Usage with comprehensive error handling
+const robustExecutor = new RobustFlowExecutor(client, {
+  maxRetries: 3,
+  retryDelay: 2000,
+  backoffMultiplier: 1.5,
+  timeoutMs: 600000 // 10 minutes
+});
+
+try {
+  const result = await robustExecutor.executeWithRecovery(
+    'critical-business-flow',
+    { 
+      customerId: '12345',
+      operation: 'account-migration' 
+    },
+    {
+      onStepFailure: async (step, error) => {
+        console.log(`💡 Step '${step}' failed with: ${error.message}`);
+        
+        // Custom recovery logic based on step
+        switch (step) {
+          case 'validate-customer':
+            console.log('🔍 Customer validation failed, checking backup systems...');
+            // You could perform alternative validation here
+            return true; // Continue execution
+            
+          case 'migrate-data':
+            console.log('📦 Data migration failed, this is critical');
+            return false; // Stop execution
+            
+          default:
+            return true; // Continue for other steps
+        }
+      },
+      
+      onTimeout: async () => {
+        console.log('⏰ Execution is taking longer than expected');
+        console.log('Do you want to: 1) Retry 2) Cancel 3) Continue waiting?');
+        
+        // In a real app, you might prompt the user or check system load
+        const systemLoad = await checkSystemLoad();
+        
+        if (systemLoad > 0.8) {
+          return 'retry'; // System is overloaded, retry later
+        } else {
+          return 'continue'; // Continue waiting
+        }
+      },
+      
+      onRetryableError: async (attempt, error) => {
+        console.log(`🤔 Retry attempt ${attempt + 1}: ${error.message}`);
+        
+        // Custom retry logic based on error type
+        if (error.code === 'RATE_LIMIT_EXCEEDED') {
+          console.log('⏸️  Rate limit hit, waiting longer before retry...');
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+        
+        return true; // Always retry retriable errors
+      }
+    }
+  );
+  
+  console.log('🎉 Critical operation completed successfully!');
+  
+} catch (error) {
+  console.error('💥 Critical operation failed after all retries:', error.message);
+  
+  // Implement fallback or alert mechanisms
+  await notifyOperationsTeam({
+    operation: 'critical-business-flow',
+    error: error.message,
+    customerId: '12345'
+  });
+}
+
+async function checkSystemLoad(): Promise<number> {
+  // Mock function - in real implementation, check actual system metrics
+  return Math.random();
+}
+
+async function notifyOperationsTeam(context: any): Promise<void> {
+  // Mock function - in real implementation, send alerts
+  console.log('📧 Operations team notified:', context);
+}
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Flow Creation" icon="plus" href="/sdk/resources/flows/create">
+    Learn how to create and manage flows programmatically
+  </Card>
+  <Card title="Flow Overview" icon="workflow" href="/sdk/resources/flows/overview">
+    Complete guide to the Flows SDK capabilities
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Error Handling" icon="shield-exclamation" href="/sdk/guides/error-handling">
+    Advanced error handling patterns and best practices
+  </Card>
+  <Card title="Performance Tips" icon="performance" href="/sdk/guides/performance">
+    Optimize your flow execution performance
+  </Card>
+</CardGroup>
+
+---
+
+*Master flow execution with these comprehensive patterns and examples. From simple executions to complex orchestrations, the Flows SDK provides the tools you need for robust workflow automation.*

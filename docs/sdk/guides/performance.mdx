@@ -1,0 +1,1813 @@
+---
+title: "Performance Optimization Guide"
+description: "Complete guide to optimizing performance when using the Tolstoy TypeScript SDK - from basic techniques to advanced strategies."
+---
+
+# Performance Optimization Guide
+
+This comprehensive guide covers performance optimization strategies for the Tolstoy TypeScript SDK, helping you build fast, efficient, and scalable automation systems.
+
+## Performance Fundamentals
+
+### Understanding Performance Metrics
+
+```typescript
+interface PerformanceMetrics {
+  // Request metrics
+  requestLatency: number;
+  requestThroughput: number;
+  requestSuccessRate: number;
+  
+  // Execution metrics
+  executionDuration: number;
+  stepExecutionTimes: Record<string, number>;
+  queueWaitTime: number;
+  
+  // Resource metrics
+  memoryUsage: number;
+  cpuUsage: number;
+  networkBandwidth: number;
+  
+  // Cache metrics
+  cacheHitRate: number;
+  cacheMissRate: number;
+  cacheSize: number;
+}
+
+class PerformanceTracker {
+  private metrics: Map<string, PerformanceMetrics> = new Map();
+  private startTimes: Map<string, number> = new Map();
+  
+  startTimer(operationId: string): void {
+    this.startTimes.set(operationId, performance.now());
+  }
+  
+  endTimer(operationId: string): number {
+    const startTime = this.startTimes.get(operationId);
+    if (!startTime) {
+      console.warn(`No start time found for operation: ${operationId}`);
+      return 0;
+    }
+    
+    const duration = performance.now() - startTime;
+    this.startTimes.delete(operationId);
+    return duration;
+  }
+  
+  recordMetric(operationId: string, metric: Partial<PerformanceMetrics>): void {
+    const existing = this.metrics.get(operationId) || {} as PerformanceMetrics;
+    this.metrics.set(operationId, { ...existing, ...metric });
+  }
+  
+  getMetrics(operationId: string): PerformanceMetrics | undefined {
+    return this.metrics.get(operationId);
+  }
+  
+  getAllMetrics(): Map<string, PerformanceMetrics> {
+    return new Map(this.metrics);
+  }
+  
+  generateReport(): string {
+    let report = '📊 PERFORMANCE REPORT\n';
+    report += '=' .repeat(50) + '\n\n';
+    
+    this.metrics.forEach((metrics, operationId) => {
+      report += `Operation: ${operationId}\n`;
+      report += `  Latency: ${metrics.requestLatency?.toFixed(2)}ms\n`;
+      report += `  Duration: ${metrics.executionDuration?.toFixed(2)}ms\n`;
+      report += `  Success Rate: ${metrics.requestSuccessRate?.toFixed(1)}%\n`;
+      if (metrics.cacheHitRate) {
+        report += `  Cache Hit Rate: ${metrics.cacheHitRate?.toFixed(1)}%\n`;
+      }
+      report += '\n';
+    });
+    
+    return report;
+  }
+}
+```
+
+### Performance-Optimized Client Configuration
+
+```typescript
+interface OptimizedClientConfig {
+  // Connection pooling
+  maxConnections: number;
+  keepAliveTimeout: number;
+  maxKeepAliveRequests: number;
+  
+  // Request optimization
+  timeout: number;
+  retries: number;
+  retryDelay: number;
+  
+  // Caching
+  enableResponseCache: boolean;
+  cacheSize: number;
+  cacheTTL: number;
+  
+  // Compression
+  enableCompression: boolean;
+  compressionThreshold: number;
+  
+  // Rate limiting
+  rateLimit: number;
+  rateLimitWindow: number;
+  
+  // Performance monitoring
+  enableMetrics: boolean;
+  metricsInterval: number;
+}
+
+class OptimizedTolstoyClient {
+  private client: TolstoyClient;
+  private performanceTracker: PerformanceTracker;
+  private cache: Map<string, { data: any; timestamp: number; ttl: number }>;
+  private connectionPool: any; // HTTP Agent with pooling
+  private rateLimiter: RateLimiter;
+  
+  constructor(baseClient: TolstoyClient, config: Partial<OptimizedClientConfig> = {}) {
+    this.client = baseClient;
+    this.performanceTracker = new PerformanceTracker();
+    this.cache = new Map();
+    
+    const finalConfig: OptimizedClientConfig = {
+      maxConnections: 50,
+      keepAliveTimeout: 30000,
+      maxKeepAliveRequests: 100,
+      timeout: 30000,
+      retries: 3,
+      retryDelay: 1000,
+      enableResponseCache: true,
+      cacheSize: 1000,
+      cacheTTL: 300000, // 5 minutes
+      enableCompression: true,
+      compressionThreshold: 1024,
+      rateLimit: 100,
+      rateLimitWindow: 60000,
+      enableMetrics: true,
+      metricsInterval: 60000,
+      ...config
+    };
+    
+    this.setupOptimizations(finalConfig);
+  }
+  
+  private setupOptimizations(config: OptimizedClientConfig): void {
+    // Setup connection pooling
+    if (typeof require !== 'undefined') {
+      const http = require('http');
+      const https = require('https');
+      
+      this.connectionPool = {
+        http: new http.Agent({
+          keepAlive: true,
+          maxSockets: config.maxConnections,
+          maxFreeSockets: config.maxConnections,
+          timeout: config.keepAliveTimeout,
+          maxTotalSockets: config.maxConnections * 2
+        }),
+        https: new https.Agent({
+          keepAlive: true,
+          maxSockets: config.maxConnections,
+          maxFreeSockets: config.maxConnections,
+          timeout: config.keepAliveTimeout,
+          maxTotalSockets: config.maxConnections * 2
+        })
+      };
+    }
+    
+    // Setup rate limiter
+    this.rateLimiter = new RateLimiter(config.rateLimit, config.rateLimitWindow);
+    
+    // Setup cache cleanup
+    if (config.enableResponseCache) {
+      setInterval(() => this.cleanupCache(), config.cacheTTL / 2);
+    }
+    
+    // Setup metrics collection
+    if (config.enableMetrics) {
+      setInterval(() => {
+        console.log(this.performanceTracker.generateReport());
+      }, config.metricsInterval);
+    }
+  }
+  
+  // Optimized flow execution with caching
+  async executeFlow(
+    flowId: string, 
+    inputs: any, 
+    options: { 
+      cache?: boolean;
+      priority?: 'low' | 'normal' | 'high';
+      timeout?: number;
+    } = {}
+  ) {
+    const operationId = `flow_${flowId}_${Date.now()}`;
+    const cacheKey = this.generateCacheKey('flow', flowId, inputs);
+    
+    // Check cache first
+    if (options.cache !== false) {
+      const cached = this.getFromCache(cacheKey);
+      if (cached) {
+        console.log(`🎯 Cache hit for flow ${flowId}`);
+        return cached;
+      }
+    }
+    
+    // Rate limiting
+    await this.rateLimiter.acquire();
+    
+    // Performance tracking
+    this.performanceTracker.startTimer(operationId);
+    const startTime = performance.now();
+    
+    try {
+      const result = await this.client.flows.execute(flowId, inputs, {
+        ...options,
+        timeout: options.timeout || 30000
+      });
+      
+      const duration = this.performanceTracker.endTimer(operationId);
+      
+      // Record metrics
+      this.performanceTracker.recordMetric(operationId, {
+        requestLatency: performance.now() - startTime,
+        executionDuration: duration,
+        requestSuccessRate: 100
+      });
+      
+      // Cache successful results
+      if (options.cache !== false && result.status === 'completed') {
+        this.setCache(cacheKey, result, 300000); // 5 minutes
+      }
+      
+      console.log(`✅ Flow ${flowId} executed in ${duration.toFixed(2)}ms`);
+      return result;
+      
+    } catch (error) {
+      const duration = this.performanceTracker.endTimer(operationId);
+      
+      // Record error metrics
+      this.performanceTracker.recordMetric(operationId, {
+        requestLatency: performance.now() - startTime,
+        executionDuration: duration,
+        requestSuccessRate: 0
+      });
+      
+      console.log(`❌ Flow ${flowId} failed after ${duration.toFixed(2)}ms`);
+      throw error;
+    }
+  }
+  
+  // Batch execution with optimized concurrency
+  async executeBatch<T>(
+    operations: Array<() => Promise<T>>,
+    options: {
+      concurrency?: number;
+      priority?: 'low' | 'normal' | 'high';
+      failFast?: boolean;
+    } = {}
+  ): Promise<Array<{ success: boolean; result?: T; error?: any }>> {
+    const concurrency = options.concurrency || 5;
+    const results: Array<{ success: boolean; result?: T; error?: any }> = [];
+    
+    console.log(`🚀 Starting batch execution with concurrency: ${concurrency}`);
+    
+    // Process in chunks to control concurrency
+    for (let i = 0; i < operations.length; i += concurrency) {
+      const chunk = operations.slice(i, i + concurrency);
+      
+      const chunkPromises = chunk.map(async (operation, index) => {
+        const operationId = `batch_${i + index}`;
+        this.performanceTracker.startTimer(operationId);
+        
+        try {
+          await this.rateLimiter.acquire();
+          const result = await operation();
+          const duration = this.performanceTracker.endTimer(operationId);
+          
+          console.log(`✅ Batch operation ${i + index} completed in ${duration.toFixed(2)}ms`);
+          return { success: true, result };
+          
+        } catch (error) {
+          const duration = this.performanceTracker.endTimer(operationId);
+          console.log(`❌ Batch operation ${i + index} failed after ${duration.toFixed(2)}ms`);
+          
+          if (options.failFast) {
+            throw error;
+          }
+          
+          return { success: false, error };
+        }
+      });
+      
+      const chunkResults = await Promise.allSettled(chunkPromises);
+      
+      chunkResults.forEach(result => {
+        if (result.status === 'fulfilled') {
+          results.push(result.value);
+        } else {
+          results.push({ success: false, error: result.reason });
+        }
+      });
+    }
+    
+    const successCount = results.filter(r => r.success).length;
+    console.log(`🎊 Batch execution completed: ${successCount}/${results.length} successful`);
+    
+    return results;
+  }
+  
+  // Cache management
+  private generateCacheKey(type: string, id: string, data?: any): string {
+    const dataHash = data ? this.hashObject(data) : '';
+    return `${type}:${id}:${dataHash}`;
+  }
+  
+  private hashObject(obj: any): string {
+    return Buffer.from(JSON.stringify(obj)).toString('base64').slice(0, 16);
+  }
+  
+  private getFromCache(key: string): any | null {
+    const cached = this.cache.get(key);
+    if (!cached) return null;
+    
+    if (Date.now() > cached.timestamp + cached.ttl) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return cached.data;
+  }
+  
+  private setCache(key: string, data: any, ttl: number): void {
+    if (this.cache.size >= 1000) { // Limit cache size
+      const oldestKey = this.cache.keys().next().value;
+      this.cache.delete(oldestKey);
+    }
+    
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now(),
+      ttl
+    });
+  }
+  
+  private cleanupCache(): void {
+    const now = Date.now();
+    let cleaned = 0;
+    
+    for (const [key, entry] of this.cache.entries()) {
+      if (now > entry.timestamp + entry.ttl) {
+        this.cache.delete(key);
+        cleaned++;
+      }
+    }
+    
+    if (cleaned > 0) {
+      console.log(`🧹 Cleaned ${cleaned} expired cache entries`);
+    }
+  }
+  
+  getCacheStats(): { size: number; hitRate: number } {
+    // This would need to be implemented with proper hit/miss tracking
+    return {
+      size: this.cache.size,
+      hitRate: 0 // Placeholder
+    };
+  }
+  
+  getPerformanceMetrics(): Map<string, PerformanceMetrics> {
+    return this.performanceTracker.getAllMetrics();
+  }
+}
+
+// Rate limiter implementation
+class RateLimiter {
+  private tokens: number;
+  private maxTokens: number;
+  private refillRate: number;
+  private lastRefill: number;
+  
+  constructor(maxRequests: number, windowMs: number) {
+    this.maxTokens = maxRequests;
+    this.tokens = maxRequests;
+    this.refillRate = maxRequests / windowMs; // tokens per ms
+    this.lastRefill = Date.now();
+  }
+  
+  async acquire(): Promise<void> {
+    this.refill();
+    
+    if (this.tokens >= 1) {
+      this.tokens--;
+      return;
+    }
+    
+    // Wait until tokens are available
+    const waitTime = Math.ceil(1 / this.refillRate);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+    return this.acquire();
+  }
+  
+  private refill(): void {
+    const now = Date.now();
+    const timePassed = now - this.lastRefill;
+    const tokensToAdd = timePassed * this.refillRate;
+    
+    this.tokens = Math.min(this.maxTokens, this.tokens + tokensToAdd);
+    this.lastRefill = now;
+  }
+}
+```
+
+## Caching Strategies
+
+### Multi-Level Caching
+
+```typescript
+interface CacheLevel {
+  name: string;
+  get(key: string): Promise<any>;
+  set(key: string, value: any, ttl?: number): Promise<void>;
+  delete(key: string): Promise<void>;
+  clear(): Promise<void>;
+  size(): Promise<number>;
+}
+
+class MemoryCache implements CacheLevel {
+  name = 'memory';
+  private cache = new Map<string, { data: any; expiry: number }>();
+  
+  async get(key: string): Promise<any> {
+    const entry = this.cache.get(key);
+    if (!entry) return null;
+    
+    if (Date.now() > entry.expiry) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return entry.data;
+  }
+  
+  async set(key: string, value: any, ttl = 300000): Promise<void> {
+    this.cache.set(key, {
+      data: value,
+      expiry: Date.now() + ttl
+    });
+  }
+  
+  async delete(key: string): Promise<void> {
+    this.cache.delete(key);
+  }
+  
+  async clear(): Promise<void> {
+    this.cache.clear();
+  }
+  
+  async size(): Promise<number> {
+    return this.cache.size;
+  }
+}
+
+class RedisCache implements CacheLevel {
+  name = 'redis';
+  private redis: any; // Redis client
+  
+  constructor(redisClient: any) {
+    this.redis = redisClient;
+  }
+  
+  async get(key: string): Promise<any> {
+    const data = await this.redis.get(key);
+    return data ? JSON.parse(data) : null;
+  }
+  
+  async set(key: string, value: any, ttl = 300): Promise<void> {
+    await this.redis.setex(key, ttl, JSON.stringify(value));
+  }
+  
+  async delete(key: string): Promise<void> {
+    await this.redis.del(key);
+  }
+  
+  async clear(): Promise<void> {
+    await this.redis.flushall();
+  }
+  
+  async size(): Promise<number> {
+    return await this.redis.dbsize();
+  }
+}
+
+class MultiLevelCache {
+  private levels: CacheLevel[] = [];
+  private stats = {
+    hits: new Map<string, number>(),
+    misses: new Map<string, number>(),
+    operations: 0
+  };
+  
+  addLevel(cache: CacheLevel): void {
+    this.levels.push(cache);
+  }
+  
+  async get(key: string): Promise<any> {
+    this.stats.operations++;
+    
+    for (let i = 0; i < this.levels.length; i++) {
+      const level = this.levels[i];
+      const value = await level.get(key);
+      
+      if (value !== null) {
+        // Cache hit - update stats
+        const hits = this.stats.hits.get(level.name) || 0;
+        this.stats.hits.set(level.name, hits + 1);
+        
+        // Populate higher levels (cache warming)
+        for (let j = 0; j < i; j++) {
+          await this.levels[j].set(key, value);
+        }
+        
+        return value;
+      }
+    }
+    
+    // Cache miss
+    this.levels.forEach(level => {
+      const misses = this.stats.misses.get(level.name) || 0;
+      this.stats.misses.set(level.name, misses + 1);
+    });
+    
+    return null;
+  }
+  
+  async set(key: string, value: any, ttl?: number): Promise<void> {
+    // Set in all levels
+    await Promise.all(
+      this.levels.map(level => level.set(key, value, ttl))
+    );
+  }
+  
+  async delete(key: string): Promise<void> {
+    await Promise.all(
+      this.levels.map(level => level.delete(key))
+    );
+  }
+  
+  async invalidatePattern(pattern: string): Promise<void> {
+    // Simple pattern matching - in production, use proper Redis pattern matching
+    for (const level of this.levels) {
+      if (level.name === 'memory') {
+        const memoryLevel = level as MemoryCache;
+        // @ts-ignore - accessing private property for example
+        for (const key of memoryLevel.cache.keys()) {
+          if (key.includes(pattern)) {
+            await level.delete(key);
+          }
+        }
+      }
+    }
+  }
+  
+  getCacheStats() {
+    const stats: any = { levels: [] };
+    
+    for (const level of this.levels) {
+      const hits = this.stats.hits.get(level.name) || 0;
+      const misses = this.stats.misses.get(level.name) || 0;
+      const total = hits + misses;
+      const hitRate = total > 0 ? (hits / total) * 100 : 0;
+      
+      stats.levels.push({
+        name: level.name,
+        hits,
+        misses,
+        hitRate: hitRate.toFixed(2) + '%'
+      });
+    }
+    
+    return stats;
+  }
+}
+
+// Intelligent cache manager with TTL strategies
+class IntelligentCacheManager {
+  private cache: MultiLevelCache;
+  private accessPatterns = new Map<string, { count: number; lastAccess: number }>();
+  
+  constructor() {
+    this.cache = new MultiLevelCache();
+    this.cache.addLevel(new MemoryCache());
+    
+    // Add Redis cache if available
+    if (this.isRedisAvailable()) {
+      // const redis = require('redis').createClient();
+      // this.cache.addLevel(new RedisCache(redis));
+    }
+  }
+  
+  async smartGet(key: string): Promise<any> {
+    // Update access patterns
+    const pattern = this.accessPatterns.get(key) || { count: 0, lastAccess: 0 };
+    pattern.count++;
+    pattern.lastAccess = Date.now();
+    this.accessPatterns.set(key, pattern);
+    
+    return await this.cache.get(key);
+  }
+  
+  async smartSet(key: string, value: any, context?: { type: string; importance: 'low' | 'normal' | 'high' }): Promise<void> {
+    let ttl = this.calculateOptimalTTL(key, context);
+    await this.cache.set(key, value, ttl);
+  }
+  
+  private calculateOptimalTTL(key: string, context?: any): number {
+    const baseTime = 300000; // 5 minutes
+    const pattern = this.accessPatterns.get(key);
+    
+    if (!pattern) return baseTime;
+    
+    let multiplier = 1;
+    
+    // High access frequency = longer TTL
+    if (pattern.count > 10) multiplier *= 2;
+    if (pattern.count > 50) multiplier *= 2;
+    
+    // Recent access = longer TTL
+    const timeSinceAccess = Date.now() - pattern.lastAccess;
+    if (timeSinceAccess < 60000) multiplier *= 1.5; // < 1 minute
+    
+    // Context-based adjustments
+    if (context?.importance === 'high') multiplier *= 2;
+    if (context?.importance === 'low') multiplier *= 0.5;
+    
+    if (context?.type === 'flow-definition') multiplier *= 3; // Flows change less frequently
+    if (context?.type === 'execution-result') multiplier *= 0.5; // Executions are time-sensitive
+    
+    return Math.min(baseTime * multiplier, 3600000); // Max 1 hour
+  }
+  
+  private isRedisAvailable(): boolean {
+    // Check if Redis is available in the environment
+    return process.env.REDIS_URL !== undefined;
+  }
+  
+  async preloadCache(preloadStrategies: Array<{
+    pattern: string;
+    loader: () => Promise<Array<{ key: string; value: any }>>;
+    schedule?: string; // Cron expression
+  }>): Promise<void> {
+    console.log('🔄 Preloading cache...');
+    
+    for (const strategy of preloadStrategies) {
+      try {
+        const items = await strategy.loader();
+        
+        for (const item of items) {
+          await this.cache.set(item.key, item.value);
+        }
+        
+        console.log(`✅ Preloaded ${items.length} items for pattern: ${strategy.pattern}`);
+        
+      } catch (error) {
+        console.error(`❌ Failed to preload pattern ${strategy.pattern}:`, error);
+      }
+    }
+  }
+  
+  generateCacheReport(): string {
+    const stats = this.cache.getCacheStats();
+    
+    let report = '📊 CACHE PERFORMANCE REPORT\n';
+    report += '=' .repeat(40) + '\n\n';
+    
+    stats.levels.forEach((level: any) => {
+      report += `${level.name.toUpperCase()} CACHE:\n`;
+      report += `  Hits: ${level.hits}\n`;
+      report += `  Misses: ${level.misses}\n`;
+      report += `  Hit Rate: ${level.hitRate}\n\n`;
+    });
+    
+    // Most accessed items
+    const topItems = Array.from(this.accessPatterns.entries())
+      .sort(([,a], [,b]) => b.count - a.count)
+      .slice(0, 10);
+    
+    report += 'TOP ACCESSED ITEMS:\n';
+    topItems.forEach(([key, pattern], index) => {
+      report += `${index + 1}. ${key.slice(0, 50)}... (${pattern.count} accesses)\n`;
+    });
+    
+    return report;
+  }
+}
+```
+
+## Connection Pooling and Resource Management
+
+### Advanced Connection Management
+
+```typescript
+interface ConnectionPoolConfig {
+  maxConnections: number;
+  minConnections: number;
+  acquireTimeout: number;
+  idleTimeout: number;
+  maxLifetime: number;
+  healthCheckInterval: number;
+  retryAttempts: number;
+}
+
+class ConnectionPool {
+  private connections: Connection[] = [];
+  private availableConnections: Connection[] = [];
+  private pendingRequests: Array<{
+    resolve: (connection: Connection) => void;
+    reject: (error: Error) => void;
+    timestamp: number;
+  }> = [];
+  
+  private config: ConnectionPoolConfig;
+  private healthCheckTimer: any;
+  private stats = {
+    created: 0,
+    destroyed: 0,
+    acquired: 0,
+    released: 0,
+    timeouts: 0
+  };
+  
+  constructor(config: Partial<ConnectionPoolConfig> = {}) {
+    this.config = {
+      maxConnections: 50,
+      minConnections: 5,
+      acquireTimeout: 30000,
+      idleTimeout: 300000, // 5 minutes
+      maxLifetime: 3600000, // 1 hour
+      healthCheckInterval: 60000, // 1 minute
+      retryAttempts: 3,
+      ...config
+    };
+    
+    this.initialize();
+  }
+  
+  private async initialize(): Promise<void> {
+    // Create minimum connections
+    for (let i = 0; i < this.config.minConnections; i++) {
+      const connection = await this.createConnection();
+      this.connections.push(connection);
+      this.availableConnections.push(connection);
+    }
+    
+    // Start health check
+    this.healthCheckTimer = setInterval(() => {
+      this.performHealthCheck();
+    }, this.config.healthCheckInterval);
+    
+    console.log(`✅ Connection pool initialized with ${this.config.minConnections} connections`);
+  }
+  
+  async acquire(): Promise<Connection> {
+    // Check for available connection
+    const availableConnection = this.getAvailableConnection();
+    if (availableConnection) {
+      this.stats.acquired++;
+      return availableConnection;
+    }
+    
+    // Create new connection if under limit
+    if (this.connections.length < this.config.maxConnections) {
+      const connection = await this.createConnection();
+      this.connections.push(connection);
+      this.stats.acquired++;
+      return connection;
+    }
+    
+    // Wait for connection to become available
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.stats.timeouts++;
+        const index = this.pendingRequests.findIndex(req => req.resolve === resolve);
+        if (index !== -1) {
+          this.pendingRequests.splice(index, 1);
+        }
+        reject(new Error('Connection acquisition timeout'));
+      }, this.config.acquireTimeout);
+      
+      this.pendingRequests.push({
+        resolve: (connection) => {
+          clearTimeout(timeout);
+          resolve(connection);
+        },
+        reject,
+        timestamp: Date.now()
+      });
+    });
+  }
+  
+  async release(connection: Connection): Promise<void> {
+    // Check if connection is still valid
+    if (!this.isConnectionValid(connection)) {
+      await this.destroyConnection(connection);
+      return;
+    }
+    
+    connection.lastUsed = Date.now();
+    this.availableConnections.push(connection);
+    this.stats.released++;
+    
+    // Satisfy pending request
+    const pendingRequest = this.pendingRequests.shift();
+    if (pendingRequest) {
+      const availableConnection = this.availableConnections.shift();
+      if (availableConnection) {
+        pendingRequest.resolve(availableConnection);
+      }
+    }
+  }
+  
+  private getAvailableConnection(): Connection | null {
+    const connection = this.availableConnections.shift();
+    if (!connection) return null;
+    
+    if (!this.isConnectionValid(connection)) {
+      this.destroyConnection(connection);
+      return this.getAvailableConnection(); // Recursive call to get next available
+    }
+    
+    return connection;
+  }
+  
+  private async createConnection(): Promise<Connection> {
+    let attempts = 0;
+    
+    while (attempts < this.config.retryAttempts) {
+      try {
+        const connection = new Connection();
+        await connection.connect();
+        this.stats.created++;
+        
+        console.log(`🔗 Created new connection (total: ${this.connections.length + 1})`);
+        return connection;
+        
+      } catch (error) {
+        attempts++;
+        console.error(`❌ Failed to create connection (attempt ${attempts}):`, error);
+        
+        if (attempts === this.config.retryAttempts) {
+          throw error;
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+      }
+    }
+    
+    throw new Error('Failed to create connection after all retry attempts');
+  }
+  
+  private async destroyConnection(connection: Connection): Promise<void> {
+    const index = this.connections.indexOf(connection);
+    if (index !== -1) {
+      this.connections.splice(index, 1);
+    }
+    
+    const availableIndex = this.availableConnections.indexOf(connection);
+    if (availableIndex !== -1) {
+      this.availableConnections.splice(availableIndex, 1);
+    }
+    
+    await connection.disconnect();
+    this.stats.destroyed++;
+    
+    console.log(`🗑️ Destroyed connection (total: ${this.connections.length})`);
+  }
+  
+  private isConnectionValid(connection: Connection): boolean {
+    const now = Date.now();
+    
+    // Check if connection is too old
+    if (now - connection.createdAt > this.config.maxLifetime) {
+      return false;
+    }
+    
+    // Check if connection has been idle too long
+    if (now - connection.lastUsed > this.config.idleTimeout) {
+      return false;
+    }
+    
+    // Check connection health
+    return connection.isHealthy();
+  }
+  
+  private async performHealthCheck(): Promise<void> {
+    console.log('🔍 Performing connection pool health check...');
+    
+    const unhealthyConnections = this.connections.filter(conn => !this.isConnectionValid(conn));
+    
+    // Remove unhealthy connections
+    for (const connection of unhealthyConnections) {
+      await this.destroyConnection(connection);
+    }
+    
+    // Ensure minimum connections
+    while (this.connections.length < this.config.minConnections) {
+      try {
+        const connection = await this.createConnection();
+        this.connections.push(connection);
+        this.availableConnections.push(connection);
+      } catch (error) {
+        console.error('❌ Failed to create connection during health check:', error);
+        break;
+      }
+    }
+    
+    console.log(`✅ Health check completed. Active: ${this.connections.length}, Available: ${this.availableConnections.length}`);
+  }
+  
+  getStats() {
+    return {
+      ...this.stats,
+      totalConnections: this.connections.length,
+      availableConnections: this.availableConnections.length,
+      pendingRequests: this.pendingRequests.length,
+      utilization: ((this.connections.length - this.availableConnections.length) / this.connections.length) * 100
+    };
+  }
+  
+  async close(): Promise<void> {
+    if (this.healthCheckTimer) {
+      clearInterval(this.healthCheckTimer);
+    }
+    
+    // Close all connections
+    await Promise.all(this.connections.map(conn => this.destroyConnection(conn)));
+    
+    // Reject pending requests
+    this.pendingRequests.forEach(request => {
+      request.reject(new Error('Connection pool closed'));
+    });
+    this.pendingRequests = [];
+    
+    console.log('🔒 Connection pool closed');
+  }
+}
+
+class Connection {
+  public createdAt: number;
+  public lastUsed: number;
+  private healthy = true;
+  
+  constructor() {
+    this.createdAt = Date.now();
+    this.lastUsed = Date.now();
+  }
+  
+  async connect(): Promise<void> {
+    // Simulate connection establishment
+    await new Promise(resolve => setTimeout(resolve, 100));
+    console.log('🔗 Connection established');
+  }
+  
+  async disconnect(): Promise<void> {
+    this.healthy = false;
+    // Simulate connection cleanup
+    await new Promise(resolve => setTimeout(resolve, 50));
+    console.log('🔌 Connection disconnected');
+  }
+  
+  isHealthy(): boolean {
+    return this.healthy;
+  }
+  
+  async execute(query: string): Promise<any> {
+    this.lastUsed = Date.now();
+    // Simulate query execution
+    await new Promise(resolve => setTimeout(resolve, 10));
+    return { result: 'success' };
+  }
+}
+```
+
+## Memory Management and Optimization
+
+### Memory-Efficient Data Processing
+
+```typescript
+class MemoryOptimizedProcessor {
+  private memoryThreshold = 100 * 1024 * 1024; // 100MB
+  private gcInterval = 30000; // 30 seconds
+  private processedCount = 0;
+  private gcTimer: any;
+  
+  constructor() {
+    this.startGCTimer();
+    this.monitorMemoryUsage();
+  }
+  
+  private startGCTimer(): void {
+    this.gcTimer = setInterval(() => {
+      if (global.gc) {
+        const before = process.memoryUsage().heapUsed;
+        global.gc();
+        const after = process.memoryUsage().heapUsed;
+        const freed = before - after;
+        
+        if (freed > 1024 * 1024) { // > 1MB freed
+          console.log(`🧹 GC freed ${(freed / 1024 / 1024).toFixed(2)}MB`);
+        }
+      }
+    }, this.gcInterval);
+  }
+  
+  private monitorMemoryUsage(): void {
+    setInterval(() => {
+      const usage = process.memoryUsage();
+      const heapUsedMB = usage.heapUsed / 1024 / 1024;
+      
+      if (heapUsedMB > this.memoryThreshold / 1024 / 1024) {
+        console.warn(`⚠️ High memory usage: ${heapUsedMB.toFixed(2)}MB`);
+        this.triggerMemoryOptimization();
+      }
+    }, 10000); // Check every 10 seconds
+  }
+  
+  private triggerMemoryOptimization(): void {
+    console.log('🔧 Triggering memory optimization...');
+    
+    // Force garbage collection
+    if (global.gc) {
+      global.gc();
+    }
+    
+    // Clear caches if they exist
+    if (this.cache) {
+      this.cache.clear();
+    }
+    
+    // Trigger other cleanup mechanisms
+    this.cleanupTempData();
+  }
+  
+  // Process large datasets in streams
+  async processLargeDataset<T>(
+    data: T[],
+    processor: (item: T) => Promise<void>,
+    batchSize = 100
+  ): Promise<void> {
+    console.log(`📊 Processing ${data.length} items in batches of ${batchSize}`);
+    
+    for (let i = 0; i < data.length; i += batchSize) {
+      const batch = data.slice(i, i + batchSize);
+      
+      // Process batch
+      await Promise.all(batch.map(processor));
+      
+      this.processedCount += batch.length;
+      
+      // Memory check after each batch
+      const usage = process.memoryUsage();
+      const heapUsedMB = usage.heapUsed / 1024 / 1024;
+      
+      console.log(`✅ Processed batch ${Math.floor(i / batchSize) + 1}, Memory: ${heapUsedMB.toFixed(2)}MB`);
+      
+      // Force cleanup if memory usage is high
+      if (heapUsedMB > this.memoryThreshold / 1024 / 1024 / 2) {
+        await this.performBatchCleanup();
+      }
+    }
+    
+    console.log(`🎉 Completed processing ${this.processedCount} items`);
+  }
+  
+  // Stream processing for extremely large datasets
+  async *processStream<T>(
+    dataSource: AsyncIterable<T>,
+    transformer: (item: T) => Promise<T>
+  ): AsyncGenerator<T> {
+    let processed = 0;
+    
+    for await (const item of dataSource) {
+      try {
+        const transformedItem = await transformer(item);
+        processed++;
+        
+        // Periodic memory check
+        if (processed % 1000 === 0) {
+          const usage = process.memoryUsage();
+          const heapUsedMB = usage.heapUsed / 1024 / 1024;
+          console.log(`📈 Processed ${processed} items, Memory: ${heapUsedMB.toFixed(2)}MB`);
+          
+          if (heapUsedMB > this.memoryThreshold / 1024 / 1024) {
+            await this.performBatchCleanup();
+          }
+        }
+        
+        yield transformedItem;
+        
+      } catch (error) {
+        console.error(`❌ Error processing item ${processed}:`, error);
+      }
+    }
+  }
+  
+  private async performBatchCleanup(): Promise<void> {
+    console.log('🧹 Performing batch cleanup...');
+    
+    // Clear temporary buffers
+    this.cleanupTempData();
+    
+    // Force garbage collection
+    if (global.gc) {
+      global.gc();
+    }
+    
+    // Small delay to let GC complete
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  private cleanupTempData(): void {
+    // Clear any temporary data structures
+    // Implementation depends on specific use case
+  }
+  
+  // Memory-efficient object creation
+  createOptimizedObject<T>(template: T, overrides: Partial<T>): T {
+    // Use Object.assign for efficiency instead of spread operator for large objects
+    return Object.assign(Object.create(Object.getPrototypeOf(template)), template, overrides);
+  }
+  
+  // Weak reference caching for memory-sensitive scenarios
+  private weakCache = new WeakMap<object, any>();
+  
+  getCachedOrCompute<T extends object, R>(
+    key: T,
+    computer: () => R
+  ): R {
+    if (this.weakCache.has(key)) {
+      return this.weakCache.get(key);
+    }
+    
+    const result = computer();
+    this.weakCache.set(key, result);
+    return result;
+  }
+  
+  destroy(): void {
+    if (this.gcTimer) {
+      clearInterval(this.gcTimer);
+    }
+    
+    this.cleanupTempData();
+    console.log('🗑️ Memory optimizer destroyed');
+  }
+  
+  getMemoryStats() {
+    const usage = process.memoryUsage();
+    
+    return {
+      heapUsed: `${(usage.heapUsed / 1024 / 1024).toFixed(2)}MB`,
+      heapTotal: `${(usage.heapTotal / 1024 / 1024).toFixed(2)}MB`,
+      external: `${(usage.external / 1024 / 1024).toFixed(2)}MB`,
+      rss: `${(usage.rss / 1024 / 1024).toFixed(2)}MB`,
+      processedCount: this.processedCount
+    };
+  }
+}
+```
+
+## Request Optimization Patterns
+
+### Intelligent Request Batching
+
+```typescript
+interface BatchRequest {
+  id: string;
+  operation: string;
+  params: any;
+  resolve: (result: any) => void;
+  reject: (error: Error) => void;
+  timestamp: number;
+  priority: number;
+}
+
+class RequestBatcher {
+  private batches = new Map<string, BatchRequest[]>();
+  private timers = new Map<string, NodeJS.Timeout>();
+  private config = {
+    maxBatchSize: 10,
+    maxWaitTime: 100, // milliseconds
+    maxConcurrentBatches: 5
+  };
+  
+  private activeBatches = new Set<string>();
+  
+  async batchRequest<T>(
+    operation: string,
+    params: any,
+    priority = 0
+  ): Promise<T> {
+    return new Promise((resolve, reject) => {
+      const request: BatchRequest = {
+        id: this.generateId(),
+        operation,
+        params,
+        resolve,
+        reject,
+        timestamp: Date.now(),
+        priority
+      };
+      
+      this.addToBatch(request);
+    });
+  }
+  
+  private addToBatch(request: BatchRequest): void {
+    const batchKey = request.operation;
+    
+    if (!this.batches.has(batchKey)) {
+      this.batches.set(batchKey, []);
+    }
+    
+    const batch = this.batches.get(batchKey)!;
+    batch.push(request);
+    
+    // Sort by priority
+    batch.sort((a, b) => b.priority - a.priority);
+    
+    // Check if batch should be executed immediately
+    if (batch.length >= this.config.maxBatchSize) {
+      this.executeBatch(batchKey);
+    } else {
+      // Set timer if not already set
+      if (!this.timers.has(batchKey)) {
+        const timer = setTimeout(() => {
+          this.executeBatch(batchKey);
+        }, this.config.maxWaitTime);
+        
+        this.timers.set(batchKey, timer);
+      }
+    }
+  }
+  
+  private async executeBatch(batchKey: string): Promise<void> {
+    const batch = this.batches.get(batchKey);
+    if (!batch || batch.length === 0) return;
+    
+    // Clear timer
+    const timer = this.timers.get(batchKey);
+    if (timer) {
+      clearTimeout(timer);
+      this.timers.delete(batchKey);
+    }
+    
+    // Remove batch from pending
+    this.batches.set(batchKey, []);
+    
+    // Check concurrency limit
+    if (this.activeBatches.size >= this.config.maxConcurrentBatches) {
+      // Requeue the batch
+      setTimeout(() => this.executeBatch(batchKey), 50);
+      return;
+    }
+    
+    this.activeBatches.add(batchKey);
+    
+    try {
+      console.log(`🚀 Executing batch of ${batch.length} ${batchKey} operations`);
+      
+      const results = await this.performBatchOperation(batchKey, batch);
+      
+      // Resolve individual requests
+      batch.forEach((request, index) => {
+        const result = results[index];
+        if (result.success) {
+          request.resolve(result.data);
+        } else {
+          request.reject(new Error(result.error));
+        }
+      });
+      
+    } catch (error) {
+      // Reject all requests in the batch
+      batch.forEach(request => {
+        request.reject(error as Error);
+      });
+    } finally {
+      this.activeBatches.delete(batchKey);
+    }
+  }
+  
+  private async performBatchOperation(
+    operation: string,
+    requests: BatchRequest[]
+  ): Promise<Array<{ success: boolean; data?: any; error?: string }>> {
+    // This would be implemented based on the specific batch operation
+    // For example, batching multiple flow executions, action calls, etc.
+    
+    switch (operation) {
+      case 'flow.execute':
+        return this.batchFlowExecutions(requests);
+      case 'action.execute':
+        return this.batchActionExecutions(requests);
+      default:
+        throw new Error(`Unknown batch operation: ${operation}`);
+    }
+  }
+  
+  private async batchFlowExecutions(
+    requests: BatchRequest[]
+  ): Promise<Array<{ success: boolean; data?: any; error?: string }>> {
+    // Implementation for batching flow executions
+    const results = await Promise.allSettled(
+      requests.map(async (request) => {
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 50));
+        return { executionId: `exec_${request.id}`, status: 'completed' };
+      })
+    );
+    
+    return results.map(result => ({
+      success: result.status === 'fulfilled',
+      data: result.status === 'fulfilled' ? result.value : undefined,
+      error: result.status === 'rejected' ? result.reason.message : undefined
+    }));
+  }
+  
+  private async batchActionExecutions(
+    requests: BatchRequest[]
+  ): Promise<Array<{ success: boolean; data?: any; error?: string }>> {
+    // Implementation for batching action executions
+    const results = await Promise.allSettled(
+      requests.map(async (request) => {
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 30));
+        return { actionId: request.params.actionId, result: 'success' };
+      })
+    );
+    
+    return results.map(result => ({
+      success: result.status === 'fulfilled',
+      data: result.status === 'fulfilled' ? result.value : undefined,
+      error: result.status === 'rejected' ? result.reason.message : undefined
+    }));
+  }
+  
+  private generateId(): string {
+    return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+  
+  getStats() {
+    return {
+      pendingBatches: this.batches.size,
+      activeBatches: this.activeBatches.size,
+      totalPendingRequests: Array.from(this.batches.values())
+        .reduce((sum, batch) => sum + batch.length, 0)
+    };
+  }
+}
+
+// Usage example with optimized Tolstoy client
+class BatchOptimizedTolstoyClient {
+  private client: TolstoyClient;
+  private batcher: RequestBatcher;
+  
+  constructor(client: TolstoyClient) {
+    this.client = client;
+    this.batcher = new RequestBatcher();
+  }
+  
+  // Batch-optimized flow execution
+  async executeFlow(flowId: string, inputs: any, priority = 0): Promise<any> {
+    return this.batcher.batchRequest('flow.execute', { flowId, inputs }, priority);
+  }
+  
+  // Batch-optimized action execution
+  async executeAction(actionId: string, inputs: any, priority = 0): Promise<any> {
+    return this.batcher.batchRequest('action.execute', { actionId, inputs }, priority);
+  }
+  
+  // High-priority execution (bypasses batching)
+  async executeFlowImmediate(flowId: string, inputs: any): Promise<any> {
+    return this.client.flows.execute(flowId, inputs);
+  }
+  
+  getBatchStats() {
+    return this.batcher.getStats();
+  }
+}
+```
+
+## Performance Monitoring and Profiling
+
+### Comprehensive Performance Monitoring
+
+```typescript
+interface PerformanceProfile {
+  operationName: string;
+  startTime: number;
+  endTime?: number;
+  duration?: number;
+  memoryBefore: number;
+  memoryAfter?: number;
+  memoryDelta?: number;
+  metadata?: Record<string, any>;
+}
+
+class PerformanceProfiler {
+  private profiles = new Map<string, PerformanceProfile>();
+  private aggregatedStats = new Map<string, {
+    count: number;
+    totalDuration: number;
+    avgDuration: number;
+    minDuration: number;
+    maxDuration: number;
+    totalMemoryDelta: number;
+    avgMemoryDelta: number;
+  }>();
+  
+  startProfile(operationName: string, metadata?: Record<string, any>): string {
+    const profileId = `${operationName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const profile: PerformanceProfile = {
+      operationName,
+      startTime: performance.now(),
+      memoryBefore: process.memoryUsage().heapUsed,
+      metadata
+    };
+    
+    this.profiles.set(profileId, profile);
+    return profileId;
+  }
+  
+  endProfile(profileId: string): PerformanceProfile | null {
+    const profile = this.profiles.get(profileId);
+    if (!profile) {
+      console.warn(`Profile not found: ${profileId}`);
+      return null;
+    }
+    
+    profile.endTime = performance.now();
+    profile.duration = profile.endTime - profile.startTime;
+    profile.memoryAfter = process.memoryUsage().heapUsed;
+    profile.memoryDelta = profile.memoryAfter - profile.memoryBefore;
+    
+    this.updateAggregatedStats(profile);
+    this.profiles.delete(profileId);
+    
+    return profile;
+  }
+  
+  private updateAggregatedStats(profile: PerformanceProfile): void {
+    const stats = this.aggregatedStats.get(profile.operationName) || {
+      count: 0,
+      totalDuration: 0,
+      avgDuration: 0,
+      minDuration: Infinity,
+      maxDuration: 0,
+      totalMemoryDelta: 0,
+      avgMemoryDelta: 0
+    };
+    
+    stats.count++;
+    stats.totalDuration += profile.duration!;
+    stats.avgDuration = stats.totalDuration / stats.count;
+    stats.minDuration = Math.min(stats.minDuration, profile.duration!);
+    stats.maxDuration = Math.max(stats.maxDuration, profile.duration!);
+    stats.totalMemoryDelta += profile.memoryDelta!;
+    stats.avgMemoryDelta = stats.totalMemoryDelta / stats.count;
+    
+    this.aggregatedStats.set(profile.operationName, stats);
+  }
+  
+  // Decorator for automatic profiling
+  profileMethod<T extends any[], R>(
+    target: any,
+    propertyName: string,
+    descriptor: TypedPropertyDescriptor<(...args: T) => Promise<R>>
+  ) {
+    const originalMethod = descriptor.value!;
+    
+    descriptor.value = async function(...args: T): Promise<R> {
+      const profiler = PerformanceProfiler.getInstance();
+      const profileId = profiler.startProfile(`${target.constructor.name}.${propertyName}`, {
+        args: args.map(arg => typeof arg === 'object' ? '[Object]' : arg)
+      });
+      
+      try {
+        const result = await originalMethod.apply(this, args);
+        const profile = profiler.endProfile(profileId);
+        
+        if (profile && profile.duration! > 1000) { // Log slow operations
+          console.log(`⚠️ Slow operation: ${profile.operationName} took ${profile.duration!.toFixed(2)}ms`);
+        }
+        
+        return result;
+      } catch (error) {
+        profiler.endProfile(profileId);
+        throw error;
+      }
+    };
+    
+    return descriptor;
+  }
+  
+  // Singleton instance for global profiling
+  private static instance: PerformanceProfiler;
+  
+  static getInstance(): PerformanceProfiler {
+    if (!PerformanceProfiler.instance) {
+      PerformanceProfiler.instance = new PerformanceProfiler();
+    }
+    return PerformanceProfiler.instance;
+  }
+  
+  getStats(operationName?: string) {
+    if (operationName) {
+      return this.aggregatedStats.get(operationName);
+    }
+    return Object.fromEntries(this.aggregatedStats);
+  }
+  
+  generateReport(): string {
+    let report = '📊 PERFORMANCE PROFILE REPORT\n';
+    report += '=' .repeat(50) + '\n\n';
+    
+    const sortedOperations = Array.from(this.aggregatedStats.entries())
+      .sort(([,a], [,b]) => b.avgDuration - a.avgDuration);
+    
+    for (const [operation, stats] of sortedOperations) {
+      report += `${operation}:\n`;
+      report += `  Count: ${stats.count}\n`;
+      report += `  Avg Duration: ${stats.avgDuration.toFixed(2)}ms\n`;
+      report += `  Min Duration: ${stats.minDuration.toFixed(2)}ms\n`;
+      report += `  Max Duration: ${stats.maxDuration.toFixed(2)}ms\n`;
+      report += `  Avg Memory Delta: ${(stats.avgMemoryDelta / 1024).toFixed(2)}KB\n`;
+      report += `  Total Duration: ${stats.totalDuration.toFixed(2)}ms\n\n`;
+    }
+    
+    return report;
+  }
+  
+  reset(): void {
+    this.profiles.clear();
+    this.aggregatedStats.clear();
+  }
+}
+
+// Usage with performance monitoring
+class MonitoredTolstoyClient {
+  private client: TolstoyClient;
+  private profiler: PerformanceProfiler;
+  
+  constructor(client: TolstoyClient) {
+    this.client = client;
+    this.profiler = PerformanceProfiler.getInstance();
+  }
+  
+  @PerformanceProfiler.getInstance().profileMethod
+  async executeFlow(flowId: string, inputs: any): Promise<any> {
+    return this.client.flows.execute(flowId, inputs);
+  }
+  
+  @PerformanceProfiler.getInstance().profileMethod
+  async executeAction(actionId: string, inputs: any): Promise<any> {
+    return this.client.actions.execute(actionId, inputs);
+  }
+  
+  // Manual profiling for complex operations
+  async executeFlowWithDetailed Profiling(flowId: string, inputs: any): Promise<any> {
+    const mainProfileId = this.profiler.startProfile('flow.execute.detailed', {
+      flowId,
+      inputSize: JSON.stringify(inputs).length
+    });
+    
+    try {
+      // Profile individual steps
+      const validationId = this.profiler.startProfile('flow.validation');
+      // ... validation logic ...
+      this.profiler.endProfile(validationId);
+      
+      const executionId = this.profiler.startProfile('flow.execution');
+      const result = await this.client.flows.execute(flowId, inputs);
+      this.profiler.endProfile(executionId);
+      
+      const postProcessId = this.profiler.startProfile('flow.post-processing');
+      // ... post-processing logic ...
+      this.profiler.endProfile(postProcessId);
+      
+      return result;
+      
+    } finally {
+      const mainProfile = this.profiler.endProfile(mainProfileId);
+      
+      if (mainProfile && mainProfile.duration! > 5000) {
+        console.warn(`🐌 Very slow flow execution: ${flowId} took ${mainProfile.duration!.toFixed(2)}ms`);
+      }
+    }
+  }
+  
+  getPerformanceStats(): any {
+    return this.profiler.getStats();
+  }
+  
+  generatePerformanceReport(): string {
+    return this.profiler.generateReport();
+  }
+}
+```
+
+## Best Practices Summary
+
+### Performance Optimization Checklist
+
+```typescript
+class PerformanceOptimizationChecklist {
+  static getRecommendations(): Array<{
+    category: string;
+    priority: 'high' | 'medium' | 'low';
+    recommendation: string;
+    implementation: string;
+  }> {
+    return [
+      // High Priority
+      {
+        category: 'Connection Management',
+        priority: 'high',
+        recommendation: 'Use connection pooling for HTTP requests',
+        implementation: 'Configure HTTP agent with keepAlive and connection limits'
+      },
+      {
+        category: 'Caching',
+        priority: 'high',
+        recommendation: 'Implement multi-level caching strategy',
+        implementation: 'Memory cache + Redis for frequently accessed data'
+      },
+      {
+        category: 'Request Optimization',
+        priority: 'high',
+        recommendation: 'Batch similar operations together',
+        implementation: 'Use RequestBatcher for bulk operations'
+      },
+      {
+        category: 'Error Handling',
+        priority: 'high',
+        recommendation: 'Implement proper retry logic with exponential backoff',
+        implementation: 'Use RetryManager with configurable strategies'
+      },
+      
+      // Medium Priority
+      {
+        category: 'Memory Management',
+        priority: 'medium',
+        recommendation: 'Monitor memory usage and trigger GC when needed',
+        implementation: 'Use MemoryOptimizedProcessor for large data processing'
+      },
+      {
+        category: 'Rate Limiting',
+        priority: 'medium',
+        recommendation: 'Implement client-side rate limiting',
+        implementation: 'Use token bucket algorithm for request throttling'
+      },
+      {
+        category: 'Compression',
+        priority: 'medium',
+        recommendation: 'Enable response compression for large payloads',
+        implementation: 'Configure gzip/deflate compression with threshold'
+      },
+      {
+        category: 'Monitoring',
+        priority: 'medium',
+        recommendation: 'Track performance metrics continuously',
+        implementation: 'Use PerformanceProfiler for operation timing'
+      },
+      
+      // Low Priority
+      {
+        category: 'Optimization',
+        priority: 'low',
+        recommendation: 'Use streaming for large datasets',
+        implementation: 'Process data in streams instead of loading everything'
+      },
+      {
+        category: 'Preloading',
+        priority: 'low',
+        recommendation: 'Preload frequently used data',
+        implementation: 'Implement cache warming strategies'
+      }
+    ];
+  }
+  
+  static generateImplementationPlan(): string {
+    const recommendations = this.getRecommendations();
+    
+    let plan = '📋 PERFORMANCE OPTIMIZATION IMPLEMENTATION PLAN\n';
+    plan += '=' .repeat(60) + '\n\n';
+    
+    ['high', 'medium', 'low'].forEach(priority => {
+      plan += `${priority.toUpperCase()} PRIORITY:\n`;
+      
+      const items = recommendations.filter(r => r.priority === priority);
+      items.forEach((item, index) => {
+        plan += `${index + 1}. ${item.category}: ${item.recommendation}\n`;
+        plan += `   Implementation: ${item.implementation}\n\n`;
+      });
+    });
+    
+    return plan;
+  }
+  
+  static validateImplementation(client: any): Array<{
+    check: string;
+    passed: boolean;
+    recommendation?: string;
+  }> {
+    return [
+      {
+        check: 'Connection Pooling Enabled',
+        passed: !!client.connectionPool,
+        recommendation: 'Implement OptimizedTolstoyClient with connection pooling'
+      },
+      {
+        check: 'Caching Implemented',
+        passed: !!client.cache,
+        recommendation: 'Add IntelligentCacheManager to your client'
+      },
+      {
+        check: 'Error Handling Configured',
+        passed: !!client.retryManager,
+        recommendation: 'Use RetryManager for robust error handling'
+      },
+      {
+        check: 'Performance Monitoring Active',
+        passed: !!client.profiler,
+        recommendation: 'Integrate PerformanceProfiler for monitoring'
+      },
+      {
+        check: 'Rate Limiting Implemented',
+        passed: !!client.rateLimiter,
+        recommendation: 'Add RateLimiter to prevent overwhelming the API'
+      }
+    ];
+  }
+}
+
+// Generate implementation recommendations
+console.log(PerformanceOptimizationChecklist.generateImplementationPlan());
+
+// Example usage of optimized client
+async function demonstrateOptimizedUsage() {
+  const baseClient = new TolstoyClient({
+    orgId: process.env.TOLSTOY_ORG_ID!,
+    userId: process.env.TOLSTOY_USER_ID!
+  });
+  
+  // Create optimized client
+  const optimizedClient = new OptimizedTolstoyClient(baseClient, {
+    maxConnections: 20,
+    enableResponseCache: true,
+    cacheSize: 500,
+    cacheTTL: 300000, // 5 minutes
+    rateLimit: 50, // 50 requests per minute
+    enableMetrics: true
+  });
+  
+  // Execute flows with caching
+  const results = await Promise.all([
+    optimizedClient.executeFlow('user-onboarding', { email: 'user1@example.com' }),
+    optimizedClient.executeFlow('user-onboarding', { email: 'user2@example.com' }),
+    optimizedClient.executeFlow('user-onboarding', { email: 'user3@example.com' })
+  ]);
+  
+  // Check performance metrics
+  const stats = optimizedClient.getPerformanceMetrics();
+  console.log('Performance metrics:', stats);
+}
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Error Handling" icon="shield-exclamation" href="/sdk/guides/error-handling">
+    Implement robust error handling for better performance
+  </Card>
+  <Card title="Best Practices" icon="shield-check" href="/sdk/guides/best-practices">
+    Follow best practices for optimal SDK usage
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Monitoring Guide" icon="chart-line" href="/sdk/guides/monitoring">
+    Monitor your application performance effectively
+  </Card>
+  <Card title="Testing Guide" icon="test-tube" href="/sdk/guides/testing">
+    Test performance optimizations thoroughly
+  </Card>
+</CardGroup>
+
+---
+
+*Performance optimization is an ongoing process. Use these patterns and tools to build fast, efficient, and scalable automation systems with the Tolstoy SDK.*

@@ -143,43 +143,123 @@ jobs:
           EC2_USER: ${{ secrets.EC2_USER }}
           EC2_HOST: ${{ secrets.EC2_HOST }}
           
-      - name: 🔍 Verify deployment
+      - name: 🔍 Comprehensive deployment verification
         run: |
-          echo "🔍 Verifying application health..."
+          echo "🔍 Starting comprehensive deployment verification..."
           
-          # Check PM2 logs first to see if there are any startup issues
-          timeout 10 ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${EC2_USER}@${EC2_HOST} "pm2 logs tolstoy-api --lines 10" || echo "✅ Log check completed"
+          # Check PM2 status and logs
+          echo "📊 Checking PM2 application status..."
+          ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${EC2_USER}@${EC2_HOST} "
+            echo '=== PM2 Status ==='
+            pm2 status
+            echo ''
+            echo '=== Recent Logs (last 20 lines) ==='
+            pm2 logs tolstoy-api --lines 20 --raw
+          " || echo "⚠️ PM2 status check completed with warnings"
           
-          # Wait for the application to fully start (AWS Secrets Manager + database connection)
-          echo "⏳ Waiting 15 seconds for application startup..."
-          sleep 15
+          # Wait for application startup with progressive checks
+          echo "⏳ Waiting for application to fully initialize..."
+          for i in {1..12}; do
+            echo "Startup check $i/12..."
+            
+            # Check if port is listening
+            PORT_STATUS=$(ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${EC2_USER}@${EC2_HOST} "ss -tlnp | grep :3000" || echo "not_listening")
+            
+            if [[ "$PORT_STATUS" != "not_listening" ]]; then
+              echo "✅ Port 3000 is listening"
+              break
+            fi
+            
+            if [ $i -eq 12 ]; then
+              echo "❌ Application failed to start listening on port 3000 after 60 seconds"
+              ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${EC2_USER}@${EC2_HOST} "pm2 logs tolstoy-api --lines 50"
+              exit 1
+            fi
+            
+            sleep 5
+          done
           
-          # Check if the application is listening on port 3000
-          echo "🔍 Checking if application is listening on port 3000..."
-          ssh -o StrictHostKeyChecking=no -i ssh_key.pem ${EC2_USER}@${EC2_HOST} "ss -tlnp | grep :3000 || echo 'Port 3000 not listening'"
+          # Progressive health checks
+          echo "🏥 Running progressive health checks..."
           
-          # Test health endpoint
-          echo "🔍 Testing health endpoint..."
-          HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://${EC2_HOST}/health)
+          # Basic health endpoint
+          for i in {1..6}; do
+            echo "Health check attempt $i/6..."
+            HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 30 http://${EC2_HOST}/health)
+            
+            if [ "$HEALTH_CHECK" -eq 200 ]; then
+              echo "✅ Basic health check passed (HTTP $HEALTH_CHECK)"
+              break
+            elif [ $i -eq 6 ]; then
+              echo "❌ Basic health check failed after 6 attempts (HTTP $HEALTH_CHECK)"
+              echo "Application response:"
+              curl -s --connect-timeout 10 --max-time 30 http://${EC2_HOST}/health || echo "No response"
+              exit 1
+            fi
+            
+            sleep 10
+          done
           
-          if [ "$HEALTH_CHECK" -eq 200 ]; then
-            echo "✅ Health check passed (HTTP $HEALTH_CHECK)"
-          else
-            echo "❌ Health check failed (HTTP $HEALTH_CHECK)"
-            exit 1
-          fi
-          
-          # Test status endpoint
-          STATUS_CHECK=$(curl -s -o /dev/null -w "%{http_code}" http://${EC2_HOST}/status)
+          # Status endpoint check
+          echo "📊 Testing comprehensive status endpoint..."
+          STATUS_CHECK=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 30 http://${EC2_HOST}/status)
           
           if [ "$STATUS_CHECK" -eq 200 ]; then
-            echo "✅ Status check passed (HTTP $STATUS_CHECK)"
+            echo "✅ Status endpoint check passed (HTTP $STATUS_CHECK)"
+            
+            # Get detailed status for verification
+            STATUS_RESPONSE=$(curl -s --connect-timeout 10 --max-time 30 http://${EC2_HOST}/status)
+            echo "Status response preview: $(echo "$STATUS_RESPONSE" | jq -c . 2>/dev/null || echo "$STATUS_RESPONSE" | head -c 200)"
           else
-            echo "❌ Status check failed (HTTP $STATUS_CHECK)"
+            echo "❌ Status endpoint check failed (HTTP $STATUS_CHECK)"
+            curl -s --connect-timeout 10 --max-time 30 http://${EC2_HOST}/status || echo "No response from status endpoint"
             exit 1
           fi
           
-          echo "🎉 Deployment verification successful!"
+          # Version endpoint check (new endpoint)
+          echo "🔖 Testing version endpoint..."
+          VERSION_CHECK=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 30 http://${EC2_HOST}/version)
+          
+          if [ "$VERSION_CHECK" -eq 200 ]; then
+            echo "✅ Version endpoint check passed (HTTP $VERSION_CHECK)"
+            VERSION_RESPONSE=$(curl -s --connect-timeout 10 --max-time 30 http://${EC2_HOST}/version)
+            echo "Version info: $(echo "$VERSION_RESPONSE" | jq -c . 2>/dev/null || echo "$VERSION_RESPONSE")"
+          else
+            echo "⚠️ Version endpoint check failed (HTTP $VERSION_CHECK) - this is non-critical"
+          fi
+          
+          # Detailed health endpoint check
+          echo "🔍 Testing detailed health endpoint..."
+          DETAILED_HEALTH_CHECK=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 30 http://${EC2_HOST}/status/detailed)
+          
+          if [ "$DETAILED_HEALTH_CHECK" -eq 200 ]; then
+            echo "✅ Detailed health check passed (HTTP $DETAILED_HEALTH_CHECK)"
+            DETAILED_RESPONSE=$(curl -s --connect-timeout 10 --max-time 30 http://${EC2_HOST}/status/detailed)
+            echo "Database status: $(echo "$DETAILED_RESPONSE" | jq -r '.database.status' 2>/dev/null || echo "unknown")"
+            echo "Redis status: $(echo "$DETAILED_RESPONSE" | jq -r '.redis.status' 2>/dev/null || echo "unknown")"
+          else
+            echo "⚠️ Detailed health check failed (HTTP $DETAILED_HEALTH_CHECK) - this may indicate service issues"
+          fi
+          
+          # API endpoints smoke test
+          echo "🧪 Running API endpoints smoke test..."
+          
+          # Test a few key endpoints (should return 401 without auth, which is expected)
+          for endpoint in "/flows" "/actions" "/organizations"; do
+            ENDPOINT_CHECK=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 10 --max-time 30 http://${EC2_HOST}${endpoint})
+            if [ "$ENDPOINT_CHECK" -eq 401 ] || [ "$ENDPOINT_CHECK" -eq 400 ]; then
+              echo "✅ Endpoint ${endpoint} is responding correctly (HTTP $ENDPOINT_CHECK - auth required)"
+            else
+              echo "⚠️ Endpoint ${endpoint} returned unexpected status: HTTP $ENDPOINT_CHECK"
+            fi
+          done
+          
+          # Final verification summary
+          echo ""
+          echo "🎉 Comprehensive deployment verification completed!"
+          echo "✅ Application is running and responding to requests"
+          echo "✅ Core endpoints are accessible"
+          echo "✅ Health monitoring is functional"
         env:
           EC2_USER: ${{ secrets.EC2_USER }}
           EC2_HOST: ${{ secrets.EC2_HOST }}

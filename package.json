@@ -1,9 +1,9 @@
 {
   "name": "tolstoy",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "main": "dist/main.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc --project tsconfig.build.json",
     "build:docs": "npm run build && npm run generate-openapi",
     "generate-openapi": "node dist/main.js --generate-openapi",
     "start": "node dist/main.js",
@@ -28,6 +28,7 @@
   "description": "",
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.862.0",
+    "@daytonaio/sdk": "^0.25.5",
     "@nestjs/axios": "^4.0.1",
     "@nestjs/common": "^11.1.5",
     "@nestjs/config": "^4.0.2",

@@ -1,6 +1,6 @@
 import { Injectable, InternalServerErrorException, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import * as Sentry from '@sentry/nestjs';
 import { DaytonaClientImpl } from './daytona-client';
 import { AwsSecretsService } from '../aws-secrets.service';

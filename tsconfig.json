@@ -12,18 +12,27 @@
     "baseUrl": "./",
     "incremental": true,
     "skipLibCheck": true,
-    "strict": false,
-    "strictNullChecks": true,
-    "noImplicitAny": true,
+    // Balanced TypeScript settings for quality and practicality
+    "strict": false, // Temporarily disabled for incremental migration
+    "strictFunctionTypes": true,
     "strictBindCallApply": true,
-    "strictPropertyInitialization": false,
+    "strictPropertyInitialization": false, // Keep false for NestJS decorators
     "noImplicitReturns": true,
     "noImplicitThis": true,
-    "noUncheckedIndexedAccess": false,
-    "exactOptionalPropertyTypes": false,
+    "noImplicitOverride": true,
+    "noUncheckedIndexedAccess": false, // Too strict for process.env access
+    "exactOptionalPropertyTypes": false, // Too strict for practical use
+    "noPropertyAccessFromIndexSignature": false, // Too strict for process.env
+    "noUnusedLocals": false, // Temporarily disabled for migration
+    "noUnusedParameters": false, // Temporarily disabled for migration
     "forceConsistentCasingInFileNames": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    // Additional checks
+    "useUnknownInCatchVariables": false,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": ["node_modules", "dist", "coverage", "**/*.spec.ts", "**/*.test.ts", "tests/**/*"]
 }

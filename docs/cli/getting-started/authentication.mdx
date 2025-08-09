@@ -1,0 +1,621 @@
+---
+title: "CLI Authentication Guide"
+description: "Complete guide to setting up secure authentication for the Tolstoy CLI including API keys, OAuth, and service accounts."
+---
+
+# CLI Authentication Guide
+
+This guide covers all authentication methods available for the Tolstoy CLI, helping you choose the right approach for your use case and set up secure access to your Tolstoy organization.
+
+## Authentication Overview
+
+The Tolstoy CLI supports multiple authentication methods:
+
+| Method | Use Case | Security | Setup Complexity |
+|--------|----------|-----------|------------------|
+| **API Key** | Personal use, simple automation | High | Low |
+| **OAuth** | Interactive use, team collaboration | High | Medium |
+| **Service Account** | CI/CD, server-to-server | Very High | Medium |
+| **Environment Variables** | Temporary access, scripts | Medium | Low |
+
+## API Key Authentication
+
+### Getting Your API Key
+
+1. **Login to Tolstoy Dashboard**
+   - Go to [tolstoy.getpullse.com](https://tolstoy.getpullse.com)
+   - Navigate to Settings → API Keys
+
+2. **Generate New API Key**
+   - Click "Generate New Key"
+   - Choose appropriate permissions
+   - Copy the key (it won't be shown again)
+
+3. **Configure CLI**
+   ```bash
+   # Interactive setup (secure prompt)
+   tolstoy config set api-key
+   
+   # From environment variable
+   tolstoy config set api-key "$TOLSTOY_API_KEY"
+   
+   # From file
+   tolstoy config set api-key --from-file ~/.tolstoy/api-key.txt
+   ```
+
+### API Key Best Practices
+
+<CodeGroup>
+```bash Secure Storage
+# Store API key securely
+echo "tk_live_your_api_key_here" > ~/.tolstoy/api-key.txt
+chmod 600 ~/.tolstoy/api-key.txt
+
+# Load from secure file
+tolstoy config set api-key --from-file ~/.tolstoy/api-key.txt
+
+# Verify key is working
+tolstoy config test
+```
+
+```bash Environment Variable
+# Set in shell profile (.bashrc, .zshrc)
+export TOLSTOY_API_KEY="tk_live_your_api_key_here"
+
+# Verify environment variable
+echo $TOLSTOY_API_KEY | head -c 10 # Show first 10 chars only
+
+# Test authentication
+tolstoy config test --verbose
+```
+
+```bash Per-Profile Keys
+# Set different keys for different environments
+tolstoy config set api-key --profile development # dev key
+tolstoy config set api-key --profile staging     # staging key
+tolstoy config set api-key --profile production  # prod key
+
+# Switch profiles to use different keys
+tolstoy config use production
+tolstoy flows list # Uses production API key
+```
+</CodeGroup>
+
+### API Key Management
+
+```bash
+# View API key status (masked)
+tolstoy config get api-key --masked
+
+# Check API key permissions
+tolstoy config auth permissions
+
+# Rotate API key
+tolstoy config auth rotate-key --profile production
+
+# Remove API key
+tolstoy config unset api-key
+```
+
+## OAuth Authentication
+
+### Setting Up OAuth
+
+OAuth is ideal for interactive CLI usage and provides the most secure authentication:
+
+```bash
+# Initialize OAuth flow
+tolstoy config auth oauth
+
+# This will:
+# 1. Open your default browser
+# 2. Redirect to Tolstoy OAuth consent page
+# 3. Ask for permission to access your account
+# 4. Automatically store tokens securely
+# 5. Set up token refresh
+
+# Verify OAuth status
+tolstoy config auth status
+```
+
+### OAuth Workflow
+
+1. **Browser Opens**: The CLI opens your default browser
+2. **Login**: Login to your Tolstoy account if not already logged in
+3. **Consent**: Review and approve the requested permissions
+4. **Redirect**: Browser redirects back to CLI with authorization code
+5. **Token Exchange**: CLI exchanges code for access and refresh tokens
+6. **Storage**: Tokens are encrypted and stored locally
+
+### Managing OAuth Tokens
+
+```bash
+# Check OAuth status
+tolstoy config auth status
+
+# Manual token refresh
+tolstoy config auth refresh
+
+# View token expiration
+tolstoy config auth info --show-expiration
+
+# Revoke OAuth tokens
+tolstoy config auth revoke
+
+# Re-authenticate with OAuth
+tolstoy config auth oauth --force
+```
+
+### OAuth Troubleshooting
+
+<details>
+<summary>**Browser doesn't open automatically**</summary>
+
+Copy the URL from the CLI output and open it manually:
+```bash
+# CLI will show:
+# Please open the following URL in your browser:
+# https://tolstoy.getpullse.com/oauth/authorize?client_id=...
+
+# Copy and paste the URL in your browser
+```
+</details>
+
+<details>
+<summary>**Tokens expired**</summary>
+
+```bash
+# Check token status
+tolstoy config auth status
+
+# Refresh tokens automatically
+tolstoy config auth refresh
+
+# Re-authenticate if refresh fails
+tolstoy config auth oauth
+```
+</details>
+
+## Service Account Authentication
+
+### When to Use Service Accounts
+
+Service accounts are perfect for:
+- CI/CD pipelines
+- Automated scripts
+- Server-to-server communication
+- Long-running processes
+
+### Creating Service Accounts
+
+1. **In Tolstoy Dashboard**:
+   - Go to Settings → Service Accounts
+   - Click "Create Service Account"
+   - Set name and permissions
+   - Download the service account JSON file
+
+2. **Configure CLI**:
+   ```bash
+   # From service account file
+   tolstoy config add ci-service \
+     --auth-method service-account \
+     --service-account-file ./service-account.json
+   
+   # From environment variable (CI/CD)
+   export TOLSTOY_SERVICE_ACCOUNT='{"type":"service_account",...}'
+   tolstoy config add ci-service \
+     --auth-method service-account \
+     --service-account-key "$TOLSTOY_SERVICE_ACCOUNT"
+   ```
+
+### Service Account JSON Structure
+
+```json
+{
+  "type": "service_account",
+  "account_id": "svc_abc123def456",
+  "account_name": "CI/CD Service Account",
+  "organization_id": "org_1234567890abcdef",
+  "private_key": "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----",
+  "created_at": "2024-01-20T10:00:00Z",
+  "expires_at": "2025-01-20T10:00:00Z"
+}
+```
+
+### CI/CD Integration Examples
+
+<CodeGroup>
+```yaml GitHub Actions
+name: Deploy Workflows
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Tolstoy CLI
+        run: npm install -g @tolstoy/cli
+        
+      - name: Configure Service Account
+        env:
+          TOLSTOY_SERVICE_ACCOUNT: ${{ secrets.TOLSTOY_SERVICE_ACCOUNT }}
+        run: |
+          echo "$TOLSTOY_SERVICE_ACCOUNT" > service-account.json
+          
+          tolstoy config add ci \
+            --auth-method service-account \
+            --service-account-file service-account.json \
+            --api-url "https://api.tolstoy.com" \
+            --timeout "300s"
+          
+          tolstoy config use ci
+          
+      - name: Test Authentication
+        run: tolstoy config test --timeout 30s
+        
+      - name: Deploy Workflows
+        run: tolstoy flows deploy ./workflows/
+```
+
+```yaml GitLab CI
+deploy:
+  stage: deploy
+  image: node:18-alpine
+  before_script:
+    - npm install -g @tolstoy/cli
+    - echo "$TOLSTOY_SERVICE_ACCOUNT" > service-account.json
+    - |
+      tolstoy config add gitlab-ci \
+        --auth-method service-account \
+        --service-account-file service-account.json \
+        --non-interactive
+    - tolstoy config use gitlab-ci
+  script:
+    - tolstoy config test
+    - tolstoy flows deploy ./workflows/
+  variables:
+    TOLSTOY_SERVICE_ACCOUNT: $CI_SERVICE_ACCOUNT
+  only:
+    - main
+```
+
+```dockerfile Docker
+FROM node:18-alpine
+
+# Install Tolstoy CLI
+RUN npm install -g @tolstoy/cli
+
+# Copy service account configuration
+COPY service-account.json /app/
+
+WORKDIR /app
+
+# Configure authentication
+RUN tolstoy config add docker \
+    --auth-method service-account \
+    --service-account-file service-account.json \
+    --non-interactive
+
+# Set default profile
+ENV TOLSTOY_PROFILE=docker
+
+CMD ["tolstoy", "--help"]
+```
+</CodeGroup>
+
+## Multi-Environment Authentication
+
+### Environment-Specific Credentials
+
+```bash
+# Development environment
+tolstoy config add development \
+  --api-url "https://dev-api.tolstoy.com" \
+  --org-id "org_dev_123456" \
+  --user-id "user_dev_123456"
+tolstoy config set api-key --profile development # Enter dev API key
+
+# Staging environment  
+tolstoy config add staging \
+  --api-url "https://staging-api.tolstoy.com" \
+  --org-id "org_staging_123456" \
+  --user-id "user_staging_123456"
+tolstoy config set api-key --profile staging # Enter staging API key
+
+# Production environment
+tolstoy config add production \
+  --api-url "https://api.tolstoy.com" \
+  --org-id "org_prod_123456" \
+  --user-id "user_prod_123456"
+tolstoy config set api-key --profile production # Enter prod API key
+```
+
+### Cross-Environment Scripts
+
+```bash
+#!/bin/bash
+# deploy-to-environment.sh
+
+ENVIRONMENT=${1:-development}
+
+echo "🚀 Deploying to $ENVIRONMENT environment"
+
+# Switch to environment profile
+tolstoy config use "$ENVIRONMENT"
+
+# Verify authentication
+if ! tolstoy config test --timeout 10s; then
+    echo "❌ Authentication failed for $ENVIRONMENT"
+    exit 1
+fi
+
+echo "✅ Authenticated to $ENVIRONMENT"
+
+# Deploy workflows
+tolstoy flows deploy ./workflows/ --environment "$ENVIRONMENT"
+
+echo "🎉 Deployment to $ENVIRONMENT completed"
+```
+
+## Security Best Practices
+
+### Credential Storage
+
+```bash
+# Set restrictive permissions on config files
+chmod 700 ~/.tolstoy
+chmod 600 ~/.tolstoy/config/*
+chmod 600 ~/.tolstoy/auth/*
+
+# Encrypt sensitive configuration
+tolstoy config encrypt --profile production
+
+# Use system keychain (macOS/Linux)
+tolstoy config set api-key --use-keychain
+```
+
+### Credential Rotation
+
+```bash
+# Regular API key rotation script
+#!/bin/bash
+# rotate-api-keys.sh
+
+PROFILES=("development" "staging" "production")
+
+for profile in "${PROFILES[@]}"; do
+    echo "🔄 Rotating API key for $profile"
+    
+    # Generate new API key (using Tolstoy API)
+    NEW_KEY=$(tolstoy config auth generate-key --profile "$profile")
+    
+    # Update CLI configuration
+    tolstoy config set api-key "$NEW_KEY" --profile "$profile"
+    
+    # Test new key
+    if tolstoy config test --profile "$profile"; then
+        echo "✅ $profile key rotated successfully"
+    else
+        echo "❌ $profile key rotation failed"
+    fi
+done
+```
+
+### Access Monitoring
+
+```bash
+# Monitor authentication events
+tolstoy config auth audit --since 7d
+
+# Check for suspicious activity
+tolstoy config auth audit --filter failed --since 24h
+
+# View active sessions
+tolstoy config auth sessions list
+
+# Revoke specific session
+tolstoy config auth sessions revoke session_abc123
+```
+
+## Team Authentication Management
+
+### Shared Service Accounts
+
+```bash
+# Create team service account for shared CI/CD
+tolstoy config add team-ci \
+  --auth-method service-account \
+  --service-account-file ./shared/team-service-account.json \
+  --description "Shared team CI/CD account"
+
+# Set up team-wide OAuth application
+tolstoy config auth oauth-app create \
+  --name "Team CLI Access" \
+  --redirect-uri "http://localhost:8080/callback" \
+  --scopes "flows.read,flows.execute,actions.read"
+```
+
+### Permission Management
+
+```bash
+# View authentication permissions
+tolstoy config auth permissions
+
+# Request additional permissions
+tolstoy config auth permissions request \
+  --scopes "flows.create,flows.delete" \
+  --justification "Need to manage workflows for project X"
+
+# Review team authentication status
+tolstoy config auth team-status
+```
+
+## Troubleshooting Authentication
+
+### Common Authentication Issues
+
+<details>
+<summary>**Invalid API key**</summary>
+
+**Symptoms**: `Error: Authentication failed: Invalid API key`
+
+**Solutions**:
+```bash
+# Check if API key is set correctly
+tolstoy config get api-key --masked
+
+# Verify API key format
+# Should start with 'tk_live_' or 'tk_test_'
+echo $TOLSTOY_API_KEY | grep -E '^tk_(live|test)_'
+
+# Test with verbose output
+tolstoy config test --verbose
+
+# Generate new API key if needed
+# Go to dashboard and create new key
+```
+</details>
+
+<details>
+<summary>**OAuth token expired**</summary>
+
+**Symptoms**: `Error: OAuth token expired`
+
+**Solutions**:
+```bash
+# Check token status
+tolstoy config auth status
+
+# Refresh tokens
+tolstoy config auth refresh
+
+# Re-authenticate if refresh fails
+tolstoy config auth oauth --force
+```
+</details>
+
+<details>
+<summary>**Service account authentication failed**</summary>
+
+**Symptoms**: `Error: Service account authentication failed`
+
+**Solutions**:
+```bash
+# Verify service account file format
+jq . service-account.json
+
+# Check service account expiration
+tolstoy config auth info --show-expiration
+
+# Test with verbose logging
+tolstoy config test --verbose --profile service-account-profile
+
+# Verify service account permissions in dashboard
+```
+</details>
+
+### Authentication Debugging
+
+```bash
+# Enable authentication debugging
+export TOLSTOY_AUTH_DEBUG=true
+
+# Show detailed authentication info
+tolstoy config auth debug
+
+# Test authentication with different methods
+tolstoy config test --auth-method api-key
+tolstoy config test --auth-method oauth
+tolstoy config test --auth-method service-account
+
+# Check network connectivity
+tolstoy config test --network-check
+```
+
+### Recovery Procedures
+
+```bash
+# Reset authentication completely
+tolstoy config auth reset
+
+# Backup current authentication
+tolstoy config auth backup > auth-backup.json
+
+# Restore from backup
+tolstoy config auth restore auth-backup.json
+
+# Emergency access with temporary credentials
+export TOLSTOY_API_KEY="temporary_key"
+tolstoy config test --ignore-stored-auth
+```
+
+## Advanced Authentication Topics
+
+### Custom Authentication Flows
+
+```bash
+# Set up custom OAuth flow
+tolstoy config auth oauth-custom \
+  --client-id "custom_client_id" \
+  --client-secret "custom_client_secret" \
+  --redirect-uri "https://myapp.com/oauth/callback"
+
+# Use custom authentication endpoint
+tolstoy config auth custom \
+  --auth-url "https://auth.mycompany.com/tolstoy" \
+  --token-endpoint "https://auth.mycompany.com/token"
+```
+
+### Authentication Webhooks
+
+```bash
+# Set up authentication event webhooks
+tolstoy config auth webhooks create \
+  --url "https://myapp.com/webhooks/auth" \
+  --events "auth.success,auth.failure,token.refresh" \
+  --secret "webhook_secret_123"
+```
+
+### SSO Integration
+
+```bash
+# Configure SAML SSO
+tolstoy config auth sso saml \
+  --provider "okta" \
+  --metadata-url "https://company.okta.com/app/metadata"
+
+# Configure OIDC SSO
+tolstoy config auth sso oidc \
+  --provider "auth0" \
+  --discovery-url "https://company.auth0.com/.well-known/openid-configuration"
+```
+
+## Next Steps
+
+With authentication configured, you're ready to:
+
+<CardGroup cols={2}>
+  <Card title="First Command" icon="terminal" href="/cli/getting-started/first-command">
+    Run your first CLI command
+  </Card>
+  <Card title="Security Guide" icon="shield" href="/cli/guides/security">
+    Learn advanced security practices
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="CI/CD Integration" icon="infinity" href="/cli/guides/ci-cd-integration">
+    Set up automated deployments
+  </Card>
+  <Card title="Team Setup" icon="users" href="/cli/guides/team-configuration">
+    Configure authentication for teams
+  </Card>
+</CardGroup>
+
+---
+
+*Secure authentication is the foundation of CLI security. Choose the right method for your use case and follow security best practices to protect your Tolstoy resources.*

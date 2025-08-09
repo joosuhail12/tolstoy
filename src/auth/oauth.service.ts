@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import axios, { AxiosResponse } from 'axios';
 import { AuthConfigService } from './auth-config.service';
@@ -115,7 +115,9 @@ export class OAuthService {
       // Clean up state immediately
       await this.redisCache.del(stateKey);
 
-      const stateData: OAuthState = JSON.parse(stateDataStr);
+      const stateData: OAuthState = JSON.parse(
+        typeof stateDataStr === 'string' ? stateDataStr : JSON.stringify(stateDataStr),
+      );
       const { orgId, userId, toolKey } = stateData;
 
       // Validate state timestamp (additional security)
@@ -140,8 +142,8 @@ export class OAuthService {
         : new Date(Date.now() + 3600000); // Default 1 hour
 
       // We need to get the toolId from the loaded config since setUserCredentials expects toolId
-      // The orgConfig should include the tool relation with the actual ID
-      const toolId = orgConfig.tool?.id || orgConfig.toolId;
+      // The orgConfig already contains toolId
+      const toolId = orgConfig.toolId;
       if (!toolId) {
         throw new Error(`Could not determine toolId for ${toolKey}`);
       }
@@ -156,25 +158,8 @@ export class OAuthService {
         expiresAt,
       );
 
-      // Optionally sync to AWS Secrets Manager
-      try {
-        const secretName = `tolstoy/${orgId}/users/${userId}/tools/${toolKey}`;
-        const secretValue = {
-          accessToken: tokenResponse.access_token,
-          refreshToken: tokenResponse.refresh_token,
-          expiresAt: expiresAt.toISOString(),
-          scope: tokenResponse.scope,
-          tokenType: tokenResponse.token_type || 'Bearer',
-          createdAt: new Date().toISOString(),
-        };
-
-        // Note: This assumes AwsSecretsService is available through AuthConfigService
-        // The actual sync is handled by the AuthConfigService internally
-        this.logger.debug(`Credentials stored for ${toolKey} user ${userId}`);
-      } catch (syncError) {
-        this.logger.warn(`Failed to sync credentials to AWS Secrets Manager: ${syncError.message}`);
-        // Continue execution - don't fail the entire flow for sync issues
-      }
+      // Note: Credentials are stored in database, AWS Secrets Manager sync handled by AuthConfigService
+      this.logger.debug(`Credentials stored for ${toolKey} user ${userId}`);
 
       this.logger.log(`Successfully completed OAuth flow for ${toolKey} user ${userId}`);
 
@@ -271,7 +256,14 @@ export class OAuthService {
       throw new BadRequestException(`Missing redirectUri for OAuth2 configuration of ${toolKey}`);
     }
 
-    return config as OAuthConfig;
+    return {
+      clientId: config.clientId as string,
+      clientSecret: config.clientSecret as string,
+      redirectUri: config.redirectUri as string,
+      scope: config.scope as string | undefined,
+      authorizeUrl: config.authorizeUrl as string | undefined,
+      tokenUrl: config.tokenUrl as string | undefined,
+    };
   }
 
   /**

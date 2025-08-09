@@ -291,6 +291,9 @@ describe('Tolstoy Smoke Tests', () => {
   describe('Template Import Workflow', () => {
     it('can list available templates via CLI', async () => {
       try {
+        // Check if CLI is available first
+        const cliPath = process.env.CLI_PATH || 'npx tolstoy';
+        
         const cliEnv = {
           ...process.env,
           SMOKE_TEST: '1',
@@ -298,9 +301,20 @@ describe('Tolstoy Smoke Tests', () => {
           TOLSTOY_API_KEY: API_KEY,
         };
 
-        // This test assumes CLI is available in PATH or can be invoked
-        // In practice, you may need to adjust the path to the CLI executable
-        const result = execSync('npx tolstoy templates list --json', {
+        // Test if CLI is accessible
+        try {
+          execSync(`${cliPath} --version`, { 
+            env: cliEnv, 
+            encoding: 'utf-8',
+            timeout: 10000,
+          });
+        } catch (versionError) {
+          console.warn('CLI not accessible, skipping template tests');
+          pending('CLI not available in smoke test environment');
+          return;
+        }
+
+        const result = execSync(`${cliPath} templates list --json`, {
           env: cliEnv,
           encoding: 'utf-8',
           timeout: 30000,
@@ -314,9 +328,9 @@ describe('Tolstoy Smoke Tests', () => {
         const helloWorldTemplate = templates.find((t: any) => t.name === 'Hello World');
         expect(helloWorldTemplate).toBeDefined();
       } catch (error) {
-        // If CLI is not available, mark as pending
-        console.warn('CLI not available for template testing:', error);
-        pending('CLI templates command not available in smoke test environment');
+        // If CLI is not available or commands fail, mark as pending
+        console.warn('CLI template testing failed:', error);
+        pending('CLI templates command not available or failed in smoke test environment');
       }
     });
 

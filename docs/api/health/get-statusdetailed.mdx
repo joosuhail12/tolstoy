@@ -1,3 +1,1366 @@
 ---
-openapi: get /status/detailed
+title: "Detailed System Status"
+openapi: "GET /status/detailed"
 ---
+
+# Detailed System Status
+
+Get comprehensive system health information including detailed metrics, historical data, and diagnostic information. This endpoint provides in-depth analysis of system components, performance trends, and operational insights for advanced monitoring and troubleshooting.
+
+<RequestExample>
+
+```bash cURL
+curl -X GET "https://tolstoy.getpullse.com/status/detailed" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json"
+```
+
+```typescript TypeScript
+interface DetailedSystemStatus {
+  status: 'operational' | 'degraded' | 'maintenance' | 'outage';
+  version: string;
+  uptime: number;
+  timestamp: string;
+  services: {
+    [key: string]: ServiceDetail;
+  };
+  performance: PerformanceMetrics;
+  system_metrics: SystemMetrics;
+  historical_data: HistoricalData;
+  capacity_metrics: CapacityMetrics;
+  dependencies: DependencyHealth[];
+}
+
+interface ServiceDetail {
+  status: 'healthy' | 'unhealthy' | 'unknown' | 'maintenance';
+  response_time_ms: number;
+  last_check: string;
+  uptime_percentage: number;
+  error?: string;
+  version?: string;
+  configuration?: Record<string, any>;
+  health_checks: HealthCheck[];
+}
+
+const getDetailedStatus = async () => {
+  const response = await fetch('https://tolstoy.getpullse.com/status/detailed', {
+    method: 'GET',
+    headers: {
+      'x-org-id': 'org_1234567890abcdef',
+      'x-user-id': 'user_abcdef1234567890',
+      'Content-Type': 'application/json'
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  return response.json() as DetailedSystemStatus;
+};
+
+// Comprehensive status monitoring
+const monitorDetailedStatus = async () => {
+  try {
+    const status = await getDetailedStatus();
+    
+    console.log(`=== TOLSTOY SYSTEM STATUS REPORT ===`);
+    console.log(`Status: ${status.status.toUpperCase()}`);
+    console.log(`Version: ${status.version}`);
+    console.log(`Uptime: ${Math.floor(status.uptime / 86400)} days, ${Math.floor((status.uptime % 86400) / 3600)} hours`);
+    
+    // Performance overview
+    console.log(`\n📊 PERFORMANCE METRICS:`);
+    console.log(`Response Time: ${status.performance.avg_response_time_ms}ms`);
+    console.log(`Request Rate: ${status.performance.requests_per_minute}/min`);
+    console.log(`Error Rate: ${(status.performance.error_rate * 100).toFixed(3)}%`);
+    console.log(`Active Workflows: ${status.performance.active_workflows}`);
+    
+    // Service health detailed analysis
+    console.log(`\n🔧 SERVICE HEALTH:`);
+    Object.entries(status.services).forEach(([name, service]) => {
+      const healthIcon = service.status === 'healthy' ? '✅' : 
+                        service.status === 'unhealthy' ? '❌' : 
+                        service.status === 'maintenance' ? '🔧' : '⚠️';
+      
+      console.log(`${healthIcon} ${name}:`);
+      console.log(`  Status: ${service.status}`);
+      console.log(`  Response Time: ${service.response_time_ms}ms`);
+      console.log(`  Uptime: ${service.uptime_percentage.toFixed(2)}%`);
+      
+      if (service.error) {
+        console.log(`  Error: ${service.error}`);
+      }
+      
+      if (service.health_checks.length > 0) {
+        console.log(`  Health Checks: ${service.health_checks.length} configured`);
+      }
+    });
+    
+    // System resource analysis
+    console.log(`\n💻 SYSTEM RESOURCES:`);
+    const metrics = status.system_metrics;
+    console.log(`Memory: ${metrics.memory_usage_percent.toFixed(1)}%`);
+    console.log(`CPU: ${metrics.cpu_usage_percent.toFixed(1)}%`);
+    console.log(`Disk: ${metrics.disk_usage_percent.toFixed(1)}%`);
+    console.log(`Connections: ${metrics.active_connections}`);
+    
+    // Capacity analysis
+    if (status.capacity_metrics) {
+      console.log(`\n⚡ CAPACITY ANALYSIS:`);
+      console.log(`Workflow Capacity: ${status.capacity_metrics.workflow_capacity_used}/${status.capacity_metrics.workflow_capacity_total} (${((status.capacity_metrics.workflow_capacity_used / status.capacity_metrics.workflow_capacity_total) * 100).toFixed(1)}%)`);
+      console.log(`Queue Capacity: ${status.capacity_metrics.queue_depth}/${status.capacity_metrics.queue_capacity} (${((status.capacity_metrics.queue_depth / status.capacity_metrics.queue_capacity) * 100).toFixed(1)}%)`);
+    }
+    
+    // Historical trends
+    if (status.historical_data) {
+      console.log(`\n📈 TRENDS (Last 24h):`);
+      const trend = status.historical_data.last_24h;
+      console.log(`Avg Response Time: ${trend.avg_response_time_ms}ms`);
+      console.log(`Peak Response Time: ${trend.peak_response_time_ms}ms`);
+      console.log(`Total Requests: ${trend.total_requests.toLocaleString()}`);
+      console.log(`Success Rate: ${(trend.success_rate * 100).toFixed(2)}%`);
+    }
+    
+    // Issue detection
+    const issues = detectIssues(status);
+    if (issues.length > 0) {
+      console.log(`\n🚨 DETECTED ISSUES:`);
+      issues.forEach(issue => {
+        console.log(`- ${issue.severity.toUpperCase()}: ${issue.message}`);
+      });
+    }
+    
+    return status;
+  } catch (error) {
+    console.error('Failed to get detailed status:', error);
+    throw error;
+  }
+};
+
+// Issue detection logic
+const detectIssues = (status: DetailedSystemStatus) => {
+  const issues: Array<{severity: string, message: string}> = [];
+  
+  // Check overall system status
+  if (status.status === 'outage') {
+    issues.push({severity: 'critical', message: 'System is experiencing an outage'});
+  } else if (status.status === 'degraded') {
+    issues.push({severity: 'warning', message: 'System performance is degraded'});
+  }
+  
+  // Check individual services
+  Object.entries(status.services).forEach(([name, service]) => {
+    if (service.status === 'unhealthy') {
+      issues.push({severity: 'critical', message: `Service ${name} is unhealthy: ${service.error || 'Unknown error'}`});
+    }
+    if (service.uptime_percentage < 99) {
+      issues.push({severity: 'warning', message: `Service ${name} uptime is ${service.uptime_percentage.toFixed(2)}%`});
+    }
+    if (service.response_time_ms > 2000) {
+      issues.push({severity: 'warning', message: `Service ${name} response time is high: ${service.response_time_ms}ms`});
+    }
+  });
+  
+  // Check system resources
+  const metrics = status.system_metrics;
+  if (metrics.memory_usage_percent > 90) {
+    issues.push({severity: 'critical', message: `High memory usage: ${metrics.memory_usage_percent.toFixed(1)}%`});
+  } else if (metrics.memory_usage_percent > 80) {
+    issues.push({severity: 'warning', message: `Memory usage is high: ${metrics.memory_usage_percent.toFixed(1)}%`});
+  }
+  
+  if (metrics.cpu_usage_percent > 90) {
+    issues.push({severity: 'critical', message: `High CPU usage: ${metrics.cpu_usage_percent.toFixed(1)}%`});
+  }
+  
+  // Check performance metrics
+  if (status.performance.error_rate > 0.05) {
+    issues.push({severity: 'critical', message: `High error rate: ${(status.performance.error_rate * 100).toFixed(2)}%`});
+  }
+  
+  if (status.performance.avg_response_time_ms > 2000) {
+    issues.push({severity: 'warning', message: `Slow average response time: ${status.performance.avg_response_time_ms}ms`});
+  }
+  
+  return issues;
+};
+
+// Run detailed monitoring
+setInterval(monitorDetailedStatus, 300000); // Every 5 minutes
+```
+
+```python Python
+import requests
+import json
+import time
+from typing import Dict, Any, List, Optional
+from datetime import datetime, timezone
+import matplotlib.pyplot as plt
+import pandas as pd
+
+class DetailedStatusAnalyzer:
+    def __init__(self, org_id: str, user_id: str, base_url: str = "https://tolstoy.getpullse.com"):
+        self.org_id = org_id
+        self.user_id = user_id
+        self.base_url = base_url
+        self.headers = {
+            'x-org-id': org_id,
+            'x-user-id': user_id,
+            'Content-Type': 'application/json'
+        }
+        self.status_history = []
+        
+    def get_detailed_status(self) -> Dict[str, Any]:
+        """Get comprehensive system status information."""
+        try:
+            response = requests.get(
+                f"{self.base_url}/status/detailed",
+                headers=self.headers,
+                timeout=15
+            )
+            response.raise_for_status()
+            
+            status = response.json()
+            status['retrieved_at'] = datetime.now(timezone.utc).isoformat()
+            
+            # Store in history for trend analysis
+            self.status_history.append(status)
+            if len(self.status_history) > 100:  # Keep last 100 records
+                self.status_history.pop(0)
+                
+            return status
+            
+        except requests.RequestException as e:
+            return {
+                'error': str(e),
+                'retrieved_at': datetime.now(timezone.utc).isoformat(),
+                'status': 'unknown'
+            }
+    
+    def analyze_system_health(self, status: Dict[str, Any]) -> Dict[str, Any]:
+        """Perform comprehensive system health analysis."""
+        if 'error' in status:
+            return {
+                'overall_health': 'critical',
+                'score': 0,
+                'issues': ['Unable to retrieve system status'],
+                'recommendations': ['Check network connectivity and API availability']
+            }
+        
+        health_analysis = {
+            'overall_health': 'excellent',
+            'score': 100,
+            'issues': [],
+            'warnings': [],
+            'recommendations': [],
+            'service_analysis': {},
+            'performance_analysis': {},
+            'resource_analysis': {}
+        }
+        
+        # Analyze overall system status
+        system_status = status.get('status', 'unknown')
+        if system_status == 'outage':
+            health_analysis['overall_health'] = 'critical'
+            health_analysis['score'] -= 50
+            health_analysis['issues'].append('System is experiencing an outage')
+        elif system_status == 'degraded':
+            health_analysis['overall_health'] = 'degraded'
+            health_analysis['score'] -= 25
+            health_analysis['warnings'].append('System performance is degraded')
+        elif system_status == 'maintenance':
+            health_analysis['overall_health'] = 'maintenance'
+            health_analysis['score'] -= 10
+            health_analysis['warnings'].append('System is under maintenance')
+        
+        # Analyze individual services
+        services = status.get('services', {})
+        unhealthy_services = []
+        degraded_services = []
+        
+        for service_name, service_data in services.items():
+            service_status = service_data.get('status', 'unknown')
+            response_time = service_data.get('response_time_ms', 0)
+            uptime = service_data.get('uptime_percentage', 100)
+            
+            service_score = 100
+            service_issues = []
+            
+            if service_status == 'unhealthy':
+                unhealthy_services.append(service_name)
+                service_score -= 50
+                service_issues.append('Service is unhealthy')
+            elif service_status == 'unknown':
+                service_score -= 20
+                service_issues.append('Service status unknown')
+                
+            if response_time > 2000:
+                service_score -= 15
+                service_issues.append(f'High response time: {response_time}ms')
+            elif response_time > 1000:
+                service_score -= 5
+                service_issues.append(f'Elevated response time: {response_time}ms')
+                
+            if uptime < 99:
+                service_score -= 20
+                service_issues.append(f'Low uptime: {uptime:.2f}%')
+            elif uptime < 99.9:
+                service_score -= 10
+                service_issues.append(f'Uptime below target: {uptime:.2f}%')
+                
+            health_analysis['service_analysis'][service_name] = {
+                'score': max(0, service_score),
+                'issues': service_issues,
+                'status': service_status,
+                'response_time_ms': response_time,
+                'uptime_percentage': uptime
+            }
+        
+        if unhealthy_services:
+            health_analysis['score'] -= len(unhealthy_services) * 15
+            health_analysis['issues'].extend([f'Service {s} is unhealthy' for s in unhealthy_services])
+            
+        # Analyze performance metrics
+        performance = status.get('performance', {})
+        avg_response_time = performance.get('avg_response_time_ms', 0)
+        error_rate = performance.get('error_rate', 0)
+        requests_per_minute = performance.get('requests_per_minute', 0)
+        
+        health_analysis['performance_analysis'] = {
+            'avg_response_time_ms': avg_response_time,
+            'error_rate_percent': error_rate * 100,
+            'requests_per_minute': requests_per_minute
+        }
+        
+        if error_rate > 0.05:  # > 5% error rate
+            health_analysis['score'] -= 20
+            health_analysis['issues'].append(f'High error rate: {error_rate * 100:.2f}%')
+        elif error_rate > 0.01:  # > 1% error rate
+            health_analysis['score'] -= 10
+            health_analysis['warnings'].append(f'Elevated error rate: {error_rate * 100:.2f}%')
+            
+        if avg_response_time > 2000:
+            health_analysis['score'] -= 15
+            health_analysis['issues'].append(f'Slow response time: {avg_response_time}ms')
+        elif avg_response_time > 1000:
+            health_analysis['score'] -= 5
+            health_analysis['warnings'].append(f'Elevated response time: {avg_response_time}ms')
+        
+        # Analyze system resources
+        system_metrics = status.get('system_metrics', {})
+        memory_usage = system_metrics.get('memory_usage_percent', 0)
+        cpu_usage = system_metrics.get('cpu_usage_percent', 0)
+        disk_usage = system_metrics.get('disk_usage_percent', 0)
+        
+        health_analysis['resource_analysis'] = {
+            'memory_usage_percent': memory_usage,
+            'cpu_usage_percent': cpu_usage,
+            'disk_usage_percent': disk_usage
+        }
+        
+        if memory_usage > 90:
+            health_analysis['score'] -= 15
+            health_analysis['issues'].append(f'Critical memory usage: {memory_usage:.1f}%')
+        elif memory_usage > 80:
+            health_analysis['score'] -= 8
+            health_analysis['warnings'].append(f'High memory usage: {memory_usage:.1f}%')
+            
+        if cpu_usage > 90:
+            health_analysis['score'] -= 15
+            health_analysis['issues'].append(f'Critical CPU usage: {cpu_usage:.1f}%')
+        elif cpu_usage > 80:
+            health_analysis['score'] -= 8
+            health_analysis['warnings'].append(f'High CPU usage: {cpu_usage:.1f}%')
+            
+        if disk_usage > 95:
+            health_analysis['score'] -= 10
+            health_analysis['issues'].append(f'Critical disk usage: {disk_usage:.1f}%')
+        elif disk_usage > 85:
+            health_analysis['score'] -= 5
+            health_analysis['warnings'].append(f'High disk usage: {disk_usage:.1f}%')
+        
+        # Determine overall health based on score
+        if health_analysis['score'] >= 95:
+            health_analysis['overall_health'] = 'excellent'
+        elif health_analysis['score'] >= 85:
+            health_analysis['overall_health'] = 'good'
+        elif health_analysis['score'] >= 70:
+            health_analysis['overall_health'] = 'fair'
+        elif health_analysis['score'] >= 50:
+            health_analysis['overall_health'] = 'poor'
+        else:
+            health_analysis['overall_health'] = 'critical'
+            
+        # Generate recommendations
+        if health_analysis['score'] < 90:
+            health_analysis['recommendations'].append('System performance requires attention')
+            
+        if len(unhealthy_services) > 0:
+            health_analysis['recommendations'].append(f'Investigate and resolve issues with {len(unhealthy_services)} unhealthy services')
+            
+        if memory_usage > 80:
+            health_analysis['recommendations'].append('Consider increasing memory allocation or optimizing memory usage')
+            
+        if cpu_usage > 80:
+            health_analysis['recommendations'].append('Investigate CPU intensive processes or consider scaling')
+            
+        if avg_response_time > 1000:
+            health_analysis['recommendations'].append('Optimize system performance to reduce response times')
+            
+        return health_analysis
+    
+    def generate_trend_analysis(self, hours: int = 24) -> Dict[str, Any]:
+        """Generate trend analysis from historical status data."""
+        if len(self.status_history) < 2:
+            return {'error': 'Insufficient historical data for trend analysis'}
+        
+        cutoff_time = datetime.now(timezone.utc).timestamp() - (hours * 3600)
+        recent_statuses = [
+            status for status in self.status_history 
+            if datetime.fromisoformat(status['retrieved_at'].replace('Z', '+00:00')).timestamp() > cutoff_time
+        ]
+        
+        if len(recent_statuses) < 2:
+            return {'error': f'Insufficient data for {hours}h trend analysis'}
+        
+        # Extract metrics for trend analysis
+        timestamps = [datetime.fromisoformat(s['retrieved_at'].replace('Z', '+00:00')) for s in recent_statuses]
+        response_times = [s.get('performance', {}).get('avg_response_time_ms', 0) for s in recent_statuses]
+        error_rates = [s.get('performance', {}).get('error_rate', 0) for s in recent_statuses]
+        memory_usage = [s.get('system_metrics', {}).get('memory_usage_percent', 0) for s in recent_statuses]
+        cpu_usage = [s.get('system_metrics', {}).get('cpu_usage_percent', 0) for s in recent_statuses]
+        
+        trend_analysis = {
+            'timeframe_hours': hours,
+            'data_points': len(recent_statuses),
+            'response_time_trend': {
+                'current': response_times[-1] if response_times else 0,
+                'average': sum(response_times) / len(response_times) if response_times else 0,
+                'min': min(response_times) if response_times else 0,
+                'max': max(response_times) if response_times else 0,
+                'trend': 'stable'
+            },
+            'error_rate_trend': {
+                'current': error_rates[-1] * 100 if error_rates else 0,
+                'average': (sum(error_rates) / len(error_rates)) * 100 if error_rates else 0,
+                'trend': 'stable'
+            },
+            'resource_trends': {
+                'memory': {
+                    'current': memory_usage[-1] if memory_usage else 0,
+                    'average': sum(memory_usage) / len(memory_usage) if memory_usage else 0,
+                    'trend': 'stable'
+                },
+                'cpu': {
+                    'current': cpu_usage[-1] if cpu_usage else 0,
+                    'average': sum(cpu_usage) / len(cpu_usage) if cpu_usage else 0,
+                    'trend': 'stable'
+                }
+            }
+        }
+        
+        # Determine trends
+        if len(response_times) >= 5:
+            recent_avg = sum(response_times[-3:]) / 3
+            earlier_avg = sum(response_times[:3]) / 3
+            if recent_avg > earlier_avg * 1.2:
+                trend_analysis['response_time_trend']['trend'] = 'increasing'
+            elif recent_avg < earlier_avg * 0.8:
+                trend_analysis['response_time_trend']['trend'] = 'decreasing'
+        
+        return trend_analysis
+    
+    def export_comprehensive_report(self, filename: str = None) -> str:
+        """Generate and export a comprehensive system report."""
+        status = self.get_detailed_status()
+        health_analysis = self.analyze_system_health(status)
+        trend_analysis = self.generate_trend_analysis(24)
+        
+        if filename is None:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"tolstoy_comprehensive_report_{timestamp}.json"
+        
+        report = {
+            'report_metadata': {
+                'generated_at': datetime.now(timezone.utc).isoformat(),
+                'report_type': 'comprehensive_system_analysis',
+                'version': '2.0',
+                'analyst': 'Tolstoy Status Monitor'
+            },
+            'system_status': status,
+            'health_analysis': health_analysis,
+            'trend_analysis': trend_analysis,
+            'summary': {
+                'overall_health': health_analysis.get('overall_health', 'unknown'),
+                'health_score': health_analysis.get('score', 0),
+                'critical_issues': len(health_analysis.get('issues', [])),
+                'warnings': len(health_analysis.get('warnings', [])),
+                'recommendations': len(health_analysis.get('recommendations', []))
+            }
+        }
+        
+        with open(filename, 'w') as f:
+            json.dump(report, f, indent=2)
+        
+        print(f"Comprehensive system report exported to: {filename}")
+        return filename
+
+# Usage examples
+analyzer = DetailedStatusAnalyzer('org_1234567890abcdef', 'user_abcdef1234567890')
+
+# Get detailed status and analysis
+status = analyzer.get_detailed_status()
+health = analyzer.analyze_system_health(status)
+
+print(f"System Health Score: {health['score']}/100")
+print(f"Overall Health: {health['overall_health'].upper()}")
+
+if health['issues']:
+    print("\n🚨 Critical Issues:")
+    for issue in health['issues']:
+        print(f"  - {issue}")
+
+if health['warnings']:
+    print("\n⚠️  Warnings:")
+    for warning in health['warnings']:
+        print(f"  - {warning}")
+
+if health['recommendations']:
+    print("\n💡 Recommendations:")
+    for rec in health['recommendations']:
+        print(f"  - {rec}")
+
+# Generate comprehensive report
+# report_file = analyzer.export_comprehensive_report()
+```
+
+```javascript Node.js
+const axios = require('axios');
+const fs = require('fs').promises;
+
+class ComprehensiveStatusMonitor {
+  constructor(orgId, userId, baseUrl = 'https://tolstoy.getpullse.com') {
+    this.orgId = orgId;
+    this.userId = userId;
+    this.baseUrl = baseUrl;
+    this.headers = {
+      'x-org-id': orgId,
+      'x-user-id': userId,
+      'Content-Type': 'application/json'
+    };
+    this.statusHistory = [];
+    this.alertThresholds = {
+      responseTime: 2000,
+      errorRate: 0.05,
+      memoryUsage: 85,
+      cpuUsage: 85,
+      diskUsage: 90
+    };
+  }
+
+  async getDetailedStatus() {
+    try {
+      const response = await axios.get(`${this.baseUrl}/status/detailed`, {
+        headers: this.headers,
+        timeout: 15000
+      });
+
+      const status = {
+        ...response.data,
+        retrieved_at: new Date().toISOString()
+      };
+
+      // Add to history for trend analysis
+      this.statusHistory.unshift(status);
+      if (this.statusHistory.length > 200) {
+        this.statusHistory.pop();
+      }
+
+      return status;
+
+    } catch (error) {
+      return {
+        error: error.message,
+        retrieved_at: new Date().toISOString(),
+        status: 'unknown'
+      };
+    }
+  }
+
+  analyzeSystemHealth(status) {
+    const analysis = {
+      overall_health: 'excellent',
+      health_score: 100,
+      issues: [],
+      warnings: [],
+      recommendations: [],
+      service_health: {},
+      performance_analysis: {},
+      resource_analysis: {},
+      capacity_analysis: {}
+    };
+
+    if (status.error) {
+      analysis.overall_health = 'critical';
+      analysis.health_score = 0;
+      analysis.issues.push('Unable to retrieve system status');
+      return analysis;
+    }
+
+    // System status analysis
+    switch (status.status) {
+      case 'outage':
+        analysis.health_score -= 50;
+        analysis.issues.push('System is experiencing an outage');
+        break;
+      case 'degraded':
+        analysis.health_score -= 25;
+        analysis.warnings.push('System performance is degraded');
+        break;
+      case 'maintenance':
+        analysis.health_score -= 10;
+        analysis.warnings.push('System is under scheduled maintenance');
+        break;
+    }
+
+    // Service health analysis
+    const services = status.services || {};
+    Object.entries(services).forEach(([serviceName, serviceData]) => {
+      const serviceAnalysis = this.analyzeService(serviceName, serviceData);
+      analysis.service_health[serviceName] = serviceAnalysis;
+      
+      analysis.health_score -= serviceAnalysis.score_deduction;
+      analysis.issues.push(...serviceAnalysis.issues);
+      analysis.warnings.push(...serviceAnalysis.warnings);
+    });
+
+    // Performance analysis
+    const performance = status.performance || {};
+    const perfAnalysis = this.analyzePerformance(performance);
+    analysis.performance_analysis = perfAnalysis;
+    analysis.health_score -= perfAnalysis.score_deduction;
+    analysis.issues.push(...perfAnalysis.issues);
+    analysis.warnings.push(...perfAnalysis.warnings);
+
+    // Resource analysis
+    const systemMetrics = status.system_metrics || {};
+    const resourceAnalysis = this.analyzeResources(systemMetrics);
+    analysis.resource_analysis = resourceAnalysis;
+    analysis.health_score -= resourceAnalysis.score_deduction;
+    analysis.issues.push(...resourceAnalysis.issues);
+    analysis.warnings.push(...resourceAnalysis.warnings);
+
+    // Capacity analysis
+    if (status.capacity_metrics) {
+      const capacityAnalysis = this.analyzeCapacity(status.capacity_metrics);
+      analysis.capacity_analysis = capacityAnalysis;
+      analysis.health_score -= capacityAnalysis.score_deduction;
+      analysis.issues.push(...capacityAnalysis.issues);
+      analysis.warnings.push(...capacityAnalysis.warnings);
+    }
+
+    // Determine overall health based on score
+    analysis.health_score = Math.max(0, analysis.health_score);
+    
+    if (analysis.health_score >= 95) {
+      analysis.overall_health = 'excellent';
+    } else if (analysis.health_score >= 85) {
+      analysis.overall_health = 'good';
+    } else if (analysis.health_score >= 70) {
+      analysis.overall_health = 'fair';
+    } else if (analysis.health_score >= 50) {
+      analysis.overall_health = 'poor';
+    } else {
+      analysis.overall_health = 'critical';
+    }
+
+    // Generate recommendations
+    analysis.recommendations = this.generateRecommendations(analysis);
+
+    return analysis;
+  }
+
+  analyzeService(serviceName, serviceData) {
+    const analysis = {
+      status: serviceData.status,
+      score_deduction: 0,
+      issues: [],
+      warnings: [],
+      metrics: {
+        response_time: serviceData.response_time_ms || 0,
+        uptime: serviceData.uptime_percentage || 100
+      }
+    };
+
+    if (serviceData.status === 'unhealthy') {
+      analysis.score_deduction += 20;
+      analysis.issues.push(`${serviceName} is unhealthy${serviceData.error ? ': ' + serviceData.error : ''}`);
+    } else if (serviceData.status === 'unknown') {
+      analysis.score_deduction += 10;
+      analysis.warnings.push(`${serviceName} status is unknown`);
+    }
+
+    if (serviceData.response_time_ms > 3000) {
+      analysis.score_deduction += 15;
+      analysis.issues.push(`${serviceName} has critical response time: ${serviceData.response_time_ms}ms`);
+    } else if (serviceData.response_time_ms > 1000) {
+      analysis.score_deduction += 5;
+      analysis.warnings.push(`${serviceName} has elevated response time: ${serviceData.response_time_ms}ms`);
+    }
+
+    if (serviceData.uptime_percentage < 99) {
+      analysis.score_deduction += 15;
+      analysis.issues.push(`${serviceName} uptime is low: ${serviceData.uptime_percentage.toFixed(2)}%`);
+    } else if (serviceData.uptime_percentage < 99.9) {
+      analysis.score_deduction += 5;
+      analysis.warnings.push(`${serviceName} uptime below target: ${serviceData.uptime_percentage.toFixed(2)}%`);
+    }
+
+    return analysis;
+  }
+
+  analyzePerformance(performance) {
+    const analysis = {
+      score_deduction: 0,
+      issues: [],
+      warnings: [],
+      metrics: {
+        avg_response_time: performance.avg_response_time_ms || 0,
+        error_rate: (performance.error_rate || 0) * 100,
+        request_rate: performance.requests_per_minute || 0,
+        active_workflows: performance.active_workflows || 0
+      }
+    };
+
+    const errorRate = performance.error_rate || 0;
+    if (errorRate > 0.1) {
+      analysis.score_deduction += 25;
+      analysis.issues.push(`Critical error rate: ${(errorRate * 100).toFixed(2)}%`);
+    } else if (errorRate > 0.05) {
+      analysis.score_deduction += 15;
+      analysis.issues.push(`High error rate: ${(errorRate * 100).toFixed(2)}%`);
+    } else if (errorRate > 0.01) {
+      analysis.score_deduction += 5;
+      analysis.warnings.push(`Elevated error rate: ${(errorRate * 100).toFixed(2)}%`);
+    }
+
+    const responseTime = performance.avg_response_time_ms || 0;
+    if (responseTime > 3000) {
+      analysis.score_deduction += 20;
+      analysis.issues.push(`Critical response time: ${responseTime}ms`);
+    } else if (responseTime > 1000) {
+      analysis.score_deduction += 10;
+      analysis.warnings.push(`Slow response time: ${responseTime}ms`);
+    }
+
+    return analysis;
+  }
+
+  analyzeResources(systemMetrics) {
+    const analysis = {
+      score_deduction: 0,
+      issues: [],
+      warnings: [],
+      metrics: {
+        memory_usage: systemMetrics.memory_usage_percent || 0,
+        cpu_usage: systemMetrics.cpu_usage_percent || 0,
+        disk_usage: systemMetrics.disk_usage_percent || 0,
+        connections: systemMetrics.active_connections || 0
+      }
+    };
+
+    const memory = systemMetrics.memory_usage_percent || 0;
+    if (memory > 95) {
+      analysis.score_deduction += 20;
+      analysis.issues.push(`Critical memory usage: ${memory.toFixed(1)}%`);
+    } else if (memory > 85) {
+      analysis.score_deduction += 10;
+      analysis.warnings.push(`High memory usage: ${memory.toFixed(1)}%`);
+    }
+
+    const cpu = systemMetrics.cpu_usage_percent || 0;
+    if (cpu > 95) {
+      analysis.score_deduction += 20;
+      analysis.issues.push(`Critical CPU usage: ${cpu.toFixed(1)}%`);
+    } else if (cpu > 85) {
+      analysis.score_deduction += 10;
+      analysis.warnings.push(`High CPU usage: ${cpu.toFixed(1)}%`);
+    }
+
+    const disk = systemMetrics.disk_usage_percent || 0;
+    if (disk > 95) {
+      analysis.score_deduction += 15;
+      analysis.issues.push(`Critical disk usage: ${disk.toFixed(1)}%`);
+    } else if (disk > 90) {
+      analysis.score_deduction += 8;
+      analysis.warnings.push(`High disk usage: ${disk.toFixed(1)}%`);
+    }
+
+    return analysis;
+  }
+
+  analyzeCapacity(capacityMetrics) {
+    const analysis = {
+      score_deduction: 0,
+      issues: [],
+      warnings: [],
+      metrics: capacityMetrics
+    };
+
+    const workflowUtilization = capacityMetrics.workflow_capacity_used / capacityMetrics.workflow_capacity_total;
+    if (workflowUtilization > 0.9) {
+      analysis.score_deduction += 15;
+      analysis.issues.push(`Workflow capacity critically high: ${(workflowUtilization * 100).toFixed(1)}%`);
+    } else if (workflowUtilization > 0.8) {
+      analysis.score_deduction += 8;
+      analysis.warnings.push(`Workflow capacity high: ${(workflowUtilization * 100).toFixed(1)}%`);
+    }
+
+    const queueUtilization = capacityMetrics.queue_depth / capacityMetrics.queue_capacity;
+    if (queueUtilization > 0.8) {
+      analysis.score_deduction += 10;
+      analysis.warnings.push(`Queue utilization high: ${(queueUtilization * 100).toFixed(1)}%`);
+    }
+
+    return analysis;
+  }
+
+  generateRecommendations(analysis) {
+    const recommendations = [];
+
+    if (analysis.health_score < 90) {
+      recommendations.push('System requires immediate attention to improve overall health');
+    }
+
+    if (analysis.issues.some(issue => issue.includes('memory'))) {
+      recommendations.push('Consider increasing memory allocation or optimizing memory-intensive processes');
+    }
+
+    if (analysis.issues.some(issue => issue.includes('CPU'))) {
+      recommendations.push('Investigate CPU-intensive processes and consider horizontal scaling');
+    }
+
+    if (analysis.issues.some(issue => issue.includes('response time'))) {
+      recommendations.push('Optimize application performance and database queries');
+    }
+
+    if (analysis.issues.some(issue => issue.includes('error rate'))) {
+      recommendations.push('Investigate and fix root causes of application errors');
+    }
+
+    const unhealthyServices = Object.entries(analysis.service_health)
+      .filter(([, health]) => health.issues.length > 0)
+      .length;
+
+    if (unhealthyServices > 0) {
+      recommendations.push(`Investigate and restore ${unhealthyServices} unhealthy or degraded services`);
+    }
+
+    return recommendations;
+  }
+
+  async generateComprehensiveReport() {
+    const status = await this.getDetailedStatus();
+    const analysis = this.analyzeSystemHealth(status);
+    const trends = this.analyzeTrends();
+
+    const report = {
+      report_metadata: {
+        generated_at: new Date().toISOString(),
+        report_type: 'comprehensive_system_health',
+        version: '2.0',
+        monitoring_period_hours: 24
+      },
+      executive_summary: {
+        overall_health: analysis.overall_health,
+        health_score: analysis.health_score,
+        system_status: status.status || 'unknown',
+        critical_issues: analysis.issues.length,
+        warnings: analysis.warnings.length,
+        uptime: status.uptime || 0,
+        version: status.version || 'unknown'
+      },
+      detailed_status: status,
+      health_analysis: analysis,
+      trend_analysis: trends,
+      action_items: {
+        immediate: analysis.issues,
+        planned: analysis.warnings,
+        recommendations: analysis.recommendations
+      }
+    };
+
+    return report;
+  }
+
+  analyzeTrends() {
+    if (this.statusHistory.length < 5) {
+      return { error: 'Insufficient data for trend analysis' };
+    }
+
+    const recent = this.statusHistory.slice(0, 10);
+    const responseTimes = recent.map(s => s.performance?.avg_response_time_ms || 0);
+    const errorRates = recent.map(s => s.performance?.error_rate || 0);
+    const memoryUsage = recent.map(s => s.system_metrics?.memory_usage_percent || 0);
+
+    return {
+      response_time_trend: this.calculateTrend(responseTimes),
+      error_rate_trend: this.calculateTrend(errorRates),
+      memory_usage_trend: this.calculateTrend(memoryUsage),
+      data_points: recent.length
+    };
+  }
+
+  calculateTrend(values) {
+    if (values.length < 3) return 'insufficient_data';
+    
+    const recent = values.slice(0, Math.floor(values.length / 2));
+    const older = values.slice(Math.floor(values.length / 2));
+    
+    const recentAvg = recent.reduce((a, b) => a + b, 0) / recent.length;
+    const olderAvg = older.reduce((a, b) => a + b, 0) / older.length;
+    
+    const change = ((recentAvg - olderAvg) / olderAvg) * 100;
+    
+    if (Math.abs(change) < 5) return 'stable';
+    return change > 0 ? 'increasing' : 'decreasing';
+  }
+
+  async exportReport(filename) {
+    const report = await this.generateComprehensiveReport();
+    
+    if (!filename) {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      filename = `tolstoy-system-report-${timestamp}.json`;
+    }
+
+    await fs.writeFile(filename, JSON.stringify(report, null, 2));
+    console.log(`Comprehensive report exported to: ${filename}`);
+    
+    return filename;
+  }
+}
+
+// Usage examples
+const monitor = new ComprehensiveStatusMonitor('org_1234567890abcdef', 'user_abcdef1234567890');
+
+// Generate and display comprehensive analysis
+async function runHealthCheck() {
+  console.log('🔍 Running comprehensive health check...\n');
+  
+  const status = await monitor.getDetailedStatus();
+  const analysis = monitor.analyzeSystemHealth(status);
+  
+  console.log('=== TOLSTOY SYSTEM HEALTH REPORT ===');
+  console.log(`Overall Health: ${analysis.overall_health.toUpperCase()}`);
+  console.log(`Health Score: ${analysis.health_score}/100`);
+  console.log(`System Status: ${status.status || 'Unknown'}`);
+  
+  if (analysis.issues.length > 0) {
+    console.log('\n🚨 CRITICAL ISSUES:');
+    analysis.issues.forEach(issue => console.log(`  - ${issue}`));
+  }
+  
+  if (analysis.warnings.length > 0) {
+    console.log('\n⚠️  WARNINGS:');
+    analysis.warnings.forEach(warning => console.log(`  - ${warning}`));
+  }
+  
+  if (analysis.recommendations.length > 0) {
+    console.log('\n💡 RECOMMENDATIONS:');
+    analysis.recommendations.forEach(rec => console.log(`  - ${rec}`));
+  }
+  
+  // Export comprehensive report
+  const reportFile = await monitor.exportReport();
+  console.log(`\n📊 Full report saved: ${reportFile}`);
+}
+
+// Run health check
+runHealthCheck().catch(console.error);
+```
+
+</RequestExample>
+
+## Response
+
+<ResponseExample>
+
+```json Comprehensive Status Response
+{
+  "status": "operational",
+  "version": "2.1.4",
+  "uptime": 2847691,
+  "timestamp": "2024-01-15T14:30:00Z",
+  "services": {
+    "database": {
+      "status": "healthy",
+      "response_time_ms": 45,
+      "last_check": "2024-01-15T14:29:55Z",
+      "uptime_percentage": 99.98,
+      "version": "PostgreSQL 14.9",
+      "health_checks": [
+        {
+          "name": "connection_pool",
+          "status": "healthy",
+          "details": "32/100 connections active"
+        },
+        {
+          "name": "query_performance",
+          "status": "healthy",
+          "details": "Avg query time: 12ms"
+        },
+        {
+          "name": "replication_lag",
+          "status": "healthy",
+          "details": "Lag: 0.2s"
+        }
+      ]
+    },
+    "redis": {
+      "status": "healthy",
+      "response_time_ms": 12,
+      "last_check": "2024-01-15T14:29:55Z",
+      "uptime_percentage": 99.99,
+      "version": "Redis 7.0.8",
+      "health_checks": [
+        {
+          "name": "memory_usage",
+          "status": "healthy",
+          "details": "2.1GB/8GB used"
+        },
+        {
+          "name": "key_expiration",
+          "status": "healthy",
+          "details": "Normal expiration rate"
+        }
+      ]
+    },
+    "workflow_engine": {
+      "status": "healthy",
+      "response_time_ms": 156,
+      "last_check": "2024-01-15T14:29:55Z",
+      "uptime_percentage": 99.95,
+      "version": "2.1.4",
+      "configuration": {
+        "max_concurrent_workflows": 1000,
+        "queue_size": 5000,
+        "timeout_seconds": 3600
+      },
+      "health_checks": [
+        {
+          "name": "queue_health",
+          "status": "healthy",
+          "details": "23 workflows queued"
+        },
+        {
+          "name": "worker_processes",
+          "status": "healthy",
+          "details": "12/15 workers active"
+        },
+        {
+          "name": "execution_performance",
+          "status": "healthy",
+          "details": "Avg execution time: 2.3s"
+        }
+      ]
+    }
+  },
+  "performance": {
+    "avg_response_time_ms": 234,
+    "requests_per_minute": 1847,
+    "error_rate": 0.0023,
+    "active_workflows": 145,
+    "queue_depth": 23,
+    "throughput_metrics": {
+      "workflows_per_hour": 2156,
+      "api_calls_per_hour": 110820,
+      "webhook_deliveries_per_hour": 4567
+    }
+  },
+  "system_metrics": {
+    "memory_usage_percent": 68.5,
+    "cpu_usage_percent": 42.3,
+    "disk_usage_percent": 31.2,
+    "active_connections": 256,
+    "network_io": {
+      "bytes_in_per_sec": 1234567,
+      "bytes_out_per_sec": 2345678
+    },
+    "gc_metrics": {
+      "collections_per_minute": 12,
+      "avg_gc_time_ms": 45
+    }
+  },
+  "historical_data": {
+    "last_24h": {
+      "avg_response_time_ms": 245,
+      "peak_response_time_ms": 1234,
+      "min_response_time_ms": 89,
+      "total_requests": 2654321,
+      "success_rate": 0.9977,
+      "uptime_percentage": 99.98
+    },
+    "last_7d": {
+      "avg_response_time_ms": 267,
+      "peak_response_time_ms": 2345,
+      "total_requests": 18580247,
+      "success_rate": 0.9975,
+      "uptime_percentage": 99.96
+    }
+  },
+  "capacity_metrics": {
+    "workflow_capacity_total": 2000,
+    "workflow_capacity_used": 145,
+    "queue_capacity": 5000,
+    "queue_depth": 23,
+    "connection_pool_total": 500,
+    "connection_pool_used": 256,
+    "storage_capacity_gb": 1000,
+    "storage_used_gb": 312
+  },
+  "dependencies": [
+    {
+      "name": "GitHub API",
+      "status": "healthy",
+      "response_time_ms": 234,
+      "last_check": "2024-01-15T14:29:50Z",
+      "url": "https://api.github.com"
+    },
+    {
+      "name": "Slack API",
+      "status": "healthy", 
+      "response_time_ms": 123,
+      "last_check": "2024-01-15T14:29:50Z",
+      "url": "https://slack.com/api"
+    },
+    {
+      "name": "AWS Services",
+      "status": "healthy",
+      "response_time_ms": 89,
+      "last_check": "2024-01-15T14:29:50Z",
+      "url": "https://s3.amazonaws.com"
+    }
+  ],
+  "security_metrics": {
+    "failed_auth_attempts_per_hour": 23,
+    "suspicious_activity_score": 0.02,
+    "rate_limiting_triggered": 156,
+    "last_security_scan": "2024-01-15T06:00:00Z"
+  }
+}
+```
+
+```json Degraded System Response
+{
+  "status": "degraded",
+  "version": "2.1.4",
+  "uptime": 2847691,
+  "timestamp": "2024-01-15T14:30:00Z",
+  "services": {
+    "database": {
+      "status": "healthy",
+      "response_time_ms": 45,
+      "last_check": "2024-01-15T14:29:55Z",
+      "uptime_percentage": 99.98
+    },
+    "workflow_engine": {
+      "status": "unhealthy",
+      "response_time_ms": 3456,
+      "last_check": "2024-01-15T14:29:55Z",
+      "uptime_percentage": 98.23,
+      "error": "High memory usage causing processing delays",
+      "health_checks": [
+        {
+          "name": "memory_usage",
+          "status": "critical",
+          "details": "7.2GB/8GB used (90%)"
+        },
+        {
+          "name": "queue_health",
+          "status": "degraded",
+          "details": "234 workflows queued (queue backing up)"
+        }
+      ]
+    }
+  },
+  "performance": {
+    "avg_response_time_ms": 1245,
+    "requests_per_minute": 1234,
+    "error_rate": 0.0456,
+    "active_workflows": 234,
+    "queue_depth": 234
+  },
+  "system_metrics": {
+    "memory_usage_percent": 91.2,
+    "cpu_usage_percent": 85.9,
+    "disk_usage_percent": 31.2,
+    "active_connections": 456
+  },
+  "incidents": [
+    {
+      "id": "inc_20240115_002",
+      "title": "Workflow Engine Memory Pressure",
+      "status": "investigating",
+      "started_at": "2024-01-15T14:15:00Z",
+      "description": "High memory usage in workflow engine causing performance degradation",
+      "severity": "high",
+      "affected_services": ["workflow_engine"],
+      "updates": [
+        {
+          "timestamp": "2024-01-15T14:25:00Z",
+          "message": "Memory usage at 91%, implementing mitigation measures"
+        }
+      ]
+    }
+  ],
+  "alerts": [
+    {
+      "id": "alert_memory_high",
+      "severity": "warning",
+      "message": "System memory usage above 90%",
+      "triggered_at": "2024-01-15T14:20:00Z"
+    },
+    {
+      "id": "alert_response_time",
+      "severity": "warning", 
+      "message": "Average response time above threshold",
+      "triggered_at": "2024-01-15T14:22:00Z"
+    }
+  ]
+}
+```
+
+</ResponseExample>
+
+## Status Codes
+
+<ResponseField name="200" type="OK">
+Detailed status information retrieved successfully
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+Missing or invalid authentication credentials
+</ResponseField>
+
+<ResponseField name="403" type="Forbidden">
+Insufficient permissions to access detailed status
+</ResponseField>
+
+<ResponseField name="503" type="Service Unavailable">
+System is experiencing critical issues
+</ResponseField>
+
+## Response Fields
+
+<ResponseField name="status" type="string">
+Overall system status: `operational`, `degraded`, `maintenance`, or `outage`
+</ResponseField>
+
+<ResponseField name="services" type="object">
+Comprehensive health information for each system service
+  <Expandable title="Detailed Service Fields">
+    <ResponseField name="health_checks" type="object[]">
+      Individual health check results for the service
+    </ResponseField>
+    <ResponseField name="version" type="string">
+      Version of the service component
+    </ResponseField>
+    <ResponseField name="configuration" type="object">
+      Service configuration parameters
+    </ResponseField>
+    <ResponseField name="uptime_percentage" type="number">
+      Service uptime percentage over recent period
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="performance" type="object">
+Extended performance metrics
+  <Expandable title="Performance Details">
+    <ResponseField name="throughput_metrics" type="object">
+      Throughput measurements for different operation types
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="system_metrics" type="object">
+Comprehensive system resource metrics
+  <Expandable title="Extended System Metrics">
+    <ResponseField name="network_io" type="object">
+      Network I/O statistics
+    </ResponseField>
+    <ResponseField name="gc_metrics" type="object">
+      Garbage collection performance metrics
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="historical_data" type="object">
+Historical performance and reliability metrics
+  <Expandable title="Historical Metrics">
+    <ResponseField name="last_24h" type="object">
+      Metrics for the last 24 hours
+    </ResponseField>
+    <ResponseField name="last_7d" type="object">
+      Metrics for the last 7 days
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="capacity_metrics" type="object">
+System capacity utilization information
+</ResponseField>
+
+<ResponseField name="dependencies" type="object[]">
+Health status of external service dependencies
+</ResponseField>
+
+<ResponseField name="security_metrics" type="object">
+Security-related metrics and indicators
+</ResponseField>
+
+<ResponseField name="incidents" type="object[]">
+Active incidents with detailed information and updates
+</ResponseField>
+
+<ResponseField name="alerts" type="object[]">
+Current system alerts and warnings
+</ResponseField>
+
+## Common Use Cases
+
+### Advanced Monitoring Dashboards
+
+Build comprehensive monitoring dashboards with detailed metrics and trends.
+
+### Predictive Analysis
+
+Use historical data and trends to predict potential issues before they occur.
+
+### Capacity Planning
+
+Analyze capacity utilization to plan for scaling and resource allocation.
+
+### Root Cause Analysis
+
+Leverage detailed service health information for troubleshooting complex issues.
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Basic Status" icon="heart-pulse" href="/api/health/get-status">
+    Get basic system health information
+  </Card>
+  <Card title="System Metrics" icon="chart-bar" href="/api/metrics/get-metrics">
+    View detailed performance metrics
+  </Card>
+</CardGroup>
+
+---
+
+<Info>
+**Pro Tip**: Use the detailed status endpoint for comprehensive health monitoring and the basic status endpoint for simple uptime checks and load balancer health verification.
+</Info>

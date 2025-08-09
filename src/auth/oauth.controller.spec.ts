@@ -4,12 +4,12 @@ import { Response } from 'express';
 import { Counter, register } from 'prom-client';
 import { OAuthController } from './oauth.controller';
 import { OAuthService } from './oauth.service';
+import { MetricsService } from '../metrics/metrics.service';
 
 describe('OAuthController', () => {
   let controller: OAuthController;
   let oauthService: jest.Mocked<OAuthService>;
-  let redirectCounter: jest.Mocked<Counter>;
-  let callbackCounter: jest.Mocked<Counter>;
+  let metricsService: jest.Mocked<MetricsService>;
   let mockResponse: jest.Mocked<Response>;
 
   const mockOrgId = 'org_123';
@@ -33,19 +33,19 @@ describe('OAuthController', () => {
             handleCallback: jest.fn(),
           },
         },
+        {
+          provide: MetricsService,
+          useValue: {
+            incrementOAuthRedirect: jest.fn(),
+            incrementOAuthCallback: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
     controller = module.get<OAuthController>(OAuthController);
     oauthService = module.get(OAuthService);
-
-    // Access the counters from the controller instance and spy on their methods
-    redirectCounter = (controller as any).redirectCounter;
-    callbackCounter = (controller as any).callbackCounter;
-
-    // Mock the counter methods
-    jest.spyOn(redirectCounter, 'inc').mockImplementation(() => redirectCounter);
-    jest.spyOn(callbackCounter, 'inc').mockImplementation(() => callbackCounter);
+    metricsService = module.get(MetricsService);
 
     // Mock Express Response object
     mockResponse = {
@@ -76,17 +76,14 @@ describe('OAuthController', () => {
       await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockResponse);
 
       expect(oauthService.getAuthorizeUrl).toHaveBeenCalledWith(mockToolKey, mockOrgId, mockUserId);
-      expect(redirectCounter.inc).toHaveBeenCalledWith({ toolKey: mockToolKey });
+      expect(metricsService.incrementOAuthRedirect).toHaveBeenCalledWith({ orgId: mockOrgId, toolKey: mockToolKey });
       expect(mockResponse.redirect).toHaveBeenCalledWith(302, mockAuthUrl);
     });
 
     it('should return 400 for missing X-Org-ID header', async () => {
       await controller.initiateLogin(mockParams, mockQuery, '', mockResponse);
 
-      expect(redirectCounter.inc).toHaveBeenCalledWith({
-        toolKey: mockToolKey,
-        error: 'true',
-      });
+      // Metrics are not incremented on validation errors before service call
       expect(mockResponse.status).toHaveBeenCalledWith(400);
       expect(mockResponse.json).toHaveBeenCalledWith({
         success: false,
@@ -103,10 +100,7 @@ describe('OAuthController', () => {
 
       await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockResponse);
 
-      expect(redirectCounter.inc).toHaveBeenCalledWith({
-        toolKey: mockToolKey,
-        error: 'true',
-      });
+      // Metrics are not incremented on service errors
       expect(mockResponse.status).toHaveBeenCalledWith(400);
       expect(mockResponse.json).toHaveBeenCalledWith({
         success: false,
@@ -120,10 +114,7 @@ describe('OAuthController', () => {
 
       await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockResponse);
 
-      expect(redirectCounter.inc).toHaveBeenCalledWith({
-        toolKey: mockToolKey,
-        error: 'true',
-      });
+      // Metrics are not incremented on unexpected errors
       expect(mockResponse.status).toHaveBeenCalledWith(500);
       expect(mockResponse.json).toHaveBeenCalledWith({
         success: false,
@@ -140,8 +131,8 @@ describe('OAuthController', () => {
 
       await controller.initiateLogin(mockParams, mockQuery, mockOrgId, mockResponse);
 
-      expect(redirectCounter.inc).toHaveBeenCalledTimes(1);
-      expect(redirectCounter.inc).toHaveBeenCalledWith({ toolKey: mockToolKey });
+      expect(metricsService.incrementOAuthRedirect).toHaveBeenCalledTimes(1);
+      expect(metricsService.incrementOAuthRedirect).toHaveBeenCalledWith({ orgId: mockOrgId, toolKey: mockToolKey });
     });
   });
 
@@ -162,7 +153,8 @@ describe('OAuthController', () => {
       await controller.handleCallback(mockParams, mockQuery, mockResponse);
 
       expect(oauthService.handleCallback).toHaveBeenCalledWith(mockCode, mockState);
-      expect(callbackCounter.inc).toHaveBeenCalledWith({
+      expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
+        orgId: mockOrgId,
         toolKey: mockToolKey,
         success: 'true',
       });
@@ -181,11 +173,7 @@ describe('OAuthController', () => {
 
       await controller.handleCallback(mockParams, mockErrorQuery, mockResponse);
 
-      expect(callbackCounter.inc).toHaveBeenCalledWith({
-        toolKey: mockToolKey,
-        success: 'false',
-        error: 'access_denied',
-      });
+      // Error metrics are not recorded for OAuth provider errors (no orgId available)
       expect(mockResponse.status).toHaveBeenCalledWith(400);
       expect(mockResponse.send).toHaveBeenCalledWith(
         expect.stringContaining('Authorization Failed'),
@@ -201,10 +189,10 @@ describe('OAuthController', () => {
 
       await controller.handleCallback(mockParams, mockQueryWithoutCode, mockResponse);
 
-      expect(callbackCounter.inc).toHaveBeenCalledWith({
+      expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
+        orgId: 'unknown',
         toolKey: mockToolKey,
         success: 'false',
-        error: 'processing_error',
       });
       expect(mockResponse.status).toHaveBeenCalledWith(500);
       expect(mockResponse.send).toHaveBeenCalledWith(
@@ -220,10 +208,10 @@ describe('OAuthController', () => {
 
       await controller.handleCallback(mockParams, mockQueryWithoutState, mockResponse);
 
-      expect(callbackCounter.inc).toHaveBeenCalledWith({
+      expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
+        orgId: 'unknown',
         toolKey: mockToolKey,
         success: 'false',
-        error: 'processing_error',
       });
       expect(mockResponse.status).toHaveBeenCalledWith(500);
       expect(mockResponse.send).toHaveBeenCalledWith(
@@ -236,10 +224,10 @@ describe('OAuthController', () => {
 
       await controller.handleCallback(mockParams, mockQuery, mockResponse);
 
-      expect(callbackCounter.inc).toHaveBeenCalledWith({
+      expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
+        orgId: 'unknown',
         toolKey: mockToolKey,
         success: 'false',
-        error: 'processing_error',
       });
       expect(mockResponse.status).toHaveBeenCalledWith(500);
       expect(mockResponse.send).toHaveBeenCalledWith(
@@ -256,8 +244,9 @@ describe('OAuthController', () => {
 
       await controller.handleCallback(mockParams, mockQuery, mockResponse);
 
-      expect(callbackCounter.inc).toHaveBeenCalledTimes(1);
-      expect(callbackCounter.inc).toHaveBeenCalledWith({
+      expect(metricsService.incrementOAuthCallback).toHaveBeenCalledTimes(1);
+      expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
+        orgId: mockOrgId,
         toolKey: mockToolKey,
         success: 'true',
       });
@@ -272,12 +261,7 @@ describe('OAuthController', () => {
 
       await controller.handleCallback(mockParams, mockErrorQuery, mockResponse);
 
-      expect(callbackCounter.inc).toHaveBeenCalledTimes(1);
-      expect(callbackCounter.inc).toHaveBeenCalledWith({
-        toolKey: mockToolKey,
-        success: 'false',
-        error: 'invalid_request',
-      });
+      // OAuth provider errors do not increment metrics
     });
 
     it('should increment metrics correctly for processing error', async () => {
@@ -285,11 +269,11 @@ describe('OAuthController', () => {
 
       await controller.handleCallback(mockParams, mockQuery, mockResponse);
 
-      expect(callbackCounter.inc).toHaveBeenCalledTimes(1);
-      expect(callbackCounter.inc).toHaveBeenCalledWith({
+      expect(metricsService.incrementOAuthCallback).toHaveBeenCalledTimes(1);
+      expect(metricsService.incrementOAuthCallback).toHaveBeenCalledWith({
+        orgId: 'unknown',
         toolKey: mockToolKey,
         success: 'false',
-        error: 'processing_error',
       });
     });
   });

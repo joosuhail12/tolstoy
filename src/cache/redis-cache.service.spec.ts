@@ -41,6 +41,7 @@ describe('RedisCacheService', () => {
 
     mockAwsSecretsService = {
       getSecret: jest.fn(),
+      getRedisConfig: jest.fn(),
     } as any;
 
     mockLogger = {
@@ -77,22 +78,16 @@ describe('RedisCacheService', () => {
 
   describe('initialization', () => {
     it('should initialize with AWS Secrets Manager credentials', async () => {
-      mockAwsSecretsService.getSecret
-        .mockResolvedValueOnce('https://redis-url.upstash.io')
-        .mockResolvedValueOnce('redis-token-123');
+      mockAwsSecretsService.getRedisConfig.mockResolvedValue({
+        url: 'https://redis-url.upstash.io',
+        token: 'redis-token-123'
+      });
       mockRedis.ping.mockResolvedValue('PONG');
 
       // Initialize service
       await service['initializeRedis']();
 
-      expect(mockAwsSecretsService.getSecret).toHaveBeenCalledWith(
-        'conductor-db-secret',
-        'UPSTASH_REDIS_REST_URL',
-      );
-      expect(mockAwsSecretsService.getSecret).toHaveBeenCalledWith(
-        'conductor-db-secret',
-        'UPSTASH_REDIS_REST_TOKEN',
-      );
+      expect(mockAwsSecretsService.getRedisConfig).toHaveBeenCalled();
       expect(Redis).toHaveBeenCalledWith({
         url: 'https://redis-url.upstash.io',
         token: 'redis-token-123',
@@ -135,9 +130,10 @@ describe('RedisCacheService', () => {
   describe('cache operations', () => {
     beforeEach(async () => {
       // Setup successful initialization via AWS Secrets
-      mockAwsSecretsService.getSecret
-        .mockResolvedValueOnce('https://redis-url.upstash.io')
-        .mockResolvedValueOnce('redis-token-123');
+      mockAwsSecretsService.getRedisConfig.mockResolvedValue({
+        url: 'https://redis-url.upstash.io',
+        token: 'redis-token-123'
+      });
       mockRedis.ping.mockResolvedValue('PONG');
       await service['initializeRedis']();
     });
@@ -357,10 +353,12 @@ describe('RedisCacheService', () => {
 
     it('should track cache hits and misses', async () => {
       // Ensure service is connected for this test
-      const status = service.getConnectionStatus();
-      if (!status.connected) {
-        await service['initializeRedis']();
-      }
+      mockAwsSecretsService.getRedisConfig.mockResolvedValue({
+        url: 'https://redis-url.upstash.io',
+        token: 'redis-token-123'
+      });
+      mockRedis.ping.mockResolvedValue('PONG');
+      await service['initializeRedis']();
 
       mockRedis.get
         .mockResolvedValueOnce('cached-value') // Hit
@@ -377,10 +375,12 @@ describe('RedisCacheService', () => {
 
     it('should track operation counts', async () => {
       // Ensure service is connected for this test
-      const status = service.getConnectionStatus();
-      if (!status.connected) {
-        await service['initializeRedis']();
-      }
+      mockAwsSecretsService.getRedisConfig.mockResolvedValue({
+        url: 'https://redis-url.upstash.io',
+        token: 'redis-token-123'
+      });
+      mockRedis.ping.mockResolvedValue('PONG');
+      await service['initializeRedis']();
 
       mockRedis.get.mockResolvedValue('value');
       mockRedis.set.mockResolvedValue('OK');
@@ -410,9 +410,10 @@ describe('RedisCacheService', () => {
 
   describe('connection status', () => {
     it('should return connection status', async () => {
-      mockAwsSecretsService.getSecret
-        .mockResolvedValueOnce('https://redis-url.upstash.io')
-        .mockResolvedValueOnce('redis-token-123');
+      mockAwsSecretsService.getRedisConfig.mockResolvedValue({
+        url: 'https://redis-url.upstash.io',
+        token: 'redis-token-123'
+      });
       mockRedis.ping.mockResolvedValue('PONG');
       await service['initializeRedis']();
 
@@ -423,9 +424,10 @@ describe('RedisCacheService', () => {
     });
 
     it('should test connection with ping', async () => {
-      mockAwsSecretsService.getSecret
-        .mockResolvedValueOnce('https://redis-url.upstash.io')
-        .mockResolvedValueOnce('redis-token-123');
+      mockAwsSecretsService.getRedisConfig.mockResolvedValue({
+        url: 'https://redis-url.upstash.io',
+        token: 'redis-token-123'
+      });
       mockRedis.ping.mockResolvedValue('PONG');
       await service['initializeRedis']();
 

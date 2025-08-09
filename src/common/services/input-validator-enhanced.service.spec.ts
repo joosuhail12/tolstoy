@@ -370,14 +370,14 @@ describe('InputValidatorService - Enhanced Features', () => {
             type: 'string',
             required: false,
             control: 'text',
-            visibleIf: { '===': [{ var: 'inputs.type' }, 'email'] },
+            visibleIf: { '===': [{ var: 'type' }, 'email'] },
           },
           {
             name: 'phoneNumber',
             type: 'string',
             required: false,
             control: 'text',
-            visibleIf: { '===': [{ var: 'inputs.type' }, 'sms'] },
+            visibleIf: { '===': [{ var: 'type' }, 'sms'] },
           },
         ];
 
@@ -428,8 +428,8 @@ describe('InputValidatorService - Enhanced Features', () => {
             control: 'textarea',
             visibleIf: {
               and: [
-                { '===': [{ var: 'inputs.enabled' }, true] },
-                { '===': [{ var: 'inputs.priority' }, 'high'] },
+                { '===': [{ var: 'enabled' }, true] },
+                { '===': [{ var: 'priority' }, 'high'] },
               ],
             },
           },

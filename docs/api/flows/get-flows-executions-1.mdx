@@ -1,3 +1,1231 @@
 ---
-openapi: get /flows/{id}/executions/{executionId}
+title: "Get Execution Details"
+openapi: "GET /flows/{id}/executions/{executionId}"
 ---
+
+# Get Execution Details
+
+Get detailed information about a specific flow execution, including complete step-by-step results, performance metrics, and real-time progress for running executions.
+
+<RequestExample>
+
+```bash cURL
+curl -X GET "https://tolstoy.getpullse.com/flows/flow_abc123def456/executions/exec_xyz789abc123def456" \
+  -H "x-org-id: org_1234567890abcdef" \
+  -H "x-user-id: user_abcdef1234567890" \
+  -H "Content-Type: application/json"
+```
+
+```typescript TypeScript
+interface ExecutionDetails {
+  id: string;
+  flow_id: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'timeout';
+  mode: 'sync' | 'async';
+  priority: string;
+  inputs: Record<string, any>;
+  outputs?: Record<string, any>;
+  error?: ExecutionError;
+  execution_summary?: ExecutionSummary;
+  performance?: PerformanceMetrics;
+  progress?: ExecutionProgress;
+  step_logs?: StepLog[];
+  tags?: string[];
+  webhook_url?: string;
+  created_by: UserInfo;
+  started_at: string;
+  completed_at?: string;
+  failed_at?: string;
+  estimated_completion?: string;
+}
+
+const getExecutionDetails = async (flowId: string, executionId: string): Promise<ExecutionDetails> => {
+  const response = await fetch(
+    `https://tolstoy.getpullse.com/flows/${flowId}/executions/${executionId}`,
+    {
+      method: 'GET',
+      headers: {
+        'x-org-id': 'org_1234567890abcdef',
+        'x-user-id': 'user_abcdef1234567890',
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+  }
+
+  const result = await response.json();
+  return result.data;
+};
+
+// Get execution details
+const execution = await getExecutionDetails('flow_abc123def456', 'exec_xyz789abc123def456');
+console.log(`Execution ${execution.id} status: ${execution.status}`);
+
+if (execution.status === 'running') {
+  console.log(`Progress: ${execution.progress?.percentage}%`);
+  console.log(`Current step: ${execution.progress?.current_step}`);
+} else if (execution.status === 'completed') {
+  console.log(`Completed in ${execution.performance?.duration_ms}ms`);
+  console.log(`Success rate: ${execution.execution_summary?.success_rate}`);
+} else if (execution.status === 'failed') {
+  console.log(`Failed at step: ${execution.error?.step_key}`);
+  console.log(`Error: ${execution.error?.message}`);
+}
+```
+
+```python Python
+import requests
+from typing import Dict, Any, Optional
+
+class ExecutionDetailsClient:
+    def __init__(self, org_id: str, user_id: str, base_url: str = "https://tolstoy.getpullse.com"):
+        self.org_id = org_id
+        self.user_id = user_id
+        self.base_url = base_url
+        self.headers = {
+            'x-org-id': org_id,
+            'x-user-id': user_id,
+            'Content-Type': 'application/json'
+        }
+
+    def get_execution_details(self, flow_id: str, execution_id: str) -> Dict[str, Any]:
+        """Get detailed information about a specific execution."""
+        response = requests.get(
+            f"{self.base_url}/flows/{flow_id}/executions/{execution_id}",
+            headers=self.headers
+        )
+        response.raise_for_status()
+        return response.json()['data']
+
+    def get_execution_logs(self, flow_id: str, execution_id: str) -> Dict[str, Any]:
+        """Get execution with detailed step logs."""
+        execution = self.get_execution_details(flow_id, execution_id)
+        
+        # Extract step-by-step execution timeline
+        timeline = []
+        step_logs = execution.get('step_logs', [])
+        
+        for log in step_logs:
+            timeline.append({
+                'step_key': log['step_key'],
+                'status': log['status'],
+                'started_at': log.get('started_at'),
+                'completed_at': log.get('completed_at'),
+                'duration_ms': log.get('duration_ms'),
+                'error': log.get('error')
+            })
+        
+        return {
+            'execution': execution,
+            'timeline': timeline,
+            'total_steps': len(timeline),
+            'completed_steps': len([log for log in timeline if log['status'] == 'completed']),
+            'failed_steps': len([log for log in timeline if log['status'] == 'failed'])
+        }
+
+    def wait_for_completion(
+        self, 
+        flow_id: str, 
+        execution_id: str, 
+        timeout_seconds: int = 300,
+        poll_interval: int = 5
+    ) -> Dict[str, Any]:
+        """Wait for execution to complete and return final status."""
+        import time
+        
+        start_time = time.time()
+        
+        while time.time() - start_time < timeout_seconds:
+            execution = self.get_execution_details(flow_id, execution_id)
+            status = execution['status']
+            
+            if status in ['completed', 'failed', 'cancelled', 'timeout']:
+                return execution
+            
+            print(f"Execution {execution_id} is {status}, waiting...")
+            if execution.get('progress'):
+                print(f"Progress: {execution['progress']['percentage']}%")
+            
+            time.sleep(poll_interval)
+        
+        raise TimeoutError(f"Execution did not complete within {timeout_seconds} seconds")
+
+    def analyze_execution_performance(self, flow_id: str, execution_id: str) -> Dict[str, Any]:
+        """Analyze the performance characteristics of an execution."""
+        execution = self.get_execution_details(flow_id, execution_id)
+        
+        if execution['status'] not in ['completed', 'failed']:
+            return {'error': 'Execution not yet finished'}
+        
+        performance = execution.get('performance', {})
+        step_logs = execution.get('step_logs', [])
+        
+        # Analyze step durations
+        step_performance = []
+        for log in step_logs:
+            if log.get('duration_ms'):
+                step_performance.append({
+                    'step_key': log['step_key'],
+                    'duration_ms': log['duration_ms'],
+                    'status': log['status'],
+                    'percentage_of_total': (log['duration_ms'] / performance.get('duration_ms', 1)) * 100
+                })
+        
+        # Sort by duration to find bottlenecks
+        step_performance.sort(key=lambda x: x['duration_ms'], reverse=True)
+        
+        return {
+            'execution_id': execution_id,
+            'total_duration_ms': performance.get('duration_ms'),
+            'queue_wait_ms': performance.get('queue_wait_ms'),
+            'execution_time_ms': performance.get('duration_ms', 0) - performance.get('queue_wait_ms', 0),
+            'memory_peak_mb': performance.get('memory_peak_mb'),
+            'step_performance': step_performance,
+            'bottleneck_step': step_performance[0] if step_performance else None
+        }
+
+# Usage examples
+client = ExecutionDetailsClient('org_1234567890abcdef', 'user_abcdef1234567890')
+
+# Get execution details
+execution = client.get_execution_details('flow_abc123', 'exec_xyz789')
+print(f"Execution status: {execution['status']}")
+
+# Wait for completion
+try:
+    completed_execution = client.wait_for_completion('flow_abc123', 'exec_xyz789', timeout_seconds=180)
+    print(f"Execution completed with status: {completed_execution['status']}")
+except TimeoutError as e:
+    print(f"Timeout: {e}")
+
+# Analyze performance
+performance_analysis = client.analyze_execution_performance('flow_abc123', 'exec_xyz789')
+if performance_analysis.get('bottleneck_step'):
+    bottleneck = performance_analysis['bottleneck_step']
+    print(f"Bottleneck step: {bottleneck['step_key']} ({bottleneck['duration_ms']}ms)")
+```
+
+```javascript Node.js
+const axios = require('axios');
+
+class ExecutionDetailsClient {
+  constructor(orgId, userId, baseUrl = 'https://tolstoy.getpullse.com') {
+    this.orgId = orgId;
+    this.userId = userId;
+    this.baseUrl = baseUrl;
+    this.headers = {
+      'x-org-id': orgId,
+      'x-user-id': userId,
+      'Content-Type': 'application/json'
+    };
+  }
+
+  async getExecutionDetails(flowId, executionId) {
+    try {
+      const response = await axios.get(
+        `${this.baseUrl}/flows/${flowId}/executions/${executionId}`,
+        { headers: this.headers }
+      );
+
+      return response.data.data;
+    } catch (error) {
+      if (error.response) {
+        throw new Error(`API Error: ${error.response.status} - ${error.response.data?.error?.message || error.message}`);
+      }
+      throw error;
+    }
+  }
+
+  async streamExecutionProgress(flowId, executionId, onUpdate, intervalMs = 5000) {
+    let previousProgress = null;
+    
+    const checkProgress = async () => {
+      try {
+        const execution = await this.getExecutionDetails(flowId, executionId);
+        
+        // Check if progress has changed
+        const currentProgress = execution.progress?.percentage || 0;
+        const status = execution.status;
+        
+        if (status !== 'running' || currentProgress !== previousProgress) {
+          onUpdate(execution);
+          previousProgress = currentProgress;
+        }
+        
+        // Stop if execution is complete
+        if (['completed', 'failed', 'cancelled', 'timeout'].includes(status)) {
+          return execution;
+        }
+        
+        // Schedule next check
+        setTimeout(checkProgress, intervalMs);
+        
+      } catch (error) {
+        console.error('Error checking execution progress:', error.message);
+        setTimeout(checkProgress, intervalMs * 2); // Backoff on error
+      }
+    };
+
+    // Start monitoring
+    return checkProgress();
+  }
+
+  async getExecutionTimeline(flowId, executionId) {
+    const execution = await this.getExecutionDetails(flowId, executionId);
+    const stepLogs = execution.step_logs || [];
+    
+    // Create a timeline of events
+    const timeline = [];
+    
+    // Add execution start
+    timeline.push({
+      type: 'execution_start',
+      timestamp: execution.started_at,
+      message: `Execution ${executionId} started`,
+      details: {
+        mode: execution.mode,
+        priority: execution.priority
+      }
+    });
+    
+    // Add step events
+    stepLogs.forEach(log => {
+      if (log.started_at) {
+        timeline.push({
+          type: 'step_start',
+          timestamp: log.started_at,
+          message: `Step '${log.step_key}' started`,
+          step_key: log.step_key,
+          details: log.inputs
+        });
+      }
+      
+      if (log.completed_at) {
+        timeline.push({
+          type: log.status === 'completed' ? 'step_success' : 'step_failure',
+          timestamp: log.completed_at,
+          message: `Step '${log.step_key}' ${log.status}`,
+          step_key: log.step_key,
+          details: log.status === 'completed' ? log.outputs : log.error,
+          duration_ms: log.duration_ms
+        });
+      }
+    });
+    
+    // Add execution completion
+    const completionTime = execution.completed_at || execution.failed_at;
+    if (completionTime) {
+      timeline.push({
+        type: 'execution_end',
+        timestamp: completionTime,
+        message: `Execution ${execution.status}`,
+        details: {
+          status: execution.status,
+          duration_ms: execution.performance?.duration_ms,
+          success_rate: execution.execution_summary?.success_rate
+        }
+      });
+    }
+    
+    // Sort by timestamp
+    timeline.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    
+    return {
+      execution_id: executionId,
+      flow_id: flowId,
+      timeline,
+      summary: {
+        total_events: timeline.length,
+        duration_ms: execution.performance?.duration_ms,
+        step_count: stepLogs.length
+      }
+    };
+  }
+
+  async compareExecutions(flowId, executionIds) {
+    const executions = await Promise.all(
+      executionIds.map(id => this.getExecutionDetails(flowId, id))
+    );
+
+    const comparison = {
+      flow_id: flowId,
+      executions: executions.map(exec => ({
+        id: exec.id,
+        status: exec.status,
+        duration_ms: exec.performance?.duration_ms || 0,
+        success_rate: exec.execution_summary?.success_rate || 0,
+        started_at: exec.started_at,
+        memory_peak_mb: exec.performance?.memory_peak_mb || 0
+      })),
+      averages: {
+        duration_ms: 0,
+        success_rate: 0,
+        memory_peak_mb: 0
+      },
+      fastest: null,
+      slowest: null
+    };
+
+    // Calculate averages
+    const completedExecutions = comparison.executions.filter(e => e.duration_ms > 0);
+    if (completedExecutions.length > 0) {
+      comparison.averages.duration_ms = completedExecutions.reduce((sum, e) => sum + e.duration_ms, 0) / completedExecutions.length;
+      comparison.averages.success_rate = completedExecutions.reduce((sum, e) => sum + e.success_rate, 0) / completedExecutions.length;
+      comparison.averages.memory_peak_mb = completedExecutions.reduce((sum, e) => sum + e.memory_peak_mb, 0) / completedExecutions.length;
+
+      // Find fastest and slowest
+      comparison.fastest = completedExecutions.reduce((min, e) => e.duration_ms < min.duration_ms ? e : min);
+      comparison.slowest = completedExecutions.reduce((max, e) => e.duration_ms > max.duration_ms ? e : max);
+    }
+
+    return comparison;
+  }
+}
+
+// Usage examples
+const client = new ExecutionDetailsClient('org_1234567890abcdef', 'user_abcdef1234567890');
+
+// Get execution details
+async function monitorExecution(flowId, executionId) {
+  console.log(`Monitoring execution ${executionId}...`);
+
+  // Get initial details
+  let execution = await client.getExecutionDetails(flowId, executionId);
+  console.log(`Initial status: ${execution.status}`);
+
+  if (execution.status === 'running') {
+    // Stream progress updates
+    const finalExecution = await client.streamExecutionProgress(
+      flowId, 
+      executionId,
+      (updatedExecution) => {
+        const progress = updatedExecution.progress;
+        if (progress) {
+          console.log(`Progress: ${progress.percentage}% - Current step: ${progress.current_step}`);
+        }
+        console.log(`Status: ${updatedExecution.status}`);
+      },
+      3000 // Check every 3 seconds
+    );
+
+    console.log(`Final status: ${finalExecution.status}`);
+    
+    if (finalExecution.status === 'completed') {
+      console.log(`Total duration: ${finalExecution.performance?.duration_ms}ms`);
+    } else if (finalExecution.status === 'failed') {
+      console.log(`Error: ${finalExecution.error?.message}`);
+    }
+  }
+
+  // Get detailed timeline
+  const timeline = await client.getExecutionTimeline(flowId, executionId);
+  console.log('\nExecution Timeline:');
+  timeline.timeline.forEach(event => {
+    console.log(`[${event.timestamp}] ${event.message}`);
+  });
+
+  return execution;
+}
+
+// Compare multiple executions
+async function compareExecutionPerformance(flowId, executionIds) {
+  const comparison = await client.compareExecutions(flowId, executionIds);
+  
+  console.log('\nExecution Comparison:');
+  console.log(`Average duration: ${Math.round(comparison.averages.duration_ms)}ms`);
+  console.log(`Average success rate: ${(comparison.averages.success_rate * 100).toFixed(1)}%`);
+  
+  if (comparison.fastest && comparison.slowest) {
+    console.log(`Fastest: ${comparison.fastest.id} (${comparison.fastest.duration_ms}ms)`);
+    console.log(`Slowest: ${comparison.slowest.id} (${comparison.slowest.duration_ms}ms)`);
+  }
+}
+
+// Monitor a specific execution
+monitorExecution('flow_abc123', 'exec_xyz789')
+  .then(() => console.log('Monitoring complete'))
+  .catch(error => console.error('Monitoring failed:', error.message));
+```
+
+</RequestExample>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+Unique flow identifier (format: `flow_` + 15 alphanumeric characters)
+</ParamField>
+
+<ParamField path="executionId" type="string" required>
+Unique execution identifier (format: `exec_` + 24 alphanumeric characters)
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="include_logs" type="boolean" default="false">
+Include detailed step-by-step execution logs in the response.
+</ParamField>
+
+<ParamField query="include_performance" type="boolean" default="true">
+Include performance metrics and timing information.
+</ParamField>
+
+## Response
+
+<ResponseExample>
+
+```json Completed Execution
+{
+  "success": true,
+  "data": {
+    "id": "exec_abc123def456ghi789",
+    "flow_id": "flow_abc123def456",
+    "status": "completed",
+    "mode": "async",
+    "priority": "normal",
+    "inputs": {
+      "customer_email": "john@company.com",
+      "plan_type": "premium",
+      "customer_name": "John Smith"
+    },
+    "outputs": {
+      "send_welcome_email": {
+        "status": "completed",
+        "message_id": "msg_abc123",
+        "delivered_at": "2024-01-15T14:30:15Z",
+        "provider": "sendgrid",
+        "tracking": {
+          "opens": 0,
+          "clicks": 0,
+          "tracking_enabled": true
+        }
+      },
+      "create_account": {
+        "status": "completed",
+        "account_id": "acc_xyz789",
+        "created_at": "2024-01-15T14:30:30Z",
+        "login_url": "https://app.company.com/login/acc_xyz789"
+      },
+      "send_confirmation": {
+        "status": "completed",
+        "confirmation_sent": true,
+        "tracking_id": "track_def456",
+        "email_sent_at": "2024-01-15T14:30:35Z"
+      }
+    },
+    "execution_summary": {
+      "total_steps": 3,
+      "completed_steps": 3,
+      "failed_steps": 0,
+      "skipped_steps": 0,
+      "success_rate": 1.0,
+      "execution_path": [
+        "send_welcome_email",
+        "create_account", 
+        "send_confirmation"
+      ]
+    },
+    "performance": {
+      "duration_ms": 4580,
+      "queue_wait_ms": 123,
+      "execution_time_ms": 4457,
+      "steps_duration_ms": {
+        "send_welcome_email": 1200,
+        "create_account": 2100,
+        "send_confirmation": 800
+      },
+      "memory_peak_mb": 45,
+      "cpu_time_ms": 1250,
+      "network_requests": 3,
+      "cache_hits": 2,
+      "cache_misses": 1
+    },
+    "step_logs": [
+      {
+        "step_key": "send_welcome_email",
+        "step_name": "Send Welcome Email",
+        "status": "completed",
+        "inputs": {
+          "to": "john@company.com",
+          "subject": "Welcome to our platform!",
+          "template": "welcome-template",
+          "variables": {
+            "customer_name": "John Smith",
+            "plan_type": "premium"
+          }
+        },
+        "outputs": {
+          "message_id": "msg_abc123",
+          "delivered_at": "2024-01-15T14:30:15Z",
+          "provider": "sendgrid"
+        },
+        "started_at": "2024-01-15T14:30:01Z",
+        "completed_at": "2024-01-15T14:30:02Z",
+        "duration_ms": 1200,
+        "retry_count": 0
+      },
+      {
+        "step_key": "create_account",
+        "step_name": "Create Account",
+        "status": "completed",
+        "inputs": {
+          "method": "POST",
+          "url": "https://api.company.com/accounts",
+          "headers": {
+            "Authorization": "Bearer ***",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "email": "john@company.com",
+            "plan": "premium",
+            "welcome_email_id": "msg_abc123"
+          }
+        },
+        "outputs": {
+          "account_id": "acc_xyz789",
+          "created_at": "2024-01-15T14:30:30Z",
+          "login_url": "https://app.company.com/login/acc_xyz789",
+          "status_code": 201
+        },
+        "started_at": "2024-01-15T14:30:02Z",
+        "completed_at": "2024-01-15T14:30:04Z",
+        "duration_ms": 2100,
+        "retry_count": 1,
+        "retry_details": [
+          {
+            "attempt": 1,
+            "error": "Temporary API timeout",
+            "retried_at": "2024-01-15T14:30:03Z"
+          }
+        ]
+      },
+      {
+        "step_key": "send_confirmation",
+        "step_name": "Send Account Confirmation",
+        "status": "completed",
+        "inputs": {
+          "to": "john@company.com",
+          "template": "account-created",
+          "variables": {
+            "customer_name": "John Smith",
+            "account_id": "acc_xyz789",
+            "login_url": "https://app.company.com/login/acc_xyz789"
+          }
+        },
+        "outputs": {
+          "confirmation_sent": true,
+          "tracking_id": "track_def456",
+          "email_sent_at": "2024-01-15T14:30:35Z"
+        },
+        "started_at": "2024-01-15T14:30:04Z",
+        "completed_at": "2024-01-15T14:30:05Z",
+        "duration_ms": 800,
+        "retry_count": 0
+      }
+    ],
+    "progress": {
+      "current_step": null,
+      "completed_steps": 3,
+      "total_steps": 3,
+      "percentage": 100,
+      "step_progress": {
+        "send_welcome_email": "completed",
+        "create_account": "completed",
+        "send_confirmation": "completed"
+      }
+    },
+    "tags": ["customer-onboarding", "premium"],
+    "webhook_url": "https://your-app.com/webhooks/flow-completion",
+    "webhook_delivered": true,
+    "webhook_delivered_at": "2024-01-15T14:30:06Z",
+    "created_by": {
+      "id": "user_abcdef1234567890",
+      "name": "John Smith",
+      "email": "john@company.com"
+    },
+    "started_at": "2024-01-15T14:30:00Z",
+    "completed_at": "2024-01-15T14:30:05Z",
+    "estimated_completion": null
+  },
+  "metadata": {
+    "request_id": "req_details123",
+    "timestamp": "2024-01-15T15:00:00Z",
+    "execution_time_ms": 45
+  }
+}
+```
+
+```json Running Execution
+{
+  "success": true,
+  "data": {
+    "id": "exec_running123def456ghi",
+    "flow_id": "flow_abc123def456",
+    "status": "running",
+    "mode": "async",
+    "priority": "high",
+    "inputs": {
+      "customer_email": "customer@example.com",
+      "plan_type": "enterprise",
+      "customer_name": "Enterprise Client"
+    },
+    "outputs": {
+      "send_welcome_email": {
+        "status": "completed",
+        "message_id": "msg_running123",
+        "delivered_at": "2024-01-15T14:45:15Z"
+      }
+    },
+    "progress": {
+      "current_step": "create_account",
+      "completed_steps": 1,
+      "total_steps": 3,
+      "percentage": 33,
+      "step_progress": {
+        "send_welcome_email": "completed",
+        "create_account": "running",
+        "send_confirmation": "pending"
+      },
+      "estimated_time_remaining_ms": 3200,
+      "current_step_started_at": "2024-01-15T14:45:16Z"
+    },
+    "performance": {
+      "duration_ms": 2340,
+      "queue_wait_ms": 45,
+      "execution_time_ms": 2295,
+      "steps_duration_ms": {
+        "send_welcome_email": 1100
+      },
+      "memory_peak_mb": 38,
+      "network_requests": 1
+    },
+    "step_logs": [
+      {
+        "step_key": "send_welcome_email",
+        "step_name": "Send Welcome Email",
+        "status": "completed",
+        "inputs": {
+          "to": "customer@example.com",
+          "subject": "Welcome to our enterprise platform!",
+          "template": "enterprise-welcome"
+        },
+        "outputs": {
+          "message_id": "msg_running123",
+          "delivered_at": "2024-01-15T14:45:15Z"
+        },
+        "started_at": "2024-01-15T14:45:01Z",
+        "completed_at": "2024-01-15T14:45:02Z",
+        "duration_ms": 1100,
+        "retry_count": 0
+      },
+      {
+        "step_key": "create_account",
+        "step_name": "Create Enterprise Account",
+        "status": "running",
+        "inputs": {
+          "method": "POST",
+          "url": "https://api.company.com/accounts",
+          "body": {
+            "email": "customer@example.com",
+            "plan": "enterprise",
+            "tier": "platinum"
+          }
+        },
+        "started_at": "2024-01-15T14:45:02Z",
+        "retry_count": 0
+      }
+    ],
+    "tags": ["customer-onboarding", "enterprise"],
+    "webhook_url": "https://your-app.com/webhooks/flow-completion",
+    "created_by": {
+      "id": "user_fedcba0987654321",
+      "name": "Sarah Johnson",
+      "email": "sarah@company.com"
+    },
+    "started_at": "2024-01-15T14:45:00Z",
+    "estimated_completion": "2024-01-15T14:47:00Z"
+  },
+  "metadata": {
+    "request_id": "req_running456",
+    "timestamp": "2024-01-15T14:45:18Z",
+    "execution_time_ms": 23
+  }
+}
+```
+
+```json Failed Execution
+{
+  "success": true,
+  "data": {
+    "id": "exec_failed123abc456def",
+    "flow_id": "flow_abc123def456",
+    "status": "failed",
+    "mode": "sync",
+    "priority": "normal",
+    "inputs": {
+      "customer_email": "invalid-email",
+      "plan_type": "premium",
+      "customer_name": "Jane Doe"
+    },
+    "error": {
+      "code": "VALIDATION_ERROR",
+      "message": "Email validation failed in step 'send_welcome_email'",
+      "step_key": "send_welcome_email",
+      "details": {
+        "field": "to",
+        "value": "invalid-email",
+        "reason": "Invalid email format",
+        "validation_rule": "email"
+      },
+      "retry_count": 2,
+      "last_retry_at": "2024-01-15T13:45:10Z",
+      "is_retryable": false,
+      "suggested_fixes": [
+        "Ensure the email address follows the format: user@domain.com",
+        "Check for typos in the email address",
+        "Validate email addresses before starting the flow"
+      ]
+    },
+    "outputs": {
+      "send_welcome_email": {
+        "status": "failed",
+        "error": {
+          "code": "INVALID_EMAIL",
+          "message": "Invalid email format: invalid-email"
+        },
+        "attempted_at": "2024-01-15T13:45:05Z"
+      }
+    },
+    "execution_summary": {
+      "total_steps": 3,
+      "completed_steps": 0,
+      "failed_steps": 1,
+      "skipped_steps": 2,
+      "success_rate": 0.0,
+      "execution_path": [
+        "send_welcome_email"
+      ],
+      "failure_point": "send_welcome_email"
+    },
+    "performance": {
+      "duration_ms": 156,
+      "queue_wait_ms": 67,
+      "execution_time_ms": 89,
+      "steps_duration_ms": {
+        "send_welcome_email": 89
+      },
+      "memory_peak_mb": 12,
+      "cpu_time_ms": 45
+    },
+    "step_logs": [
+      {
+        "step_key": "send_welcome_email",
+        "step_name": "Send Welcome Email",
+        "status": "failed",
+        "inputs": {
+          "to": "invalid-email",
+          "subject": "Welcome!",
+          "template": "welcome-template"
+        },
+        "error": {
+          "code": "INVALID_EMAIL",
+          "message": "Invalid email format: invalid-email",
+          "details": {
+            "validation_error": "Email must contain @ symbol and valid domain"
+          }
+        },
+        "started_at": "2024-01-15T13:45:00Z",
+        "failed_at": "2024-01-15T13:45:00Z",
+        "duration_ms": 89,
+        "retry_count": 2,
+        "retry_details": [
+          {
+            "attempt": 1,
+            "error": "Invalid email format",
+            "retried_at": "2024-01-15T13:45:05Z"
+          },
+          {
+            "attempt": 2,
+            "error": "Invalid email format",
+            "retried_at": "2024-01-15T13:45:10Z"
+          }
+        ]
+      }
+    ],
+    "tags": ["customer-onboarding"],
+    "created_by": {
+      "id": "user_abcdef1234567890",
+      "name": "John Smith",
+      "email": "john@company.com"
+    },
+    "started_at": "2024-01-15T13:45:00Z",
+    "failed_at": "2024-01-15T13:45:00Z",
+    "retry_after": null
+  },
+  "metadata": {
+    "request_id": "req_failed789",
+    "timestamp": "2024-01-15T13:45:01Z",
+    "execution_time_ms": 12
+  }
+}
+```
+
+```json Execution Not Found
+{
+  "success": false,
+  "error": {
+    "code": "EXECUTION_NOT_FOUND",
+    "message": "Execution not found or not accessible",
+    "details": {
+      "flow_id": "flow_abc123def456",
+      "execution_id": "exec_nonexistent123"
+    }
+  },
+  "metadata": {
+    "request_id": "req_notfound123",
+    "timestamp": "2024-01-15T15:00:00Z"
+  }
+}
+```
+
+</ResponseExample>
+
+## Response Fields
+
+### Execution Details
+
+<ResponseField name="id" type="string">
+Unique execution identifier
+</ResponseField>
+
+<ResponseField name="flow_id" type="string">
+ID of the executed flow
+</ResponseField>
+
+<ResponseField name="status" type="string">
+Current execution status
+</ResponseField>
+
+<ResponseField name="mode" type="string">
+Execution mode: `sync` or `async`
+</ResponseField>
+
+<ResponseField name="priority" type="string">
+Execution priority level
+</ResponseField>
+
+<ResponseField name="inputs" type="object">
+Input data provided for execution
+</ResponseField>
+
+<ResponseField name="outputs" type="object">
+Results from completed steps
+</ResponseField>
+
+<ResponseField name="error" type="object">
+Detailed error information (failed executions only)
+  <Expandable title="Error Fields">
+    <ResponseField name="code" type="string">Error code</ResponseField>
+    <ResponseField name="message" type="string">Human-readable error message</ResponseField>
+    <ResponseField name="step_key" type="string">Step where error occurred</ResponseField>
+    <ResponseField name="details" type="object">Additional error context</ResponseField>
+    <ResponseField name="retry_count" type="integer">Number of retry attempts</ResponseField>
+    <ResponseField name="is_retryable" type="boolean">Whether error can be resolved by retrying</ResponseField>
+    <ResponseField name="suggested_fixes" type="string[]">Suggestions for resolving the error</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="execution_summary" type="object">
+Summary statistics and execution path
+  <Expandable title="Summary Fields">
+    <ResponseField name="total_steps" type="integer">Total steps in flow</ResponseField>
+    <ResponseField name="completed_steps" type="integer">Successfully completed steps</ResponseField>
+    <ResponseField name="failed_steps" type="integer">Failed steps</ResponseField>
+    <ResponseField name="skipped_steps" type="integer">Skipped steps</ResponseField>
+    <ResponseField name="success_rate" type="number">Success rate (0.0 to 1.0)</ResponseField>
+    <ResponseField name="execution_path" type="string[]">Order of steps executed</ResponseField>
+    <ResponseField name="failure_point" type="string">Step where failure occurred (if failed)</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="performance" type="object">
+Detailed performance metrics
+  <Expandable title="Performance Fields">
+    <ResponseField name="duration_ms" type="integer">Total execution duration</ResponseField>
+    <ResponseField name="queue_wait_ms" type="integer">Time spent waiting in queue</ResponseField>
+    <ResponseField name="execution_time_ms" type="integer">Actual execution time</ResponseField>
+    <ResponseField name="steps_duration_ms" type="object">Duration breakdown by step</ResponseField>
+    <ResponseField name="memory_peak_mb" type="number">Peak memory usage</ResponseField>
+    <ResponseField name="cpu_time_ms" type="integer">CPU time consumed</ResponseField>
+    <ResponseField name="network_requests" type="integer">Number of network calls made</ResponseField>
+    <ResponseField name="cache_hits" type="integer">Number of cache hits</ResponseField>
+    <ResponseField name="cache_misses" type="integer">Number of cache misses</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="step_logs" type="array">
+Detailed logs for each step (when include_logs=true)
+  <Expandable title="Step Log Fields">
+    <ResponseField name="step_key" type="string">Step identifier</ResponseField>
+    <ResponseField name="step_name" type="string">Human-readable step name</ResponseField>
+    <ResponseField name="status" type="string">Step execution status</ResponseField>
+    <ResponseField name="inputs" type="object">Step input data</ResponseField>
+    <ResponseField name="outputs" type="object">Step output data</ResponseField>
+    <ResponseField name="error" type="object">Step error details (if failed)</ResponseField>
+    <ResponseField name="started_at" type="string">Step start timestamp</ResponseField>
+    <ResponseField name="completed_at" type="string">Step completion timestamp</ResponseField>
+    <ResponseField name="failed_at" type="string">Step failure timestamp</ResponseField>
+    <ResponseField name="duration_ms" type="integer">Step execution duration</ResponseField>
+    <ResponseField name="retry_count" type="integer">Number of retries attempted</ResponseField>
+    <ResponseField name="retry_details" type="array">Details of retry attempts</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="progress" type="object">
+Real-time progress information (running executions)
+  <Expandable title="Progress Fields">
+    <ResponseField name="current_step" type="string">Currently executing step</ResponseField>
+    <ResponseField name="completed_steps" type="integer">Number of completed steps</ResponseField>
+    <ResponseField name="total_steps" type="integer">Total steps in flow</ResponseField>
+    <ResponseField name="percentage" type="number">Completion percentage</ResponseField>
+    <ResponseField name="step_progress" type="object">Status of each step</ResponseField>
+    <ResponseField name="estimated_time_remaining_ms" type="integer">Estimated time to completion</ResponseField>
+    <ResponseField name="current_step_started_at" type="string">When current step started</ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="webhook_url" type="string">
+Webhook URL for completion notifications
+</ResponseField>
+
+<ResponseField name="webhook_delivered" type="boolean">
+Whether webhook was successfully delivered
+</ResponseField>
+
+<ResponseField name="webhook_delivered_at" type="string">
+Timestamp of webhook delivery
+</ResponseField>
+
+## Status Codes
+
+<ResponseField name="200" type="Success">
+Execution details retrieved successfully
+</ResponseField>
+
+<ResponseField name="400" type="Bad Request">
+Invalid flow or execution ID format
+</ResponseField>
+
+<ResponseField name="401" type="Unauthorized">
+Missing or invalid authentication
+</ResponseField>
+
+<ResponseField name="403" type="Forbidden">
+Insufficient permissions to access execution
+</ResponseField>
+
+<ResponseField name="404" type="Not Found">
+Flow or execution not found
+</ResponseField>
+
+<ResponseField name="429" type="Too Many Requests">
+Rate limit exceeded
+</ResponseField>
+
+<ResponseField name="500" type="Internal Server Error">
+Server error occurred
+</ResponseField>
+
+## Examples
+
+### Monitor Running Execution
+
+<CodeGroup>
+
+```bash Poll for Updates
+# Check execution status every 10 seconds
+while true; do
+  STATUS=$(curl -s -X GET "https://tolstoy.getpullse.com/flows/flow_abc123/executions/exec_xyz789" \
+    -H "x-org-id: org_1234567890abcdef" \
+    -H "x-user-id: user_abcdef1234567890" \
+    | jq -r '.data.status')
+  
+  echo "Status: $STATUS"
+  
+  if [[ "$STATUS" != "running" && "$STATUS" != "queued" ]]; then
+    echo "Execution completed with status: $STATUS"
+    break
+  fi
+  
+  sleep 10
+done
+```
+
+```typescript Real-time Monitoring
+async function monitorExecution(flowId: string, executionId: string) {
+  let status = 'running';
+  
+  while (status === 'running' || status === 'queued') {
+    const execution = await getExecutionDetails(flowId, executionId);
+    status = execution.status;
+    
+    console.log(`Status: ${status}`);
+    
+    if (execution.progress) {
+      console.log(`Progress: ${execution.progress.percentage}%`);
+      console.log(`Current step: ${execution.progress.current_step}`);
+      
+      if (execution.progress.estimated_time_remaining_ms) {
+        const remainingSeconds = Math.round(execution.progress.estimated_time_remaining_ms / 1000);
+        console.log(`Estimated time remaining: ${remainingSeconds}s`);
+      }
+    }
+    
+    // Wait 5 seconds before next check
+    await new Promise(resolve => setTimeout(resolve, 5000));
+  }
+  
+  console.log(`Final status: ${status}`);
+  return status;
+}
+
+// Usage
+await monitorExecution('flow_abc123', 'exec_xyz789');
+```
+
+</CodeGroup>
+
+### Analyze Step Performance
+
+<CodeGroup>
+
+```python Performance Analysis
+def analyze_step_performance(flow_id: str, execution_id: str):
+    execution = client.get_execution_details(flow_id, execution_id)
+    
+    if execution['status'] not in ['completed', 'failed']:
+        print("Execution not yet finished")
+        return
+    
+    step_logs = execution.get('step_logs', [])
+    total_duration = execution['performance']['duration_ms']
+    
+    print(f"Execution Performance Analysis")
+    print(f"Total Duration: {total_duration}ms")
+    print(f"Queue Wait: {execution['performance']['queue_wait_ms']}ms")
+    print()
+    
+    # Analyze each step
+    for i, step in enumerate(step_logs, 1):
+        duration = step.get('duration_ms', 0)
+        percentage = (duration / total_duration * 100) if total_duration > 0 else 0
+        
+        print(f"{i}. {step['step_key']} - {step['status']}")
+        print(f"   Duration: {duration}ms ({percentage:.1f}% of total)")
+        
+        if step['retry_count'] > 0:
+            print(f"   Retries: {step['retry_count']}")
+        
+        if step.get('error'):
+            print(f"   Error: {step['error']['message']}")
+        
+        print()
+
+# Analyze specific execution
+analyze_step_performance('flow_abc123', 'exec_xyz789')
+```
+
+</CodeGroup>
+
+### Debug Failed Execution
+
+<CodeGroup>
+
+```javascript Failure Analysis
+async function debugFailedExecution(flowId, executionId) {
+  const execution = await client.getExecutionDetails(flowId, executionId);
+  
+  if (execution.status !== 'failed') {
+    console.log('Execution did not fail');
+    return;
+  }
+  
+  console.log('=== Failure Analysis ===');
+  console.log(`Execution ID: ${executionId}`);
+  console.log(`Failed at step: ${execution.error.step_key}`);
+  console.log(`Error: ${execution.error.message}`);
+  console.log(`Error code: ${execution.error.code}`);
+  
+  if (execution.error.suggested_fixes) {
+    console.log('\nSuggested fixes:');
+    execution.error.suggested_fixes.forEach((fix, index) => {
+      console.log(`${index + 1}. ${fix}`);
+    });
+  }
+  
+  console.log('\n=== Step Timeline ===');
+  execution.step_logs.forEach(step => {
+    const status = step.status;
+    const duration = step.duration_ms || 0;
+    
+    console.log(`${step.step_key}: ${status} (${duration}ms)`);
+    
+    if (step.error) {
+      console.log(`  Error: ${step.error.message}`);
+    }
+    
+    if (step.retry_count > 0) {
+      console.log(`  Retries: ${step.retry_count}`);
+      step.retry_details?.forEach((retry, index) => {
+        console.log(`    ${index + 1}. ${retry.error} (${retry.retried_at})`);
+      });
+    }
+  });
+  
+  console.log('\n=== Performance Impact ===');
+  const performance = execution.performance;
+  console.log(`Total time: ${performance.duration_ms}ms`);
+  console.log(`Time wasted on failures: ${performance.execution_time_ms - performance.duration_ms + (execution.error.retry_count || 0) * 1000}ms`);
+  
+  return execution;
+}
+
+// Debug a failed execution
+debugFailedExecution('flow_abc123', 'exec_failed123')
+  .then(execution => {
+    console.log('Debugging complete');
+  })
+  .catch(error => {
+    console.error('Debug failed:', error.message);
+  });
+```
+
+</CodeGroup>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="List Flow Executions" icon="list" href="/api/flows/get-flows-executions">
+    Browse all executions for a flow
+  </Card>
+  <Card title="Cancel Execution" icon="stop" href="/api/flows/post-flows-executions-cancel">
+    Cancel a running execution
+  </Card>
+</CardGroup>
+
+<CardGroup cols={2}>
+  <Card title="Retry Execution" icon="refresh" href="/api/flows/post-flows-executions-retry">
+    Retry a failed execution
+  </Card>
+  <Card title="Execution Logs" icon="file-text" href="/api/executionlogs/get-execution-logs">
+    View detailed execution logs
+  </Card>
+</CardGroup>
+
+---
+
+<Info>
+**Tip**: Use the `include_logs=true` parameter to get detailed step-by-step information for debugging failed executions or analyzing performance bottlenecks.
+</Info>

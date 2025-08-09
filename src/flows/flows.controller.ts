@@ -1,25 +1,25 @@
 import {
-  Controller,
-  Get,
-  Post,
   Body,
-  Param,
-  Put,
+  Controller,
   Delete,
-  ValidationPipe,
-  HttpStatus,
+  Get,
   HttpCode,
+  HttpStatus,
   Optional,
+  Param,
+  Post,
+  Put,
+  ValidationPipe,
 } from '@nestjs/common';
 import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiParam,
   ApiBody,
+  ApiOperation,
+  ApiParam,
+  ApiResponse,
   ApiSecurity,
+  ApiTags,
 } from '@nestjs/swagger';
-import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { FlowsService } from './flows.service';
 import { FlowExecutorService } from './flow-executor.service';
 import { InngestExecutionService } from './inngest/inngest-execution.service';
@@ -471,7 +471,7 @@ export class FlowsController {
     description: 'Execution not found',
   })
   async getExecutionStatus(
-    @Param('id') flowId: string,
+    @Param('id') _flowId: string, // Reserved for future flow-scoped execution filtering
     @Param('executionId') executionId: string,
     @Tenant() tenant: TenantContext,
   ) {

@@ -1,7 +1,7 @@
 import {
-  createParamDecorator,
   ExecutionContext,
   InternalServerErrorException,
+  createParamDecorator,
 } from '@nestjs/common';
 import { TenantContext } from '../interfaces/tenant-context.interface';
 
@@ -18,8 +18,8 @@ export const Tenant = createParamDecorator(
     }
 
     // If still not found, try accessing the original request object
-    if (!tenant && (request as any).logContext) {
-      const logContext = (request as any).logContext;
+    if (!tenant && request.logContext) {
+      const logContext = request.logContext;
       tenant = {
         orgId: logContext.orgId,
         userId: logContext.userId,

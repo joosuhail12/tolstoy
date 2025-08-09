@@ -114,11 +114,11 @@ describe('OAuthController - Metrics', () => {
 
     it('should not increment success metrics when OAuth provider returns error', async () => {
       const params = { toolKey: 'github' };
-      const query = { 
+      const query = {
         code: '',
-        state: '', 
-        error: 'access_denied', 
-        error_description: 'User denied access' 
+        state: '',
+        error: 'access_denied',
+        error_description: 'User denied access',
       };
 
       await controller.handleCallback(params, query, mockResponse as Response);

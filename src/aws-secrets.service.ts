@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { PinoLogger, InjectPinoLogger } from 'nestjs-pino';
+import { InjectPinoLogger, PinoLogger } from 'nestjs-pino';
 import { ConfigService } from '@nestjs/config';
 import {
-  SecretsManagerClient,
+  CreateSecretCommand,
+  DeleteSecretCommand,
+  DescribeSecretCommand,
   GetSecretValueCommand,
   PutSecretValueCommand,
-  CreateSecretCommand,
-  DescribeSecretCommand,
-  DeleteSecretCommand,
   ResourceNotFoundException,
+  SecretsManagerClient,
 } from '@aws-sdk/client-secrets-manager';
 import { RedisCacheService } from './cache/redis-cache.service';
 import CacheKeys from './cache/cache-keys';
@@ -52,7 +52,7 @@ export class AwsSecretsService {
       const cached = await this.cacheService.get(cacheKey);
       if (cached) {
         this.logger.debug({ secretId, key, cached: true }, 'Using cached secret from Redis');
-        return cached;
+        return typeof cached === 'string' ? cached : JSON.stringify(cached);
       }
     }
 
@@ -114,7 +114,7 @@ export class AwsSecretsService {
         }
       }
 
-      throw lastError!;
+      throw lastError;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown secret retrieval error';
       this.logger.error(
@@ -131,7 +131,7 @@ export class AwsSecretsService {
               { secretId, key, cached: true, stale: true },
               'Using stale cached value from Redis due to error',
             );
-            return staleCache;
+            return typeof staleCache === 'string' ? staleCache : JSON.stringify(staleCache);
           }
         } catch (cacheError) {
           const cacheErrorMsg =
@@ -155,31 +155,31 @@ export class AwsSecretsService {
     }
   }
 
-  async getDatabaseUrl(secretId: string = 'conductor-db-secret'): Promise<string> {
+  async getDatabaseUrl(secretId: string = 'tolstoy/env'): Promise<string> {
     return this.getSecret(secretId, 'DATABASE_URL');
   }
 
-  async getDatabaseDirectUrl(secretId: string = 'conductor-db-secret'): Promise<string> {
+  async getDatabaseDirectUrl(secretId: string = 'tolstoy/env'): Promise<string> {
     return this.getSecret(secretId, 'DIRECT_URL');
   }
 
-  async getDaytonaApiKey(secretId: string = 'conductor-db-secret'): Promise<string> {
+  async getDaytonaApiKey(secretId: string = 'tolstoy/env'): Promise<string> {
     return this.getSecret(secretId, 'DAYTONA_API_KEY');
   }
 
-  async getDaytonaBaseUrl(secretId: string = 'conductor-db-secret'): Promise<string> {
+  async getDaytonaBaseUrl(secretId: string = 'tolstoy/env'): Promise<string> {
     return this.getSecret(secretId, 'DAYTONA_BASE_URL');
   }
 
-  async getDaytonaSyncTimeout(secretId: string = 'conductor-db-secret'): Promise<string> {
+  async getDaytonaSyncTimeout(secretId: string = 'tolstoy/env'): Promise<string> {
     return this.getSecret(secretId, 'DAYTONA_SYNC_TIMEOUT');
   }
 
-  async getDaytonaAsyncTimeout(secretId: string = 'conductor-db-secret'): Promise<string> {
+  async getDaytonaAsyncTimeout(secretId: string = 'tolstoy/env'): Promise<string> {
     return this.getSecret(secretId, 'DAYTONA_ASYNC_TIMEOUT');
   }
 
-  async getAblyApiKey(secretId: string = 'conductor-db-secret'): Promise<string> {
+  async getAblyApiKey(secretId: string = 'tolstoy/env'): Promise<string> {
     return this.getSecret(secretId, 'ABLY_API_KEY');
   }
 
@@ -191,14 +191,78 @@ export class AwsSecretsService {
     return this.getSecret(secretId, 'INNGEST_WEBHOOK_SECRET');
   }
 
+  async getInngestEventKey(secretId: string = 'tolstoy/env'): Promise<string> {
+    return this.getSecret(secretId, 'INNGEST_EVENT_KEY');
+  }
+
+  async getInngestSigningKey(secretId: string = 'tolstoy/env'): Promise<string> {
+    return this.getSecret(secretId, 'INNGEST_SIGNING_KEY');
+  }
+
   async getInngestConfig(secretId: string = 'tolstoy/env'): Promise<{
     apiKey: string;
     webhookSecret: string;
+    eventKey: string;
+    signingKey: string;
   }> {
     const secrets = await this.getSecretAsJson(secretId);
     return {
       apiKey: String(secrets.INNGEST_API_KEY),
       webhookSecret: String(secrets.INNGEST_WEBHOOK_SECRET),
+      eventKey: String(secrets.INNGEST_EVENT_KEY),
+      signingKey: String(secrets.INNGEST_SIGNING_KEY),
+    };
+  }
+
+  async getHcpClientId(secretId: string = 'tolstoy/env'): Promise<string> {
+    return this.getSecret(secretId, 'HCP_CLIENT_ID');
+  }
+
+  async getHcpClientSecret(secretId: string = 'tolstoy/env'): Promise<string> {
+    return this.getSecret(secretId, 'HCP_CLIENT_SECRET');
+  }
+
+  async getHcpServicePrincipalId(secretId: string = 'tolstoy/env'): Promise<string> {
+    return this.getSecret(secretId, 'HCP_SERVICE_PRINCIPAL_ID');
+  }
+
+  async getHcpConfig(secretId: string = 'tolstoy/env'): Promise<{
+    clientId: string;
+    clientSecret: string;
+    servicePrincipalId: string;
+  }> {
+    const secrets = await this.getSecretAsJson(secretId);
+    return {
+      clientId: String(secrets.HCP_CLIENT_ID),
+      clientSecret: String(secrets.HCP_CLIENT_SECRET),
+      servicePrincipalId: String(secrets.HCP_SERVICE_PRINCIPAL_ID),
+    };
+  }
+
+  async getStainlessToken(secretId: string = 'tolstoy/env'): Promise<string> {
+    return this.getSecret(secretId, 'STAINLESS_TOKEN');
+  }
+
+  async getSentryDsn(secretId: string = 'tolstoy/env'): Promise<string> {
+    return this.getSecret(secretId, 'SENTRY_DSN');
+  }
+
+  async getUpstashRedisUrl(secretId: string = 'tolstoy/env'): Promise<string> {
+    return this.getSecret(secretId, 'UPSTASH_REDIS_REST_URL');
+  }
+
+  async getUpstashRedisToken(secretId: string = 'tolstoy/env'): Promise<string> {
+    return this.getSecret(secretId, 'UPSTASH_REDIS_REST_TOKEN');
+  }
+
+  async getRedisConfig(secretId: string = 'tolstoy/env'): Promise<{
+    url: string;
+    token: string;
+  }> {
+    const secrets = await this.getSecretAsJson(secretId);
+    return {
+      url: String(secrets.UPSTASH_REDIS_REST_URL),
+      token: String(secrets.UPSTASH_REDIS_REST_TOKEN),
     };
   }
 

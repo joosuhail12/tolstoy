@@ -10,7 +10,10 @@ The official TypeScript SDK for the Tolstoy workflow automation platform. Build 
 ## Why Use the Tolstoy SDK?
 
 - **🔒 Multi-tenant Ready**: Built-in support for organization and user context
+- **🔐 OAuth2 Authentication**: Full support for 7 major OAuth2 providers with auto-refresh
 - **📝 Full Type Safety**: Complete TypeScript support with IntelliSense
+- **⚡ Action Execution**: Direct action execution with automatic credential injection
+- **📊 Monitoring Ready**: Built-in Prometheus metrics and health monitoring
 - **🎯 Simple & Powerful**: Helper methods for common tasks + raw API access
 - **⚡ Production Ready**: Comprehensive error handling and testing
 - **🔄 Always Current**: Auto-generated from OpenAPI specification
@@ -26,45 +29,60 @@ const client = new TolstoyClient(
   'your-user-id'
 );
 
-// Execute workflows
+// OAuth2 Authentication Setup
+await client.configureOAuth2({
+  toolId: 'github-tool-id',
+  provider: 'github',
+  clientId: 'your-github-client-id',
+  clientSecret: 'your-github-client-secret',
+  redirectUri: 'https://your-app.com/callback'
+});
+
+// Execute workflows with automatic auth injection
 const execution = await client.runFlow('flow_123', {
   userId: 'user_456',
   email: 'user@example.com'
 });
 
-// Manage integrations
-const tool = await client.createTool({
-  name: 'GitHub API',
-  baseUrl: 'https://api.github.com',
-  authType: 'bearer'
+// Execute standalone actions
+const actionResult = await client.executeAction('github-create-issue', {
+  title: 'Bug Report',
+  body: 'Found an issue with the authentication flow',
+  labels: ['bug', 'priority-high']
 });
 
-// Set up webhooks
-const webhook = await client.createWebhook({
-  name: 'Flow Monitor',
-  url: 'https://your-app.com/webhooks',
-  events: ['flow.completed', 'flow.failed']
-});
+// Monitor system health
+const health = await client.getDetailedHealth();
+console.log(`System status: ${health.database.status}`);
 ```
 
 ## Key Features
+
+### 🔐 OAuth2 Authentication
+Full OAuth2 integration with automatic token refresh for GitHub, Google, Microsoft, Slack, Discord, LinkedIn, and Facebook.
+
+### ⚡ Action Execution
+Execute individual actions directly with automatic credential injection and comprehensive input validation.
+
+### 📊 Health Monitoring
+Multi-level health checks with detailed system metrics, database status, and Redis connection monitoring.
 
 ### ⚡ Workflow Automation
 Execute and monitor workflows with full type safety. Support for both synchronous and asynchronous execution modes.
 
 ### 🔧 Tool Integrations
-Create and manage connections to external APIs and services. Support for multiple authentication methods.
+Create and manage connections to external APIs and services. Support for multiple authentication methods including OAuth2 and API keys.
 
 ### 🔗 Event-Driven Architecture
 Set up webhooks for real-time notifications about workflow events, user actions, and system changes.
 
 ### 📊 Complete API Coverage
-Access to all **52 API endpoints** across health, organizations, users, tools, actions, flows, logs, and webhooks.
+Access to all **60+ API endpoints** across health, organizations, users, tools, actions, flows, logs, webhooks, and authentication.
 
 ## Package Information
 
-- **Package**: `@joosuhail/tolstoy-sdk@1.0.0`
-- **Size**: 26.8 KB compressed, 221.7 kB unpacked
+- **Package**: `@joosuhail/tolstoy-sdk@1.0.1`
+- **Size**: 28.2 KB compressed, 235.4 kB unpacked  
 - **Dependencies**: axios (production-ready)
 - **Node.js**: 16.0.0+ required
 - **TypeScript**: 5.0.0+ recommended
@@ -77,20 +95,48 @@ The SDK provides two levels of access:
 Simplified methods for common operations with sensible defaults.
 
 ```typescript
+// OAuth2 authentication setup
+await client.setupOAuth2('github', {
+  clientId: 'your-client-id',
+  clientSecret: 'your-client-secret',
+  redirectUri: 'https://your-app.com/callback'
+});
+
+// Simple action execution with auto-auth
+const result = await client.executeAction('create-github-issue', {
+  title: 'New Feature Request',
+  body: 'Please add OAuth2 support'
+});
+
 // Simple workflow execution
 const execution = await client.runFlow('flow_id', inputs);
 
-// Easy tool creation
-const tool = await client.createTool(toolConfig);
+// Health monitoring
+const health = await client.checkHealth();
 ```
 
 ### 2. Raw API Access (Advanced)
 Direct access to all generated endpoints for advanced use cases.
 
 ```typescript
-// Advanced operations
-const metrics = await client.raw.flows.flowsControllerGetMetrics('flow_id');
+// Advanced OAuth2 operations
+const authUrl = await client.raw.auth.authControllerGetAuthorizeUrl({
+  provider: 'github',
+  orgId: 'org_123',
+  userId: 'user_456'
+});
+
+// Direct action execution
+const actionResult = await client.raw.actions.actionsControllerExecute(
+  'action_id',
+  { inputs: { title: 'Issue Title' } }
+);
+
+// Detailed health monitoring
 const health = await client.raw.health.healthControllerGetDetailedHealth();
+
+// Prometheus metrics access
+const metrics = await client.raw.metrics.metricsControllerGetMetrics();
 ```
 
 ## Multi-Tenant Architecture
@@ -180,40 +226,93 @@ Connect external services, manage API credentials, and monitor integration healt
 - **💬 Community**: Join our developer community
 - **🔄 Updates**: SDK automatically syncs with API changes
 
-## Next Steps
+## Ready to Build? Choose Your Path
 
 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
-  <div className="border rounded-lg p-4">
-    <h3 className="text-lg font-semibold mb-2">🚀 Get Started</h3>
-    <p className="text-sm text-gray-600 mb-3">Install the SDK and run your first workflow in 2 minutes.</p>
-    <a href="/sdk/installation" className="text-blue-600 font-medium">Installation Guide →</a>
+  <div className="border rounded-lg p-4 bg-gradient-to-br from-blue-50 to-blue-100">
+    <h3 className="text-lg font-semibold mb-2 text-blue-900">🚀 Quick Start</h3>
+    <p className="text-sm text-blue-700 mb-3">Install the SDK and execute your first workflow in under 2 minutes with comprehensive examples.</p>
+    <div className="space-y-2">
+      <a href="/sdk/quickstart" className="block text-blue-600 font-medium hover:text-blue-800">Quick Start Guide →</a>
+      <a href="/sdk/getting-started/installation" className="block text-blue-600 text-sm hover:text-blue-800">Installation & Setup →</a>
+    </div>
   </div>
   
-  <div className="border rounded-lg p-4">
-    <h3 className="text-lg font-semibold mb-2">🖥️ Use CLI</h3>
-    <p className="text-sm text-gray-600 mb-3">Command-line tools for authentication, actions, and automation.</p>
-    <a href="/sdk/cli" className="text-blue-600 font-medium">CLI Documentation →</a>
+  <div className="border rounded-lg p-4 bg-gradient-to-br from-green-50 to-green-100">
+    <h3 className="text-lg font-semibold mb-2 text-green-900">🖥️ CLI Integration</h3>
+    <p className="text-sm text-green-700 mb-3">Command-line tools for authentication, configuration, and automated deployment workflows.</p>
+    <div className="space-y-2">
+      <a href="/cli/overview" className="block text-green-600 font-medium hover:text-green-800">CLI Documentation →</a>
+      <a href="/cli/getting-started/installation" className="block text-green-600 text-sm hover:text-green-800">CLI Setup Guide →</a>
+    </div>
   </div>
   
-  <div className="border rounded-lg p-4">
-    <h3 className="text-lg font-semibold mb-2">💡 See Examples</h3>
-    <p className="text-sm text-gray-600 mb-3">Real-world implementations for common automation scenarios.</p>
-    <a href="/sdk/examples" className="text-blue-600 font-medium">View Examples →</a>
+  <div className="border rounded-lg p-4 bg-gradient-to-br from-purple-50 to-purple-100">
+    <h3 className="text-lg font-semibold mb-2 text-purple-900">💡 Real Examples</h3>
+    <p className="text-sm text-purple-700 mb-3">Complete implementations for user onboarding, e-commerce, marketing automation, and more.</p>
+    <div className="space-y-2">
+      <a href="/sdk/examples" className="block text-purple-600 font-medium hover:text-purple-800">View Examples →</a>
+      <a href="/sdk/examples/user-onboarding" className="block text-purple-600 text-sm hover:text-purple-800">User Onboarding →</a>
+      <a href="/sdk/examples/ecommerce" className="block text-purple-600 text-sm hover:text-purple-800">E-commerce Automation →</a>
+    </div>
   </div>
   
-  <div className="border rounded-lg p-4">
-    <h3 className="text-lg font-semibold mb-2">🔧 Core Features</h3>
-    <p className="text-sm text-gray-600 mb-3">Learn about workflows, tools, webhooks, and advanced patterns.</p>
-    <a href="/sdk/core-features" className="text-blue-600 font-medium">Explore Features →</a>
+  <div className="border rounded-lg p-4 bg-gradient-to-br from-orange-50 to-orange-100">
+    <h3 className="text-lg font-semibold mb-2 text-orange-900">🔧 Core Features</h3>
+    <p className="text-sm text-orange-700 mb-3">Master workflows, tools, webhooks, multi-tenant architecture, and advanced patterns.</p>
+    <div className="space-y-2">
+      <a href="/sdk/core-features" className="block text-orange-600 font-medium hover:text-orange-800">Explore Features →</a>
+      <a href="/sdk/authentication" className="block text-orange-600 text-sm hover:text-orange-800">Authentication →</a>
+      <a href="/sdk/guides/multi-tenant" className="block text-orange-600 text-sm hover:text-orange-800">Multi-Tenant Setup →</a>
+    </div>
   </div>
   
-  <div className="border rounded-lg p-4">
-    <h3 className="text-lg font-semibold mb-2">📚 API Reference</h3>
-    <p className="text-sm text-gray-600 mb-3">Complete method documentation and type definitions.</p>
-    <a href="/sdk/api-reference" className="text-blue-600 font-medium">Browse API →</a>
+  <div className="border rounded-lg p-4 bg-gradient-to-br from-gray-50 to-gray-100">
+    <h3 className="text-lg font-semibold mb-2 text-gray-900">📚 Complete Reference</h3>
+    <p className="text-sm text-gray-700 mb-3">Comprehensive API documentation, method signatures, and TypeScript type definitions.</p>
+    <div className="space-y-2">
+      <a href="/sdk/api-reference" className="block text-gray-600 font-medium hover:text-gray-800">API Reference →</a>
+      <a href="/sdk/resources/flows/overview" className="block text-gray-600 text-sm hover:text-gray-800">Flows API →</a>
+      <a href="/sdk/resources/tools/overview" className="block text-gray-600 text-sm hover:text-gray-800">Tools API →</a>
+    </div>
+  </div>
+  
+  <div className="border rounded-lg p-4 bg-gradient-to-br from-indigo-50 to-indigo-100">
+    <h3 className="text-lg font-semibold mb-2 text-indigo-900">🎓 Learning Resources</h3>
+    <p className="text-sm text-indigo-700 mb-3">Tutorials, best practices, troubleshooting guides, and community resources.</p>
+    <div className="space-y-2">
+      <a href="/sdk/guides" className="block text-indigo-600 font-medium hover:text-indigo-800">Guides & Tutorials →</a>
+      <a href="/sdk/troubleshooting" className="block text-indigo-600 text-sm hover:text-indigo-800">Troubleshooting →</a>
+      <a href="/sdk/best-practices" className="block text-indigo-600 text-sm hover:text-indigo-800">Best Practices →</a>
+    </div>
+  </div>
+</div>
+
+## Why Choose Tolstoy SDK?
+
+<div className="bg-gray-50 border-l-4 border-blue-500 p-6 my-8">
+  <div className="flex">
+    <div className="flex-shrink-0">
+      <span className="text-2xl">🎯</span>
+    </div>
+    <div className="ml-3">
+      <h3 className="text-lg font-medium text-gray-900">Built for Production Scale</h3>
+      <div className="mt-2 text-sm text-gray-700 space-y-2">
+        <p>• <strong>Type Safety:</strong> Full TypeScript support with IntelliSense and compile-time validation</p>
+        <p>• <strong>Error Handling:</strong> Comprehensive error types with retry strategies and fallback mechanisms</p>
+        <p>• <strong>Multi-Tenant:</strong> Built-in organization isolation for SaaS applications</p>
+        <p>• <strong>Performance:</strong> Connection pooling, intelligent caching, and optimized API calls</p>
+        <p>• <strong>Monitoring:</strong> Real-time webhooks, detailed logging, and execution analytics</p>
+        <p>• <strong>Security:</strong> API key management, OAuth2 support, and webhook signature verification</p>
+      </div>
+    </div>
   </div>
 </div>
 
 ---
 
-*The Tolstoy SDK is automatically generated from our OpenAPI specification and is always up-to-date with the latest API changes.*
+<div className="text-center text-gray-600 text-sm mt-12">
+  <p><strong>🔄 Always Up-to-Date</strong></p>
+  <p>The Tolstoy TypeScript SDK is automatically generated from our OpenAPI specification and stays synchronized with the latest API changes.</p>
+  <p className="mt-2">Package: <code>@joosuhail/tolstoy-sdk</code> | Size: 26.8 KB compressed | Node.js 16+ | TypeScript 5+ recommended</p>
+</div>

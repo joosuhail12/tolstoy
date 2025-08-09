@@ -30,15 +30,15 @@ import { AuthModule } from '../../auth/auth.module';
       useFactory: async (secretsService: AwsSecretsService) => {
         try {
           // Fetch Inngest credentials from AWS Secrets Manager
-          const eventKey = await secretsService.getSecret('tolstoy/env', 'INNGEST_API_KEY');
+          const inngestConfig = await secretsService.getInngestConfig();
 
           return {
             appId: 'tolstoy-workflow-engine',
-            signingKey: eventKey, // Add signingKey for nestjs-inngest compatibility
+            signingKey: inngestConfig.signingKey, // Use proper signing key
             inngest: {
               id: 'tolstoy',
               name: 'Tolstoy Workflow Engine',
-              eventKey: eventKey,
+              eventKey: inngestConfig.eventKey, // Use event key
             },
             serve: {
               servePort: process.env.PORT || 3000,
@@ -68,11 +68,11 @@ import { AuthModule } from '../../auth/auth.module';
           // Fallback to environment variables if AWS Secrets fail
           return {
             appId: 'tolstoy-workflow-engine',
-            signingKey: process.env.INNGEST_API_KEY || 'dev-key', // Add signingKey for nestjs-inngest compatibility
+            signingKey: process.env.INNGEST_SIGNING_KEY || process.env.INNGEST_API_KEY || 'dev-key',
             inngest: {
               id: 'tolstoy',
               name: 'Tolstoy Workflow Engine',
-              eventKey: process.env.INNGEST_API_KEY || 'dev-key',
+              eventKey: process.env.INNGEST_EVENT_KEY || process.env.INNGEST_API_KEY || 'dev-key',
             },
             serve: {
               servePort: process.env.PORT || 3000,
