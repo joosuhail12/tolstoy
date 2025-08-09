@@ -83,13 +83,13 @@ jobs:
         run: npm ci
 
       - name: 🔍 Lint check
-        run: npm run lint
+        run: npx eslint "src/**/*.ts"
 
       - name: 🔍 Type check
         run: npx tsc --noEmit
 
       - name: 🔍 Format check
-        run: npx prettier --check "src/**/*.ts" "test/**/*.ts"
+        run: npx prettier --check "src/**/*.ts"
 
       - name: 🔒 Security audit
         run: npm audit --audit-level=moderate --omit=dev

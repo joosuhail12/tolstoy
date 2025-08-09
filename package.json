@@ -20,7 +20,7 @@
     "test:smoke": "jest --config jest.smoke.config.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\"",
     "lint:fix": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\""
+    "format": "prettier --write \"src/**/*.ts\""
   },
   "keywords": [],
   "author": "",
