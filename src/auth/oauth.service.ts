@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { randomUUID } from 'crypto';
 import axios, { AxiosResponse } from 'axios';
 import { AuthConfigService } from './auth-config.service';
@@ -22,7 +23,7 @@ export interface OAuthTokenResponse {
 export interface OAuthConfig {
   clientId: string;
   clientSecret: string;
-  redirectUri: string;
+  redirectUri?: string; // Now optional - will use dynamic redirect URI
   scope?: string;
   authorizeUrl?: string;
   tokenUrl?: string;
@@ -35,7 +36,19 @@ export class OAuthService {
   constructor(
     private readonly authConfig: AuthConfigService,
     private readonly redisCache: RedisCacheService,
+    private readonly configService: ConfigService,
   ) {}
+
+  /**
+   * Build redirect URI for OAuth callback based on current domain configuration
+   */
+  private buildRedirectUri(toolKey: string): string {
+    const baseUrl = this.configService.get('NODE_ENV') === 'production'
+      ? `https://${this.configService.get('DOMAIN', 'tolstoy.getpullse.com')}`
+      : `http://localhost:${this.configService.get('PORT', '3000')}`;
+    
+    return `${baseUrl}/auth/oauth/${toolKey}/callback`;
+  }
 
   /**
    * Generate OAuth authorization URL with state parameter
@@ -73,10 +86,14 @@ export class OAuthService {
 
       // Build authorization URL
       const authorizeUrl = oauthConfig.authorizeUrl || this.getDefaultAuthorizeUrl(toolKey);
+      
+      // Use configured redirect URI or build one based on current domain
+      const redirectUri = oauthConfig.redirectUri || this.buildRedirectUri(toolKey);
+      
       const params = new URLSearchParams({
         response_type: 'code',
         client_id: oauthConfig.clientId,
-        redirect_uri: oauthConfig.redirectUri,
+        redirect_uri: redirectUri,
         state,
         ...(oauthConfig.scope && { scope: oauthConfig.scope }),
       });
@@ -252,9 +269,7 @@ export class OAuthService {
       throw new BadRequestException(`Missing clientSecret for OAuth2 configuration of ${toolKey}`);
     }
 
-    if (!config.redirectUri) {
-      throw new BadRequestException(`Missing redirectUri for OAuth2 configuration of ${toolKey}`);
-    }
+    // redirectUri is now optional - will use dynamic redirect URI if not configured
 
     return {
       clientId: config.clientId as string,

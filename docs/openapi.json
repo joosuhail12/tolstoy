@@ -1,6 +1,39 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/health": {
+      "get": {
+        "description": "Simple health check endpoint (deprecated - use /status instead)",
+        "operationId": "AppController_getHealth",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Basic health status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "ok"
+                    },
+                    "timestamp": {
+                      "type": "string",
+                      "example": "2025-08-08T10:30:00.000Z"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Basic Health Check",
+        "tags": [
+          "App"
+        ]
+      }
+    },
     "/status": {
       "get": {
         "description": "Get basic application health status",
@@ -42,7 +75,7 @@
         ]
       }
     },
-    "/status/detailed": {
+    "/detailed": {
       "get": {
         "description": "Get comprehensive health status including database, environment, and system information",
         "operationId": "HealthController_getDetailedHealth",
@@ -4432,26 +4465,38 @@
         ]
       }
     },
-    "/health": {
+    "/version": {
       "get": {
-        "description": "Simple health check endpoint (deprecated - use /status instead)",
-        "operationId": "AppController_getHealth",
+        "description": "Get version information including build details and commit hash",
+        "operationId": "AppController_getVersion",
         "parameters": [],
         "responses": {
           "200": {
-            "description": "Basic health status",
+            "description": "Version information retrieved successfully",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
+                    "version": {
                       "type": "string",
-                      "example": "ok"
+                      "example": "1.0.0"
                     },
-                    "timestamp": {
+                    "commit": {
                       "type": "string",
-                      "example": "2025-08-08T10:30:00.000Z"
+                      "example": "abc123def456"
+                    },
+                    "buildTime": {
+                      "type": "string",
+                      "example": "2025-08-09T10:30:00.000Z"
+                    },
+                    "nodeVersion": {
+                      "type": "string",
+                      "example": "20.11.0"
+                    },
+                    "environment": {
+                      "type": "string",
+                      "example": "production"
                     }
                   }
                 }
@@ -4459,7 +4504,7 @@
             }
           }
         },
-        "summary": "Basic Health Check",
+        "summary": "Version Information",
         "tags": [
           "App"
         ]
@@ -4469,11 +4514,15 @@
   "info": {
     "title": "Tolstoy API",
     "description": "Interactive API reference for Tolstoy workflow automation platform",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "contact": {}
   },
   "tags": [],
   "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Development"
+    },
     {
       "url": "https://tolstoy.getpullse.com",
       "description": "Production"

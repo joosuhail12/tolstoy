@@ -3,11 +3,32 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { DatabaseHealthCheck, HealthCheck, HealthService } from './health.service';
 
 @ApiTags('Health')
-@Controller('status')
+@Controller()
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
-  @Get()
+  // Simple health endpoint for load balancers
+  @Get('health')
+  @ApiOperation({
+    summary: 'Load Balancer Health Check',
+    description: 'Simple health check endpoint for load balancers and monitoring systems',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Application is healthy',
+    schema: {
+      type: 'object',
+      properties: {
+        status: { type: 'string', example: 'ok' },
+      },
+    },
+  })
+  async getSimpleHealth(): Promise<{ status: string }> {
+    // Simple health check - just return ok if the service is running
+    return { status: 'ok' };
+  }
+
+  @Get('status')
   @ApiOperation({
     summary: 'Health Check',
     description: 'Get basic application health status',

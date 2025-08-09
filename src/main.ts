@@ -4,6 +4,7 @@ import './instrument';
 // All other imports below
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Logger } from 'nestjs-pino';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
@@ -11,6 +12,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AppModule } from './app.module';
 import { SentryExceptionFilter } from './common/filters/sentry-exception.filter';
+import fastifyHelmet from '@fastify/helmet';
+import fastifyCors from '@fastify/cors';
+import fastifyRateLimit from '@fastify/rate-limit';
 
 interface FastifyInstance {
   route(options: {
@@ -32,12 +36,68 @@ interface FastifyReply {
 async function bootstrap() {
   const app: NestFastifyApplication = await NestFactory.create(
     AppModule,
-    new FastifyAdapter({ logger: false }),
+    new FastifyAdapter({ 
+      logger: false,
+      trustProxy: true, // Trust proxy headers from Cloudflare
+    }),
     { bufferLogs: true },
   );
 
   // Use Pino logger globally
   app.useLogger(app.get(Logger));
+  
+  // Get configuration service
+  const configService = app.get(ConfigService);
+  const isProduction = configService.get('NODE_ENV') === 'production';
+  const domain = configService.get('DOMAIN', 'tolstoy.getpullse.com');
+  const port = parseInt(configService.get('PORT', '3000'), 10);
+
+  // Configure security headers with Helmet
+  await app.register(fastifyHelmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: [`'self'`],
+        styleSrc: [`'self'`, `'unsafe-inline'`, 'cdnjs.cloudflare.com'],
+        scriptSrc: [`'self'`, 'cdnjs.cloudflare.com'],
+        imgSrc: [`'self'`, 'data:', 'https:'],
+        connectSrc: [`'self'`],
+        fontSrc: [`'self'`, 'cdnjs.cloudflare.com'],
+        objectSrc: [`'none'`],
+        mediaSrc: [`'self'`],
+        frameSrc: [`'none'`],
+      },
+    },
+    crossOriginEmbedderPolicy: false, // Disable for API compatibility
+  });
+
+  // Configure CORS for production domain
+  await app.register(fastifyCors, {
+    origin: isProduction 
+      ? [`https://${domain}`, 'https://*.getpullse.com']
+      : true, // Allow all origins in development
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'x-org-id',
+      'x-user-id',
+      'x-api-key',
+      'Accept',
+      'User-Agent',
+    ],
+  });
+
+  // Configure rate limiting
+  await app.register(fastifyRateLimit, {
+    max: parseInt(configService.get('RATE_LIMIT_MAX_REQUESTS', '1000'), 10),
+    timeWindow: parseInt(configService.get('RATE_LIMIT_WINDOW_MS', '900000'), 10), // 15 minutes
+    errorResponseBuilder: () => ({
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: 'Rate limit exceeded, please try again later.',
+    }),
+  });
 
   // Enable global validation
   app.useGlobalPipes(
@@ -53,10 +113,12 @@ async function bootstrap() {
   app.useGlobalFilters(new SentryExceptionFilter(app.get(Logger)));
 
   // Configure Swagger/OpenAPI
+  const baseUrl = isProduction ? `https://${domain}` : `http://localhost:${port}`;
   const config = new DocumentBuilder()
     .setTitle('Tolstoy API')
     .setDescription('Interactive API reference for Tolstoy workflow automation platform')
-    .setVersion(process.env.APP_VERSION || '1.0.0')
+    .setVersion(configService.get('APP_VERSION', '1.1.0'))
+    .addServer(baseUrl, isProduction ? 'Production' : 'Development')
     .addServer('https://tolstoy.getpullse.com', 'Production')
     .addServer('http://localhost:3000', 'Development')
     .addApiKey(
@@ -118,10 +180,13 @@ async function bootstrap() {
     });
   });
 
-  await app.listen(3000, '0.0.0.0');
+  await app.listen(port, '0.0.0.0');
 
   const logger = app.get(Logger);
-  logger.log('Application is running on: http://localhost:3000', 'Bootstrap');
+  logger.log(`Application is running on: ${baseUrl}`, 'Bootstrap');
+  logger.log(`Environment: ${configService.get('NODE_ENV', 'development')}`, 'Bootstrap');
+  logger.log(`Domain: ${domain}`, 'Bootstrap');
+  logger.log(`CORS origins: ${isProduction ? `https://${domain}, https://*.getpullse.com` : 'all origins'}`, 'Bootstrap');
 }
 
 bootstrap();
