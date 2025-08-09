@@ -110,7 +110,7 @@ jobs:
             
             pm2 save
             
-            echo "✅ Deployment completed!"
+            echo "✅ Deployment completed successfully!"
           EOF
 
       - name: Health check
