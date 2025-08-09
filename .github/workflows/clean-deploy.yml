@@ -102,6 +102,12 @@ jobs:
             echo "🔨 Building application..."
             npm run build
             
+            echo "🗃️ Configuring environment for database migrations..."
+            # Get database URLs from AWS Secrets Manager for Prisma CLI
+            SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id tolstoy/env --region us-east-1 --query 'SecretString' --output text)
+            export DATABASE_URL=$(echo $SECRET_JSON | jq -r '.DATABASE_URL')
+            export DIRECT_URL=$(echo $SECRET_JSON | jq -r '.DIRECT_URL')
+            
             echo "🗃️ Running database migrations..."
             npx prisma migrate deploy
             
