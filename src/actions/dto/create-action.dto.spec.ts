@@ -22,7 +22,7 @@ describe('CreateActionDto', () => {
 
   const validHeaders = {
     'Content-Type': 'application/json',
-    'Authorization': 'Bearer {token}',
+    Authorization: 'Bearer {token}',
   };
 
   it('should pass validation with valid data', async () => {
@@ -102,13 +102,7 @@ describe('CreateActionDto', () => {
 
   describe('key validation', () => {
     it('should pass validation with valid key', async () => {
-      const validKeys = [
-        'test_action',
-        'send_message',
-        'create_user',
-        'get_data',
-        'action123',
-      ];
+      const validKeys = ['test_action', 'send_message', 'create_user', 'get_data', 'action123'];
 
       for (const key of validKeys) {
         const validData = {
@@ -306,7 +300,7 @@ describe('CreateActionDto', () => {
         inputSchema: validInputSchema,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer token',
+          Authorization: 'Bearer token',
           'X-API-Key': 'key123',
         },
       };
@@ -503,7 +497,7 @@ describe('CreateActionDto', () => {
       const errors = await validate(dto);
 
       expect(errors.length).toBeGreaterThan(0);
-      
+
       const errorProperties = errors.map(error => error.property);
       expect(errorProperties).toContain('name');
       expect(errorProperties).toContain('key');

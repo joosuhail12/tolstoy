@@ -307,7 +307,7 @@ describe('CreateToolDto', () => {
       const errors = await validate(dto);
 
       expect(errors.length).toBeGreaterThanOrEqual(2);
-      
+
       const errorProperties = errors.map(error => error.property);
       expect(errorProperties).toContain('name');
       expect(errorProperties).toContain('baseUrl');
@@ -342,7 +342,7 @@ describe('CreateToolDto', () => {
       const errors = await validate(dto);
 
       expect(errors.length).toBeGreaterThan(0);
-      
+
       const errorProperties = errors.map(error => error.property);
       expect(errorProperties).toContain('name');
       expect(errorProperties).toContain('baseUrl');
@@ -360,7 +360,7 @@ describe('CreateToolDto', () => {
       const errors = await validate(dto);
 
       expect(errors.length).toBeGreaterThan(0);
-      
+
       const errorProperties = errors.map(error => error.property);
       expect(errorProperties).toContain('name');
       expect(errorProperties).toContain('baseUrl');

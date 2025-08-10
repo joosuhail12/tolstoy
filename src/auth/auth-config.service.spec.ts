@@ -272,7 +272,11 @@ describe('AuthConfigService', () => {
 
   describe('setOrgAuthConfig', () => {
     it('should create or update org auth config and invalidate cache', async () => {
-      const newConfig = { apiKey: 'new-key', headerName: 'Authorization', headerValue: 'Bearer new-key' };
+      const newConfig = {
+        apiKey: 'new-key',
+        headerName: 'Authorization',
+        headerValue: 'Bearer new-key',
+      };
       prismaService.toolAuthConfig.upsert.mockResolvedValue({
         ...mockOrgAuthConfig,
         tool: mockTool,

@@ -37,9 +37,7 @@ describe('ToolsController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [ToolsController],
-      providers: [
-        { provide: ToolsService, useValue: mockToolsService },
-      ],
+      providers: [{ provide: ToolsService, useValue: mockToolsService }],
     }).compile();
 
     controller = module.get<ToolsController>(ToolsController);
@@ -79,8 +77,9 @@ describe('ToolsController', () => {
 
       toolsService.create.mockRejectedValue(new BadRequestException('Tool name already exists'));
 
-      await expect(controller.create(createToolDto, mockTenantContext))
-        .rejects.toThrow(BadRequestException);
+      await expect(controller.create(createToolDto, mockTenantContext)).rejects.toThrow(
+        BadRequestException,
+      );
 
       expect(toolsService.create).toHaveBeenCalledWith(createToolDto, mockTenantContext);
     });
@@ -120,8 +119,9 @@ describe('ToolsController', () => {
     it('should throw NotFoundException when tool does not exist', async () => {
       toolsService.findOne.mockRejectedValue(new NotFoundException('Tool not found'));
 
-      await expect(controller.findOne('non-existent-tool', mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(controller.findOne('non-existent-tool', mockTenantContext)).rejects.toThrow(
+        NotFoundException,
+      );
 
       expect(toolsService.findOne).toHaveBeenCalledWith('non-existent-tool', mockTenantContext);
     });
@@ -140,7 +140,11 @@ describe('ToolsController', () => {
       const result = await controller.update('tool-123', updateToolDto, mockTenantContext);
 
       expect(result).toEqual(updatedTool);
-      expect(toolsService.update).toHaveBeenCalledWith('tool-123', updateToolDto, mockTenantContext);
+      expect(toolsService.update).toHaveBeenCalledWith(
+        'tool-123',
+        updateToolDto,
+        mockTenantContext,
+      );
     });
 
     it('should handle partial updates', async () => {
@@ -154,17 +158,26 @@ describe('ToolsController', () => {
       const result = await controller.update('tool-123', partialUpdateDto, mockTenantContext);
 
       expect(result).toEqual(updatedTool);
-      expect(toolsService.update).toHaveBeenCalledWith('tool-123', partialUpdateDto, mockTenantContext);
+      expect(toolsService.update).toHaveBeenCalledWith(
+        'tool-123',
+        partialUpdateDto,
+        mockTenantContext,
+      );
     });
 
     it('should throw NotFoundException when updating non-existent tool', async () => {
       const updateDto: UpdateToolDto = { name: 'Updated Name' };
       toolsService.update.mockRejectedValue(new NotFoundException('Tool not found'));
 
-      await expect(controller.update('non-existent-tool', updateDto, mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        controller.update('non-existent-tool', updateDto, mockTenantContext),
+      ).rejects.toThrow(NotFoundException);
 
-      expect(toolsService.update).toHaveBeenCalledWith('non-existent-tool', updateDto, mockTenantContext);
+      expect(toolsService.update).toHaveBeenCalledWith(
+        'non-existent-tool',
+        updateDto,
+        mockTenantContext,
+      );
     });
   });
 
@@ -180,8 +193,9 @@ describe('ToolsController', () => {
     it('should throw NotFoundException when removing non-existent tool', async () => {
       toolsService.remove.mockRejectedValue(new NotFoundException('Tool not found'));
 
-      await expect(controller.remove('non-existent-tool', mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(controller.remove('non-existent-tool', mockTenantContext)).rejects.toThrow(
+        NotFoundException,
+      );
 
       expect(toolsService.remove).toHaveBeenCalledWith('non-existent-tool', mockTenantContext);
     });
@@ -198,16 +212,18 @@ describe('ToolsController', () => {
         authType: 'apiKey',
       };
 
-      await expect(controller.create(createDto, mockTenantContext))
-        .rejects.toThrow(BadRequestException);
+      await expect(controller.create(createDto, mockTenantContext)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should handle unexpected errors gracefully', async () => {
       const unexpectedError = new Error('Unexpected database error');
       toolsService.findAll.mockRejectedValue(unexpectedError);
 
-      await expect(controller.findAll(mockTenantContext))
-        .rejects.toThrow('Unexpected database error');
+      await expect(controller.findAll(mockTenantContext)).rejects.toThrow(
+        'Unexpected database error',
+      );
     });
   });
 

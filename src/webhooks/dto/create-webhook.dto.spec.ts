@@ -624,7 +624,7 @@ describe('CreateWebhookDto', () => {
       const errors = await validate(dto);
 
       expect(errors.length).toBeGreaterThan(0);
-      
+
       const errorProperties = errors.map(error => error.property);
       expect(errorProperties).toContain('name');
       expect(errorProperties).toContain('url');
@@ -650,7 +650,7 @@ describe('CreateWebhookDto', () => {
       const errors = await validate(dto);
 
       expect(errors.length).toBeGreaterThan(0);
-      
+
       const errorProperties = errors.map(error => error.property);
       expect(errorProperties).toContain('name');
       expect(errorProperties).toContain('url');
@@ -668,7 +668,7 @@ describe('CreateWebhookDto', () => {
       const errors = await validate(dto);
 
       expect(errors.length).toBeGreaterThan(0);
-      
+
       const errorProperties = errors.map(error => error.property);
       expect(errorProperties).toContain('name');
       expect(errorProperties).toContain('url');

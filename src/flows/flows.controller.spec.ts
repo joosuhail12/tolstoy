@@ -140,11 +140,12 @@ describe('FlowsController', () => {
       };
 
       flowsService.create.mockRejectedValue(
-        new BadRequestException('Flow with name "Existing Flow" already exists')
+        new BadRequestException('Flow with name "Existing Flow" already exists'),
       );
 
-      await expect(controller.create(createFlowDto, mockTenantContext))
-        .rejects.toThrow(BadRequestException);
+      await expect(controller.create(createFlowDto, mockTenantContext)).rejects.toThrow(
+        BadRequestException,
+      );
 
       expect(flowsService.create).toHaveBeenCalledWith(createFlowDto, mockTenantContext);
       expect(metricsService.recordFlowCreation).not.toHaveBeenCalled();
@@ -175,10 +176,7 @@ describe('FlowsController', () => {
 
   describe('findAll', () => {
     it('should return array of flows for organization', async () => {
-      const mockFlows = [
-        mockFlow,
-        { ...mockFlow, id: 'flow-456', name: 'Another Flow' },
-      ];
+      const mockFlows = [mockFlow, { ...mockFlow, id: 'flow-456', name: 'Another Flow' }];
       flowsService.findAll.mockResolvedValue(mockFlows);
 
       const result = await controller.findAll(mockTenantContext);
@@ -219,8 +217,9 @@ describe('FlowsController', () => {
     it('should throw NotFoundException when flow does not exist', async () => {
       flowsService.findOne.mockRejectedValue(new NotFoundException('Flow not found'));
 
-      await expect(controller.findOne('non-existent-flow', mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(controller.findOne('non-existent-flow', mockTenantContext)).rejects.toThrow(
+        NotFoundException,
+      );
 
       expect(flowsService.findOne).toHaveBeenCalledWith('non-existent-flow', mockTenantContext);
     });
@@ -239,7 +238,11 @@ describe('FlowsController', () => {
       const result = await controller.update('flow-123', updateFlowDto, mockTenantContext);
 
       expect(result).toEqual(updatedFlow);
-      expect(flowsService.update).toHaveBeenCalledWith('flow-123', updateFlowDto, mockTenantContext);
+      expect(flowsService.update).toHaveBeenCalledWith(
+        'flow-123',
+        updateFlowDto,
+        mockTenantContext,
+      );
       expect(metricsService.recordFlowUpdate).toHaveBeenCalledWith({
         orgId: mockTenantContext.orgId,
         flowId: 'flow-123',
@@ -258,7 +261,11 @@ describe('FlowsController', () => {
       const result = await controller.update('flow-123', partialUpdateDto, mockTenantContext);
 
       expect(result).toEqual(updatedFlow);
-      expect(flowsService.update).toHaveBeenCalledWith('flow-123', partialUpdateDto, mockTenantContext);
+      expect(flowsService.update).toHaveBeenCalledWith(
+        'flow-123',
+        partialUpdateDto,
+        mockTenantContext,
+      );
     });
   });
 
@@ -278,8 +285,9 @@ describe('FlowsController', () => {
     it('should throw NotFoundException when removing non-existent flow', async () => {
       flowsService.remove.mockRejectedValue(new NotFoundException('Flow not found'));
 
-      await expect(controller.remove('non-existent-flow', mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(controller.remove('non-existent-flow', mockTenantContext)).rejects.toThrow(
+        NotFoundException,
+      );
 
       expect(flowsService.remove).toHaveBeenCalledWith('non-existent-flow', mockTenantContext);
     });
@@ -300,7 +308,11 @@ describe('FlowsController', () => {
       const result = await controller.execute(executeData, mockTenantContext);
 
       expect(result).toEqual(mockExecutionResult);
-      expect(flowsService.execute).toHaveBeenCalledWith(executeData.flowId, executeData.variables, mockTenantContext);
+      expect(flowsService.execute).toHaveBeenCalledWith(
+        executeData.flowId,
+        executeData.variables,
+        mockTenantContext,
+      );
       expect(metricsService.recordFlowExecution).toHaveBeenCalledWith({
         orgId: mockTenantContext.orgId,
         flowId: 'flow-123',
@@ -316,13 +328,18 @@ describe('FlowsController', () => {
       };
 
       flowsService.execute.mockRejectedValue(
-        new BadRequestException('Flow execution failed: invalid variables')
+        new BadRequestException('Flow execution failed: invalid variables'),
       );
 
-      await expect(controller.execute(executeData, mockTenantContext))
-        .rejects.toThrow(BadRequestException);
+      await expect(controller.execute(executeData, mockTenantContext)).rejects.toThrow(
+        BadRequestException,
+      );
 
-      expect(flowsService.execute).toHaveBeenCalledWith(executeData.flowId, executeData.variables, mockTenantContext);
+      expect(flowsService.execute).toHaveBeenCalledWith(
+        executeData.flowId,
+        executeData.variables,
+        mockTenantContext,
+      );
     });
 
     it('should execute flow without variables', async () => {
@@ -361,8 +378,9 @@ describe('FlowsController', () => {
     it('should throw NotFoundException for non-existent execution', async () => {
       flowsService.getExecution.mockRejectedValue(new NotFoundException('Execution not found'));
 
-      await expect(controller.getExecution('non-existent-exec', mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(controller.getExecution('non-existent-exec', mockTenantContext)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -447,16 +465,18 @@ describe('FlowsController', () => {
         settings: {},
       };
 
-      await expect(controller.create(createDto, mockTenantContext))
-        .rejects.toThrow(BadRequestException);
+      await expect(controller.create(createDto, mockTenantContext)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should handle unexpected errors gracefully', async () => {
       const unexpectedError = new Error('Unexpected database error');
       flowsService.findAll.mockRejectedValue(unexpectedError);
 
-      await expect(controller.findAll(mockTenantContext))
-        .rejects.toThrow('Unexpected database error');
+      await expect(controller.findAll(mockTenantContext)).rejects.toThrow(
+        'Unexpected database error',
+      );
     });
   });
 });

@@ -96,11 +96,11 @@ describe('WebhooksController', () => {
           url: createWebhookDto.url,
           eventTypes: createWebhookDto.eventTypes,
         },
-        'Creating webhook'
+        'Creating webhook',
       );
       expect(logger.info).toHaveBeenCalledWith(
         { orgId: mockTenantContext.orgId, webhookId: mockWebhook.id },
-        'Webhook created successfully'
+        'Webhook created successfully',
       );
     });
 
@@ -112,11 +112,14 @@ describe('WebhooksController', () => {
       };
 
       webhooksService.create.mockRejectedValue(
-        new BadRequestException('Webhook with URL "https://api.existing.com/webhook" already exists')
+        new BadRequestException(
+          'Webhook with URL "https://api.existing.com/webhook" already exists',
+        ),
       );
 
-      await expect(controller.create(createWebhookDto, mockTenantContext))
-        .rejects.toThrow(BadRequestException);
+      await expect(controller.create(createWebhookDto, mockTenantContext)).rejects.toThrow(
+        BadRequestException,
+      );
 
       expect(webhooksService.create).toHaveBeenCalledWith(createWebhookDto, mockTenantContext);
       expect(logger.info).toHaveBeenCalledWith(
@@ -125,7 +128,7 @@ describe('WebhooksController', () => {
           url: createWebhookDto.url,
           eventTypes: createWebhookDto.eventTypes,
         },
-        'Creating webhook'
+        'Creating webhook',
       );
     });
 
@@ -223,10 +226,14 @@ describe('WebhooksController', () => {
     it('should throw NotFoundException when webhook does not exist', async () => {
       webhooksService.findOne.mockRejectedValue(new NotFoundException('Webhook not found'));
 
-      await expect(controller.findOne('non-existent-webhook', mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(controller.findOne('non-existent-webhook', mockTenantContext)).rejects.toThrow(
+        NotFoundException,
+      );
 
-      expect(webhooksService.findOne).toHaveBeenCalledWith('non-existent-webhook', mockTenantContext);
+      expect(webhooksService.findOne).toHaveBeenCalledWith(
+        'non-existent-webhook',
+        mockTenantContext,
+      );
     });
   });
 
@@ -244,7 +251,11 @@ describe('WebhooksController', () => {
       const result = await controller.update('webhook-123', updateWebhookDto, mockTenantContext);
 
       expect(result).toEqual(updatedWebhook);
-      expect(webhooksService.update).toHaveBeenCalledWith('webhook-123', updateWebhookDto, mockTenantContext);
+      expect(webhooksService.update).toHaveBeenCalledWith(
+        'webhook-123',
+        updateWebhookDto,
+        mockTenantContext,
+      );
     });
 
     it('should handle partial updates', async () => {
@@ -258,17 +269,26 @@ describe('WebhooksController', () => {
       const result = await controller.update('webhook-123', partialUpdateDto, mockTenantContext);
 
       expect(result).toEqual(updatedWebhook);
-      expect(webhooksService.update).toHaveBeenCalledWith('webhook-123', partialUpdateDto, mockTenantContext);
+      expect(webhooksService.update).toHaveBeenCalledWith(
+        'webhook-123',
+        partialUpdateDto,
+        mockTenantContext,
+      );
     });
 
     it('should throw NotFoundException when updating non-existent webhook', async () => {
       const updateDto: UpdateWebhookDto = { name: 'Updated Name' };
       webhooksService.update.mockRejectedValue(new NotFoundException('Webhook not found'));
 
-      await expect(controller.update('non-existent-webhook', updateDto, mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        controller.update('non-existent-webhook', updateDto, mockTenantContext),
+      ).rejects.toThrow(NotFoundException);
 
-      expect(webhooksService.update).toHaveBeenCalledWith('non-existent-webhook', updateDto, mockTenantContext);
+      expect(webhooksService.update).toHaveBeenCalledWith(
+        'non-existent-webhook',
+        updateDto,
+        mockTenantContext,
+      );
     });
   });
 
@@ -281,24 +301,28 @@ describe('WebhooksController', () => {
       expect(webhooksService.remove).toHaveBeenCalledWith('webhook-123', mockTenantContext);
       expect(logger.warn).toHaveBeenCalledWith(
         { webhookId: 'webhook-123', orgId: mockTenantContext.orgId },
-        'Deleting webhook'
+        'Deleting webhook',
       );
       expect(logger.info).toHaveBeenCalledWith(
         { webhookId: 'webhook-123', orgId: mockTenantContext.orgId },
-        'Webhook deleted successfully'
+        'Webhook deleted successfully',
       );
     });
 
     it('should throw NotFoundException when removing non-existent webhook', async () => {
       webhooksService.remove.mockRejectedValue(new NotFoundException('Webhook not found'));
 
-      await expect(controller.remove('non-existent-webhook', mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(controller.remove('non-existent-webhook', mockTenantContext)).rejects.toThrow(
+        NotFoundException,
+      );
 
-      expect(webhooksService.remove).toHaveBeenCalledWith('non-existent-webhook', mockTenantContext);
+      expect(webhooksService.remove).toHaveBeenCalledWith(
+        'non-existent-webhook',
+        mockTenantContext,
+      );
       expect(logger.warn).toHaveBeenCalledWith(
         { webhookId: 'non-existent-webhook', orgId: mockTenantContext.orgId },
-        'Deleting webhook'
+        'Deleting webhook',
       );
     });
   });
@@ -319,21 +343,25 @@ describe('WebhooksController', () => {
       expect(webhooksService.toggle).toHaveBeenCalledWith('webhook-123', mockTenantContext);
       expect(logger.info).toHaveBeenCalledWith(
         { webhookId: 'webhook-123', orgId: mockTenantContext.orgId },
-        'Toggling webhook enabled status'
+        'Toggling webhook enabled status',
       );
       expect(logger.info).toHaveBeenCalledWith(
         { webhookId: 'webhook-123', orgId: mockTenantContext.orgId, enabled: false },
-        'Webhook status toggled'
+        'Webhook status toggled',
       );
     });
 
     it('should throw NotFoundException when toggling non-existent webhook', async () => {
       webhooksService.toggle.mockRejectedValue(new NotFoundException('Webhook not found'));
 
-      await expect(controller.toggle('non-existent-webhook', mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(controller.toggle('non-existent-webhook', mockTenantContext)).rejects.toThrow(
+        NotFoundException,
+      );
 
-      expect(webhooksService.toggle).toHaveBeenCalledWith('non-existent-webhook', mockTenantContext);
+      expect(webhooksService.toggle).toHaveBeenCalledWith(
+        'non-existent-webhook',
+        mockTenantContext,
+      );
     });
   });
 
@@ -353,11 +381,11 @@ describe('WebhooksController', () => {
       expect(webhooksService.testWebhook).toHaveBeenCalledWith('webhook-123', mockTenantContext);
       expect(logger.info).toHaveBeenCalledWith(
         { webhookId: 'webhook-123', orgId: mockTenantContext.orgId },
-        'Testing webhook'
+        'Testing webhook',
       );
       expect(logger.info).toHaveBeenCalledWith(
         { webhookId: 'webhook-123', orgId: mockTenantContext.orgId, success: true },
-        'Webhook test completed'
+        'Webhook test completed',
       );
     });
 
@@ -376,17 +404,21 @@ describe('WebhooksController', () => {
       expect(webhooksService.testWebhook).toHaveBeenCalledWith('webhook-123', mockTenantContext);
       expect(logger.info).toHaveBeenCalledWith(
         { webhookId: 'webhook-123', orgId: mockTenantContext.orgId, success: false },
-        'Webhook test completed'
+        'Webhook test completed',
       );
     });
 
     it('should throw NotFoundException when testing non-existent webhook', async () => {
       webhooksService.testWebhook.mockRejectedValue(new NotFoundException('Webhook not found'));
 
-      await expect(controller.testWebhook('non-existent-webhook', mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        controller.testWebhook('non-existent-webhook', mockTenantContext),
+      ).rejects.toThrow(NotFoundException);
 
-      expect(webhooksService.testWebhook).toHaveBeenCalledWith('non-existent-webhook', mockTenantContext);
+      expect(webhooksService.testWebhook).toHaveBeenCalledWith(
+        'non-existent-webhook',
+        mockTenantContext,
+      );
     });
   });
 
@@ -401,16 +433,18 @@ describe('WebhooksController', () => {
         eventTypes: ['flow.execution.completed'],
       };
 
-      await expect(controller.create(createDto, mockTenantContext))
-        .rejects.toThrow(BadRequestException);
+      await expect(controller.create(createDto, mockTenantContext)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should handle unexpected errors gracefully', async () => {
       const unexpectedError = new Error('Unexpected database error');
       webhooksService.findAll.mockRejectedValue(unexpectedError);
 
-      await expect(controller.findAll(undefined, mockTenantContext))
-        .rejects.toThrow('Unexpected database error');
+      await expect(controller.findAll(undefined, mockTenantContext)).rejects.toThrow(
+        'Unexpected database error',
+      );
     });
   });
 
@@ -427,17 +461,19 @@ describe('WebhooksController', () => {
       await controller.create(createDto, mockTenantContext);
 
       expect(logger.info).toHaveBeenCalledTimes(2);
-      expect(logger.info).toHaveBeenNthCalledWith(1,
+      expect(logger.info).toHaveBeenNthCalledWith(
+        1,
         {
           orgId: mockTenantContext.orgId,
           url: createDto.url,
           eventTypes: createDto.eventTypes,
         },
-        'Creating webhook'
+        'Creating webhook',
       );
-      expect(logger.info).toHaveBeenNthCalledWith(2,
+      expect(logger.info).toHaveBeenNthCalledWith(
+        2,
         { orgId: mockTenantContext.orgId, webhookId: mockWebhook.id },
-        'Webhook created successfully'
+        'Webhook created successfully',
       );
     });
   });

@@ -126,11 +126,12 @@ describe('ActionsController', () => {
       };
 
       actionsService.create.mockRejectedValue(
-        new BadRequestException('Action with key "existing_action" already exists')
+        new BadRequestException('Action with key "existing_action" already exists'),
       );
 
-      await expect(controller.create(createActionDto, mockTenantContext))
-        .rejects.toThrow(BadRequestException);
+      await expect(controller.create(createActionDto, mockTenantContext)).rejects.toThrow(
+        BadRequestException,
+      );
 
       expect(actionsService.create).toHaveBeenCalledWith(createActionDto, mockTenantContext);
       expect(metricsService.recordActionCreation).not.toHaveBeenCalled();
@@ -183,8 +184,9 @@ describe('ActionsController', () => {
     it('should throw NotFoundException when action does not exist', async () => {
       actionsService.findOne.mockRejectedValue(new NotFoundException('Action not found'));
 
-      await expect(controller.findOne('non-existent-action', mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(controller.findOne('non-existent-action', mockTenantContext)).rejects.toThrow(
+        NotFoundException,
+      );
 
       expect(actionsService.findOne).toHaveBeenCalledWith('non-existent-action', mockTenantContext);
     });
@@ -203,7 +205,11 @@ describe('ActionsController', () => {
       const result = await controller.update('action-123', updateActionDto, mockTenantContext);
 
       expect(result).toEqual(updatedAction);
-      expect(actionsService.update).toHaveBeenCalledWith('action-123', updateActionDto, mockTenantContext);
+      expect(actionsService.update).toHaveBeenCalledWith(
+        'action-123',
+        updateActionDto,
+        mockTenantContext,
+      );
       expect(metricsService.recordActionUpdate).toHaveBeenCalledWith({
         orgId: mockTenantContext.orgId,
         actionId: 'action-123',
@@ -222,17 +228,26 @@ describe('ActionsController', () => {
       const result = await controller.update('action-123', partialUpdateDto, mockTenantContext);
 
       expect(result).toEqual(updatedAction);
-      expect(actionsService.update).toHaveBeenCalledWith('action-123', partialUpdateDto, mockTenantContext);
+      expect(actionsService.update).toHaveBeenCalledWith(
+        'action-123',
+        partialUpdateDto,
+        mockTenantContext,
+      );
     });
 
     it('should throw NotFoundException when updating non-existent action', async () => {
       const updateDto: UpdateActionDto = { name: 'Updated Name' };
       actionsService.update.mockRejectedValue(new NotFoundException('Action not found'));
 
-      await expect(controller.update('non-existent-action', updateDto, mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        controller.update('non-existent-action', updateDto, mockTenantContext),
+      ).rejects.toThrow(NotFoundException);
 
-      expect(actionsService.update).toHaveBeenCalledWith('non-existent-action', updateDto, mockTenantContext);
+      expect(actionsService.update).toHaveBeenCalledWith(
+        'non-existent-action',
+        updateDto,
+        mockTenantContext,
+      );
     });
   });
 
@@ -252,8 +267,9 @@ describe('ActionsController', () => {
     it('should throw NotFoundException when removing non-existent action', async () => {
       actionsService.remove.mockRejectedValue(new NotFoundException('Action not found'));
 
-      await expect(controller.remove('non-existent-action', mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(controller.remove('non-existent-action', mockTenantContext)).rejects.toThrow(
+        NotFoundException,
+      );
 
       expect(actionsService.remove).toHaveBeenCalledWith('non-existent-action', mockTenantContext);
     });
@@ -277,7 +293,11 @@ describe('ActionsController', () => {
       const result = await controller.execute('test_action', executeDto, mockTenantContext);
 
       expect(result).toEqual(executionResult);
-      expect(actionsService.execute).toHaveBeenCalledWith('test_action', executeDto, mockTenantContext);
+      expect(actionsService.execute).toHaveBeenCalledWith(
+        'test_action',
+        executeDto,
+        mockTenantContext,
+      );
       expect(metricsService.recordActionExecution).toHaveBeenCalledWith({
         orgId: mockTenantContext.orgId,
         actionKey: 'test_action',
@@ -303,7 +323,11 @@ describe('ActionsController', () => {
       const result = await controller.execute('test_action', executeDto, mockTenantContext);
 
       expect(result).toEqual(executionResult);
-      expect(actionsService.execute).toHaveBeenCalledWith('test_action', executeDto, mockTenantContext);
+      expect(actionsService.execute).toHaveBeenCalledWith(
+        'test_action',
+        executeDto,
+        mockTenantContext,
+      );
       expect(metricsService.recordActionExecution).toHaveBeenCalledWith({
         orgId: mockTenantContext.orgId,
         actionKey: 'test_action',
@@ -315,24 +339,30 @@ describe('ActionsController', () => {
     it('should throw NotFoundException when executing non-existent action', async () => {
       const executeDto: ExecuteActionDto = { message: 'test' };
       actionsService.execute.mockRejectedValue(
-        new NotFoundException('Action with key "non_existent_action" not found')
+        new NotFoundException('Action with key "non_existent_action" not found'),
       );
 
-      await expect(controller.execute('non_existent_action', executeDto, mockTenantContext))
-        .rejects.toThrow(NotFoundException);
+      await expect(
+        controller.execute('non_existent_action', executeDto, mockTenantContext),
+      ).rejects.toThrow(NotFoundException);
 
-      expect(actionsService.execute).toHaveBeenCalledWith('non_existent_action', executeDto, mockTenantContext);
+      expect(actionsService.execute).toHaveBeenCalledWith(
+        'non_existent_action',
+        executeDto,
+        mockTenantContext,
+      );
     });
 
     it('should handle validation errors in execution input', async () => {
       const invalidExecuteDto = {}; // Missing required fields
 
       actionsService.execute.mockRejectedValue(
-        new BadRequestException('Validation failed: message is required')
+        new BadRequestException('Validation failed: message is required'),
       );
 
-      await expect(controller.execute('test_action', invalidExecuteDto as ExecuteActionDto, mockTenantContext))
-        .rejects.toThrow(BadRequestException);
+      await expect(
+        controller.execute('test_action', invalidExecuteDto as ExecuteActionDto, mockTenantContext),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 
@@ -351,16 +381,18 @@ describe('ActionsController', () => {
         outputSchema: [],
       };
 
-      await expect(controller.create(createDto, mockTenantContext))
-        .rejects.toThrow(BadRequestException);
+      await expect(controller.create(createDto, mockTenantContext)).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('should handle unexpected errors gracefully', async () => {
       const unexpectedError = new Error('Unexpected database error');
       actionsService.findAll.mockRejectedValue(unexpectedError);
 
-      await expect(controller.findAll(mockTenantContext))
-        .rejects.toThrow('Unexpected database error');
+      await expect(controller.findAll(mockTenantContext)).rejects.toThrow(
+        'Unexpected database error',
+      );
     });
   });
 
