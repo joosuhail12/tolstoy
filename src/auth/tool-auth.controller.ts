@@ -28,9 +28,9 @@ import {
 import { AuthConfigService } from './auth-config.service';
 import { CreateAuthConfigDto } from './dto/create-auth-config.dto';
 import {
+  AuthConfigListResponseDto,
   AuthConfigResponseDto,
   DeleteAuthConfigResponseDto,
-  AuthConfigListResponseDto,
 } from './dto/auth-config-response.dto';
 import { MetricsService } from '../metrics/metrics.service';
 import { PrismaService } from '../prisma.service';

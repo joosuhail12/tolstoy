@@ -10,7 +10,7 @@ export class AuthConfigResponseDto {
   @ApiProperty({ description: 'Tool ID' })
   toolId: string;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Configuration name',
     example: 'default',
   })
@@ -27,7 +27,7 @@ export class AuthConfigResponseDto {
   })
   config: Record<string, unknown>;
 
-  @ApiProperty({ 
+  @ApiProperty({
     description: 'Whether this is the default configuration for the tool',
     example: false,
   })

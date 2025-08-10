@@ -1,11 +1,11 @@
 import {
+  IsBoolean,
   IsIn,
   IsNotEmpty,
   IsObject,
+  IsOptional,
   IsString,
   Validate,
-  IsOptional,
-  IsBoolean,
 } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { AuthConfigValidator } from './create-auth-config.validator';
@@ -34,7 +34,6 @@ export class CreateAuthConfigDto {
   @ApiProperty({
     description: 'Name for this configuration (e.g., "production", "staging", "development")',
     example: 'production',
-    required: true,
   })
   @IsString()
   @IsNotEmpty()

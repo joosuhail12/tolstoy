@@ -26,6 +26,7 @@ describe('ActionsController', () => {
     endpoint: '/api/test',
     toolId: 'tool-123',
     orgId: mockTenantContext.orgId,
+    headers: { 'Content-Type': 'application/json' },
     inputSchema: [
       {
         name: 'message',
@@ -35,7 +36,8 @@ describe('ActionsController', () => {
         control: 'text',
       },
     ],
-    outputSchema: [],
+    executeIf: null,
+    version: 1,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -48,7 +50,7 @@ describe('ActionsController', () => {
       findByKey: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
-      execute: jest.fn(),
+      executeAction: jest.fn(),
     };
 
     const mockMetricsService = {
@@ -56,7 +58,7 @@ describe('ActionsController', () => {
       recordActionCreation: jest.fn(),
       recordActionUpdate: jest.fn(),
       recordActionDeletion: jest.fn(),
-      recordActionExecution: jest.fn(),
+      // No recordActionExecution method in MetricsService
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -288,12 +290,12 @@ describe('ActionsController', () => {
         data: { result: 'Action executed successfully' },
       };
 
-      actionsService.execute.mockResolvedValue(executionResult);
+      actionsService.executeAction.mockResolvedValue(executionResult);
 
-      const result = await controller.execute('test_action', executeDto, mockTenantContext);
+      const result = await controller.execute('org-123', 'user-456', 'test_action', executeDto);
 
       expect(result).toEqual(executionResult);
-      expect(actionsService.execute).toHaveBeenCalledWith(
+      expect(actionsService.executeAction).toHaveBeenCalledWith(
         'test_action',
         executeDto,
         mockTenantContext,
@@ -318,12 +320,12 @@ describe('ActionsController', () => {
         data: { error: 'API returned 500' },
       };
 
-      actionsService.execute.mockResolvedValue(executionResult);
+      actionsService.executeAction.mockResolvedValue(executionResult);
 
-      const result = await controller.execute('test_action', executeDto, mockTenantContext);
+      const result = await controller.execute('org-123', 'user-456', 'test_action', executeDto);
 
       expect(result).toEqual(executionResult);
-      expect(actionsService.execute).toHaveBeenCalledWith(
+      expect(actionsService.executeAction).toHaveBeenCalledWith(
         'test_action',
         executeDto,
         mockTenantContext,
@@ -337,8 +339,8 @@ describe('ActionsController', () => {
     });
 
     it('should throw NotFoundException when executing non-existent action', async () => {
-      const executeDto: ExecuteActionDto = { message: 'test' };
-      actionsService.execute.mockRejectedValue(
+      const executeDto: ExecuteActionDto = { inputs: { message: 'test' } };
+      actionsService.executeAction.mockRejectedValue(
         new NotFoundException('Action with key "non_existent_action" not found'),
       );
 
@@ -346,7 +348,7 @@ describe('ActionsController', () => {
         controller.execute('non_existent_action', executeDto, mockTenantContext),
       ).rejects.toThrow(NotFoundException);
 
-      expect(actionsService.execute).toHaveBeenCalledWith(
+      expect(actionsService.executeAction).toHaveBeenCalledWith(
         'non_existent_action',
         executeDto,
         mockTenantContext,
@@ -356,12 +358,12 @@ describe('ActionsController', () => {
     it('should handle validation errors in execution input', async () => {
       const invalidExecuteDto = {}; // Missing required fields
 
-      actionsService.execute.mockRejectedValue(
+      actionsService.executeAction.mockRejectedValue(
         new BadRequestException('Validation failed: message is required'),
       );
 
       await expect(
-        controller.execute('test_action', invalidExecuteDto as ExecuteActionDto, mockTenantContext),
+        controller.execute('org-123', 'user-456', 'test_action', invalidExecuteDto as ExecuteActionDto),
       ).rejects.toThrow(BadRequestException);
     });
   });
@@ -377,8 +379,8 @@ describe('ActionsController', () => {
         method: 'POST',
         endpoint: '/api/test',
         toolId: 'tool-123',
+        headers: {},
         inputSchema: [],
-        outputSchema: [],
       };
 
       await expect(controller.create(createDto, mockTenantContext)).rejects.toThrow(
