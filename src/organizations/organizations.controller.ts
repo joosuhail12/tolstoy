@@ -27,28 +27,8 @@ export class OrganizationsController {
     description: 'Create a new organization',
   })
   @ApiBody({
+    type: CreateOrganizationDto,
     description: 'Organization details',
-    schema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Organization name',
-          example: 'Acme Corp',
-        },
-        description: {
-          type: 'string',
-          description: 'Organization description',
-          example: 'Leading technology company',
-        },
-        settings: {
-          type: 'object',
-          description: 'Organization settings',
-          example: { timezone: 'UTC', currency: 'USD' },
-        },
-      },
-      required: ['name'],
-    },
   })
   @ApiResponse({
     status: 201,

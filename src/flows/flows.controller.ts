@@ -48,54 +48,8 @@ export class FlowsController {
     description: 'Create a new workflow with steps and configuration',
   })
   @ApiBody({
+    type: CreateFlowDto,
     description: 'Flow definition',
-    schema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Flow name',
-          example: 'User Onboarding Flow',
-        },
-        description: {
-          type: 'string',
-          description: 'Flow description',
-          example: 'Automated user onboarding process with email and notifications',
-        },
-        version: {
-          type: 'number',
-          description: 'Flow version number',
-          example: 1,
-        },
-        steps: {
-          type: 'array',
-          description: 'Workflow steps definition',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string', example: 'step_1' },
-              type: { type: 'string', example: 'action' },
-              actionId: { type: 'string', example: 'action_abc123' },
-              config: { type: 'object', example: { timeout: 30000 } },
-            },
-          },
-          example: [
-            {
-              id: 'step_1',
-              type: 'action',
-              actionId: 'action_send_email',
-              config: { to: '{{user.email}}', template: 'welcome' },
-            },
-          ],
-        },
-        settings: {
-          type: 'object',
-          description: 'Flow execution settings',
-          example: { timeout: 300000, retries: 2 },
-        },
-      },
-      required: ['name', 'steps'],
-    },
   })
   @ApiResponse({
     status: 201,

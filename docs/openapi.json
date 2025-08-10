@@ -245,30 +245,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "Organization name",
-                    "example": "Acme Corp"
-                  },
-                  "description": {
-                    "type": "string",
-                    "description": "Organization description",
-                    "example": "Leading technology company"
-                  },
-                  "settings": {
-                    "type": "object",
-                    "description": "Organization settings",
-                    "example": {
-                      "timezone": "UTC",
-                      "currency": "USD"
-                    }
-                  }
-                },
-                "required": [
-                  "name"
-                ]
+                "$ref": "#/components/schemas/CreateOrganizationDto"
               }
             }
           }
@@ -537,42 +514,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "format": "email",
-                    "description": "User email address",
-                    "example": "john.doe@example.com"
-                  },
-                  "name": {
-                    "type": "string",
-                    "description": "User full name",
-                    "example": "John Doe"
-                  },
-                  "role": {
-                    "type": "string",
-                    "description": "User role",
-                    "enum": [
-                      "admin",
-                      "member",
-                      "viewer"
-                    ],
-                    "example": "member"
-                  },
-                  "profile": {
-                    "type": "object",
-                    "description": "User profile information",
-                    "example": {
-                      "department": "Engineering",
-                      "title": "Software Engineer"
-                    }
-                  }
-                },
-                "required": [
-                  "email",
-                  "name"
-                ]
+                "$ref": "#/components/schemas/CreateUserDto"
               }
             }
           }
@@ -1255,109 +1197,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "Human-readable action name",
-                    "example": "Send Slack Message"
-                  },
-                  "key": {
-                    "type": "string",
-                    "description": "Unique identifier for the action",
-                    "example": "slack_send_message"
-                  },
-                  "toolId": {
-                    "type": "string",
-                    "description": "ID of the associated tool",
-                    "example": "tool_slack_123"
-                  },
-                  "method": {
-                    "type": "string",
-                    "description": "HTTP method for the action",
-                    "enum": [
-                      "GET",
-                      "POST",
-                      "PUT",
-                      "DELETE",
-                      "PATCH"
-                    ],
-                    "example": "POST"
-                  },
-                  "endpoint": {
-                    "type": "string",
-                    "description": "API endpoint URL or path",
-                    "example": "/api/chat.postMessage"
-                  },
-                  "headers": {
-                    "type": "object",
-                    "description": "HTTP headers required for the action",
-                    "example": {
-                      "Content-Type": "application/json",
-                      "Authorization": "Bearer {token}"
-                    }
-                  },
-                  "inputSchema": {
-                    "type": "array",
-                    "description": "Schema defining input parameters for the action",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string",
-                          "example": "channel"
-                        },
-                        "type": {
-                          "type": "string",
-                          "example": "string"
-                        },
-                        "required": {
-                          "type": "boolean",
-                          "example": true
-                        },
-                        "description": {
-                          "type": "string",
-                          "example": "Slack channel ID"
-                        }
-                      }
-                    },
-                    "example": [
-                      {
-                        "name": "channel",
-                        "type": "string",
-                        "required": true,
-                        "description": "Slack channel ID"
-                      },
-                      {
-                        "name": "text",
-                        "type": "string",
-                        "required": true,
-                        "description": "Message content"
-                      }
-                    ]
-                  },
-                  "executeIf": {
-                    "type": "object",
-                    "description": "Conditional execution rules (optional)",
-                    "example": {
-                      "user.role": "admin"
-                    }
-                  },
-                  "version": {
-                    "type": "number",
-                    "description": "Action version number",
-                    "example": 1
-                  }
-                },
-                "required": [
-                  "name",
-                  "key",
-                  "toolId",
-                  "method",
-                  "endpoint",
-                  "headers",
-                  "inputSchema"
-                ]
+                "$ref": "#/components/schemas/CreateActionDto"
               }
             }
           }
@@ -2758,74 +2598,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "Flow name",
-                    "example": "User Onboarding Flow"
-                  },
-                  "description": {
-                    "type": "string",
-                    "description": "Flow description",
-                    "example": "Automated user onboarding process with email and notifications"
-                  },
-                  "version": {
-                    "type": "number",
-                    "description": "Flow version number",
-                    "example": 1
-                  },
-                  "steps": {
-                    "type": "array",
-                    "description": "Workflow steps definition",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": {
-                          "type": "string",
-                          "example": "step_1"
-                        },
-                        "type": {
-                          "type": "string",
-                          "example": "action"
-                        },
-                        "actionId": {
-                          "type": "string",
-                          "example": "action_abc123"
-                        },
-                        "config": {
-                          "type": "object",
-                          "example": {
-                            "timeout": 30000
-                          }
-                        }
-                      }
-                    },
-                    "example": [
-                      {
-                        "id": "step_1",
-                        "type": "action",
-                        "actionId": "action_send_email",
-                        "config": {
-                          "to": "{{user.email}}",
-                          "template": "welcome"
-                        }
-                      }
-                    ]
-                  },
-                  "settings": {
-                    "type": "object",
-                    "description": "Flow execution settings",
-                    "example": {
-                      "timeout": 300000,
-                      "retries": 2
-                    }
-                  }
-                },
-                "required": [
-                  "name",
-                  "steps"
-                ]
+                "$ref": "#/components/schemas/CreateFlowDto"
               }
             }
           }
@@ -4905,6 +4678,70 @@
       }
     },
     "schemas": {
+      "CreateOrganizationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Organization name",
+            "example": "Acme Corp"
+          },
+          "description": {
+            "type": "string",
+            "description": "Organization description",
+            "example": "Leading technology company"
+          },
+          "settings": {
+            "type": "object",
+            "description": "Organization settings",
+            "example": {
+              "timezone": "UTC",
+              "currency": "USD"
+            }
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "CreateUserDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "User email address",
+            "format": "email",
+            "example": "john.doe@example.com"
+          },
+          "name": {
+            "type": "string",
+            "description": "User full name",
+            "example": "John Doe"
+          },
+          "role": {
+            "type": "string",
+            "description": "User role",
+            "enum": [
+              "admin",
+              "member",
+              "viewer"
+            ],
+            "example": "member"
+          },
+          "profile": {
+            "type": "object",
+            "description": "User profile information",
+            "example": {
+              "department": "Engineering",
+              "title": "Software Engineer"
+            }
+          }
+        },
+        "required": [
+          "email",
+          "name"
+        ]
+      },
       "CreateToolDto": {
         "type": "object",
         "properties": {
@@ -4929,6 +4766,111 @@
           "name",
           "baseUrl",
           "authType"
+        ]
+      },
+      "CreateActionDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Human-readable action name",
+            "example": "Send Slack Message"
+          },
+          "key": {
+            "type": "string",
+            "description": "Unique identifier for the action",
+            "example": "slack_send_message"
+          },
+          "toolId": {
+            "type": "string",
+            "description": "ID of the associated tool",
+            "example": "tool_slack_123"
+          },
+          "method": {
+            "type": "string",
+            "description": "HTTP method for the action",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "DELETE",
+              "PATCH"
+            ],
+            "example": "POST"
+          },
+          "endpoint": {
+            "type": "string",
+            "description": "API endpoint URL or path",
+            "example": "/api/chat.postMessage"
+          },
+          "headers": {
+            "type": "object",
+            "description": "HTTP headers required for the action",
+            "example": {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer {token}"
+            }
+          },
+          "inputSchema": {
+            "type": "array",
+            "description": "Schema defining input parameters for the action",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "example": "channel"
+                },
+                "type": {
+                  "type": "string",
+                  "example": "string"
+                },
+                "required": {
+                  "type": "boolean",
+                  "example": true
+                },
+                "description": {
+                  "type": "string",
+                  "example": "Slack channel ID"
+                }
+              }
+            },
+            "example": [
+              {
+                "name": "channel",
+                "type": "string",
+                "required": true,
+                "description": "Slack channel ID"
+              },
+              {
+                "name": "text",
+                "type": "string",
+                "required": true,
+                "description": "Message content"
+              }
+            ]
+          },
+          "executeIf": {
+            "type": "object",
+            "description": "Conditional execution rules (optional)",
+            "example": {
+              "user.role": "admin"
+            }
+          },
+          "version": {
+            "type": "number",
+            "description": "Action version number",
+            "example": 1
+          }
+        },
+        "required": [
+          "name",
+          "key",
+          "toolId",
+          "method",
+          "endpoint",
+          "headers",
+          "inputSchema"
         ]
       },
       "ExecuteActionDto": {
@@ -5214,6 +5156,76 @@
         },
         "required": [
           "success"
+        ]
+      },
+      "CreateFlowDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Flow name",
+            "example": "User Onboarding Flow"
+          },
+          "description": {
+            "type": "string",
+            "description": "Flow description",
+            "example": "Automated user onboarding process with email and notifications"
+          },
+          "version": {
+            "type": "number",
+            "description": "Flow version number",
+            "example": 1
+          },
+          "steps": {
+            "type": "array",
+            "description": "Workflow steps definition",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "example": "step_1"
+                },
+                "type": {
+                  "type": "string",
+                  "example": "action"
+                },
+                "actionId": {
+                  "type": "string",
+                  "example": "action_abc123"
+                },
+                "config": {
+                  "type": "object",
+                  "example": {
+                    "timeout": 30000
+                  }
+                }
+              }
+            },
+            "example": [
+              {
+                "id": "step_1",
+                "type": "action",
+                "actionId": "action_send_email",
+                "config": {
+                  "to": "{{user.email}}",
+                  "template": "welcome"
+                }
+              }
+            ]
+          },
+          "settings": {
+            "type": "object",
+            "description": "Flow execution settings",
+            "example": {
+              "timeout": 300000,
+              "retries": 2
+            }
+          }
+        },
+        "required": [
+          "name",
+          "steps"
         ]
       }
     }

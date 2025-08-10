@@ -38,35 +38,8 @@ export class UsersController {
     description: 'Create a new user in the organization',
   })
   @ApiBody({
+    type: CreateUserDto,
     description: 'User details',
-    schema: {
-      type: 'object',
-      properties: {
-        email: {
-          type: 'string',
-          format: 'email',
-          description: 'User email address',
-          example: 'john.doe@example.com',
-        },
-        name: {
-          type: 'string',
-          description: 'User full name',
-          example: 'John Doe',
-        },
-        role: {
-          type: 'string',
-          description: 'User role',
-          enum: ['admin', 'member', 'viewer'],
-          example: 'member',
-        },
-        profile: {
-          type: 'object',
-          description: 'User profile information',
-          example: { department: 'Engineering', title: 'Software Engineer' },
-        },
-      },
-      required: ['email', 'name'],
-    },
   })
   @ApiResponse({
     status: 201,

@@ -44,84 +44,8 @@ export class ActionsController {
       'Create a reusable action template for workflows. Actions define API calls that can be executed within workflow steps.',
   })
   @ApiBody({
+    type: CreateActionDto,
     description: 'Action template configuration',
-    schema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Human-readable action name',
-          example: 'Send Slack Message',
-        },
-        key: {
-          type: 'string',
-          description: 'Unique identifier for the action',
-          example: 'slack_send_message',
-        },
-        toolId: {
-          type: 'string',
-          description: 'ID of the associated tool',
-          example: 'tool_slack_123',
-        },
-        method: {
-          type: 'string',
-          description: 'HTTP method for the action',
-          enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-          example: 'POST',
-        },
-        endpoint: {
-          type: 'string',
-          description: 'API endpoint URL or path',
-          example: '/api/chat.postMessage',
-        },
-        headers: {
-          type: 'object',
-          description: 'HTTP headers required for the action',
-          example: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer {token}',
-          },
-        },
-        inputSchema: {
-          type: 'array',
-          description: 'Schema defining input parameters for the action',
-          items: {
-            type: 'object',
-            properties: {
-              name: { type: 'string', example: 'channel' },
-              type: { type: 'string', example: 'string' },
-              required: { type: 'boolean', example: true },
-              description: { type: 'string', example: 'Slack channel ID' },
-            },
-          },
-          example: [
-            {
-              name: 'channel',
-              type: 'string',
-              required: true,
-              description: 'Slack channel ID',
-            },
-            {
-              name: 'text',
-              type: 'string',
-              required: true,
-              description: 'Message content',
-            },
-          ],
-        },
-        executeIf: {
-          type: 'object',
-          description: 'Conditional execution rules (optional)',
-          example: { 'user.role': 'admin' },
-        },
-        version: {
-          type: 'number',
-          description: 'Action version number',
-          example: 1,
-        },
-      },
-      required: ['name', 'key', 'toolId', 'method', 'endpoint', 'headers', 'inputSchema'],
-    },
   })
   @ApiResponse({
     status: 201,
