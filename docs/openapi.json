@@ -1,89 +1,6 @@
 {
   "openapi": "3.0.0",
   "paths": {
-    "/": {
-      "get": {
-        "description": "Get a welcome message from the Tolstoy API",
-        "operationId": "AppController_getHello",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Welcome message retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "string",
-                  "example": "Welcome to Tolstoy - Workflow Automation Platform"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Welcome Message",
-        "tags": [
-          "App"
-        ]
-      }
-    },
-    "/version": {
-      "get": {
-        "description": "Get version information including build details and commit hash",
-        "operationId": "AppController_getVersion",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Version information retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "version": {
-                      "type": "string",
-                      "example": "1.0.0"
-                    },
-                    "commit": {
-                      "type": "string",
-                      "example": "abc123def456"
-                    },
-                    "buildTime": {
-                      "type": "string",
-                      "example": "2025-08-09T10:30:00.000Z"
-                    },
-                    "nodeVersion": {
-                      "type": "string",
-                      "example": "20.11.0"
-                    },
-                    "environment": {
-                      "type": "string",
-                      "example": "production"
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "summary": "Version Information",
-        "tags": [
-          "App"
-        ]
-      }
-    },
-    "/metrics": {
-      "get": {
-        "operationId": "PrometheusController_index",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": [
-          "Prometheus"
-        ]
-      }
-    },
     "/health": {
       "get": {
         "description": "Simple health check endpoint for load balancers and monitoring systems",
@@ -436,27 +353,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "Organization name",
-                    "example": "Acme Corp"
-                  },
-                  "description": {
-                    "type": "string",
-                    "description": "Organization description",
-                    "example": "Leading technology company"
-                  },
-                  "settings": {
-                    "type": "object",
-                    "description": "Organization settings",
-                    "example": {
-                      "timezone": "UTC",
-                      "currency": "USD"
-                    }
-                  }
-                }
+                "$ref": "#/components/schemas/UpdateOrganizationDto"
               }
             }
           }
@@ -744,38 +641,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "email": {
-                    "type": "string",
-                    "format": "email",
-                    "description": "User email address",
-                    "example": "john.doe@example.com"
-                  },
-                  "name": {
-                    "type": "string",
-                    "description": "User full name",
-                    "example": "John Doe"
-                  },
-                  "role": {
-                    "type": "string",
-                    "description": "User role",
-                    "enum": [
-                      "admin",
-                      "member",
-                      "viewer"
-                    ],
-                    "example": "member"
-                  },
-                  "profile": {
-                    "type": "object",
-                    "description": "User profile information",
-                    "example": {
-                      "department": "Engineering",
-                      "title": "Senior Software Engineer"
-                    }
-                  }
-                }
+                "$ref": "#/components/schemas/UpdateUserDto"
               }
             }
           }
@@ -1082,45 +948,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "Tool name",
-                    "example": "Slack Notifier"
-                  },
-                  "type": {
-                    "type": "string",
-                    "description": "Tool type/category",
-                    "enum": [
-                      "notification",
-                      "api",
-                      "database",
-                      "webhook",
-                      "email"
-                    ],
-                    "example": "notification"
-                  },
-                  "configuration": {
-                    "type": "object",
-                    "description": "Tool-specific configuration",
-                    "example": {
-                      "baseUrl": "https://hooks.slack.com",
-                      "timeout": 10000,
-                      "retries": 5
-                    }
-                  },
-                  "description": {
-                    "type": "string",
-                    "description": "Tool description",
-                    "example": "Enhanced Slack notification tool"
-                  },
-                  "version": {
-                    "type": "string",
-                    "description": "Tool version",
-                    "example": "1.1.0"
-                  }
-                }
+                "$ref": "#/components/schemas/UpdateToolDto"
               }
             }
           }
@@ -1507,102 +1335,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "Human-readable action name",
-                    "example": "Send Enhanced Slack Message"
-                  },
-                  "key": {
-                    "type": "string",
-                    "description": "Unique identifier for the action",
-                    "example": "slack_send_enhanced_message"
-                  },
-                  "toolId": {
-                    "type": "string",
-                    "description": "ID of the associated tool",
-                    "example": "tool_slack_123"
-                  },
-                  "method": {
-                    "type": "string",
-                    "description": "HTTP method for the action",
-                    "enum": [
-                      "GET",
-                      "POST",
-                      "PUT",
-                      "DELETE",
-                      "PATCH"
-                    ],
-                    "example": "POST"
-                  },
-                  "endpoint": {
-                    "type": "string",
-                    "description": "API endpoint URL or path",
-                    "example": "/api/chat.postMessage"
-                  },
-                  "headers": {
-                    "type": "object",
-                    "description": "HTTP headers required for the action",
-                    "example": {
-                      "Content-Type": "application/json",
-                      "Authorization": "Bearer {token}"
-                    }
-                  },
-                  "inputSchema": {
-                    "type": "array",
-                    "description": "Schema defining input parameters for the action",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "name": {
-                          "type": "string"
-                        },
-                        "type": {
-                          "type": "string"
-                        },
-                        "required": {
-                          "type": "boolean"
-                        },
-                        "description": {
-                          "type": "string"
-                        }
-                      }
-                    },
-                    "example": [
-                      {
-                        "name": "channel",
-                        "type": "string",
-                        "required": true,
-                        "description": "Slack channel ID"
-                      },
-                      {
-                        "name": "text",
-                        "type": "string",
-                        "required": true,
-                        "description": "Message content"
-                      },
-                      {
-                        "name": "attachments",
-                        "type": "array",
-                        "required": false,
-                        "description": "Message attachments"
-                      }
-                    ]
-                  },
-                  "executeIf": {
-                    "type": "object",
-                    "description": "Conditional execution rules (optional)",
-                    "example": {
-                      "user.role": "admin"
-                    }
-                  },
-                  "version": {
-                    "type": "number",
-                    "description": "Action version number",
-                    "example": 2
-                  }
-                }
+                "$ref": "#/components/schemas/UpdateActionDto"
               }
             }
           }
@@ -1711,21 +1444,6 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "inputs": {
-                    "type": "object",
-                    "description": "Input parameters matching the action's inputSchema",
-                    "example": {
-                      "channel": "#general",
-                      "text": "Hello from Tolstoy!",
-                      "user_id": "U123456"
-                    }
-                  }
-                },
-                "required": [
-                  "inputs"
-                ],
                 "$ref": "#/components/schemas/ExecuteActionDto"
               }
             }
@@ -2270,323 +1988,6 @@
         ]
       }
     },
-    "/tools/{toolId}/auth": {
-      "post": {
-        "description": "Configures authentication settings (API Key or OAuth2) for a specific tool within an organization. API Key auth requires headerName and headerValue. OAuth2 auth requires clientId, clientSecret, and accessToken. A default callback URL is automatically added for OAuth2 configurations.",
-        "operationId": "ToolAuthController_upsert",
-        "parameters": [
-          {
-            "name": "X-Org-ID",
-            "required": true,
-            "in": "header",
-            "description": "Organization identifier",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "toolId",
-            "required": true,
-            "in": "path",
-            "description": "Unique identifier of the tool to configure",
-            "schema": {
-              "example": "tool-123",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateAuthConfigDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Auth configuration created or updated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthConfigResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid request data or validation errors"
-          },
-          "404": {
-            "description": "Tool not found or organization does not have access"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Create or update organization-level auth configuration for a tool",
-        "tags": [
-          "Tool Authentication"
-        ]
-      },
-      "get": {
-        "description": "Retrieves the authentication configuration for a specific tool within an organization. Sensitive values may be masked in the response.",
-        "operationId": "ToolAuthController_get",
-        "parameters": [
-          {
-            "name": "X-Org-ID",
-            "required": true,
-            "in": "header",
-            "description": "Organization identifier",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "toolId",
-            "required": true,
-            "in": "path",
-            "description": "Unique identifier of the tool",
-            "schema": {
-              "example": "tool-123",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Auth configuration retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/AuthConfigResponseDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Auth configuration not found for this tool and organization"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Fetch current auth configuration for a tool",
-        "tags": [
-          "Tool Authentication"
-        ]
-      },
-      "delete": {
-        "description": "Removes the authentication configuration for a specific tool within an organization. This action also cleans up associated secrets and cache entries.",
-        "operationId": "ToolAuthController_remove",
-        "parameters": [
-          {
-            "name": "X-Org-ID",
-            "required": true,
-            "in": "header",
-            "description": "Organization identifier",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "toolId",
-            "required": true,
-            "in": "path",
-            "description": "Unique identifier of the tool",
-            "schema": {
-              "example": "tool-123",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Auth configuration deleted successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DeleteAuthConfigResponseDto"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Auth configuration not found for this tool and organization"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Delete auth configuration for a tool",
-        "tags": [
-          "Tool Authentication"
-        ]
-      }
-    },
-    "/auth/{toolId}/login": {
-      "get": {
-        "description": "Redirects the user to the OAuth provider authorization page. The user must grant permission, after which they will be redirected back to the callback endpoint.",
-        "operationId": "OAuthController_initiateLogin",
-        "parameters": [
-          {
-            "name": "toolId",
-            "required": true,
-            "in": "path",
-            "description": "Tool unique identifier (database ID)",
-            "schema": {
-              "example": "cme3zjbwc0000uppplgvx1hse",
-              "type": "string"
-            }
-          },
-          {
-            "name": "userId",
-            "required": true,
-            "in": "query",
-            "description": "User ID for whom to initiate OAuth",
-            "schema": {
-              "example": "user_123",
-              "type": "string"
-            }
-          },
-          {
-            "name": "X-Org-ID",
-            "required": true,
-            "in": "header",
-            "description": "Organization identifier",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "302": {
-            "description": "Redirects to OAuth provider authorization URL"
-          },
-          "400": {
-            "description": "Invalid request parameters or tool not configured for OAuth",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OAuthErrorResponseDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Missing or invalid organization ID",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OAuthErrorResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Initiate OAuth2 login for a user",
-        "tags": [
-          "OAuth Authentication"
-        ]
-      }
-    },
-    "/auth/callback": {
-      "get": {
-        "description": "Processes the authorization code returned by the OAuth provider, exchanges it for access tokens, and stores the user credentials.",
-        "operationId": "OAuthController_handleCallback",
-        "parameters": [
-          {
-            "name": "code",
-            "required": true,
-            "in": "query",
-            "description": "Authorization code from OAuth provider",
-            "schema": {
-              "example": "abc123def456",
-              "type": "string"
-            }
-          },
-          {
-            "name": "state",
-            "required": true,
-            "in": "query",
-            "description": "State parameter to validate request origin",
-            "schema": {
-              "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
-              "type": "string"
-            }
-          },
-          {
-            "name": "error",
-            "required": false,
-            "in": "query",
-            "description": "Error code if authorization was denied",
-            "schema": {
-              "example": "access_denied",
-              "type": "string"
-            }
-          },
-          {
-            "name": "error_description",
-            "required": false,
-            "in": "query",
-            "description": "Human-readable error description",
-            "schema": {
-              "example": "The user denied the request",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OAuth callback processed successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OAuthCallbackResponseDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid callback parameters or authorization error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OAuthErrorResponseDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Invalid or expired state parameter",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OAuthErrorResponseDto"
-                }
-              }
-            }
-          }
-        },
-        "summary": "Handle OAuth2 callback from provider",
-        "tags": [
-          "OAuth Authentication"
-        ]
-      }
-    },
     "/flows": {
       "post": {
         "description": "Create a new workflow with steps and configuration",
@@ -2784,47 +2185,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "Flow name",
-                    "example": "Updated User Onboarding Flow"
-                  },
-                  "description": {
-                    "type": "string",
-                    "description": "Flow description",
-                    "example": "Enhanced automated user onboarding process"
-                  },
-                  "version": {
-                    "type": "number",
-                    "description": "Flow version number",
-                    "example": 2
-                  },
-                  "steps": {
-                    "type": "array",
-                    "description": "Updated workflow steps definition",
-                    "example": [
-                      {
-                        "id": "step_1",
-                        "type": "action",
-                        "actionId": "action_send_email",
-                        "config": {
-                          "to": "{{user.email}}",
-                          "template": "welcome_v2"
-                        }
-                      }
-                    ]
-                  },
-                  "settings": {
-                    "type": "object",
-                    "description": "Updated flow execution settings",
-                    "example": {
-                      "timeout": 600000,
-                      "retries": 3
-                    }
-                  }
-                }
+                "$ref": "#/components/schemas/UpdateFlowDto"
               }
             }
           }
@@ -3341,81 +2702,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "flowId": {
-                    "type": "string",
-                    "description": "ID of the workflow being executed",
-                    "example": "flow_abc123"
-                  },
-                  "executionId": {
-                    "type": "string",
-                    "description": "Unique execution instance ID",
-                    "example": "exec_xyz789"
-                  },
-                  "stepKey": {
-                    "type": "string",
-                    "description": "Unique identifier for the step within the workflow",
-                    "example": "send_notification"
-                  },
-                  "inputs": {
-                    "type": "object",
-                    "description": "Input data provided to the step",
-                    "example": {
-                      "stepName": "Send Slack Notification",
-                      "stepType": "action",
-                      "config": {
-                        "actionKey": "slack_send_message",
-                        "parameters": {
-                          "channel": "#general",
-                          "message": "Workflow completed successfully"
-                        }
-                      },
-                      "variables": {
-                        "userId": "user_123",
-                        "timestamp": "2024-01-15T10:30:00Z"
-                      },
-                      "stepOutputs": {}
-                    }
-                  },
-                  "outputs": {
-                    "type": "object",
-                    "description": "Output data produced by the step (optional)",
-                    "example": {
-                      "messageId": "msg_456",
-                      "timestamp": "2024-01-15T10:30:05Z",
-                      "success": true
-                    }
-                  },
-                  "error": {
-                    "type": "object",
-                    "description": "Error information if step failed (optional)",
-                    "example": {
-                      "message": "Channel not found",
-                      "code": "CHANNEL_NOT_FOUND",
-                      "stack": "Error stack trace..."
-                    }
-                  },
-                  "status": {
-                    "type": "string",
-                    "description": "Execution status of the step",
-                    "enum": [
-                      "pending",
-                      "running",
-                      "completed",
-                      "failed",
-                      "skipped"
-                    ],
-                    "example": "completed"
-                  }
-                },
-                "required": [
-                  "flowId",
-                  "executionId",
-                  "stepKey",
-                  "inputs",
-                  "status"
-                ]
+                "$ref": "#/components/schemas/CreateExecutionLogDto"
               }
             }
           }
@@ -3704,40 +2991,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "outputs": {
-                    "type": "object",
-                    "description": "Output data produced by the step",
-                    "example": {
-                      "messageId": "msg_456",
-                      "timestamp": "2024-01-15T10:30:05Z",
-                      "success": true,
-                      "responseCode": 200
-                    }
-                  },
-                  "error": {
-                    "type": "object",
-                    "description": "Error information if step failed",
-                    "example": {
-                      "message": "Channel not found",
-                      "code": "CHANNEL_NOT_FOUND",
-                      "stack": "Error stack trace..."
-                    }
-                  },
-                  "status": {
-                    "type": "string",
-                    "description": "Updated execution status",
-                    "enum": [
-                      "pending",
-                      "running",
-                      "completed",
-                      "failed",
-                      "skipped"
-                    ],
-                    "example": "completed"
-                  }
-                }
+                "$ref": "#/components/schemas/UpdateExecutionLogDto"
               }
             }
           }
@@ -3817,40 +3071,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "url": {
-                    "type": "string",
-                    "format": "uri",
-                    "description": "Webhook endpoint URL",
-                    "example": "https://api.example.com/webhook"
-                  },
-                  "eventTypes": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "Event types to subscribe to",
-                    "example": [
-                      "flow.execution.completed",
-                      "flow.execution.failed"
-                    ]
-                  },
-                  "enabled": {
-                    "type": "boolean",
-                    "description": "Whether the webhook is active",
-                    "default": true
-                  },
-                  "secret": {
-                    "type": "string",
-                    "description": "Optional secret for webhook signature verification",
-                    "example": "webhook_secret_123"
-                  }
-                },
-                "required": [
-                  "url",
-                  "eventTypes"
-                ]
+                "$ref": "#/components/schemas/CreateWebhookDto"
               }
             }
           }
@@ -4131,34 +3352,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "url": {
-                    "type": "string",
-                    "format": "uri",
-                    "description": "Webhook endpoint URL",
-                    "example": "https://api.example.com/webhook"
-                  },
-                  "eventTypes": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    },
-                    "description": "Event types to subscribe to",
-                    "example": [
-                      "flow.execution.completed",
-                      "flow.execution.failed"
-                    ]
-                  },
-                  "enabled": {
-                    "type": "boolean",
-                    "description": "Whether the webhook is active"
-                  },
-                  "secret": {
-                    "type": "string",
-                    "description": "Optional secret for webhook signature verification"
-                  }
-                }
+                "$ref": "#/components/schemas/UpdateWebhookDto"
               }
             }
           }
@@ -4659,22 +3853,428 @@
           "Tool Secrets List"
         ]
       }
+    },
+    "/tools/{toolId}/auth": {
+      "post": {
+        "description": "Configures authentication settings (API Key or OAuth2) for a specific tool within an organization. API Key auth requires headerName and headerValue. OAuth2 auth requires clientId, clientSecret, and accessToken. A default callback URL is automatically added for OAuth2 configurations.",
+        "operationId": "ToolAuthController_upsert",
+        "parameters": [
+          {
+            "name": "X-Org-ID",
+            "required": true,
+            "in": "header",
+            "description": "Organization identifier",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toolId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the tool to configure",
+            "schema": {
+              "example": "tool-123",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAuthConfigDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Auth configuration created or updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request data or validation errors"
+          },
+          "404": {
+            "description": "Tool not found or organization does not have access"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create or update organization-level auth configuration for a tool",
+        "tags": [
+          "Tool Authentication"
+        ]
+      },
+      "get": {
+        "description": "Retrieves the authentication configuration for a specific tool within an organization. Sensitive values may be masked in the response.",
+        "operationId": "ToolAuthController_get",
+        "parameters": [
+          {
+            "name": "X-Org-ID",
+            "required": true,
+            "in": "header",
+            "description": "Organization identifier",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toolId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the tool",
+            "schema": {
+              "example": "tool-123",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auth configuration retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthConfigResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Auth configuration not found for this tool and organization"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Fetch current auth configuration for a tool",
+        "tags": [
+          "Tool Authentication"
+        ]
+      },
+      "delete": {
+        "description": "Removes the authentication configuration for a specific tool within an organization. This action also cleans up associated secrets and cache entries.",
+        "operationId": "ToolAuthController_remove",
+        "parameters": [
+          {
+            "name": "X-Org-ID",
+            "required": true,
+            "in": "header",
+            "description": "Organization identifier",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "toolId",
+            "required": true,
+            "in": "path",
+            "description": "Unique identifier of the tool",
+            "schema": {
+              "example": "tool-123",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Auth configuration deleted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeleteAuthConfigResponseDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Auth configuration not found for this tool and organization"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete auth configuration for a tool",
+        "tags": [
+          "Tool Authentication"
+        ]
+      }
+    },
+    "/auth/{toolId}/login": {
+      "get": {
+        "description": "Redirects the user to the OAuth provider authorization page. The user must grant permission, after which they will be redirected back to the callback endpoint.",
+        "operationId": "OAuthController_initiateLogin",
+        "parameters": [
+          {
+            "name": "toolId",
+            "required": true,
+            "in": "path",
+            "description": "Tool unique identifier (database ID)",
+            "schema": {
+              "example": "cme3zjbwc0000uppplgvx1hse",
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "query",
+            "description": "User ID for whom to initiate OAuth",
+            "schema": {
+              "example": "user_123",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Org-ID",
+            "required": true,
+            "in": "header",
+            "description": "Organization identifier",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Redirects to OAuth provider authorization URL"
+          },
+          "400": {
+            "description": "Invalid request parameters or tool not configured for OAuth",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid organization ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Initiate OAuth2 login for a user",
+        "tags": [
+          "OAuth Authentication"
+        ]
+      }
+    },
+    "/auth/callback": {
+      "get": {
+        "description": "Processes the authorization code returned by the OAuth provider, exchanges it for access tokens, and stores the user credentials.",
+        "operationId": "OAuthController_handleCallback",
+        "parameters": [
+          {
+            "name": "code",
+            "required": true,
+            "in": "query",
+            "description": "Authorization code from OAuth provider",
+            "schema": {
+              "example": "abc123def456",
+              "type": "string"
+            }
+          },
+          {
+            "name": "state",
+            "required": true,
+            "in": "query",
+            "description": "State parameter to validate request origin",
+            "schema": {
+              "example": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+              "type": "string"
+            }
+          },
+          {
+            "name": "error",
+            "required": false,
+            "in": "query",
+            "description": "Error code if authorization was denied",
+            "schema": {
+              "example": "access_denied",
+              "type": "string"
+            }
+          },
+          {
+            "name": "error_description",
+            "required": false,
+            "in": "query",
+            "description": "Human-readable error description",
+            "schema": {
+              "example": "The user denied the request",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OAuth callback processed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthCallbackResponseDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid callback parameters or authorization error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponseDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Invalid or expired state parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OAuthErrorResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Handle OAuth2 callback from provider",
+        "tags": [
+          "OAuth Authentication"
+        ]
+      }
+    },
+    "/": {
+      "get": {
+        "description": "Get a welcome message from the Tolstoy API",
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Welcome message retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string",
+                  "example": "Welcome to Tolstoy - Workflow Automation Platform"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Welcome Message",
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/version": {
+      "get": {
+        "description": "Get version information including build details and commit hash",
+        "operationId": "AppController_getVersion",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Version information retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "version": {
+                      "type": "string",
+                      "example": "1.0.0"
+                    },
+                    "commit": {
+                      "type": "string",
+                      "example": "abc123def456"
+                    },
+                    "buildTime": {
+                      "type": "string",
+                      "example": "2025-08-09T10:30:00.000Z"
+                    },
+                    "nodeVersion": {
+                      "type": "string",
+                      "example": "20.11.0"
+                    },
+                    "environment": {
+                      "type": "string",
+                      "example": "production"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Version Information",
+        "tags": [
+          "App"
+        ]
+      }
     }
   },
   "info": {
     "title": "Tolstoy API",
-    "description": "Tolstoy API Documentation",
+    "description": "Interactive API reference for Tolstoy workflow automation platform",
     "version": "1.1.0",
     "contact": {}
   },
   "tags": [],
-  "servers": [],
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Development"
+    },
+    {
+      "url": "https://tolstoy.getpullse.com",
+      "description": "Production"
+    },
+    {
+      "url": "http://localhost:3000",
+      "description": "Development"
+    }
+  ],
   "components": {
     "securitySchemes": {
-      "bearer": {
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "type": "http"
+      "x-org-id": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-org-id",
+        "description": "Organization ID for multi-tenant access"
+      },
+      "x-user-id": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-user-id",
+        "description": "User ID for request context"
       }
     },
     "schemas": {
@@ -4703,6 +4303,10 @@
         "required": [
           "name"
         ]
+      },
+      "UpdateOrganizationDto": {
+        "type": "object",
+        "properties": {}
       },
       "CreateUserDto": {
         "type": "object",
@@ -4742,6 +4346,10 @@
           "name"
         ]
       },
+      "UpdateUserDto": {
+        "type": "object",
+        "properties": {}
+      },
       "CreateToolDto": {
         "type": "object",
         "properties": {
@@ -4767,6 +4375,10 @@
           "baseUrl",
           "authType"
         ]
+      },
+      "UpdateToolDto": {
+        "type": "object",
+        "properties": {}
       },
       "CreateActionDto": {
         "type": "object",
@@ -4873,6 +4485,10 @@
           "inputSchema"
         ]
       },
+      "UpdateActionDto": {
+        "type": "object",
+        "properties": {}
+      },
       "ExecuteActionDto": {
         "type": "object",
         "properties": {
@@ -4935,6 +4551,207 @@
         "required": [
           "inputs"
         ]
+      },
+      "CreateFlowDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Flow name",
+            "example": "User Onboarding Flow"
+          },
+          "description": {
+            "type": "string",
+            "description": "Flow description",
+            "example": "Automated user onboarding process with email and notifications"
+          },
+          "version": {
+            "type": "number",
+            "description": "Flow version number",
+            "example": 1
+          },
+          "steps": {
+            "type": "array",
+            "description": "Workflow steps definition",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "example": "step_1"
+                },
+                "type": {
+                  "type": "string",
+                  "example": "action"
+                },
+                "actionId": {
+                  "type": "string",
+                  "example": "action_abc123"
+                },
+                "config": {
+                  "type": "object",
+                  "example": {
+                    "timeout": 30000
+                  }
+                }
+              }
+            },
+            "example": [
+              {
+                "id": "step_1",
+                "type": "action",
+                "actionId": "action_send_email",
+                "config": {
+                  "to": "{{user.email}}",
+                  "template": "welcome"
+                }
+              }
+            ]
+          },
+          "settings": {
+            "type": "object",
+            "description": "Flow execution settings",
+            "example": {
+              "timeout": 300000,
+              "retries": 2
+            }
+          }
+        },
+        "required": [
+          "name",
+          "steps"
+        ]
+      },
+      "UpdateFlowDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateExecutionLogDto": {
+        "type": "object",
+        "properties": {
+          "flowId": {
+            "type": "string",
+            "description": "ID of the workflow being executed",
+            "example": "flow_abc123"
+          },
+          "executionId": {
+            "type": "string",
+            "description": "Unique execution instance ID",
+            "example": "exec_xyz789"
+          },
+          "stepKey": {
+            "type": "string",
+            "description": "Unique identifier for the step within the workflow",
+            "example": "send_notification"
+          },
+          "inputs": {
+            "type": "object",
+            "description": "Input data provided to the step",
+            "example": {
+              "channel": "#general",
+              "message": "Workflow started",
+              "userId": "user_123"
+            }
+          },
+          "outputs": {
+            "type": "object",
+            "description": "Output data produced by the step",
+            "example": {
+              "messageId": "msg_456",
+              "timestamp": "2024-01-15T10:30:05Z",
+              "success": true
+            }
+          },
+          "error": {
+            "type": "object",
+            "description": "Error information if step failed",
+            "example": {
+              "message": "API rate limit exceeded",
+              "code": "RATE_LIMIT",
+              "retryAfter": 3600
+            }
+          },
+          "status": {
+            "type": "string",
+            "description": "Execution status",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed"
+            ],
+            "example": "completed"
+          }
+        },
+        "required": [
+          "flowId",
+          "executionId",
+          "stepKey",
+          "inputs",
+          "status"
+        ]
+      },
+      "UpdateExecutionLogDto": {
+        "type": "object",
+        "properties": {}
+      },
+      "CreateWebhookDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Webhook name",
+            "example": "Production Notifications",
+            "minLength": 3,
+            "maxLength": 100
+          },
+          "url": {
+            "type": "string",
+            "description": "Webhook endpoint URL",
+            "format": "uri",
+            "example": "https://api.example.com/webhook"
+          },
+          "eventTypes": {
+            "description": "Event types to subscribe to",
+            "example": [
+              "flow.execution.completed",
+              "flow.execution.failed"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "enabled": {
+            "type": "boolean",
+            "description": "Whether the webhook is active",
+            "default": true
+          },
+          "secret": {
+            "type": "string",
+            "description": "Optional secret for webhook signature verification",
+            "example": "webhook_secret_123",
+            "minLength": 16,
+            "maxLength": 256
+          },
+          "headers": {
+            "type": "object",
+            "description": "Additional HTTP headers to include with webhook requests",
+            "example": {
+              "X-API-Key": "your-api-key",
+              "Content-Type": "application/json"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "url",
+          "eventTypes"
+        ]
+      },
+      "UpdateWebhookDto": {
+        "type": "object",
+        "properties": {}
       },
       "CreateAuthConfigDto": {
         "type": "object",
@@ -5156,76 +4973,6 @@
         },
         "required": [
           "success"
-        ]
-      },
-      "CreateFlowDto": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Flow name",
-            "example": "User Onboarding Flow"
-          },
-          "description": {
-            "type": "string",
-            "description": "Flow description",
-            "example": "Automated user onboarding process with email and notifications"
-          },
-          "version": {
-            "type": "number",
-            "description": "Flow version number",
-            "example": 1
-          },
-          "steps": {
-            "type": "array",
-            "description": "Workflow steps definition",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "example": "step_1"
-                },
-                "type": {
-                  "type": "string",
-                  "example": "action"
-                },
-                "actionId": {
-                  "type": "string",
-                  "example": "action_abc123"
-                },
-                "config": {
-                  "type": "object",
-                  "example": {
-                    "timeout": 30000
-                  }
-                }
-              }
-            },
-            "example": [
-              {
-                "id": "step_1",
-                "type": "action",
-                "actionId": "action_send_email",
-                "config": {
-                  "to": "{{user.email}}",
-                  "template": "welcome"
-                }
-              }
-            ]
-          },
-          "settings": {
-            "type": "object",
-            "description": "Flow execution settings",
-            "example": {
-              "timeout": 300000,
-              "retries": 2
-            }
-          }
-        },
-        "required": [
-          "name",
-          "steps"
         ]
       }
     }
