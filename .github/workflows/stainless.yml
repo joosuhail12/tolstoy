@@ -98,7 +98,7 @@ jobs:
           input_path: ${{ env.OAS_PATH }}
           project_name: ${{ env.STAINLESS_PROJECT }}
           branch: main
-          commit_message: "Merged PR with OpenAPI spec updates"
+          commit_message: "feat: merged PR with OpenAPI spec updates"
 
   push:
     # Run builds when changes are pushed directly to main
@@ -140,4 +140,4 @@ jobs:
           input_path: ${{ env.OAS_PATH }}
           project_name: ${{ env.STAINLESS_PROJECT }}
           branch: main
-          commit_message: "Update OpenAPI spec from commit ${{ github.sha }}"
+          commit_message: "feat: update OpenAPI spec from commit ${{ github.sha }}"
