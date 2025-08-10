@@ -3918,7 +3918,7 @@
         ]
       },
       "get": {
-        "description": "Retrieves the authentication configuration for a specific tool within an organization. Sensitive values may be masked in the response.",
+        "description": "Retrieves authentication configuration(s) for a specific tool within an organization. Use configName query parameter to get a specific configuration, or omit to list all configurations.",
         "operationId": "ToolAuthController_get",
         "parameters": [
           {
@@ -3939,15 +3939,32 @@
               "example": "tool-123",
               "type": "string"
             }
+          },
+          {
+            "name": "configName",
+            "required": false,
+            "in": "query",
+            "description": "Name of specific configuration to retrieve (optional)",
+            "schema": {
+              "example": "production",
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Auth configuration retrieved successfully",
+            "description": "Auth configuration(s) retrieved successfully",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AuthConfigResponseDto"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/AuthConfigResponseDto"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AuthConfigListResponseDto"
+                    }
+                  ]
                 }
               }
             }
@@ -3961,13 +3978,13 @@
             "bearer": []
           }
         ],
-        "summary": "Fetch current auth configuration for a tool",
+        "summary": "Fetch auth configuration(s) for a tool",
         "tags": [
           "Tool Authentication"
         ]
       },
       "delete": {
-        "description": "Removes the authentication configuration for a specific tool within an organization. This action also cleans up associated secrets and cache entries.",
+        "description": "Removes authentication configuration(s) for a specific tool within an organization. Use configName query parameter to delete a specific configuration, or use deleteAll=true to delete all configurations.",
         "operationId": "ToolAuthController_remove",
         "parameters": [
           {
@@ -3987,6 +4004,26 @@
             "schema": {
               "example": "tool-123",
               "type": "string"
+            }
+          },
+          {
+            "name": "configName",
+            "required": false,
+            "in": "query",
+            "description": "Name of specific configuration to delete (optional)",
+            "schema": {
+              "example": "staging",
+              "type": "string"
+            }
+          },
+          {
+            "name": "deleteAll",
+            "required": false,
+            "in": "query",
+            "description": "Delete all configurations for the tool (optional)",
+            "schema": {
+              "example": false,
+              "type": "boolean"
             }
           }
         ],
@@ -4775,6 +4812,18 @@
               }
             }
           },
+          "name": {
+            "type": "string",
+            "description": "Name for this configuration (e.g., \"production\", \"staging\", \"development\")",
+            "example": "default",
+            "default": "default"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Whether this should be the default configuration for the tool",
+            "example": false,
+            "default": false
+          },
           "config": {
             "description": "Authentication configuration (structure depends on type)",
             "examples": {
@@ -4876,6 +4925,11 @@
             "type": "string",
             "description": "Tool ID"
           },
+          "name": {
+            "type": "string",
+            "description": "Configuration name",
+            "example": "default"
+          },
           "type": {
             "type": "string",
             "enum": [
@@ -4887,6 +4941,11 @@
           "config": {
             "type": "object",
             "description": "Authentication configuration (sensitive values may be masked)"
+          },
+          "isDefault": {
+            "type": "boolean",
+            "description": "Whether this is the default configuration for the tool",
+            "example": false
           },
           "createdAt": {
             "format": "date-time",
@@ -4903,8 +4962,10 @@
           "id",
           "orgId",
           "toolId",
+          "name",
           "type",
           "config",
+          "isDefault",
           "createdAt",
           "updatedAt"
         ]

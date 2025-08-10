@@ -1,4 +1,12 @@
-import { IsIn, IsNotEmpty, IsObject, IsString, Validate } from 'class-validator';
+import {
+  IsIn,
+  IsNotEmpty,
+  IsObject,
+  IsString,
+  Validate,
+  IsOptional,
+  IsBoolean,
+} from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { AuthConfigValidator } from './create-auth-config.validator';
 
@@ -22,6 +30,25 @@ export class CreateAuthConfigDto {
   @IsNotEmpty()
   @IsIn(['apiKey', 'oauth2'])
   type: 'apiKey' | 'oauth2';
+
+  @ApiProperty({
+    description: 'Name for this configuration (e.g., "production", "staging", "development")',
+    example: 'production',
+    required: true,
+  })
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @ApiProperty({
+    description: 'Whether this should be the default configuration for the tool',
+    example: false,
+    default: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  isDefault?: boolean = false;
 
   @ApiProperty({
     description: 'Authentication configuration (structure depends on type)',

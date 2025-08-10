@@ -51,7 +51,7 @@ describe('OAuthService', () => {
         {
           provide: AuthConfigService,
           useValue: {
-            getOrgAuthConfig: jest.fn(),
+            getDefaultOrgAuthConfig: jest.fn(),
             setUserCredentials: jest.fn(),
           },
         },
@@ -96,7 +96,7 @@ describe('OAuthService', () => {
 
   describe('getAuthorizeUrl', () => {
     it('should generate OAuth authorization URL successfully', async () => {
-      authConfigService.getOrgAuthConfig.mockResolvedValue(mockOAuthConfig);
+      authConfigService.getDefaultOrgAuthConfig.mockResolvedValue(mockOAuthConfig);
       redisCacheService.set.mockResolvedValue(undefined);
 
       const result = await service.getAuthorizeUrl(mockToolId, mockOrgId, mockUserId);
@@ -109,7 +109,7 @@ describe('OAuthService', () => {
       expect(result.url).toContain(`state=${result.state}`);
       expect(result.state).toBeDefined();
 
-      expect(authConfigService.getOrgAuthConfig).toHaveBeenCalledWith(mockOrgId, mockToolId);
+      expect(authConfigService.getDefaultOrgAuthConfig).toHaveBeenCalledWith(mockOrgId, mockToolId);
       expect(redisCacheService.set).toHaveBeenCalledWith(
         `oauth:state:${result.state}`,
         expect.stringContaining(mockOrgId),
@@ -219,7 +219,7 @@ describe('OAuthService', () => {
     beforeEach(() => {
       redisCacheService.get.mockResolvedValue(JSON.stringify(mockStateData));
       redisCacheService.del.mockResolvedValue(undefined);
-      authConfigService.getOrgAuthConfig.mockResolvedValue(mockOAuthConfig);
+      authConfigService.getDefaultOrgAuthConfig.mockResolvedValue(mockOAuthConfig);
       authConfigService.setUserCredentials.mockResolvedValue(mockCredential);
     });
 
@@ -236,7 +236,7 @@ describe('OAuthService', () => {
 
       expect(redisCacheService.get).toHaveBeenCalledWith(`oauth:state:${mockState}`);
       expect(redisCacheService.del).toHaveBeenCalledWith(`oauth:state:${mockState}`);
-      expect(authConfigService.getOrgAuthConfig).toHaveBeenCalledWith(mockOrgId, mockToolId);
+      expect(authConfigService.getDefaultOrgAuthConfig).toHaveBeenCalledWith(mockOrgId, mockToolId);
       expect(authConfigService.setUserCredentials).toHaveBeenCalledWith(
         mockOrgId,
         mockUserId,
@@ -280,7 +280,7 @@ describe('OAuthService', () => {
       redisCacheService.get.mockResolvedValue(JSON.stringify(validStateData));
 
       // Set up OAuth config
-      authConfigService.getOrgAuthConfig.mockResolvedValue(mockOAuthConfig);
+      authConfigService.getDefaultOrgAuthConfig.mockResolvedValue(mockOAuthConfig);
 
       mockedAxios.post.mockRejectedValue(new Error('Token exchange failed'));
 
@@ -300,7 +300,7 @@ describe('OAuthService', () => {
       redisCacheService.get.mockResolvedValue(JSON.stringify(validStateData));
 
       // Set up OAuth config
-      authConfigService.getOrgAuthConfig.mockResolvedValue(mockOAuthConfig);
+      authConfigService.getDefaultOrgAuthConfig.mockResolvedValue(mockOAuthConfig);
 
       const axiosError = new Error('Request failed with status code 400');
       (axiosError as any).response = {

@@ -11,6 +11,7 @@ import {
   NotFoundException,
   Param,
   Post,
+  Query,
   UnauthorizedException,
 } from '@nestjs/common';
 import {
@@ -20,12 +21,17 @@ import {
   ApiNotFoundResponse,
   ApiOperation,
   ApiParam,
+  ApiQuery,
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { AuthConfigService } from './auth-config.service';
 import { CreateAuthConfigDto } from './dto/create-auth-config.dto';
-import { AuthConfigResponseDto, DeleteAuthConfigResponseDto } from './dto/auth-config-response.dto';
+import {
+  AuthConfigResponseDto,
+  DeleteAuthConfigResponseDto,
+  AuthConfigListResponseDto,
+} from './dto/auth-config-response.dto';
 import { MetricsService } from '../metrics/metrics.service';
 import { PrismaService } from '../prisma.service';
 
@@ -123,23 +129,42 @@ export class ToolAuthController {
       action: 'upsert',
     });
 
-    const result = await this.authConfig.setOrgAuthConfig(orgId, toolId, dto.type, dto.config);
+    if (!dto.name) {
+      throw new BadRequestException('Configuration name is required');
+    }
 
-    this.logger.log(`Successfully upserted auth config ${result.id} for tool ${toolId}`);
+    const result = await this.authConfig.setOrgAuthConfig(
+      orgId,
+      toolId,
+      dto.type,
+      dto.config,
+      dto.name,
+      dto.isDefault || false,
+    );
+
+    this.logger.log(
+      `Successfully upserted auth config ${result.id} for tool ${toolId}:${result.name}`,
+    );
 
     return result;
   }
 
   @Get()
   @ApiOperation({
-    summary: 'Fetch current auth configuration for a tool',
+    summary: 'Fetch auth configuration(s) for a tool',
     description:
-      'Retrieves the authentication configuration for a specific tool within an organization. Sensitive values may be masked in the response.',
+      'Retrieves authentication configuration(s) for a specific tool within an organization. Use configName query parameter to get a specific configuration, or omit to list all configurations.',
   })
   @ApiParam({
     name: 'toolId',
     description: 'Unique identifier of the tool',
     example: 'tool-123',
+  })
+  @ApiQuery({
+    name: 'configName',
+    description: 'Name of specific configuration to retrieve (optional)',
+    required: false,
+    example: 'production',
   })
   @ApiHeader({
     name: 'X-Org-ID',
@@ -149,8 +174,13 @@ export class ToolAuthController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Auth configuration retrieved successfully',
-    type: AuthConfigResponseDto,
+    description: 'Auth configuration(s) retrieved successfully',
+    schema: {
+      oneOf: [
+        { $ref: '#/components/schemas/AuthConfigResponseDto' },
+        { $ref: '#/components/schemas/AuthConfigListResponseDto' },
+      ],
+    },
   })
   @ApiNotFoundResponse({
     description: 'Auth configuration not found for this tool and organization',
@@ -158,15 +188,14 @@ export class ToolAuthController {
   async get(
     @Headers('X-Org-ID') orgId: string,
     @Param('toolId') toolId: string,
-  ): Promise<AuthConfigResponseDto> {
+    @Query('configName') configName?: string,
+  ): Promise<AuthConfigResponseDto | AuthConfigListResponseDto> {
     if (!orgId) {
       throw new BadRequestException('X-Org-ID header is required');
     }
 
     // Validate tool ownership first
     const tool = await this.validateToolAccess(toolId, orgId);
-
-    this.logger.log(`Fetching auth config for tool ${toolId} in org ${orgId}`);
 
     // Record metrics using tool name
     this.metricsService.incrementToolAuthConfig({
@@ -175,23 +204,47 @@ export class ToolAuthController {
       action: 'get',
     });
 
-    // Get auth config using toolId
-    const config = await this.authConfig.getOrgAuthConfig(orgId, toolId);
+    if (configName) {
+      // Get specific configuration
+      this.logger.log(`Fetching auth config for tool ${toolId}:${configName} in org ${orgId}`);
 
-    this.logger.log(`Successfully retrieved auth config for tool ${toolId}`);
+      const config = await this.authConfig.getOrgAuthConfig(orgId, toolId, configName);
 
-    // Mask sensitive values in the response
-    const maskedConfig = this.maskSensitiveValues(config.config);
+      this.logger.log(`Successfully retrieved auth config for tool ${toolId}:${configName}`);
 
-    return {
-      id: config.id,
-      orgId: config.orgId,
-      toolId: config.toolId,
-      type: config.type,
-      config: maskedConfig,
-      createdAt: config.createdAt,
-      updatedAt: config.updatedAt,
-    };
+      // Mask sensitive values in the response
+      const maskedConfig = this.maskSensitiveValues(config.config);
+
+      return {
+        id: config.id,
+        orgId: config.orgId,
+        toolId: config.toolId,
+        name: config.name,
+        type: config.type,
+        config: maskedConfig,
+        isDefault: config.isDefault,
+        createdAt: config.createdAt,
+        updatedAt: config.updatedAt,
+      };
+    } else {
+      // List all configurations
+      this.logger.log(`Listing auth configs for tool ${toolId} in org ${orgId}`);
+
+      const configs = await this.authConfig.listOrgAuthConfigs(orgId, toolId);
+
+      this.logger.log(`Successfully retrieved ${configs.length} auth configs for tool ${toolId}`);
+
+      // Mask sensitive values in all configurations
+      const maskedConfigs = configs.map(config => ({
+        ...config,
+        config: this.maskSensitiveValues(config.config),
+      }));
+
+      return {
+        configs: maskedConfigs,
+        total: configs.length,
+      };
+    }
   }
 
   @Delete()
@@ -199,12 +252,25 @@ export class ToolAuthController {
   @ApiOperation({
     summary: 'Delete auth configuration for a tool',
     description:
-      'Removes the authentication configuration for a specific tool within an organization. This action also cleans up associated secrets and cache entries.',
+      'Removes authentication configuration(s) for a specific tool within an organization. Use configName query parameter to delete a specific configuration, or use deleteAll=true to delete all configurations.',
   })
   @ApiParam({
     name: 'toolId',
     description: 'Unique identifier of the tool',
     example: 'tool-123',
+  })
+  @ApiQuery({
+    name: 'configName',
+    description: 'Name of specific configuration to delete (optional)',
+    required: false,
+    example: 'staging',
+  })
+  @ApiQuery({
+    name: 'deleteAll',
+    description: 'Delete all configurations for the tool (optional)',
+    required: false,
+    type: 'boolean',
+    example: false,
   })
   @ApiHeader({
     name: 'X-Org-ID',
@@ -223,6 +289,8 @@ export class ToolAuthController {
   async remove(
     @Headers('X-Org-ID') orgId: string,
     @Param('toolId') toolId: string,
+    @Query('configName') configName?: string,
+    @Query('deleteAll') deleteAll?: boolean,
   ): Promise<DeleteAuthConfigResponseDto> {
     if (!orgId) {
       throw new BadRequestException('X-Org-ID header is required');
@@ -231,8 +299,6 @@ export class ToolAuthController {
     // Validate tool ownership first
     const tool = await this.validateToolAccess(toolId, orgId);
 
-    this.logger.log(`Deleting auth config for tool ${toolId} in org ${orgId}`);
-
     // Record metrics using tool name
     this.metricsService.incrementToolAuthConfig({
       orgId,
@@ -240,14 +306,37 @@ export class ToolAuthController {
       action: 'delete',
     });
 
-    await this.authConfig.deleteOrgAuthConfig(orgId, toolId);
+    if (deleteAll) {
+      // Delete all configurations
+      this.logger.log(`Deleting all auth configs for tool ${toolId} in org ${orgId}`);
 
-    this.logger.log(`Successfully deleted auth config for tool ${toolId}`);
+      await this.authConfig.deleteAllOrgAuthConfigs(orgId, toolId);
 
-    return {
-      success: true,
-      message: 'Auth configuration deleted successfully',
-    };
+      this.logger.log(`Successfully deleted all auth configs for tool ${toolId}`);
+
+      return {
+        success: true,
+        message: 'All auth configurations deleted successfully',
+      };
+    } else {
+      // Delete specific configuration - configName is now required
+      if (!configName) {
+        throw new BadRequestException(
+          'Configuration name is required when deleteAll is not specified',
+        );
+      }
+
+      this.logger.log(`Deleting auth config for tool ${toolId}:${configName} in org ${orgId}`);
+
+      await this.authConfig.deleteOrgAuthConfig(orgId, toolId, configName);
+
+      this.logger.log(`Successfully deleted auth config for tool ${toolId}:${configName}`);
+
+      return {
+        success: true,
+        message: `Auth configuration '${configName}' deleted successfully`,
+      };
+    }
   }
 
   /**

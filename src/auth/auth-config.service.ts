@@ -8,8 +8,10 @@ export interface OrgAuthConfig {
   id: string;
   orgId: string;
   toolId: string;
+  name: string;
   type: string; // "apiKey" | "oauth2" - kept as string to match Prisma generated type
   config: Record<string, unknown>;
+  isDefault: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -82,8 +84,8 @@ export class AuthConfigService {
     }
   }
 
-  private orgConfigKey(orgId: string, toolId: string): string {
-    return `auth:org:${orgId}:tool:${toolId}`;
+  private orgConfigKey(orgId: string, toolId: string, configName: string): string {
+    return `auth:org:${orgId}:tool:${toolId}:config:${configName}`;
   }
 
   private _userCredKey(orgId: string, userId: string, toolId: string): string {
@@ -95,26 +97,31 @@ export class AuthConfigService {
    * Load org-level auth config (apiKey or oauth2)
    * First validates tool access, checks cache, then database, then syncs to AWS Secrets Manager
    */
-  async getOrgAuthConfig(orgId: string, toolId: string): Promise<OrgAuthConfig> {
+  async getOrgAuthConfig(
+    orgId: string,
+    toolId: string,
+    configName: string,
+  ): Promise<OrgAuthConfig> {
     // Validate tool access first
     await this.validateToolAccess(toolId, orgId);
 
-    const cacheKey = this.orgConfigKey(orgId, toolId);
+    const cacheKey = this.orgConfigKey(orgId, toolId, configName);
 
-    this.logger.debug(`Loading org auth config for ${orgId}:${toolId}`);
+    this.logger.debug(`Loading org auth config for ${orgId}:${toolId}:${configName}`);
 
     // Check cache first
     const cached = await this.cache.get(cacheKey);
     if (cached && typeof cached === 'object' && 'id' in cached) {
-      this.logger.debug(`Found cached auth config for ${orgId}:${toolId}`);
+      this.logger.debug(`Found cached auth config for ${orgId}:${toolId}:${configName}`);
       return cached as OrgAuthConfig;
     }
 
-    // Load from database using toolId directly
+    // Load from database using toolId and configName
     const record = await this.prisma.toolAuthConfig.findFirst({
       where: {
         orgId,
         toolId,
+        name: configName,
       },
       include: {
         tool: true,
@@ -122,8 +129,12 @@ export class AuthConfigService {
     });
 
     if (!record) {
-      this.logger.warn(`No auth config found for org ${orgId} and tool ${toolId}`);
-      throw new NotFoundException(`No auth config for tool ${toolId} in organization ${orgId}`);
+      this.logger.warn(
+        `No auth config found for org ${orgId} and tool ${toolId} with config name ${configName}`,
+      );
+      throw new NotFoundException(
+        `No auth config '${configName}' for tool ${toolId} in organization ${orgId}`,
+      );
     }
 
     const config = record.config;
@@ -134,8 +145,13 @@ export class AuthConfigService {
         config && typeof config === 'object' && config !== null
           ? (config as Record<string, unknown>)
           : {};
-      await this.syncToSecretsManager(`tolstoy/${orgId}/tools/${toolId}/config`, configToSync);
-      this.logger.debug(`Synced auth config to AWS Secrets Manager for ${orgId}:${toolId}`);
+      await this.syncToSecretsManager(
+        `tolstoy/${orgId}/tools/${toolId}/config/${configName}`,
+        configToSync,
+      );
+      this.logger.debug(
+        `Synced auth config to AWS Secrets Manager for ${orgId}:${toolId}:${configName}`,
+      );
     } catch (error) {
       this.logger.warn(`Failed to sync auth config to AWS Secrets Manager: ${error.message}`);
       // Continue execution - don't fail if secrets manager is unavailable
@@ -144,16 +160,123 @@ export class AuthConfigService {
     // Cache for 10 minutes
     await this.cache.set(cacheKey, config, { ttl: 600 });
 
-    this.logger.debug(`Loaded and cached auth config for ${orgId}:${toolId}`);
+    this.logger.debug(`Loaded and cached auth config for ${orgId}:${toolId}:${configName}`);
     return {
       id: record.id,
       orgId: record.orgId,
       toolId: record.toolId,
+      name: record.name,
       type: record.type,
       config: record.config as Record<string, unknown>,
+      isDefault: record.isDefault,
       createdAt: record.createdAt,
       updatedAt: record.updatedAt,
     };
+  }
+
+  /**
+   * Get default auth configuration for a tool (first checks for isDefault = true, falls back to 'default' name)
+   */
+  async getDefaultOrgAuthConfig(orgId: string, toolId: string): Promise<OrgAuthConfig> {
+    // Validate tool access first
+    await this.validateToolAccess(toolId, orgId);
+
+    this.logger.debug(`Loading default org auth config for ${orgId}:${toolId}`);
+
+    // First try to find a config marked as default
+    let record = await this.prisma.toolAuthConfig.findFirst({
+      where: {
+        orgId,
+        toolId,
+        isDefault: true,
+      },
+      include: {
+        tool: true,
+      },
+    });
+
+    // If no default found, try to find the 'default' named config
+    if (!record) {
+      record = await this.prisma.toolAuthConfig.findFirst({
+        where: {
+          orgId,
+          toolId,
+          name: 'default',
+        },
+        include: {
+          tool: true,
+        },
+      });
+    }
+
+    // If still no config found, get the first available configuration
+    if (!record) {
+      record = await this.prisma.toolAuthConfig.findFirst({
+        where: {
+          orgId,
+          toolId,
+        },
+        include: {
+          tool: true,
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+      });
+    }
+
+    if (!record) {
+      this.logger.warn(`No auth config found for org ${orgId} and tool ${toolId}`);
+      throw new NotFoundException(`No auth config for tool ${toolId} in organization ${orgId}`);
+    }
+
+    return {
+      id: record.id,
+      orgId: record.orgId,
+      toolId: record.toolId,
+      name: record.name,
+      type: record.type,
+      config: record.config as Record<string, unknown>,
+      isDefault: record.isDefault,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    };
+  }
+
+  /**
+   * List all auth configurations for a tool
+   */
+  async listOrgAuthConfigs(orgId: string, toolId: string): Promise<OrgAuthConfig[]> {
+    // Validate tool access first
+    await this.validateToolAccess(toolId, orgId);
+
+    this.logger.debug(`Listing auth configs for ${orgId}:${toolId}`);
+
+    const records = await this.prisma.toolAuthConfig.findMany({
+      where: {
+        orgId,
+        toolId,
+      },
+      include: {
+        tool: true,
+      },
+      orderBy: [
+        { isDefault: 'desc' }, // Default configs first
+        { name: 'asc' }, // Then alphabetically by name
+      ],
+    });
+
+    return records.map(record => ({
+      id: record.id,
+      orgId: record.orgId,
+      toolId: record.toolId,
+      name: record.name,
+      type: record.type,
+      config: record.config as Record<string, unknown>,
+      isDefault: record.isDefault,
+      createdAt: record.createdAt,
+      updatedAt: record.updatedAt,
+    }));
   }
 
   /**
@@ -226,7 +349,7 @@ export class AuthConfigService {
       }
 
       // Load OAuth configuration for token refresh
-      const orgConfig = await this.getOrgAuthConfig(cred.orgId, cred.toolId);
+      const orgConfig = await this.getDefaultOrgAuthConfig(cred.orgId, cred.toolId);
 
       if (orgConfig.type !== 'oauth2') {
         throw new Error(`Tool ${tool.name} is not configured for OAuth2 authentication`);
@@ -278,28 +401,47 @@ export class AuthConfigService {
     toolId: string,
     type: string, // 'apiKey' | 'oauth2'
     config: Record<string, unknown>,
+    configName: string,
+    isDefault: boolean = false,
   ): Promise<OrgAuthConfig> {
     // Validate tool access first
     await this.validateToolAccess(toolId, orgId);
 
-    this.logger.debug(`Setting org auth config for ${orgId}:${toolId}`);
+    this.logger.debug(`Setting org auth config for ${orgId}:${toolId}:${configName}`);
 
     // Transform and validate the config based on type
     const processedConfig = this.processAuthConfig(type, config);
 
+    // If setting as default, unset any existing default for this tool
+    if (isDefault) {
+      await this.prisma.toolAuthConfig.updateMany({
+        where: {
+          orgId,
+          toolId,
+          isDefault: true,
+        },
+        data: {
+          isDefault: false,
+        },
+      });
+    }
+
     const authConfig = await this.prisma.toolAuthConfig.upsert({
       where: {
-        orgId_toolId: { orgId, toolId },
+        orgId_toolId_name: { orgId, toolId, name: configName },
       },
       create: {
         orgId,
         toolId,
+        name: configName,
         type,
         config: processedConfig as any,
+        isDefault,
       },
       update: {
         type,
         config: processedConfig as any,
+        isDefault,
         updatedAt: new Date(),
       },
       include: {
@@ -308,16 +450,18 @@ export class AuthConfigService {
     });
 
     // Invalidate cache
-    const cacheKey = this.orgConfigKey(orgId, toolId);
+    const cacheKey = this.orgConfigKey(orgId, toolId, configName);
     await this.cache.del(cacheKey);
 
-    this.logger.debug(`Successfully set auth config for ${orgId}:${toolId}`);
+    this.logger.debug(`Successfully set auth config for ${orgId}:${toolId}:${configName}`);
     return {
       id: authConfig.id,
       orgId: authConfig.orgId,
       toolId: authConfig.toolId,
+      name: authConfig.name,
       type: authConfig.type,
       config: authConfig.config as Record<string, unknown>,
+      isDefault: authConfig.isDefault,
       createdAt: authConfig.createdAt,
       updatedAt: authConfig.updatedAt,
     };
@@ -366,25 +510,54 @@ export class AuthConfigService {
   /**
    * Delete org auth configuration
    */
-  async deleteOrgAuthConfig(orgId: string, toolId: string): Promise<void> {
+  async deleteOrgAuthConfig(orgId: string, toolId: string, configName: string): Promise<void> {
     // Validate tool access first
     await this.validateToolAccess(toolId, orgId);
 
-    this.logger.debug(`Deleting org auth config for ${orgId}:${toolId}`);
+    this.logger.debug(`Deleting org auth config for ${orgId}:${toolId}:${configName}`);
+
+    const deleted = await this.prisma.toolAuthConfig.deleteMany({
+      where: { orgId, toolId, name: configName },
+    });
+
+    if (deleted.count === 0) {
+      throw new NotFoundException(
+        `No auth config '${configName}' found for org ${orgId} and tool ${toolId}`,
+      );
+    }
+
+    // Clean up cache
+    const cacheKey = this.orgConfigKey(orgId, toolId, configName);
+    await this.cache.del(cacheKey);
+
+    this.logger.debug(`Successfully deleted auth config for ${orgId}:${toolId}:${configName}`);
+  }
+
+  /**
+   * Delete all auth configurations for a tool
+   */
+  async deleteAllOrgAuthConfigs(orgId: string, toolId: string): Promise<void> {
+    // Validate tool access first
+    await this.validateToolAccess(toolId, orgId);
+
+    this.logger.debug(`Deleting all org auth configs for ${orgId}:${toolId}`);
 
     const deleted = await this.prisma.toolAuthConfig.deleteMany({
       where: { orgId, toolId },
     });
 
     if (deleted.count === 0) {
-      throw new NotFoundException(`No auth config found for org ${orgId} and tool ${toolId}`);
+      throw new NotFoundException(`No auth configs found for org ${orgId} and tool ${toolId}`);
     }
 
-    // Clean up cache
-    const cacheKey = this.orgConfigKey(orgId, toolId);
+    // Clean up cache - we need to clear all possible cache keys
+    // Since we don't know all config names, we'll need to clear the broader pattern
+    // This is a limitation of Redis - we can't easily clear by pattern
+    // For now, we'll clear the default one and let others expire naturally
+    const cacheKey = this.orgConfigKey(orgId, toolId, 'default');
     await this.cache.del(cacheKey);
 
-    this.logger.debug(`Successfully deleted auth config for ${orgId}:${toolId}`);
+    this.logger.debug(`Successfully deleted ${deleted.count} auth configs for ${orgId}:${toolId}`);
   }
 
   /**

@@ -235,7 +235,7 @@ export class OAuthService {
       );
 
       // Load org OAuth configuration using toolId
-      const orgConfig = await this.authConfig.getOrgAuthConfig(orgId, toolId);
+      const orgConfig = await this.authConfig.getDefaultOrgAuthConfig(orgId, toolId);
 
       if (orgConfig.type !== 'oauth2') {
         throw new BadRequestException(
@@ -326,7 +326,7 @@ export class OAuthService {
       );
 
       // Load OAuth configuration for token exchange
-      const orgConfig = await this.authConfig.getOrgAuthConfig(orgId, toolId);
+      const orgConfig = await this.authConfig.getDefaultOrgAuthConfig(orgId, toolId);
       const oauthConfig = this.validateOAuthConfig(orgConfig.config, toolKey);
 
       // Use the same redirect URI resolution logic as in authorization

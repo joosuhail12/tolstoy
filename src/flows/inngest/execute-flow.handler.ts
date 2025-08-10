@@ -599,7 +599,7 @@ export class ExecuteFlowHandler {
       }
 
       // Get organization auth configuration for the tool
-      const orgAuth = await this.authConfig.getOrgAuthConfig(context.orgId, toolName);
+      const orgAuth = await this.authConfig.getDefaultOrgAuthConfig(context.orgId, toolName);
       const authHeaders: Record<string, string> = {};
 
       if (orgAuth) {

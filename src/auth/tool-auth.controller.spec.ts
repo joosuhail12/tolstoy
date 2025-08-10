@@ -54,14 +54,17 @@ describe('ToolAuthController', () => {
       const toolId = 'github';
       const dto: CreateAuthConfigDto = {
         type: 'apiKey',
+        name: 'production',
         config: { apiKey: 'test-key', header: 'Authorization' },
       };
       const mockResult = {
         id: 'config-123',
         orgId,
         toolId,
+        name: 'production',
         type: 'apiKey',
         config: dto.config,
+        isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };
@@ -86,6 +89,7 @@ describe('ToolAuthController', () => {
     it('should throw BadRequestException when orgId is missing', async () => {
       const dto: CreateAuthConfigDto = {
         type: 'apiKey',
+        name: 'production',
         config: { apiKey: 'test-key' },
       };
 
@@ -104,8 +108,10 @@ describe('ToolAuthController', () => {
         id: 'config-123',
         orgId: 'org-123',
         toolId: 'github',
+        name: 'production',
         type: 'apiKey',
         config: { apiKey: 'masked****' },
+        isDefault: false,
         createdAt: new Date(),
         updatedAt: new Date(),
       };

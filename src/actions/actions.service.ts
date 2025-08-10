@@ -224,6 +224,7 @@ export class ActionsService {
       });
 
       const toolName = action.tool.name;
+      const toolId = action.toolId;
 
       // Increment counter metric
       this.metrics.actionExecutionCounter.inc({
@@ -251,7 +252,8 @@ export class ActionsService {
       };
 
       try {
-        const orgAuth = await this.authConfig.getOrgAuthConfig(orgId, toolName);
+        // Get the default auth configuration for the tool
+        const orgAuth = await this.authConfig.getDefaultOrgAuthConfig(orgId, toolId);
 
         if (orgAuth?.type === 'apiKey') {
           const headerName = (orgAuth.config.headerName as string) || 'Authorization';

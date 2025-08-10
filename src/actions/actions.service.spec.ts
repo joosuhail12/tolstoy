@@ -79,7 +79,7 @@ describe('ActionsService', () => {
     };
 
     const mockAuthConfig = {
-      getOrgAuthConfig: jest.fn(),
+      getDefaultOrgAuthConfig: jest.fn(),
       getUserCredentials: jest.fn(),
       refreshUserToken: jest.fn(),
     };
@@ -164,7 +164,7 @@ describe('ActionsService', () => {
         duration: 100,
       });
 
-      authConfig.getOrgAuthConfig.mockResolvedValue(apiKeyConfig);
+      authConfig.getDefaultOrgAuthConfig.mockResolvedValue(apiKeyConfig);
 
       const result = await service.executeAction('org-456', 'user-123', 'send-email', validInputs);
 
@@ -194,7 +194,7 @@ describe('ActionsService', () => {
       );
 
       // Verify API key auth was applied
-      expect(authConfig.getOrgAuthConfig).toHaveBeenCalledWith('org-456', 'email-service');
+      expect(authConfig.getDefaultOrgAuthConfig).toHaveBeenCalledWith('org-456', 'email-service');
 
       // Verify HTTP request through Daytona
       expect(daytonaService.executeHttpRequest).toHaveBeenCalledWith({
@@ -243,7 +243,7 @@ describe('ActionsService', () => {
         expiresAt: new Date(Date.now() + 3600000),
       };
 
-      authConfig.getOrgAuthConfig.mockResolvedValue(oauth2Config);
+      authConfig.getDefaultOrgAuthConfig.mockResolvedValue(oauth2Config);
       authConfig.getUserCredentials.mockResolvedValue(userCredential);
       authConfig.refreshUserToken.mockResolvedValue('oauth-token-123');
 
@@ -296,7 +296,7 @@ describe('ActionsService', () => {
         },
       };
 
-      authConfig.getOrgAuthConfig.mockResolvedValue(oauth2Config);
+      authConfig.getDefaultOrgAuthConfig.mockResolvedValue(oauth2Config);
 
       const result = await service.executeAction('org-456', undefined, 'send-email', validInputs);
 

@@ -89,7 +89,7 @@ describe('ExecuteFlowHandler - Throttling & Queuing', () => {
     } as any;
 
     const mockAuthConfigService = {
-      getOrgAuthConfig: jest.fn().mockResolvedValue(null),
+      getDefaultOrgAuthConfig: jest.fn().mockResolvedValue(null),
       getUserCredentials: jest.fn().mockResolvedValue(null),
     };
 

@@ -15,8 +15,10 @@ describe('AuthConfigService', () => {
     id: 'config-123',
     orgId: 'org-456',
     toolId: 'tool-789',
+    name: 'production',
     type: 'apiKey',
     config: { apiKey: 'secret-api-key-123' },
+    isDefault: true,
     createdAt: new Date('2023-01-01'),
     updatedAt: new Date('2023-01-02'),
   };
@@ -108,7 +110,7 @@ describe('AuthConfigService', () => {
       };
       cacheService.get.mockResolvedValue(cachedConfig);
 
-      const result = await service.getOrgAuthConfig('org-456', 'tool-789');
+      const result = await service.getOrgAuthConfig('org-456', 'tool-789', 'production');
 
       expect(result).toEqual(cachedConfig);
       expect(cacheService.get).toHaveBeenCalledWith('auth:org:org-456:tool:tool-789');
@@ -124,7 +126,7 @@ describe('AuthConfigService', () => {
       awsSecretsService.secretExists.mockResolvedValue(false);
       awsSecretsService.createSecret.mockResolvedValue(undefined);
 
-      const result = await service.getOrgAuthConfig('org-456', 'tool-789');
+      const result = await service.getOrgAuthConfig('org-456', 'tool-789', 'production');
 
       expect(result).toEqual(mockOrgAuthConfig);
       expect(prismaService.toolAuthConfig.findFirst).toHaveBeenCalledWith({
@@ -153,7 +155,7 @@ describe('AuthConfigService', () => {
       // Mock tool not found
       prismaService.tool.findUnique.mockResolvedValueOnce(null);
 
-      await expect(service.getOrgAuthConfig('org-456', 'nonexistent-tool-id')).rejects.toThrow(
+      await expect(service.getOrgAuthConfig('org-456', 'nonexistent-tool-id', 'production')).rejects.toThrow(
         new NotFoundException('Tool with ID nonexistent-tool-id not found'),
       );
     });
@@ -166,7 +168,7 @@ describe('AuthConfigService', () => {
       } as any);
       awsSecretsService.secretExists.mockRejectedValue(new Error('AWS Error'));
 
-      const result = await service.getOrgAuthConfig('org-456', 'tool-789');
+      const result = await service.getOrgAuthConfig('org-456', 'tool-789', 'production');
 
       expect(result).toEqual(mockOrgAuthConfig);
       expect(cacheService.set).toHaveBeenCalled();
@@ -224,7 +226,7 @@ describe('AuthConfigService', () => {
 
       // Mock the dependencies for token refresh
       prismaService.tool.findUnique.mockResolvedValue(mockTool);
-      service.getOrgAuthConfig = jest.fn().mockResolvedValue({
+      service.getDefaultOrgAuthConfig = jest.fn().mockResolvedValue({
         ...mockOrgAuthConfig,
         type: 'oauth2',
         config: {
@@ -283,7 +285,7 @@ describe('AuthConfigService', () => {
         config: newConfig,
       } as any);
 
-      const result = await service.setOrgAuthConfig('org-456', 'tool-789', 'apiKey', newConfig);
+      const result = await service.setOrgAuthConfig('org-456', 'tool-789', 'apiKey', newConfig, 'production');
 
       expect(result).toEqual({
         ...mockOrgAuthConfig,
@@ -358,7 +360,7 @@ describe('AuthConfigService', () => {
       prismaService.toolAuthConfig.deleteMany.mockResolvedValue({ count: 1 });
       prismaService.tool.findUnique.mockResolvedValue(mockTool as any);
 
-      await service.deleteOrgAuthConfig('org-456', 'tool-789');
+      await service.deleteOrgAuthConfig('org-456', 'tool-789', 'production');
 
       expect(prismaService.toolAuthConfig.deleteMany).toHaveBeenCalledWith({
         where: { orgId: 'org-456', toolId: 'tool-789' },
@@ -369,7 +371,7 @@ describe('AuthConfigService', () => {
     it('should throw NotFoundException when no config to delete', async () => {
       prismaService.toolAuthConfig.deleteMany.mockResolvedValue({ count: 0 });
 
-      await expect(service.deleteOrgAuthConfig('org-456', 'tool-789')).rejects.toThrow(
+      await expect(service.deleteOrgAuthConfig('org-456', 'tool-789', 'production')).rejects.toThrow(
         new NotFoundException('No auth config found for org org-456 and tool tool-789'),
       );
     });
@@ -401,10 +403,10 @@ describe('AuthConfigService', () => {
 
   describe('private helper methods', () => {
     it('should generate correct cache keys', () => {
-      const orgKey = service['orgConfigKey']('org-123', 'tool-456');
+      const orgKey = service['orgConfigKey']('org-123', 'tool-456', 'production');
       const userKey = service['_userCredKey']('org-123', 'user-456', 'tool-789');
 
-      expect(orgKey).toBe('auth:org:org-123:tool:tool-456');
+      expect(orgKey).toBe('auth:org:org-123:tool:tool-456:config:production');
       expect(userKey).toBe('auth:user:org-123:user-456:tool:tool-789');
     });
   });
