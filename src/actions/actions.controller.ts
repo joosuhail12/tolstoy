@@ -188,89 +188,8 @@ export class ActionsController {
     example: 'action_abc123',
   })
   @ApiBody({
+    type: UpdateActionDto,
     description: 'Updated action configuration',
-    schema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Human-readable action name',
-          example: 'Send Enhanced Slack Message',
-        },
-        key: {
-          type: 'string',
-          description: 'Unique identifier for the action',
-          example: 'slack_send_enhanced_message',
-        },
-        toolId: {
-          type: 'string',
-          description: 'ID of the associated tool',
-          example: 'tool_slack_123',
-        },
-        method: {
-          type: 'string',
-          description: 'HTTP method for the action',
-          enum: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-          example: 'POST',
-        },
-        endpoint: {
-          type: 'string',
-          description: 'API endpoint URL or path',
-          example: '/api/chat.postMessage',
-        },
-        headers: {
-          type: 'object',
-          description: 'HTTP headers required for the action',
-          example: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer {token}',
-          },
-        },
-        inputSchema: {
-          type: 'array',
-          description: 'Schema defining input parameters for the action',
-          items: {
-            type: 'object',
-            properties: {
-              name: { type: 'string' },
-              type: { type: 'string' },
-              required: { type: 'boolean' },
-              description: { type: 'string' },
-            },
-          },
-          example: [
-            {
-              name: 'channel',
-              type: 'string',
-              required: true,
-              description: 'Slack channel ID',
-            },
-            {
-              name: 'text',
-              type: 'string',
-              required: true,
-              description: 'Message content',
-            },
-            {
-              name: 'attachments',
-              type: 'array',
-              required: false,
-              description: 'Message attachments',
-            },
-          ],
-        },
-        executeIf: {
-          type: 'object',
-          description: 'Conditional execution rules (optional)',
-          example: { 'user.role': 'admin' },
-        },
-        version: {
-          type: 'number',
-          description: 'Action version number',
-          example: 2,
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 200,
@@ -345,23 +264,8 @@ export class ActionsController {
     example: 'user_789',
   })
   @ApiBody({
-    description: 'Action execution inputs',
     type: ExecuteActionDto,
-    schema: {
-      type: 'object',
-      properties: {
-        inputs: {
-          type: 'object',
-          description: "Input parameters matching the action's inputSchema",
-          example: {
-            channel: '#general',
-            text: 'Hello from Tolstoy!',
-            user_id: 'U123456',
-          },
-        },
-      },
-      required: ['inputs'],
-    },
+    description: 'Action execution inputs',
   })
   @ApiResponse({
     status: 200,

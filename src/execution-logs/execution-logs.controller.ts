@@ -39,72 +39,8 @@ export class ExecutionLogsController {
       'Create a log entry for workflow step execution. This tracks the execution history, inputs, outputs, and any errors.',
   })
   @ApiBody({
+    type: CreateExecutionLogDto,
     description: 'Execution log entry data',
-    schema: {
-      type: 'object',
-      properties: {
-        flowId: {
-          type: 'string',
-          description: 'ID of the workflow being executed',
-          example: 'flow_abc123',
-        },
-        executionId: {
-          type: 'string',
-          description: 'Unique execution instance ID',
-          example: 'exec_xyz789',
-        },
-        stepKey: {
-          type: 'string',
-          description: 'Unique identifier for the step within the workflow',
-          example: 'send_notification',
-        },
-        inputs: {
-          type: 'object',
-          description: 'Input data provided to the step',
-          example: {
-            stepName: 'Send Slack Notification',
-            stepType: 'action',
-            config: {
-              actionKey: 'slack_send_message',
-              parameters: {
-                channel: '#general',
-                message: 'Workflow completed successfully',
-              },
-            },
-            variables: {
-              userId: 'user_123',
-              timestamp: '2024-01-15T10:30:00Z',
-            },
-            stepOutputs: {},
-          },
-        },
-        outputs: {
-          type: 'object',
-          description: 'Output data produced by the step (optional)',
-          example: {
-            messageId: 'msg_456',
-            timestamp: '2024-01-15T10:30:05Z',
-            success: true,
-          },
-        },
-        error: {
-          type: 'object',
-          description: 'Error information if step failed (optional)',
-          example: {
-            message: 'Channel not found',
-            code: 'CHANNEL_NOT_FOUND',
-            stack: 'Error stack trace...',
-          },
-        },
-        status: {
-          type: 'string',
-          description: 'Execution status of the step',
-          enum: ['pending', 'running', 'completed', 'failed', 'skipped'],
-          example: 'completed',
-        },
-      },
-      required: ['flowId', 'executionId', 'stepKey', 'inputs', 'status'],
-    },
   })
   @ApiResponse({
     status: 201,
@@ -264,37 +200,8 @@ export class ExecutionLogsController {
     example: 'log_def456',
   })
   @ApiBody({
+    type: UpdateExecutionLogDto,
     description: 'Updated execution log data',
-    schema: {
-      type: 'object',
-      properties: {
-        outputs: {
-          type: 'object',
-          description: 'Output data produced by the step',
-          example: {
-            messageId: 'msg_456',
-            timestamp: '2024-01-15T10:30:05Z',
-            success: true,
-            responseCode: 200,
-          },
-        },
-        error: {
-          type: 'object',
-          description: 'Error information if step failed',
-          example: {
-            message: 'Channel not found',
-            code: 'CHANNEL_NOT_FOUND',
-            stack: 'Error stack trace...',
-          },
-        },
-        status: {
-          type: 'string',
-          description: 'Updated execution status',
-          enum: ['pending', 'running', 'completed', 'failed', 'skipped'],
-          example: 'completed',
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 200,

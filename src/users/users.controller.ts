@@ -142,34 +142,8 @@ export class UsersController {
     example: 'user_abc123',
   })
   @ApiBody({
+    type: UpdateUserDto,
     description: 'Updated user details',
-    schema: {
-      type: 'object',
-      properties: {
-        email: {
-          type: 'string',
-          format: 'email',
-          description: 'User email address',
-          example: 'john.doe@example.com',
-        },
-        name: {
-          type: 'string',
-          description: 'User full name',
-          example: 'John Doe',
-        },
-        role: {
-          type: 'string',
-          description: 'User role',
-          enum: ['admin', 'member', 'viewer'],
-          example: 'member',
-        },
-        profile: {
-          type: 'object',
-          description: 'User profile information',
-          example: { department: 'Engineering', title: 'Senior Software Engineer' },
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 200,

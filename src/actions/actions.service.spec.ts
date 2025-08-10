@@ -68,6 +68,10 @@ describe('ActionsService', () => {
       tool: {
         findUnique: jest.fn(),
       },
+      actionExecutionLog: {
+        create: jest.fn().mockResolvedValue({ id: 'exec-log-123' }),
+        update: jest.fn(),
+      },
     };
 
     const mockInputValidator = {

@@ -140,42 +140,8 @@ export class ToolsController {
     example: 'tool_abc123',
   })
   @ApiBody({
+    type: UpdateToolDto,
     description: 'Updated tool configuration',
-    schema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Tool name',
-          example: 'Slack Notifier',
-        },
-        type: {
-          type: 'string',
-          description: 'Tool type/category',
-          enum: ['notification', 'api', 'database', 'webhook', 'email'],
-          example: 'notification',
-        },
-        configuration: {
-          type: 'object',
-          description: 'Tool-specific configuration',
-          example: {
-            baseUrl: 'https://hooks.slack.com',
-            timeout: 10000,
-            retries: 5,
-          },
-        },
-        description: {
-          type: 'string',
-          description: 'Tool description',
-          example: 'Enhanced Slack notification tool',
-        },
-        version: {
-          type: 'string',
-          description: 'Tool version',
-          example: '1.1.0',
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 200,

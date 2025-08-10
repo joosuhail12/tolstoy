@@ -46,35 +46,8 @@ export class WebhooksController {
     description: 'Create a new webhook to receive event notifications',
   })
   @ApiBody({
+    type: CreateWebhookDto,
     description: 'Webhook configuration',
-    schema: {
-      type: 'object',
-      properties: {
-        url: {
-          type: 'string',
-          format: 'uri',
-          description: 'Webhook endpoint URL',
-          example: 'https://api.example.com/webhook',
-        },
-        eventTypes: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Event types to subscribe to',
-          example: ['flow.execution.completed', 'flow.execution.failed'],
-        },
-        enabled: {
-          type: 'boolean',
-          description: 'Whether the webhook is active',
-          default: true,
-        },
-        secret: {
-          type: 'string',
-          description: 'Optional secret for webhook signature verification',
-          example: 'webhook_secret_123',
-        },
-      },
-      required: ['url', 'eventTypes'],
-    },
   })
   @ApiResponse({
     status: 201,
@@ -234,32 +207,8 @@ export class WebhooksController {
     example: 'webhook_abc123',
   })
   @ApiBody({
+    type: UpdateWebhookDto,
     description: 'Updated webhook configuration',
-    schema: {
-      type: 'object',
-      properties: {
-        url: {
-          type: 'string',
-          format: 'uri',
-          description: 'Webhook endpoint URL',
-          example: 'https://api.example.com/webhook',
-        },
-        eventTypes: {
-          type: 'array',
-          items: { type: 'string' },
-          description: 'Event types to subscribe to',
-          example: ['flow.execution.completed', 'flow.execution.failed'],
-        },
-        enabled: {
-          type: 'boolean',
-          description: 'Whether the webhook is active',
-        },
-        secret: {
-          type: 'string',
-          description: 'Optional secret for webhook signature verification',
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 200,

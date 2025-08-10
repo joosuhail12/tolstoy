@@ -148,44 +148,8 @@ export class FlowsController {
     example: 'flow_abc123',
   })
   @ApiBody({
+    type: UpdateFlowDto,
     description: 'Updated flow definition',
-    schema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Flow name',
-          example: 'Updated User Onboarding Flow',
-        },
-        description: {
-          type: 'string',
-          description: 'Flow description',
-          example: 'Enhanced automated user onboarding process',
-        },
-        version: {
-          type: 'number',
-          description: 'Flow version number',
-          example: 2,
-        },
-        steps: {
-          type: 'array',
-          description: 'Updated workflow steps definition',
-          example: [
-            {
-              id: 'step_1',
-              type: 'action',
-              actionId: 'action_send_email',
-              config: { to: '{{user.email}}', template: 'welcome_v2' },
-            },
-          ],
-        },
-        settings: {
-          type: 'object',
-          description: 'Updated flow execution settings',
-          example: { timeout: 600000, retries: 3 },
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 200,

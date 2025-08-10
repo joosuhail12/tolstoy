@@ -124,27 +124,8 @@ export class OrganizationsController {
     example: 'org_abc123',
   })
   @ApiBody({
+    type: UpdateOrganizationDto,
     description: 'Updated organization details',
-    schema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Organization name',
-          example: 'Acme Corp',
-        },
-        description: {
-          type: 'string',
-          description: 'Organization description',
-          example: 'Leading technology company',
-        },
-        settings: {
-          type: 'object',
-          description: 'Organization settings',
-          example: { timezone: 'UTC', currency: 'USD' },
-        },
-      },
-    },
   })
   @ApiResponse({
     status: 200,
