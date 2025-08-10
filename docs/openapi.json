@@ -4538,7 +4538,7 @@
     },
     "/tools/{toolId}/auth": {
       "post": {
-        "description": "Configures authentication settings (API Key or OAuth2) for a specific tool within an organization. This endpoint supports both creating new configurations and updating existing ones.",
+        "description": "Configures authentication settings (API Key or OAuth2) for a specific tool within an organization. API Key auth requires headerName and headerValue. OAuth2 auth requires clientId, clientSecret, and accessToken. A default callback URL is automatically added for OAuth2 configurations.",
         "operationId": "ToolAuthController_upsert",
         "parameters": [
           {
@@ -5033,29 +5033,97 @@
               "oauth2"
             ],
             "description": "Type of authentication configuration",
-            "example": "apiKey"
+            "example": "apiKey",
+            "examples": {
+              "apiKey": {
+                "summary": "API Key Authentication",
+                "value": "apiKey"
+              },
+              "oauth2": {
+                "summary": "OAuth2 Authentication",
+                "value": "oauth2"
+              }
+            }
           },
           "config": {
-            "type": "object",
-            "description": "Authentication configuration JSON",
+            "description": "Authentication configuration (structure depends on type)",
             "examples": {
               "apiKey": {
                 "summary": "API Key Configuration",
+                "description": "Configuration for API key-based authentication",
                 "value": {
-                  "apiKey": "your-api-key-here",
-                  "header": "X-API-Key"
+                  "headerName": "Authorization",
+                  "headerValue": "Bearer sk-1234567890abcdef"
                 }
               },
               "oauth2": {
                 "summary": "OAuth2 Configuration",
+                "description": "Configuration for OAuth2-based authentication",
                 "value": {
-                  "clientId": "your-client-id",
-                  "clientSecret": "your-client-secret",
-                  "redirectUri": "https://your-app.com/oauth/callback",
-                  "scope": "read write"
+                  "clientId": "your-oauth-client-id",
+                  "clientSecret": "your-oauth-client-secret",
+                  "accessToken": "oauth2-access-token-here",
+                  "refreshToken": "oauth2-refresh-token-here",
+                  "scopes": "read write",
+                  "expiresAt": "2024-12-31T23:59:59.000Z"
                 }
               }
-            }
+            },
+            "oneOf": [
+              {
+                "type": "object",
+                "title": "API Key Configuration",
+                "properties": {
+                  "headerName": {
+                    "type": "string",
+                    "example": "Authorization"
+                  },
+                  "headerValue": {
+                    "type": "string",
+                    "example": "Bearer sk-1234567890abcdef"
+                  }
+                },
+                "required": [
+                  "headerName",
+                  "headerValue"
+                ]
+              },
+              {
+                "type": "object",
+                "title": "OAuth2 Configuration",
+                "properties": {
+                  "clientId": {
+                    "type": "string",
+                    "example": "your-oauth-client-id"
+                  },
+                  "clientSecret": {
+                    "type": "string",
+                    "example": "your-oauth-client-secret"
+                  },
+                  "accessToken": {
+                    "type": "string",
+                    "example": "oauth2-access-token-here"
+                  },
+                  "refreshToken": {
+                    "type": "string",
+                    "example": "oauth2-refresh-token-here"
+                  },
+                  "scopes": {
+                    "type": "string",
+                    "example": "read write"
+                  },
+                  "expiresAt": {
+                    "type": "string",
+                    "example": "2024-12-31T23:59:59.000Z"
+                  }
+                },
+                "required": [
+                  "clientId",
+                  "clientSecret",
+                  "accessToken"
+                ]
+              }
+            ]
           }
         },
         "required": [

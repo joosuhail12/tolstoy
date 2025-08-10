@@ -284,6 +284,9 @@ export class AuthConfigService {
 
     this.logger.debug(`Setting org auth config for ${orgId}:${toolId}`);
 
+    // Transform and validate the config based on type
+    const processedConfig = this.processAuthConfig(type, config);
+
     const authConfig = await this.prisma.toolAuthConfig.upsert({
       where: {
         orgId_toolId: { orgId, toolId },
@@ -292,11 +295,11 @@ export class AuthConfigService {
         orgId,
         toolId,
         type,
-        config: config as any,
+        config: processedConfig as any,
       },
       update: {
         type,
-        config: config as any,
+        config: processedConfig as any,
         updatedAt: new Date(),
       },
       include: {
@@ -533,5 +536,57 @@ export class AuthConfigService {
       this.logger.warn(`Failed to sync to secrets manager: ${error.message}`);
       throw error;
     }
+  }
+
+  /**
+   * Process and validate auth configuration based on type
+   * Adds default values and transforms the config for storage
+   */
+  private processAuthConfig(type: string, config: Record<string, unknown>): Record<string, unknown> {
+    if (type === 'apiKey') {
+      // For API key auth, ensure we have headerName and headerValue
+      const apiKeyConfig = config as { headerName: string; headerValue: string };
+      
+      if (!apiKeyConfig.headerName || !apiKeyConfig.headerValue) {
+        throw new Error('API key configuration requires headerName and headerValue');
+      }
+
+      return {
+        headerName: apiKeyConfig.headerName,
+        headerValue: apiKeyConfig.headerValue,
+        // Keep legacy field for backward compatibility
+        apiKey: apiKeyConfig.headerValue,
+      };
+    } else if (type === 'oauth2') {
+      // For OAuth2 auth, add default callback URL and validate required fields
+      const oauthConfig = config as {
+        clientId: string;
+        clientSecret: string;
+        accessToken: string;
+        refreshToken?: string;
+        scopes?: string;
+        expiresAt?: string;
+      };
+
+      if (!oauthConfig.clientId || !oauthConfig.clientSecret || !oauthConfig.accessToken) {
+        throw new Error('OAuth2 configuration requires clientId, clientSecret, and accessToken');
+      }
+
+      // Add default callback URL - this will be used by Tolstoy's OAuth flow
+      const defaultCallbackUrl = `${process.env.BASE_URL || 'https://tolstoy.getpullse.com'}/api/auth/oauth/callback`;
+
+      return {
+        clientId: oauthConfig.clientId,
+        clientSecret: oauthConfig.clientSecret,
+        accessToken: oauthConfig.accessToken,
+        refreshToken: oauthConfig.refreshToken,
+        scopes: oauthConfig.scopes || 'read',
+        expiresAt: oauthConfig.expiresAt,
+        redirectUri: defaultCallbackUrl, // Use our own callback URL
+        callbackUrl: defaultCallbackUrl, // Alias for backward compatibility
+      };
+    }
+
+    throw new Error(`Unsupported auth type: ${type}`);
   }
 }

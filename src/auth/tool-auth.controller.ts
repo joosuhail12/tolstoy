@@ -78,7 +78,7 @@ export class ToolAuthController {
   @ApiOperation({
     summary: 'Create or update organization-level auth configuration for a tool',
     description:
-      'Configures authentication settings (API Key or OAuth2) for a specific tool within an organization. This endpoint supports both creating new configurations and updating existing ones.',
+      'Configures authentication settings (API Key or OAuth2) for a specific tool within an organization. API Key auth requires headerName and headerValue. OAuth2 auth requires clientId, clientSecret, and accessToken. A default callback URL is automatically added for OAuth2 configurations.',
   })
   @ApiParam({
     name: 'toolId',
