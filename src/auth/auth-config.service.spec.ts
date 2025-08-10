@@ -155,9 +155,9 @@ describe('AuthConfigService', () => {
       // Mock tool not found
       prismaService.tool.findUnique.mockResolvedValueOnce(null);
 
-      await expect(service.getOrgAuthConfig('org-456', 'nonexistent-tool-id', 'production')).rejects.toThrow(
-        new NotFoundException('Tool with ID nonexistent-tool-id not found'),
-      );
+      await expect(
+        service.getOrgAuthConfig('org-456', 'nonexistent-tool-id', 'production'),
+      ).rejects.toThrow(new NotFoundException('Tool with ID nonexistent-tool-id not found'));
     });
 
     it('should continue execution if AWS Secrets Manager fails', async () => {
@@ -285,7 +285,13 @@ describe('AuthConfigService', () => {
         config: newConfig,
       } as any);
 
-      const result = await service.setOrgAuthConfig('org-456', 'tool-789', 'apiKey', newConfig, 'production');
+      const result = await service.setOrgAuthConfig(
+        'org-456',
+        'tool-789',
+        'apiKey',
+        newConfig,
+        'production',
+      );
 
       expect(result).toEqual({
         ...mockOrgAuthConfig,
@@ -371,7 +377,9 @@ describe('AuthConfigService', () => {
     it('should throw NotFoundException when no config to delete', async () => {
       prismaService.toolAuthConfig.deleteMany.mockResolvedValue({ count: 0 });
 
-      await expect(service.deleteOrgAuthConfig('org-456', 'tool-789', 'production')).rejects.toThrow(
+      await expect(
+        service.deleteOrgAuthConfig('org-456', 'tool-789', 'production'),
+      ).rejects.toThrow(
         new NotFoundException('No auth config found for org org-456 and tool tool-789'),
       );
     });

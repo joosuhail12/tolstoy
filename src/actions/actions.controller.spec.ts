@@ -363,7 +363,12 @@ describe('ActionsController', () => {
       );
 
       await expect(
-        controller.execute('org-123', 'user-456', 'test_action', invalidExecuteDto as ExecuteActionDto),
+        controller.execute(
+          'org-123',
+          'user-456',
+          'test_action',
+          invalidExecuteDto as ExecuteActionDto,
+        ),
       ).rejects.toThrow(BadRequestException);
     });
   });
