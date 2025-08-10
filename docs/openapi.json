@@ -907,50 +907,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object",
-                "properties": {
-                  "name": {
-                    "type": "string",
-                    "description": "Tool name",
-                    "example": "Slack Notifier"
-                  },
-                  "type": {
-                    "type": "string",
-                    "description": "Tool type/category",
-                    "enum": [
-                      "notification",
-                      "api",
-                      "database",
-                      "webhook",
-                      "email"
-                    ],
-                    "example": "notification"
-                  },
-                  "configuration": {
-                    "type": "object",
-                    "description": "Tool-specific configuration",
-                    "example": {
-                      "baseUrl": "https://hooks.slack.com",
-                      "timeout": 5000,
-                      "retries": 3
-                    }
-                  },
-                  "description": {
-                    "type": "string",
-                    "description": "Tool description",
-                    "example": "Send notifications to Slack channels"
-                  },
-                  "version": {
-                    "type": "string",
-                    "description": "Tool version",
-                    "example": "1.0.0"
-                  }
-                },
-                "required": [
-                  "name",
-                  "type",
-                  "configuration"
-                ]
+                "$ref": "#/components/schemas/CreateToolDto"
               }
             }
           }
@@ -965,29 +922,23 @@
                   "properties": {
                     "id": {
                       "type": "string",
-                      "example": "tool_abc123"
+                      "example": "cme3zjbwc0000uppplgvx1hse"
                     },
                     "name": {
                       "type": "string",
                       "example": "Slack Notifier"
                     },
-                    "type": {
+                    "baseUrl": {
                       "type": "string",
-                      "example": "notification"
+                      "example": "https://hooks.slack.com/services"
                     },
-                    "configuration": {
-                      "type": "object",
-                      "example": {
-                        "baseUrl": "https://hooks.slack.com"
-                      }
-                    },
-                    "description": {
+                    "authType": {
                       "type": "string",
-                      "example": "Send notifications to Slack channels"
+                      "example": "apiKey"
                     },
-                    "version": {
+                    "orgId": {
                       "type": "string",
-                      "example": "1.0.0"
+                      "example": "org_123"
                     },
                     "createdAt": {
                       "type": "string",
@@ -4954,6 +4905,32 @@
       }
     },
     "schemas": {
+      "CreateToolDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Tool name",
+            "example": "Slack Notifier"
+          },
+          "baseUrl": {
+            "type": "string",
+            "description": "Base URL for the tool API",
+            "example": "https://hooks.slack.com/services",
+            "format": "uri"
+          },
+          "authType": {
+            "type": "string",
+            "description": "Authentication type (apiKey, oauth2, basic)",
+            "example": "apiKey"
+          }
+        },
+        "required": [
+          "name",
+          "baseUrl",
+          "authType"
+        ]
+      },
       "ExecuteActionDto": {
         "type": "object",
         "properties": {

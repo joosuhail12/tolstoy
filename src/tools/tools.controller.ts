@@ -38,43 +38,8 @@ export class ToolsController {
     description: 'Register a new external tool for use in workflows',
   })
   @ApiBody({
+    type: CreateToolDto,
     description: 'Tool configuration',
-    schema: {
-      type: 'object',
-      properties: {
-        name: {
-          type: 'string',
-          description: 'Tool name',
-          example: 'Slack Notifier',
-        },
-        type: {
-          type: 'string',
-          description: 'Tool type/category',
-          enum: ['notification', 'api', 'database', 'webhook', 'email'],
-          example: 'notification',
-        },
-        configuration: {
-          type: 'object',
-          description: 'Tool-specific configuration',
-          example: {
-            baseUrl: 'https://hooks.slack.com',
-            timeout: 5000,
-            retries: 3,
-          },
-        },
-        description: {
-          type: 'string',
-          description: 'Tool description',
-          example: 'Send notifications to Slack channels',
-        },
-        version: {
-          type: 'string',
-          description: 'Tool version',
-          example: '1.0.0',
-        },
-      },
-      required: ['name', 'type', 'configuration'],
-    },
   })
   @ApiResponse({
     status: 201,
@@ -82,12 +47,11 @@ export class ToolsController {
     schema: {
       type: 'object',
       properties: {
-        id: { type: 'string', example: 'tool_abc123' },
+        id: { type: 'string', example: 'cme3zjbwc0000uppplgvx1hse' },
         name: { type: 'string', example: 'Slack Notifier' },
-        type: { type: 'string', example: 'notification' },
-        configuration: { type: 'object', example: { baseUrl: 'https://hooks.slack.com' } },
-        description: { type: 'string', example: 'Send notifications to Slack channels' },
-        version: { type: 'string', example: '1.0.0' },
+        baseUrl: { type: 'string', example: 'https://hooks.slack.com/services' },
+        authType: { type: 'string', example: 'apiKey' },
+        orgId: { type: 'string', example: 'org_123' },
         createdAt: { type: 'string', format: 'date-time' },
         updatedAt: { type: 'string', format: 'date-time' },
       },
