@@ -1,0 +1,503 @@
+---
+title: "Health Status"
+description: "Check the overall health and status of the Tolstoy API"
+---
+
+# Health Status
+
+<Badge variant="success">GET</Badge> `/health`
+
+Check the current health status of the Tolstoy API and its dependencies. This endpoint provides information about system availability, performance metrics, and service dependencies.
+
+## Request
+
+### **HTTP Request**
+
+```http
+GET https://api.tolstoy.dev/health
+```
+
+### **Query Parameters**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `detailed` | boolean | false | Include detailed health metrics |
+| `include_dependencies` | boolean | false | Include dependency health status |
+
+## Response
+
+### **Basic Health Response**
+
+<CodeGroup>
+
+```json 200 OK
+{
+  "status": "healthy",
+  "timestamp": "2024-01-15T20:00:00.000Z",
+  "version": "2.1.0",
+  "environment": "production",
+  "uptime_seconds": 2592000,
+  "checks": {
+    "database": "healthy",
+    "redis": "healthy",
+    "queue": "healthy",
+    "external_apis": "healthy"
+  }
+}
+```
+
+</CodeGroup>
+
+### **Detailed Health Response**
+
+<CodeGroup>
+
+```json 200 OK (detailed=true)
+{
+  "status": "healthy",
+  "timestamp": "2024-01-15T20:00:00.000Z",
+  "version": "2.1.0",
+  "environment": "production",
+  "uptime_seconds": 2592000,
+  "region": "us-east-1",
+  "instance_id": "i-1234567890abcdef0",
+  "checks": {
+    "database": {
+      "status": "healthy",
+      "response_time_ms": 12,
+      "connections": {
+        "active": 15,
+        "idle": 85,
+        "max": 100
+      },
+      "last_check": "2024-01-15T19:59:55.000Z"
+    },
+    "redis": {
+      "status": "healthy",
+      "response_time_ms": 3,
+      "memory_usage": {
+        "used_mb": 245,
+        "max_mb": 1024,
+        "percentage": 23.9
+      },
+      "connected_clients": 8,
+      "last_check": "2024-01-15T19:59:58.000Z"
+    },
+    "queue": {
+      "status": "healthy",
+      "pending_jobs": 42,
+      "failed_jobs": 3,
+      "workers": {
+        "active": 5,
+        "idle": 3,
+        "total": 8
+      },
+      "last_processed": "2024-01-15T19:59:59.000Z"
+    },
+    "external_apis": {
+      "status": "healthy",
+      "services": {
+        "salesforce": {
+          "status": "healthy",
+          "response_time_ms": 156,
+          "success_rate": 99.8
+        },
+        "sendgrid": {
+          "status": "healthy",
+          "response_time_ms": 89,
+          "success_rate": 99.9
+        },
+        "stripe": {
+          "status": "degraded",
+          "response_time_ms": 2340,
+          "success_rate": 97.2,
+          "note": "Elevated response times"
+        }
+      }
+    }
+  },
+  "metrics": {
+    "requests_per_minute": 1247,
+    "avg_response_time_ms": 234,
+    "error_rate": 0.02,
+    "active_executions": 89,
+    "cpu_usage": 45.2,
+    "memory_usage": 67.8,
+    "disk_usage": 23.1
+  },
+  "maintenance": {
+    "scheduled": false,
+    "next_window": "2024-01-20T02:00:00.000Z"
+  }
+}
+```
+
+</CodeGroup>
+
+### **Unhealthy Response**
+
+<CodeGroup>
+
+```json 503 Service Unavailable
+{
+  "status": "unhealthy",
+  "timestamp": "2024-01-15T20:00:00.000Z",
+  "version": "2.1.0",
+  "environment": "production",
+  "uptime_seconds": 2592000,
+  "checks": {
+    "database": {
+      "status": "unhealthy",
+      "error": "Connection timeout",
+      "last_success": "2024-01-15T19:55:00.000Z",
+      "response_time_ms": null
+    },
+    "redis": "healthy",
+    "queue": {
+      "status": "degraded",
+      "warning": "High queue backlog",
+      "pending_jobs": 15432,
+      "workers": {
+        "active": 8,
+        "idle": 0,
+        "total": 8
+      }
+    },
+    "external_apis": "healthy"
+  },
+  "incidents": [
+    {
+      "id": "inc_20240115_001",
+      "title": "Database connectivity issues",
+      "status": "investigating",
+      "started_at": "2024-01-15T19:55:00.000Z",
+      "estimated_resolution": "2024-01-15T20:30:00.000Z"
+    }
+  ]
+}
+```
+
+</CodeGroup>
+
+## Examples
+
+### **Basic Health Check**
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET 'https://api.tolstoy.dev/health' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript
+async function checkHealth() {
+  try {
+    const response = await fetch('https://api.tolstoy.dev/health');
+    const health = await response.json();
+    
+    console.log(`API Status: ${health.status}`);
+    console.log(`Version: ${health.version}`);
+    console.log(`Uptime: ${Math.round(health.uptime_seconds / 3600)} hours`);
+    
+    // Check individual services
+    Object.entries(health.checks).forEach(([service, status]) => {
+      const statusIcon = status === 'healthy' ? '✅' : 
+                        status === 'degraded' ? '⚠️' : '❌';
+      console.log(`${statusIcon} ${service}: ${status}`);
+    });
+    
+    return health.status === 'healthy';
+  } catch (error) {
+    console.error('Health check failed:', error);
+    return false;
+  }
+}
+
+// Usage
+const isHealthy = await checkHealth();
+if (!isHealthy) {
+  console.warn('API is not healthy - some features may be unavailable');
+}
+```
+
+```python Python
+import requests
+from datetime import datetime, timedelta
+
+def check_api_health(detailed=False):
+    url = 'https://api.tolstoy.dev/health'
+    params = {}
+    
+    if detailed:
+        params['detailed'] = 'true'
+        params['include_dependencies'] = 'true'
+    
+    try:
+        response = requests.get(url, params=params, timeout=10)
+        health = response.json()
+        
+        print(f"API Status: {health['status']}")
+        print(f"Version: {health['version']}")
+        
+        uptime = timedelta(seconds=health['uptime_seconds'])
+        print(f"Uptime: {uptime}")
+        
+        # Check service health
+        for service, status in health['checks'].items():
+            if isinstance(status, dict):
+                status_val = status['status']
+                if 'response_time_ms' in status:
+                    print(f"{service}: {status_val} ({status['response_time_ms']}ms)")
+                else:
+                    print(f"{service}: {status_val}")
+            else:
+                print(f"{service}: {status}")
+        
+        return health['status'] == 'healthy'
+    
+    except requests.RequestException as e:
+        print(f"Health check failed: {e}")
+        return False
+
+# Usage
+is_healthy = check_api_health(detailed=True)
+```
+
+</CodeGroup>
+
+### **Monitoring Integration**
+
+<CodeGroup>
+
+```javascript Health Monitoring
+class HealthMonitor {
+  constructor(apiUrl, checkInterval = 60000) {
+    this.apiUrl = apiUrl;
+    this.checkInterval = checkInterval;
+    this.isHealthy = true;
+    this.subscribers = [];
+    this.metrics = [];
+  }
+  
+  subscribe(callback) {
+    this.subscribers.push(callback);
+  }
+  
+  unsubscribe(callback) {
+    this.subscribers = this.subscribers.filter(cb => cb !== callback);
+  }
+  
+  notifySubscribers(health) {
+    this.subscribers.forEach(callback => {
+      try {
+        callback(health);
+      } catch (error) {
+        console.error('Health subscriber error:', error);
+      }
+    });
+  }
+  
+  async checkHealth() {
+    try {
+      const response = await fetch(`${this.apiUrl}/health?detailed=true`);
+      const health = await response.json();
+      
+      const wasHealthy = this.isHealthy;
+      this.isHealthy = health.status === 'healthy';
+      
+      // Store metrics for trending
+      this.metrics.push({
+        timestamp: new Date(),
+        status: health.status,
+        responseTime: health.metrics?.avg_response_time_ms,
+        errorRate: health.metrics?.error_rate
+      });
+      
+      // Keep only last 100 metrics
+      if (this.metrics.length > 100) {
+        this.metrics = this.metrics.slice(-100);
+      }
+      
+      // Notify on status change
+      if (wasHealthy !== this.isHealthy) {
+        console.log(`API health changed: ${wasHealthy ? 'healthy' : 'unhealthy'} → ${this.isHealthy ? 'healthy' : 'unhealthy'}`);
+      }
+      
+      this.notifySubscribers(health);
+      return health;
+      
+    } catch (error) {
+      console.error('Health check failed:', error);
+      this.isHealthy = false;
+      this.notifySubscribers({ status: 'error', error: error.message });
+      return null;
+    }
+  }
+  
+  start() {
+    this.checkHealth(); // Initial check
+    this.intervalId = setInterval(() => {
+      this.checkHealth();
+    }, this.checkInterval);
+  }
+  
+  stop() {
+    if (this.intervalId) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+  }
+  
+  getMetricsTrend() {
+    return {
+      avgResponseTime: this.metrics.reduce((sum, m) => sum + (m.responseTime || 0), 0) / this.metrics.length,
+      avgErrorRate: this.metrics.reduce((sum, m) => sum + (m.errorRate || 0), 0) / this.metrics.length,
+      healthyPercentage: (this.metrics.filter(m => m.status === 'healthy').length / this.metrics.length) * 100
+    };
+  }
+}
+
+// Usage
+const monitor = new HealthMonitor('https://api.tolstoy.dev');
+
+monitor.subscribe(health => {
+  if (health.status === 'unhealthy') {
+    console.warn('API is unhealthy:', health);
+    // Show user notification
+    showNotification('Some features may be temporarily unavailable', 'warning');
+  } else if (health.status === 'healthy') {
+    console.log('API is healthy');
+    // Clear any warnings
+    clearNotifications();
+  }
+});
+
+monitor.start();
+
+// Stop monitoring when page unloads
+window.addEventListener('beforeunload', () => monitor.stop());
+```
+
+</CodeGroup>
+
+## Status Definitions
+
+### **Overall Status**
+
+| Status | Description |
+|--------|-------------|
+| `healthy` | All systems operational |
+| `degraded` | Some services experiencing issues but API is functional |
+| `unhealthy` | Critical services are down, API may be partially unavailable |
+| `maintenance` | Scheduled maintenance in progress |
+
+### **Service Status**
+
+| Status | Description |
+|--------|-------------|
+| `healthy` | Service is fully operational |
+| `degraded` | Service is operational but with reduced performance |
+| `unhealthy` | Service is down or experiencing critical issues |
+
+## Use Cases
+
+### **Circuit Breaker Pattern**
+
+Use health checks to implement circuit breaker logic in your application:
+
+```javascript
+class ApiClient {
+  constructor() {
+    this.circuitOpen = false;
+    this.lastHealthCheck = 0;
+    this.healthCheckInterval = 30000; // 30 seconds
+  }
+  
+  async makeRequest(endpoint, options) {
+    if (this.circuitOpen) {
+      if (Date.now() - this.lastHealthCheck > this.healthCheckInterval) {
+        const isHealthy = await this.checkHealth();
+        if (isHealthy) {
+          this.circuitOpen = false;
+        }
+      } else {
+        throw new Error('Circuit breaker is open - API is unhealthy');
+      }
+    }
+    
+    try {
+      return await fetch(endpoint, options);
+    } catch (error) {
+      // Open circuit on persistent failures
+      this.circuitOpen = true;
+      this.lastHealthCheck = Date.now();
+      throw error;
+    }
+  }
+  
+  async checkHealth() {
+    try {
+      const response = await fetch('https://api.tolstoy.dev/health');
+      const health = await response.json();
+      this.lastHealthCheck = Date.now();
+      return health.status === 'healthy';
+    } catch {
+      return false;
+    }
+  }
+}
+```
+
+## API Playground
+
+Try checking API health:
+
+<ApiPlayground
+  method="GET"
+  endpoint="/health"
+  baseUrl="https://api.tolstoy.dev"
+  parameters={[
+    {
+      name: "detailed",
+      type: "boolean",
+      defaultValue: false,
+      description: "Include detailed health metrics"
+    },
+    {
+      name: "include_dependencies",
+      type: "boolean",
+      defaultValue: false,
+      description: "Include dependency health status"
+    }
+  ]}
+  sampleResponse={{
+    "status": "healthy",
+    "timestamp": "2024-01-15T20:00:00.000Z",
+    "version": "2.1.0",
+    "uptime_seconds": 2592000,
+    "checks": {
+      "database": "healthy",
+      "redis": "healthy",
+      "queue": "healthy",
+      "external_apis": "healthy"
+    }
+  }}
+/>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="System Metrics" icon="chart-line" href="/api/health/metrics">
+    Detailed system metrics
+  </Card>
+  <Card title="Dependency Status" icon="plug" href="/api/health/dependencies">
+    External service health
+  </Card>
+  <Card title="Incidents" icon="triangle-exclamation" href="/api/health/incidents">
+    Current and past incidents
+  </Card>
+  <Card title="Status History" icon="clock-rotate-left" href="/api/health/history">
+    Historical health data
+  </Card>
+</CardGroup>

@@ -1,0 +1,503 @@
+# Sentry Error Tracking & Monitoring
+
+Complete guide to Sentry integration for error tracking, performance monitoring, and observability.
+
+## Overview
+
+Sentry provides real-time error tracking, performance monitoring, and application observability for the Tolstoy platform.
+
+### Features
+- **Error Tracking**: Automatic exception capture and reporting
+- **Performance Monitoring**: Transaction tracing and performance metrics
+- **Release Tracking**: Deploy and release monitoring
+- **User Context**: User and organization-specific error tracking
+
+## Configuration
+
+### Environment Setup
+```bash
+SENTRY_DSN=https://your-dsn@sentry.io/project-id
+NODE_ENV=production
+APP_VERSION=1.1.0
+```
+
+### Sentry Initialization
+```typescript
+// src/config/sentry-config.service.ts
+import * as Sentry from '@sentry/nestjs';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
+
+@Injectable()
+export class SentryConfigService {
+  async initializeSentry() {
+    const dsn = await this.secretsService.get('SENTRY_DSN');
+    
+    Sentry.init({
+      dsn,
+      environment: this.configService.get('NODE_ENV'),
+      release: this.configService.get('APP_VERSION'),
+      
+      // Performance monitoring
+      tracesSampleRate: 0.1, // 10% of transactions
+      profilesSampleRate: 0.1, // 10% of profiles
+      
+      // Integrations
+      integrations: [
+        nodeProfilingIntegration(),
+        Sentry.httpIntegration(),
+        Sentry.expressIntegration(),
+      ],
+      
+      // Error filtering
+      beforeSend(event) {
+        // Filter out noise
+        if (event.exception?.values?.[0]?.type === 'UnauthorizedError') {
+          return null;
+        }
+        return event;
+      }
+    });
+  }
+}
+```
+
+## Error Handling
+
+### Global Exception Filter
+```typescript
+// src/common/filters/sentry-exception.filter.ts
+@Catch()
+export class SentryExceptionFilter implements ExceptionFilter {
+  constructor(private readonly logger: PinoLogger) {}
+  
+  catch(exception: unknown, host: ArgumentsHost) {
+    const ctx = host.switchToHttp();
+    const request = ctx.getRequest();
+    const response = ctx.getResponse();
+    
+    // Set user context for Sentry
+    Sentry.setUser({
+      id: request.headers['x-user-id'],
+      orgId: request.headers['x-org-id'],
+      ip_address: request.ip
+    });
+    
+    // Set request context
+    Sentry.setTag('endpoint', request.url);
+    Sentry.setTag('method', request.method);
+    Sentry.setContext('request', {
+      url: request.url,
+      method: request.method,
+      headers: request.headers,
+      body: request.body
+    });
+    
+    // Capture exception
+    Sentry.captureException(exception);
+    
+    // Log locally
+    this.logger.error('Unhandled exception', {
+      exception: exception instanceof Error ? exception.message : exception,
+      stack: exception instanceof Error ? exception.stack : undefined,
+      url: request.url,
+      method: request.method
+    });
+    
+    // Send appropriate response
+    const status = exception instanceof HttpException 
+      ? exception.getStatus() 
+      : HttpStatus.INTERNAL_SERVER_ERROR;
+      
+    response.status(status).json({
+      statusCode: status,
+      timestamp: new Date().toISOString(),
+      path: request.url,
+      message: exception instanceof Error ? exception.message : 'Internal server error'
+    });
+  }
+}
+```
+
+### Manual Error Reporting
+```typescript
+// Service-level error handling
+@Injectable()
+export class FlowExecutorService {
+  async executeFlow(flowId: string, context: TenantContext) {
+    try {
+      // Flow execution logic
+      const result = await this.processFlow(flowId, context);
+      return result;
+    } catch (error) {
+      // Add flow-specific context
+      Sentry.setContext('flow_execution', {
+        flowId,
+        orgId: context.orgId,
+        userId: context.userId,
+        timestamp: new Date().toISOString()
+      });
+      
+      // Add custom tags
+      Sentry.setTag('service', 'flow-executor');
+      Sentry.setTag('flow_id', flowId);
+      
+      // Capture with extra data
+      Sentry.captureException(error, {
+        extra: {
+          flowDefinition: await this.getFlowDefinition(flowId),
+          executionContext: context
+        }
+      });
+      
+      throw error;
+    }
+  }
+}
+```
+
+## Performance Monitoring
+
+### Transaction Tracing
+```typescript
+// Automatic HTTP transaction tracking
+app.useGlobalFilters(new SentryExceptionFilter(logger));
+
+// Manual transaction creation
+async executeAction(actionId: string, inputs: any) {
+  const transaction = Sentry.startTransaction({
+    op: 'action.execute',
+    name: `Execute Action: ${actionId}`
+  });
+  
+  Sentry.getCurrentScope().setSpan(transaction);
+  
+  try {
+    // Add action context
+    transaction.setTag('action_id', actionId);
+    transaction.setData('inputs', inputs);
+    
+    // Create child spans for sub-operations
+    const authSpan = transaction.startChild({
+      op: 'auth.validate',
+      description: 'Validate authentication'
+    });
+    
+    await this.validateAuth();
+    authSpan.finish();
+    
+    const httpSpan = transaction.startChild({
+      op: 'http.request',
+      description: 'External API call'
+    });
+    
+    const result = await this.callExternalAPI();
+    httpSpan.finish();
+    
+    transaction.setStatus('ok');
+    return result;
+  } catch (error) {
+    transaction.setStatus('internal_error');
+    throw error;
+  } finally {
+    transaction.finish();
+  }
+}
+```
+
+### Custom Metrics
+```typescript
+// Track business metrics
+Sentry.metrics.increment('flow.executed', 1, {
+  tags: {
+    org_id: orgId,
+    flow_type: flowType,
+    status: 'success'
+  }
+});
+
+Sentry.metrics.distribution('flow.execution_time', duration, {
+  tags: {
+    org_id: orgId,
+    flow_id: flowId
+  }
+});
+
+Sentry.metrics.gauge('active_connections', connectionCount);
+```
+
+## Context Management
+
+### User Context
+```typescript
+// Middleware for setting user context
+@Injectable()
+export class SentryContextMiddleware implements NestMiddleware {
+  use(req: any, res: any, next: () => void) {
+    const orgId = req.headers['x-org-id'];
+    const userId = req.headers['x-user-id'];
+    
+    if (orgId || userId) {
+      Sentry.configureScope(scope => {
+        scope.setUser({
+          id: userId,
+          orgId: orgId,
+          ip_address: req.ip
+        });
+        
+        scope.setTag('org_id', orgId);
+        scope.setContext('request', {
+          method: req.method,
+          url: req.url,
+          user_agent: req.get('User-Agent')
+        });
+      });
+    }
+    
+    next();
+  }
+}
+```
+
+### Breadcrumbs
+```typescript
+// Add custom breadcrumbs for debugging
+Sentry.addBreadcrumb({
+  message: 'Flow execution started',
+  category: 'flow',
+  level: 'info',
+  data: {
+    flowId: flowId,
+    orgId: orgId,
+    stepCount: steps.length
+  }
+});
+
+Sentry.addBreadcrumb({
+  message: 'External API call initiated',
+  category: 'http',
+  level: 'info',
+  data: {
+    url: apiEndpoint,
+    method: 'POST',
+    timeout: 30000
+  }
+});
+```
+
+## Release Management
+
+### Release Tracking
+```typescript
+// Automatically track releases
+Sentry.init({
+  release: process.env.APP_VERSION || '1.1.0',
+  environment: process.env.NODE_ENV || 'development'
+});
+```
+
+### Deploy Notifications
+```bash
+# GitHub Actions integration
+- name: Create Sentry Release
+  uses: getsentry/action-release@v1
+  env:
+    SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+    SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+  with:
+    environment: production
+    version: ${{ github.sha }}
+```
+
+## Alerting & Notifications
+
+### Error Rate Alerts
+Configure alerts for:
+- Error rate > 1% over 5 minutes
+- New errors not seen in previous releases
+- Performance degradation > 20%
+- High memory usage or resource consumption
+
+### Slack Integration
+```json
+{
+  "alert_rule": {
+    "name": "High Error Rate",
+    "conditions": [
+      {
+        "interval": "5m",
+        "comparison_type": "greater",
+        "value": 10
+      }
+    ],
+    "actions": [
+      {
+        "service": "slack",
+        "target_identifier": "#alerts-prod"
+      }
+    ]
+  }
+}
+```
+
+## Data Privacy & Compliance
+
+### PII Scrubbing
+```typescript
+// Configure data scrubbing
+Sentry.init({
+  beforeSend(event) {
+    // Remove sensitive data
+    if (event.request?.data) {
+      delete event.request.data.password;
+      delete event.request.data.apiKey;
+      delete event.request.data.token;
+    }
+    
+    // Scrub PII from extra data
+    if (event.extra) {
+      event.extra = this.scrubPII(event.extra);
+    }
+    
+    return event;
+  }
+});
+
+private scrubPII(data: any): any {
+  const scrubbed = { ...data };
+  const piiFields = ['email', 'phone', 'ssn', 'creditCard'];
+  
+  piiFields.forEach(field => {
+    if (scrubbed[field]) {
+      scrubbed[field] = '[Scrubbed]';
+    }
+  });
+  
+  return scrubbed;
+}
+```
+
+### GDPR Compliance
+```typescript
+// User data deletion
+async deleteUserData(userId: string) {
+  // Delete from Sentry via API
+  await this.sentryApi.deleteUser(userId);
+  
+  // Clear user context
+  Sentry.configureScope(scope => {
+    scope.clear();
+  });
+}
+```
+
+## Performance Optimization
+
+### Sampling Configuration
+```typescript
+// Optimize performance overhead
+Sentry.init({
+  // Error sampling
+  sampleRate: 1.0, // 100% of errors
+  
+  // Performance sampling
+  tracesSampleRate: 0.1, // 10% of transactions
+  
+  // Profiling sampling
+  profilesSampleRate: 0.05, // 5% of transactions
+  
+  // Session sampling
+  sessionSampleRate: 0.1 // 10% of sessions
+});
+```
+
+### Memory Management
+```typescript
+// Limit breadcrumb history
+Sentry.init({
+  maxBreadcrumbs: 50, // Default is 100
+  
+  // Limit context size
+  maxValueLength: 1000,
+  
+  // Transport options
+  transport: Sentry.getDefaultTransport({
+    bufferSize: 50 // Buffer up to 50 events
+  })
+});
+```
+
+## Debugging & Troubleshooting
+
+### Debug Mode
+```typescript
+// Enable debug logging
+Sentry.init({
+  debug: process.env.NODE_ENV === 'development',
+  logLevel: LogLevel.Debug
+});
+```
+
+### Local Testing
+```bash
+# Test Sentry configuration
+npm run start:dev
+
+# Trigger test error
+curl -X POST http://localhost:3000/test-error
+```
+
+### Common Issues
+1. **Events not appearing**
+   - Verify DSN configuration
+   - Check network connectivity
+   - Review beforeSend filters
+
+2. **High overhead**
+   - Reduce sampling rates
+   - Limit breadcrumb history
+   - Optimize context data
+
+3. **Missing context**
+   - Ensure middleware is properly configured
+   - Verify scope configuration
+   - Check transaction boundaries
+
+### Monitoring Commands
+```typescript
+// Health check with Sentry
+async healthCheck() {
+  try {
+    Sentry.captureMessage('Health check executed', 'info');
+    return { sentry: 'ok' };
+  } catch (error) {
+    return { sentry: 'error', message: error.message };
+  }
+}
+```
+
+## Best Practices
+
+### Error Classification
+- **Critical**: Data corruption, security issues
+- **High**: Core functionality failures
+- **Medium**: Feature degradation
+- **Low**: Minor UI issues, logging errors
+
+### Context Strategy
+- Always include org_id and user_id
+- Add request context for API endpoints
+- Include relevant business data
+- Avoid sensitive information
+
+### Performance Monitoring
+- Monitor critical user journeys
+- Track database query performance
+- Monitor external API response times
+- Alert on performance regressions
+
+### Maintenance
+- Regular review of error patterns
+- Update sampling rates based on volume
+- Archive old releases periodically
+- Monitor Sentry quota usage

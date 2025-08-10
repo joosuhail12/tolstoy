@@ -146,7 +146,7 @@ npm run db:studio
 - **`src/`**: Core application logic with modular NestJS architecture
 - **`prisma/`**: Database schema definitions and migration files
 - **`terraform/`**: Complete infrastructure definitions for AWS deployment
-- **`docs/`**: Mintlify-powered documentation site with MDX content
+- **`docs/`**: Documentation site with MDX content
 - **`sdk/`**: Generated TypeScript SDK for external integrations
 - **`cli/`**: Command-line tool for template management and automation
 
@@ -428,7 +428,7 @@ API documentation is automatically generated from OpenAPI specifications:
 npm run build
 
 # The generated spec is at docs/openapi.json
-# Mintlify automatically updates the API reference
+# Documentation automatically updates the API reference
 ```
 
 ### Writing Documentation

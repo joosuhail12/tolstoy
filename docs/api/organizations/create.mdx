@@ -1,0 +1,926 @@
+---
+title: "Create Organization"
+description: "Create a new organization with specified settings and configuration"
+---
+
+# Create Organization
+
+<Badge variant="success">POST</Badge> `/organizations`
+
+Create a new organization with specified settings and configuration. This endpoint is typically restricted to super-admin API keys or platform administrators.
+
+<Warning>
+**Admin Access Required:** This endpoint requires special permissions and is not available to standard organization API keys.
+</Warning>
+
+## Request
+
+### **HTTP Request**
+
+```http
+POST https://api.tolstoy.dev/organizations
+```
+
+### **Request Body**
+
+<CodeGroup>
+
+```json Required Fields
+{
+  "name": "acme-corp",
+  "display_name": "Acme Corporation",
+  "admin_email": "admin@acme.com"
+}
+```
+
+```json Complete Example
+{
+  "name": "acme-corp",
+  "display_name": "Acme Corporation", 
+  "admin_email": "admin@acme.com",
+  "plan": "professional",
+  "settings": {
+    "timezone": "America/New_York",
+    "default_retry_policy": {
+      "max_retries": 3,
+      "backoff_multiplier": 2,
+      "retryable_statuses": [500, 502, 503, 504]
+    },
+    "webhook_settings": {
+      "default_timeout": 30000,
+      "max_retries": 3,
+      "enable_signature_verification": true
+    },
+    "rate_limits": {
+      "api_requests_per_minute": 2000,
+      "executions_per_hour": 1000
+    }
+  },
+  "billing": {
+    "billing_email": "billing@acme.com",
+    "purchase_order": "PO-2024-001",
+    "tax_id": "12-3456789"
+  },
+  "metadata": {
+    "industry": "technology",
+    "company_size": "medium",
+    "use_case": "workflow_automation"
+  }
+}
+```
+
+</CodeGroup>
+
+### **Request Parameters**
+
+#### **Required Fields**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Unique organization identifier (3-50 chars, lowercase, hyphens allowed) |
+| `display_name` | string | Human-readable organization name |
+| `admin_email` | string | Email address of the organization administrator |
+
+#### **Optional Fields**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `plan` | string | Subscription plan (`free`, `starter`, `professional`, `enterprise`) |
+| `settings` | object | Organization configuration settings |
+| `billing` | object | Billing information and preferences |
+| `metadata` | object | Additional organization metadata |
+| `status` | string | Initial status (`active`, `suspended`) - defaults to `active` |
+
+#### **Settings Object**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `timezone` | string | `UTC` | Default timezone (IANA timezone identifier) |
+| `default_retry_policy` | object | See below | Default retry configuration for executions |
+| `webhook_settings` | object | See below | Default webhook configuration |
+| `rate_limits` | object | Plan defaults | Custom rate limits (enterprise only) |
+
+#### **Default Retry Policy**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `max_retries` | integer | 3 | Maximum number of retries for failed executions |
+| `backoff_multiplier` | number | 2 | Exponential backoff multiplier |
+| `retryable_statuses` | array | [500,502,503,504] | HTTP status codes that trigger retries |
+| `initial_delay` | integer | 1000 | Initial delay in milliseconds |
+
+#### **Webhook Settings**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `default_timeout` | integer | 30000 | Default webhook timeout in milliseconds |
+| `max_retries` | integer | 3 | Maximum webhook delivery retries |
+| `enable_signature_verification` | boolean | true | Enable HMAC signature verification |
+
+## Response
+
+### **Success Response**
+
+<CodeGroup>
+
+```json 201 Created
+{
+  "organization": {
+    "id": "org_123456789",
+    "name": "acme-corp",
+    "display_name": "Acme Corporation",
+    "status": "active",
+    "plan": "professional",
+    "settings": {
+      "timezone": "America/New_York",
+      "default_retry_policy": {
+        "max_retries": 3,
+        "backoff_multiplier": 2,
+        "retryable_statuses": [500, 502, 503, 504],
+        "initial_delay": 1000
+      },
+      "webhook_settings": {
+        "default_timeout": 30000,
+        "max_retries": 3,
+        "enable_signature_verification": true
+      },
+      "rate_limits": {
+        "api_requests_per_minute": 2000,
+        "executions_per_hour": 1000,
+        "webhook_dispatches_per_minute": 100
+      }
+    },
+    "usage": {
+      "users_count": 1,
+      "tools_count": 0,
+      "actions_count": 0,
+      "flows_count": 0,
+      "executions_this_month": 0,
+      "api_requests_this_month": 0
+    },
+    "billing": {
+      "plan": "professional",
+      "billing_email": "billing@acme.com",
+      "subscription_status": "active",
+      "current_period_start": "2024-01-15T10:30:00Z",
+      "current_period_end": "2024-02-15T10:30:00Z",
+      "purchase_order": "PO-2024-001",
+      "tax_id": "12-3456789"
+    },
+    "admin": {
+      "id": "user_987654321",
+      "email": "admin@acme.com",
+      "name": "Organization Admin",
+      "role": "admin",
+      "status": "active"
+    },
+    "api_key": {
+      "id": "key_567890123", 
+      "key": "tolstoy_ak_1234567890abcdef...",
+      "name": "Default Admin Key",
+      "permissions": ["read", "write", "delete", "execute", "admin"],
+      "expires_at": null
+    },
+    "metadata": {
+      "industry": "technology",
+      "company_size": "medium", 
+      "use_case": "workflow_automation"
+    },
+    "created_at": "2024-01-15T10:30:00Z",
+    "updated_at": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+</CodeGroup>
+
+## Examples
+
+### **Basic Organization Creation**
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST 'https://api.tolstoy.dev/organizations' \
+  -H 'Authorization: Bearer SUPER_ADMIN_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "startup-co",
+    "display_name": "StartupCo Inc",
+    "admin_email": "founder@startupco.com",
+    "plan": "starter"
+  }'
+```
+
+```javascript JavaScript
+const newOrganization = {
+  name: 'startup-co',
+  display_name: 'StartupCo Inc', 
+  admin_email: 'founder@startupco.com',
+  plan: 'starter'
+};
+
+const response = await fetch('https://api.tolstoy.dev/organizations', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${superAdminApiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(newOrganization)
+});
+
+const data = await response.json();
+
+if (response.ok) {
+  console.log('✅ Organization created successfully');
+  console.log(`Organization ID: ${data.organization.id}`);
+  console.log(`Admin API Key: ${data.organization.api_key.key}`);
+  
+  // Store the API key securely for the new organization
+  await storeApiKey(data.organization.id, data.organization.api_key.key);
+} else {
+  console.error('❌ Failed to create organization:', data.error.message);
+}
+```
+
+```python Python
+import requests
+
+new_organization = {
+    'name': 'startup-co',
+    'display_name': 'StartupCo Inc',
+    'admin_email': 'founder@startupco.com', 
+    'plan': 'starter'
+}
+
+response = requests.post(
+    'https://api.tolstoy.dev/organizations',
+    headers={
+        'Authorization': f'Bearer {super_admin_api_key}',
+        'Content-Type': 'application/json'
+    },
+    json=new_organization
+)
+
+if response.status_code == 201:
+    data = response.json()
+    org = data['organization']
+    
+    print('✅ Organization created successfully')
+    print(f"Organization ID: {org['id']}")
+    print(f"Admin API Key: {org['api_key']['key']}")
+    
+    # Store the API key securely
+    store_api_key(org['id'], org['api_key']['key'])
+else:
+    error = response.json()
+    print(f"❌ Failed to create organization: {error['error']['message']}")
+```
+
+```go Go
+package main
+
+import (
+    "bytes"
+    "encoding/json"
+    "fmt"
+    "io"
+    "net/http"
+)
+
+type CreateOrganizationRequest struct {
+    Name        string `json:"name"`
+    DisplayName string `json:"display_name"`
+    AdminEmail  string `json:"admin_email"`
+    Plan        string `json:"plan"`
+}
+
+type OrganizationResponse struct {
+    Organization struct {
+        ID     string `json:"id"`
+        Name   string `json:"name"`
+        ApiKey struct {
+            Key string `json:"key"`
+        } `json:"api_key"`
+    } `json:"organization"`
+}
+
+func createOrganization(superAdminKey string, req CreateOrganizationRequest) (*OrganizationResponse, error) {
+    jsonData, err := json.Marshal(req)
+    if err != nil {
+        return nil, err
+    }
+    
+    client := &http.Client{}
+    httpReq, err := http.NewRequest("POST", "https://api.tolstoy.dev/organizations", bytes.NewBuffer(jsonData))
+    if err != nil {
+        return nil, err
+    }
+    
+    httpReq.Header.Set("Authorization", "Bearer "+superAdminKey)
+    httpReq.Header.Set("Content-Type", "application/json")
+    
+    resp, err := client.Do(httpReq)
+    if err != nil {
+        return nil, err
+    }
+    defer resp.Body.Close()
+    
+    body, err := io.ReadAll(resp.Body)
+    if err != nil {
+        return nil, err
+    }
+    
+    if resp.StatusCode != 201 {
+        return nil, fmt.Errorf("failed to create organization: %s", string(body))
+    }
+    
+    var orgResp OrganizationResponse
+    if err := json.Unmarshal(body, &orgResp); err != nil {
+        return nil, err
+    }
+    
+    return &orgResp, nil
+}
+
+func main() {
+    req := CreateOrganizationRequest{
+        Name:        "startup-co",
+        DisplayName: "StartupCo Inc",
+        AdminEmail:  "founder@startupco.com",
+        Plan:        "starter",
+    }
+    
+    org, err := createOrganization("super-admin-key", req)
+    if err != nil {
+        fmt.Printf("❌ Error: %v\n", err)
+        return
+    }
+    
+    fmt.Println("✅ Organization created successfully")
+    fmt.Printf("Organization ID: %s\n", org.Organization.ID)
+    fmt.Printf("Admin API Key: %s\n", org.Organization.ApiKey.Key)
+}
+```
+
+</CodeGroup>
+
+### **Enterprise Organization with Custom Settings**
+
+<CodeGroup>
+
+```bash Enterprise Setup
+curl -X POST 'https://api.tolstoy.dev/organizations' \
+  -H 'Authorization: Bearer SUPER_ADMIN_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "enterprise-corp",
+    "display_name": "Enterprise Corporation",
+    "admin_email": "admin@enterprise.com",
+    "plan": "enterprise",
+    "settings": {
+      "timezone": "America/New_York",
+      "default_retry_policy": {
+        "max_retries": 5,
+        "backoff_multiplier": 1.5,
+        "initial_delay": 500
+      },
+      "rate_limits": {
+        "api_requests_per_minute": 10000,
+        "executions_per_hour": 5000,
+        "webhook_dispatches_per_minute": 500
+      }
+    },
+    "billing": {
+      "billing_email": "billing@enterprise.com",
+      "purchase_order": "ENT-2024-001",
+      "tax_id": "98-7654321"
+    },
+    "metadata": {
+      "industry": "financial_services",
+      "company_size": "large",
+      "compliance_requirements": ["SOC2", "GDPR", "HIPAA"]
+    }
+  }'
+```
+
+```javascript Enterprise JavaScript
+const enterpriseOrg = {
+  name: 'enterprise-corp',
+  display_name: 'Enterprise Corporation',
+  admin_email: 'admin@enterprise.com',
+  plan: 'enterprise',
+  settings: {
+    timezone: 'America/New_York',
+    default_retry_policy: {
+      max_retries: 5,
+      backoff_multiplier: 1.5,
+      initial_delay: 500,
+      retryable_statuses: [500, 502, 503, 504, 408, 429]
+    },
+    webhook_settings: {
+      default_timeout: 45000, // 45 seconds for enterprise
+      max_retries: 5,
+      enable_signature_verification: true
+    },
+    rate_limits: {
+      api_requests_per_minute: 10000,
+      executions_per_hour: 5000,
+      webhook_dispatches_per_minute: 500
+    }
+  },
+  billing: {
+    billing_email: 'billing@enterprise.com',
+    purchase_order: 'ENT-2024-001',
+    tax_id: '98-7654321'
+  },
+  metadata: {
+    industry: 'financial_services',
+    company_size: 'large',
+    compliance_requirements: ['SOC2', 'GDPR', 'HIPAA'],
+    deployment_type: 'dedicated',
+    support_tier: 'premium'
+  }
+};
+
+const response = await fetch('https://api.tolstoy.dev/organizations', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${superAdminApiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(enterpriseOrg)
+});
+
+const data = await response.json();
+
+if (response.ok) {
+  const org = data.organization;
+  
+  console.log('🏢 Enterprise organization created');
+  console.log(`ID: ${org.id}`);
+  console.log(`Plan: ${org.plan}`);
+  console.log(`Rate Limits: ${org.settings.rate_limits.api_requests_per_minute}/min`);
+  console.log(`Admin Key: ${org.api_key.key}`);
+  
+  // Set up additional enterprise features
+  await setupEnterpriseFeatures(org.id, org.api_key.key);
+}
+```
+
+</CodeGroup>
+
+### **Batch Organization Creation**
+
+<CodeGroup>
+
+```javascript Batch Creation
+async function createOrganizations(superAdminKey, organizations) {
+  const results = [];
+  
+  for (const orgData of organizations) {
+    try {
+      const response = await fetch('https://api.tolstoy.dev/organizations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${superAdminKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(orgData)
+      });
+      
+      const data = await response.json();
+      
+      if (response.ok) {
+        results.push({
+          success: true,
+          organization: data.organization
+        });
+        
+        console.log(`✅ Created: ${orgData.display_name}`);
+        
+        // Small delay to respect rate limits
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+      } else {
+        results.push({
+          success: false,
+          error: data.error,
+          input: orgData
+        });
+        
+        console.error(`❌ Failed: ${orgData.display_name} - ${data.error.message}`);
+      }
+      
+    } catch (error) {
+      results.push({
+        success: false,
+        error: { message: error.message },
+        input: orgData
+      });
+      
+      console.error(`💥 Error creating ${orgData.display_name}:`, error.message);
+    }
+  }
+  
+  return results;
+}
+
+// Usage
+const organizationsToCreate = [
+  {
+    name: 'startup-a',
+    display_name: 'Startup A',
+    admin_email: 'admin@startup-a.com',
+    plan: 'starter'
+  },
+  {
+    name: 'company-b',
+    display_name: 'Company B', 
+    admin_email: 'admin@company-b.com',
+    plan: 'professional'
+  },
+  {
+    name: 'enterprise-c',
+    display_name: 'Enterprise C',
+    admin_email: 'admin@enterprise-c.com',
+    plan: 'enterprise'
+  }
+];
+
+const results = await createOrganizations(superAdminKey, organizationsToCreate);
+
+const successful = results.filter(r => r.success);
+const failed = results.filter(r => !r.success);
+
+console.log(`\n📊 Results: ${successful.length} created, ${failed.length} failed`);
+
+if (failed.length > 0) {
+  console.log('\n❌ Failed organizations:');
+  failed.forEach(f => {
+    console.log(`- ${f.input.display_name}: ${f.error.message}`);
+  });
+}
+```
+
+```python Batch Python
+import requests
+import time
+from typing import List, Dict, Any
+
+def create_organizations(super_admin_key: str, organizations: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    results = []
+    
+    for org_data in organizations:
+        try:
+            response = requests.post(
+                'https://api.tolstoy.dev/organizations',
+                headers={
+                    'Authorization': f'Bearer {super_admin_key}',
+                    'Content-Type': 'application/json'
+                },
+                json=org_data
+            )
+            
+            if response.status_code == 201:
+                data = response.json()
+                results.append({
+                    'success': True,
+                    'organization': data['organization']
+                })
+                
+                print(f"✅ Created: {org_data['display_name']}")
+                
+                # Rate limiting delay
+                time.sleep(1)
+                
+            else:
+                error_data = response.json()
+                results.append({
+                    'success': False,
+                    'error': error_data['error'],
+                    'input': org_data
+                })
+                
+                print(f"❌ Failed: {org_data['display_name']} - {error_data['error']['message']}")
+                
+        except Exception as e:
+            results.append({
+                'success': False,
+                'error': {'message': str(e)},
+                'input': org_data
+            })
+            
+            print(f"💥 Error creating {org_data['display_name']}: {e}")
+    
+    return results
+
+# Usage
+organizations_to_create = [
+    {
+        'name': 'startup-a',
+        'display_name': 'Startup A',
+        'admin_email': 'admin@startup-a.com',
+        'plan': 'starter'
+    },
+    # ... more organizations
+]
+
+results = create_organizations(super_admin_key, organizations_to_create)
+
+successful = [r for r in results if r['success']]
+failed = [r for r in results if not r['success']]
+
+print(f"\n📊 Results: {len(successful)} created, {len(failed)} failed")
+```
+
+</CodeGroup>
+
+## Error Responses
+
+<CodeGroup>
+
+```json 400 Bad Request - Missing Required Field
+{
+  "error": {
+    "code": "MISSING_REQUIRED_FIELD",
+    "message": "Required field is missing",
+    "type": "validation",
+    "field": "name",
+    "details": "Organization name is required and cannot be empty",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json 409 Conflict - Name Already Exists
+{
+  "error": {
+    "code": "RESOURCE_CONFLICT",
+    "message": "Organization name already exists",
+    "type": "conflict",
+    "field": "name",
+    "details": "An organization with name 'acme-corp' already exists",
+    "conflicting_value": "acme-corp",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json 422 Validation Error - Invalid Settings
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Multiple validation errors",
+    "type": "validation",
+    "errors": [
+      {
+        "field": "settings.timezone",
+        "code": "INVALID_TIMEZONE",
+        "message": "Invalid timezone identifier"
+      },
+      {
+        "field": "settings.rate_limits.api_requests_per_minute", 
+        "code": "INVALID_RANGE",
+        "message": "Must be between 100 and 50000"
+      }
+    ],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json 403 Forbidden - Insufficient Permissions
+{
+  "error": {
+    "code": "INSUFFICIENT_PERMISSIONS",
+    "message": "Your API key doesn't have the required permissions",
+    "type": "authorization",
+    "details": "Creating organizations requires super-admin permissions",
+    "required_permission": "super_admin",
+    "current_permissions": ["read", "write"],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+## Validation Rules
+
+### **Name Validation**
+- Must be 3-50 characters long
+- Lowercase letters, numbers, and hyphens only
+- Cannot start or end with hyphen
+- Must be unique across the platform
+
+### **Email Validation**
+- Must be a valid email address format
+- Admin email will receive organization setup instructions
+- Billing email (if different) for subscription management
+
+### **Plan Validation**
+- Must be one of: `free`, `starter`, `professional`, `enterprise`
+- Determines default rate limits and features
+- Can be upgraded later through billing
+
+### **Settings Validation**
+- Timezone must be valid IANA identifier
+- Rate limits must be within plan allowances
+- Retry policies must have reasonable values
+
+## Post-Creation Setup
+
+After successful organization creation:
+
+1. **Admin User Created** - An admin user is automatically created with the provided email
+2. **API Key Generated** - A default admin API key is created and returned
+3. **Welcome Email Sent** - Setup instructions are sent to the admin email
+4. **Billing Setup** - If not free plan, billing setup required within 7 days
+5. **Initial Resources** - Default tools and templates may be created
+
+<Info>
+**Important:** Store the returned API key securely - it won't be shown again. The admin user will need to use this key or create additional keys through the dashboard.
+</Info>
+
+## SDK Examples
+
+<CodeGroup>
+
+```javascript TypeScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const adminClient = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_SUPER_ADMIN_KEY,
+  baseURL: 'https://api.tolstoy.dev'
+});
+
+// Create organization
+const newOrg = await adminClient.organizations.create({
+  name: 'my-new-org',
+  display_name: 'My New Organization',
+  admin_email: 'admin@myneworg.com',
+  plan: 'professional',
+  settings: {
+    timezone: 'America/Los_Angeles',
+    default_retry_policy: {
+      max_retries: 3,
+      backoff_multiplier: 2
+    }
+  }
+});
+
+console.log(`Created organization: ${newOrg.id}`);
+console.log(`Admin API key: ${newOrg.api_key.key}`);
+
+// Initialize client for the new organization
+const orgClient = new TolstoyClient({
+  apiKey: newOrg.api_key.key,
+  baseURL: 'https://api.tolstoy.dev'
+});
+
+// Verify new organization setup
+const orgDetails = await orgClient.organizations.get(newOrg.id);
+console.log('Organization setup complete:', orgDetails.name);
+```
+
+```python Python SDK
+from tolstoy import TolstoyClient
+
+admin_client = TolstoyClient(
+    api_key=os.environ['TOLSTOY_SUPER_ADMIN_KEY'],
+    base_url='https://api.tolstoy.dev'
+)
+
+# Create organization
+new_org = admin_client.organizations.create(
+    name='my-new-org',
+    display_name='My New Organization', 
+    admin_email='admin@myneworg.com',
+    plan='professional',
+    settings={
+        'timezone': 'America/Los_Angeles',
+        'default_retry_policy': {
+            'max_retries': 3,
+            'backoff_multiplier': 2
+        }
+    }
+)
+
+print(f"Created organization: {new_org.id}")
+print(f"Admin API key: {new_org.api_key.key}")
+
+# Initialize client for new organization
+org_client = TolstoyClient(
+    api_key=new_org.api_key.key,
+    base_url='https://api.tolstoy.dev'
+)
+
+# Verify setup
+org_details = org_client.organizations.get(new_org.id)
+print(f"Organization setup complete: {org_details.name}")
+```
+
+</CodeGroup>
+
+## API Playground
+
+Try creating an organization:
+
+<ApiPlayground
+  method="POST"
+  endpoint="/organizations"
+  baseUrl="https://api.tolstoy.dev"
+  auth={{
+    type: "bearer",
+    placeholder: "Your Super Admin API Key"
+  }}
+  body={{
+    type: "json",
+    schema: {
+      name: {
+        type: "string",
+        placeholder: "my-new-company",
+        description: "Unique organization identifier",
+        required: true
+      },
+      display_name: {
+        type: "string",
+        placeholder: "My New Company",
+        description: "Human-readable organization name",
+        required: true
+      },
+      plan: {
+        type: "select",
+        options: ["free", "starter", "professional", "enterprise"],
+        defaultValue: "starter",
+        description: "Subscription plan",
+        required: true
+      },
+      admin_email: {
+        type: "string",
+        placeholder: "admin@mynewcompany.com",
+        description: "Email of the organization admin",
+        required: true
+      },
+      admin_name: {
+        type: "string",
+        placeholder: "John Smith",
+        description: "Name of the organization admin",
+        required: true
+      },
+      settings: {
+        type: "object",
+        defaultValue: {
+          timezone: "America/New_York",
+          default_retry_policy: {
+            max_retries: 3,
+            backoff_multiplier: 2
+          }
+        },
+        description: "Organization settings"
+      }
+    }
+  }}
+  sampleResponse={{
+    "organization": {
+      "id": "org_new789abc456",
+      "name": "my-new-company",
+      "display_name": "My New Company",
+      "status": "active",
+      "plan": "starter",
+      "created_at": "2024-01-15T20:00:00Z"
+    },
+    "admin_user": {
+      "id": "user_new123def456",
+      "email": "admin@mynewcompany.com",
+      "name": "John Smith",
+      "role": "admin"
+    },
+    "api_key": {
+      "key": "sk_live_...",
+      "name": "Default API Key"
+    }
+  }}
+/>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="List Organizations" icon="list" href="/api/organizations/list">
+    List all accessible organizations
+  </Card>
+  <Card title="Get Organization" icon="building" href="/api/organizations/get">
+    Get specific organization details
+  </Card>
+  <Card title="Update Organization" icon="pencil" href="/api/organizations/update">
+    Update organization settings
+  </Card>
+  <Card title="Delete Organization" icon="trash" href="/api/organizations/delete">
+    Delete an organization (admin only)
+  </Card>
+</CardGroup>

@@ -1,0 +1,970 @@
+---
+title: 'Troubleshooting & Known Issues'
+description: 'Comprehensive troubleshooting guide covering common issues, debugging techniques, resolution steps, and known platform limitations'
+---
+
+# Troubleshooting & Known Issues
+
+This document provides detailed troubleshooting guidance, common issues, debugging techniques, and known platform limitations to help diagnose and resolve problems quickly.
+
+## Quick Diagnosis
+
+### System Health Check
+
+<CardGroup cols={2}>
+  <Card title="Platform Status" icon="heart">
+    Check real-time platform status and service availability
+  </Card>
+  <Card title="Service Dependencies" icon="network-wired">
+    Verify database, cache, and external service connectivity
+  </Card>
+  <Card title="Performance Metrics" icon="chart-line">
+    Monitor API response times, error rates, and resource utilization
+  </Card>
+  <Card title="Recent Changes" icon="clock">
+    Review recent deployments, configuration changes, and updates
+  </Card>
+</CardGroup>
+
+### Diagnostic Commands
+
+```bash
+# Quick health check script
+#!/bin/bash
+echo "=== Tolstoy Platform Health Check ==="
+
+# Check API Gateway
+curl -s -o /dev/null -w "API Gateway: %{http_code} (%{time_total}s)\n" \
+  https://api.tolstoy.com/health
+
+# Check service endpoints
+services=("workflow-service" "execution-engine" "integration-service" "user-service")
+for service in "${services[@]}"; do
+  kubectl get pods -l app=$service -o wide
+done
+
+# Check database connectivity
+kubectl exec -it $(kubectl get pod -l app=postgres -o jsonpath='{.items[0].metadata.name}') \
+  -- pg_isready -U tolstoy
+
+# Check Redis connectivity  
+kubectl exec -it $(kubectl get pod -l app=redis -o jsonpath='{.items[0].metadata.name}') \
+  -- redis-cli ping
+
+# Check resource usage
+kubectl top nodes
+kubectl top pods --sort-by=memory
+```
+
+## Common Issues & Solutions
+
+### 1. Authentication & Authorization Issues
+
+#### Issue: API Authentication Failures (401/403)
+
+**Symptoms:**
+- API requests returning 401 Unauthorized
+- JWT token rejection errors
+- API key validation failures
+- Intermittent authentication issues
+
+**Common Causes:**
+```yaml
+root_causes:
+  expired_tokens:
+    description: "JWT tokens or API keys have expired"
+    frequency: "Very Common"
+    urgency: "Medium"
+    
+  invalid_permissions:
+    description: "User lacks required permissions for operation"
+    frequency: "Common"
+    urgency: "Medium"
+    
+  clock_skew:
+    description: "Server time drift causing token validation failures"
+    frequency: "Uncommon"
+    urgency: "High"
+    
+  rate_limiting:
+    description: "Authentication rate limits exceeded"
+    frequency: "Common"
+    urgency: "Low"
+```
+
+**Debugging Steps:**
+```bash
+# 1. Verify token validity
+curl -H "Authorization: Bearer $TOKEN" \
+  https://api.tolstoy.com/v2/auth/validate
+
+# 2. Check API key status
+curl -H "X-API-Key: $API_KEY" \
+  https://api.tolstoy.com/v2/auth/key-info
+
+# 3. Verify permissions
+curl -H "Authorization: Bearer $TOKEN" \
+  https://api.tolstoy.com/v2/auth/permissions
+
+# 4. Check server logs
+kubectl logs -f deployment/api-gateway | grep -i auth
+```
+
+**Resolution Steps:**
+1. **Token Expiration:**
+   ```javascript
+   // Implement automatic token refresh
+   const refreshToken = async () => {
+     const response = await fetch('/auth/refresh', {
+       method: 'POST',
+       headers: { 'Refresh-Token': refreshToken }
+     });
+     return response.json();
+   };
+   ```
+
+2. **Permission Issues:**
+   ```sql
+   -- Check user permissions
+   SELECT u.email, om.role, array_agg(p.permission) as permissions
+   FROM users u
+   JOIN organization_members om ON u.id = om.user_id  
+   JOIN role_permissions rp ON om.role = rp.role
+   JOIN permissions p ON rp.permission_id = p.id
+   WHERE u.id = 'user-id';
+   ```
+
+3. **Clock Skew:**
+   ```bash
+   # Sync server time
+   sudo ntpdate -s time.nist.gov
+   sudo systemctl restart chronyd
+   ```
+
+#### Issue: SSO/SAML Authentication Problems
+
+**Symptoms:**
+- SAML assertion failures
+- Redirect loop issues
+- Attribute mapping errors
+- Identity provider communication failures
+
+**Debugging:**
+```bash
+# Check SAML configuration
+kubectl get secret saml-config -o yaml
+
+# Verify certificate validity
+openssl x509 -in saml-cert.pem -text -noout
+
+# Test SAML metadata
+curl -s "https://idp.company.com/saml/metadata" | xmllint --format -
+```
+
+**Resolution:**
+```yaml
+saml_troubleshooting:
+  metadata_refresh:
+    command: "kubectl patch secret saml-config --patch='...'"
+    frequency: "When IdP changes"
+    
+  certificate_renewal:
+    steps:
+      - "Generate new certificate"
+      - "Update IdP configuration" 
+      - "Deploy to platform"
+      - "Test authentication flow"
+      
+  attribute_mapping:
+    common_issues:
+      - "Email attribute name mismatch"
+      - "Role mapping configuration"
+      - "Custom attribute parsing"
+```
+
+### 2. Workflow Execution Issues
+
+#### Issue: Workflow Execution Failures
+
+**Symptoms:**
+- Workflows failing with timeout errors
+- Actions not executing in expected order
+- Integration calls returning errors
+- Memory or resource exhaustion
+
+**Common Root Causes:**
+```yaml
+execution_failures:
+  timeout_issues:
+    description: "Workflows exceeding maximum execution time"
+    default_timeout: "1 hour"
+    max_timeout: "24 hours"
+    monitoring_metric: "execution_duration_seconds"
+    
+  resource_exhaustion:
+    description: "Insufficient memory or CPU for execution"
+    memory_limit: "2GB per execution"
+    cpu_limit: "4 cores"
+    monitoring_metric: "execution_resource_usage"
+    
+  integration_failures:
+    description: "External API calls failing or timing out"
+    timeout: "30 seconds default"
+    retry_attempts: 3
+    monitoring_metric: "integration_call_failures"
+    
+  circular_dependencies:
+    description: "Workflows with circular execution paths"
+    detection: "Graph analysis during validation"
+    prevention: "DAG validation required"
+```
+
+**Debugging Workflow Execution:**
+```bash
+# Get execution details
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://api.tolstoy.com/v2/executions/$EXECUTION_ID" | jq '.'
+
+# Check execution logs
+kubectl logs -f deployment/execution-engine \
+  -l execution.id=$EXECUTION_ID
+
+# Monitor resource usage
+kubectl top pods -l app=execution-engine --sort-by=memory
+
+# Check execution events
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://api.tolstoy.com/v2/executions/$EXECUTION_ID/events"
+```
+
+**Resolution Strategies:**
+```typescript
+// 1. Implement proper error handling
+interface WorkflowAction {
+  id: string;
+  type: string;
+  config: any;
+  error_handling: {
+    retry_count: number;
+    retry_delay: number;
+    on_failure: 'continue' | 'stop' | 'retry';
+    fallback_action?: string;
+  };
+}
+
+// 2. Add resource monitoring
+const monitorExecution = async (executionId: string) => {
+  const metrics = await getExecutionMetrics(executionId);
+  
+  if (metrics.memory_usage > 0.8) {
+    await scaleExecutionResources(executionId);
+  }
+  
+  if (metrics.duration > MAX_EXECUTION_TIME * 0.9) {
+    await sendTimeoutWarning(executionId);
+  }
+};
+
+// 3. Implement circuit breakers for integrations
+class IntegrationCircuitBreaker {
+  private failures = 0;
+  private lastFailureTime = 0;
+  private state: 'closed' | 'open' | 'half-open' = 'closed';
+  
+  async executeWithBreaker<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.state === 'open') {
+      if (Date.now() - this.lastFailureTime > RESET_TIMEOUT) {
+        this.state = 'half-open';
+      } else {
+        throw new Error('Circuit breaker is open');
+      }
+    }
+    
+    try {
+      const result = await operation();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+}
+```
+
+#### Issue: Parallel Execution Race Conditions
+
+**Symptoms:**
+- Inconsistent execution results
+- Data corruption in parallel steps
+- Deadlocks in resource access
+- Unexpected execution order
+
+**Debugging:**
+```sql
+-- Find concurrent executions
+SELECT 
+  e1.id as execution1,
+  e2.id as execution2,
+  e1.workflow_id,
+  e1.started_at,
+  e2.started_at
+FROM executions e1
+JOIN executions e2 ON e1.workflow_id = e2.workflow_id
+WHERE e1.id != e2.id
+  AND e1.status = 'running'
+  AND e2.status = 'running'
+  AND ABS(EXTRACT(EPOCH FROM e1.started_at - e2.started_at)) < 60;
+
+-- Check for resource conflicts
+SELECT 
+  resource_id,
+  COUNT(*) as concurrent_access,
+  array_agg(execution_id) as executions
+FROM execution_resources 
+WHERE status = 'locked'
+GROUP BY resource_id
+HAVING COUNT(*) > 1;
+```
+
+**Resolution:**
+```typescript
+// Implement execution locks
+class ExecutionLockManager {
+  private locks = new Map<string, string>();
+  
+  async acquireLock(resourceId: string, executionId: string): Promise<boolean> {
+    const existing = this.locks.get(resourceId);
+    if (existing && existing !== executionId) {
+      return false;
+    }
+    
+    this.locks.set(resourceId, executionId);
+    
+    // Store in Redis for distributed locking
+    const success = await this.redis.set(
+      `lock:${resourceId}`,
+      executionId,
+      'EX', 3600, // 1 hour expiry
+      'NX' // Only if not exists
+    );
+    
+    return success === 'OK';
+  }
+  
+  async releaseLock(resourceId: string, executionId: string): Promise<void> {
+    const current = this.locks.get(resourceId);
+    if (current === executionId) {
+      this.locks.delete(resourceId);
+      await this.redis.del(`lock:${resourceId}`);
+    }
+  }
+}
+```
+
+### 3. Integration Service Issues
+
+#### Issue: External API Integration Failures
+
+**Symptoms:**
+- High failure rates for specific integrations
+- Timeout errors on API calls
+- Authentication failures with third-party services
+- Rate limiting from external APIs
+
+**Common Integration Problems:**
+```yaml
+integration_issues:
+  api_timeouts:
+    frequency: "35% of integration failures"
+    common_causes:
+      - "Slow third-party API responses"
+      - "Network connectivity issues"
+      - "Incorrect timeout configurations"
+    monitoring: "integration_call_duration_seconds"
+    
+  authentication_failures:
+    frequency: "25% of integration failures"
+    common_causes:
+      - "Expired OAuth tokens"
+      - "Invalid API keys"
+      - "Changed authentication requirements"
+    monitoring: "integration_auth_failures_total"
+    
+  rate_limiting:
+    frequency: "20% of integration failures"
+    common_causes:
+      - "Exceeded third-party API limits"
+      - "Insufficient rate limiting configuration"
+      - "Burst traffic patterns"
+    monitoring: "integration_rate_limit_hits_total"
+    
+  service_unavailable:
+    frequency: "20% of integration failures"
+    common_causes:
+      - "Third-party service outages"
+      - "Maintenance windows"
+      - "Service degradation"
+    monitoring: "integration_availability_status"
+```
+
+**Debugging Integration Issues:**
+```bash
+# Check integration health
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://api.tolstoy.com/v2/integrations/$INTEGRATION_ID/health"
+
+# View recent integration calls
+kubectl logs -f deployment/integration-service \
+  --since=1h | grep -i "integration_id:$INTEGRATION_ID"
+
+# Test integration manually
+curl -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"action": "test", "parameters": {}}' \
+  "https://api.tolstoy.com/v2/integrations/$INTEGRATION_ID/execute"
+
+# Check OAuth token status
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://api.tolstoy.com/v2/integrations/$INTEGRATION_ID/oauth/status"
+```
+
+**Resolution Approaches:**
+```typescript
+// 1. Implement robust retry logic
+class IntegrationRetryHandler {
+  private retryConfig = {
+    maxAttempts: 3,
+    baseDelay: 1000,
+    maxDelay: 30000,
+    backoffMultiplier: 2,
+    retryableStatus: [408, 429, 502, 503, 504]
+  };
+  
+  async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    context: { integrationId: string; action: string }
+  ): Promise<T> {
+    let lastError: Error;
+    
+    for (let attempt = 1; attempt <= this.retryConfig.maxAttempts; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        lastError = error;
+        
+        if (!this.shouldRetry(error, attempt)) {
+          throw error;
+        }
+        
+        const delay = Math.min(
+          this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffMultiplier, attempt - 1),
+          this.retryConfig.maxDelay
+        );
+        
+        await this.delay(delay);
+        
+        // Log retry attempt
+        logger.warn('Integration call retry', {
+          integrationId: context.integrationId,
+          action: context.action,
+          attempt,
+          error: error.message
+        });
+      }
+    }
+    
+    throw lastError;
+  }
+}
+
+// 2. Implement OAuth token refresh
+class OAuthTokenManager {
+  private tokenCache = new Map<string, {
+    accessToken: string;
+    refreshToken: string;
+    expiresAt: Date;
+  }>();
+  
+  async getValidToken(integrationId: string): Promise<string> {
+    const cached = this.tokenCache.get(integrationId);
+    
+    if (cached && cached.expiresAt > new Date()) {
+      return cached.accessToken;
+    }
+    
+    if (cached?.refreshToken) {
+      const refreshed = await this.refreshToken(integrationId, cached.refreshToken);
+      this.tokenCache.set(integrationId, refreshed);
+      return refreshed.accessToken;
+    }
+    
+    throw new Error('No valid token available');
+  }
+  
+  private async refreshToken(integrationId: string, refreshToken: string) {
+    const response = await fetch(`/integrations/${integrationId}/oauth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken })
+    });
+    
+    if (!response.ok) {
+      throw new Error('Token refresh failed');
+    }
+    
+    return response.json();
+  }
+}
+```
+
+### 4. Database Performance Issues
+
+#### Issue: Slow Query Performance
+
+**Symptoms:**
+- API responses taking longer than expected
+- Database connection pool exhaustion
+- High CPU usage on database servers
+- Query timeout errors
+
+**Performance Analysis:**
+```sql
+-- Find slow queries
+SELECT 
+  query,
+  calls,
+  total_time,
+  mean_time,
+  stddev_time,
+  rows,
+  100.0 * shared_blks_hit / nullif(shared_blks_hit + shared_blks_read, 0) AS hit_percent
+FROM pg_stat_statements 
+ORDER BY total_time DESC 
+LIMIT 10;
+
+-- Check database locks
+SELECT 
+  blocked_locks.pid AS blocked_pid,
+  blocked_activity.usename AS blocked_user,
+  blocking_locks.pid AS blocking_pid,
+  blocking_activity.usename AS blocking_user,
+  blocked_activity.query AS blocked_statement,
+  blocking_activity.query AS current_statement_in_blocking_process
+FROM pg_catalog.pg_locks blocked_locks
+JOIN pg_catalog.pg_stat_activity blocked_activity ON blocked_activity.pid = blocked_locks.pid
+JOIN pg_catalog.pg_locks blocking_locks ON blocking_locks.locktype = blocked_locks.locktype
+JOIN pg_catalog.pg_stat_activity blocking_activity ON blocking_activity.pid = blocking_locks.pid
+WHERE NOT blocked_locks.granted;
+
+-- Analyze table statistics
+SELECT 
+  schemaname,
+  tablename,
+  attname,
+  n_distinct,
+  correlation
+FROM pg_stats 
+WHERE schemaname = 'public' 
+ORDER BY tablename, attname;
+```
+
+**Optimization Strategies:**
+```sql
+-- 1. Add missing indexes
+CREATE INDEX CONCURRENTLY idx_workflows_org_status 
+ON workflows(organization_id, status) 
+WHERE deleted_at IS NULL;
+
+CREATE INDEX CONCURRENTLY idx_executions_workflow_started 
+ON executions(workflow_id, started_at DESC);
+
+-- 2. Optimize problematic queries
+-- Before: Full table scan
+SELECT * FROM workflows 
+WHERE name ILIKE '%automation%' 
+AND organization_id = 'org-123';
+
+-- After: Index-optimized
+SELECT * FROM workflows 
+WHERE organization_id = 'org-123'
+AND name ILIKE '%automation%';
+
+-- 3. Implement query result caching
+CREATE MATERIALIZED VIEW workflow_summary AS
+SELECT 
+  organization_id,
+  COUNT(*) as total_workflows,
+  COUNT(*) FILTER (WHERE status = 'active') as active_workflows,
+  AVG(execution_count) as avg_executions
+FROM workflows 
+WHERE deleted_at IS NULL
+GROUP BY organization_id;
+
+-- Refresh materialized view periodically
+REFRESH MATERIALIZED VIEW CONCURRENTLY workflow_summary;
+```
+
+**Connection Pool Tuning:**
+```yaml
+# database configuration
+postgresql:
+  max_connections: 200
+  shared_buffers: "1GB"
+  effective_cache_size: "3GB"
+  work_mem: "16MB"
+  maintenance_work_mem: "256MB"
+  
+connection_pooling:
+  pool_size: 50
+  max_overflow: 20
+  pool_timeout: 30
+  pool_recycle: 3600
+  pool_pre_ping: true
+```
+
+### 5. Webhook Delivery Issues
+
+#### Issue: Webhook Delivery Failures
+
+**Symptoms:**
+- Webhooks not being delivered to endpoints
+- High retry counts and delivery delays
+- Signature verification failures
+- Webhook endpoint timeouts
+
+**Common Webhook Problems:**
+```yaml
+webhook_failures:
+  endpoint_unreachable:
+    frequency: "40% of webhook failures"
+    causes:
+      - "DNS resolution failures"
+      - "Network connectivity issues"
+      - "Firewall blocking requests"
+      - "SSL certificate problems"
+    
+  signature_verification:
+    frequency: "25% of webhook failures"
+    causes:
+      - "Incorrect signature algorithm"
+      - "Clock skew between systems"
+      - "Wrong shared secret"
+      - "Payload modification in transit"
+    
+  timeout_errors:
+    frequency: "20% of webhook failures"
+    causes:
+      - "Slow webhook endpoint processing"
+      - "Resource constraints on target server"
+      - "Database lock contention"
+      - "External API dependencies"
+    
+  server_errors:
+    frequency: "15% of webhook failures"
+    causes:
+      - "Application errors in webhook handler"
+      - "Database connection issues"
+      - "Memory/CPU resource exhaustion"
+      - "Unhandled exceptions"
+```
+
+**Debugging Webhook Deliveries:**
+```bash
+# Check webhook configuration
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://api.tolstoy.com/v2/webhooks/$WEBHOOK_ID"
+
+# View delivery attempts
+curl -H "Authorization: Bearer $TOKEN" \
+  "https://api.tolstoy.com/v2/webhooks/$WEBHOOK_ID/deliveries?limit=50"
+
+# Test webhook endpoint manually
+curl -X POST "$WEBHOOK_URL" \
+  -H "Content-Type: application/json" \
+  -H "X-Tolstoy-Signature: $SIGNATURE" \
+  -H "X-Tolstoy-Timestamp: $(date +%s)" \
+  -d "$PAYLOAD"
+
+# Check webhook service logs
+kubectl logs -f deployment/webhook-service | grep -i "$WEBHOOK_ID"
+```
+
+**Webhook Signature Verification:**
+```typescript
+// Server-side signature verification
+import crypto from 'crypto';
+
+function verifyWebhookSignature(
+  payload: string,
+  signature: string,
+  secret: string,
+  timestamp: string
+): boolean {
+  const timestampThreshold = 300; // 5 minutes
+  const currentTime = Math.floor(Date.now() / 1000);
+  
+  // Check timestamp to prevent replay attacks
+  if (Math.abs(currentTime - parseInt(timestamp)) > timestampThreshold) {
+    return false;
+  }
+  
+  // Create signature
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(timestamp + '.' + payload)
+    .digest('hex');
+  
+  // Compare signatures using constant-time comparison
+  return crypto.timingSafeEqual(
+    Buffer.from(signature, 'hex'),
+    Buffer.from(expectedSignature, 'hex')
+  );
+}
+
+// Example webhook handler
+app.post('/webhooks/tolstoy', express.raw({type: 'application/json'}), (req, res) => {
+  const signature = req.headers['x-tolstoy-signature'] as string;
+  const timestamp = req.headers['x-tolstoy-timestamp'] as string;
+  const payload = req.body.toString();
+  
+  if (!verifyWebhookSignature(payload, signature, process.env.WEBHOOK_SECRET, timestamp)) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  
+  try {
+    const event = JSON.parse(payload);
+    handleWebhookEvent(event);
+    res.status(200).json({ received: true });
+  } catch (error) {
+    console.error('Webhook processing error:', error);
+    res.status(500).json({ error: 'Processing failed' });
+  }
+});
+```
+
+## Known Platform Limitations
+
+### Current Limitations
+
+#### Workflow Engine Constraints
+```yaml
+workflow_limitations:
+  max_workflow_size:
+    limit: "10MB JSON payload"
+    impact: "Large workflows may fail to save"
+    workaround: "Use sub-workflows and references"
+    
+  max_actions_per_workflow:
+    limit: "1,000 actions"
+    impact: "Complex workflows hit action limit"
+    workaround: "Break into multiple workflows"
+    
+  max_execution_duration:
+    limit: "24 hours"
+    impact: "Long-running processes timeout"
+    workaround: "Use checkpoints and resume logic"
+    
+  max_concurrent_executions:
+    limit: "1,000 per organization"
+    impact: "High-volume orgs hit concurrency limit"
+    workaround: "Queue executions or upgrade tier"
+    
+  nested_condition_depth:
+    limit: "20 levels"
+    impact: "Complex logic structures fail validation"
+    workaround: "Refactor using sub-workflows"
+```
+
+#### Integration Service Constraints
+```yaml
+integration_limitations:
+  max_integrations_per_org:
+    limit: "500 integrations"
+    impact: "Large organizations hit integration limit"
+    planned_fix: "Version 2.5.0 - unlimited integrations"
+    
+  request_timeout:
+    limit: "300 seconds maximum"
+    impact: "Very slow APIs may timeout"
+    workaround: "Use async patterns where possible"
+    
+  payload_size:
+    limit: "50MB per request"
+    impact: "Large file operations may fail"
+    workaround: "Use streaming or chunked uploads"
+    
+  oauth_provider_support:
+    limitation: "Limited to major providers"
+    impact: "Custom OAuth servers not supported"
+    planned_fix: "Version 2.6.0 - custom OAuth config"
+```
+
+#### Database & Storage Constraints
+```yaml
+storage_limitations:
+  execution_history:
+    retention: "90 days default"
+    impact: "Historical data automatically purged"
+    upgrade_option: "Enterprise: unlimited retention"
+    
+  file_storage:
+    limit: "100GB per organization"
+    impact: "File-heavy workflows hit storage limits"
+    upgrade_option: "Additional storage available"
+    
+  database_connections:
+    limit: "100 concurrent connections"
+    impact: "High-load scenarios may exhaust connections"
+    workaround: "Connection pooling optimization"
+    
+  query_complexity:
+    limit: "30-second query timeout"
+    impact: "Complex reports may timeout"
+    workaround: "Use materialized views or async processing"
+```
+
+### Known Issues
+
+#### High Priority Issues
+```yaml
+known_issues:
+  ui_performance_safari:
+    severity: "Medium"
+    affected_versions: "2.3.0 - 2.4.0"
+    description: "Workflow builder slow on Safari 16+"
+    workaround: "Use Chrome or Firefox for workflow editing"
+    eta_fix: "Version 2.4.1"
+    
+  webhook_duplicate_delivery:
+    severity: "Low"
+    affected_versions: "2.4.0"
+    description: "Rare duplicate webhook deliveries during failover"
+    impact: "~0.1% of webhook deliveries"
+    workaround: "Implement idempotency keys in webhook handlers"
+    eta_fix: "Version 2.4.2"
+    
+  parallel_execution_race_condition:
+    severity: "Medium"
+    affected_versions: "2.3.0 - 2.4.0"
+    description: "Race condition in parallel workflow steps"
+    frequency: "~1 in 10,000 executions"
+    workaround: "Use sequential execution for critical workflows"
+    eta_fix: "Version 2.4.1"
+```
+
+#### Performance Issues Under Investigation
+```yaml
+performance_issues:
+  slow_workflow_loading:
+    description: "Workflows with 100+ actions load slowly"
+    frequency: "Affects ~5% of workflows"
+    investigation: "Database query optimization in progress"
+    
+  memory_leak_execution_engine:
+    description: "Memory usage increases over 24+ hour executions"
+    frequency: "Long-running workflows only"
+    investigation: "Memory profiling and garbage collection tuning"
+    
+  integration_connection_pooling:
+    description: "HTTP connection pool not releasing connections"
+    frequency: "High-volume integration usage"
+    investigation: "HTTP client library upgrade planned"
+```
+
+## Emergency Procedures
+
+### Critical Issue Response
+
+#### Severity Levels
+```yaml
+severity_classification:
+  critical:
+    definition: "Platform down or major functionality broken"
+    response_time: "15 minutes"
+    escalation: "Immediate page to on-call engineer"
+    
+  high:
+    definition: "Significant feature broken, workaround available"
+    response_time: "2 hours"
+    escalation: "Alert development team"
+    
+  medium:
+    definition: "Minor feature issue, limited impact"
+    response_time: "24 hours"
+    escalation: "Standard bug tracking"
+    
+  low:
+    definition: "Cosmetic or enhancement request"
+    response_time: "Best effort"
+    escalation: "Product backlog"
+```
+
+#### Incident Response Checklist
+```yaml
+incident_response:
+  immediate_actions:
+    - "Assess scope and impact"
+    - "Activate incident response team"
+    - "Create incident channel (#incident-YYYY-MM-DD)"
+    - "Begin status page updates"
+    
+  investigation_phase:
+    - "Gather logs and metrics"
+    - "Identify root cause"
+    - "Determine fix approach"
+    - "Implement temporary workaround if possible"
+    
+  resolution_phase:
+    - "Deploy fix to production"
+    - "Verify fix effectiveness"
+    - "Monitor for regression"
+    - "Update status page with resolution"
+    
+  post_incident:
+    - "Conduct post-mortem meeting"
+    - "Document lessons learned"
+    - "Create preventive action items"
+    - "Update runbooks and procedures"
+```
+
+### Rollback Procedures
+
+#### Deployment Rollback
+```bash
+#!/bin/bash
+# Emergency rollback script
+set -e
+
+ENVIRONMENT=${1:-production}
+PREVIOUS_VERSION=${2}
+
+echo "🚨 Emergency rollback to version $PREVIOUS_VERSION"
+
+# 1. Rollback application deployment
+helm rollback tolstoy-platform -n $ENVIRONMENT
+
+# 2. Check rollback status
+kubectl rollout status deployment/api-gateway -n $ENVIRONMENT
+kubectl rollout status deployment/workflow-service -n $ENVIRONMENT
+kubectl rollout status deployment/execution-engine -n $ENVIRONMENT
+
+# 3. Verify health after rollback
+sleep 30
+./scripts/health-check.sh $ENVIRONMENT
+
+# 4. Update monitoring dashboards
+curl -X POST "https://api.statuspage.io/v1/pages/PAGE_ID/incidents" \
+  -H "Authorization: OAuth $STATUSPAGE_TOKEN" \
+  -d '{
+    "incident": {
+      "name": "Emergency Rollback - ' + $(date) + '",
+      "status": "investigating",
+      "impact_override": "minor"
+    }
+  }'
+
+echo "✅ Rollback completed. Monitoring for stability."
+```
+
+This comprehensive troubleshooting guide provides systematic approaches to diagnosing and resolving the most common issues encountered in the Tolstoy platform.

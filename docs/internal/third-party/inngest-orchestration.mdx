@@ -1,0 +1,652 @@
+# Inngest Workflow Orchestration
+
+Comprehensive guide to Inngest integration for durable workflow execution and event-driven orchestration.
+
+## Overview
+
+Inngest provides serverless workflow orchestration with built-in retries, scheduling, and durable execution for the Tolstoy platform.
+
+### Key Features
+- **Durable Execution**: Workflows survive restarts and failures
+- **Event-Driven**: Trigger workflows from events
+- **Built-in Retries**: Automatic retry logic with backoff
+- **Step Functions**: Break workflows into manageable steps
+- **Observability**: Built-in monitoring and debugging
+
+## Configuration
+
+### Environment Setup
+```bash
+INNGEST_EVENT_KEY=evt_your_event_key_here
+INNGEST_SIGNING_KEY=signkey_your_signing_key
+INNGEST_DEV=false  # Set to true for local development
+```
+
+### Service Integration
+```typescript
+// src/flows/inngest/inngest-execution.service.ts
+import { InngestService } from 'nestjs-inngest';
+
+@Injectable()
+export class InngestExecutionService {
+  constructor(
+    private readonly inngest: InngestService,
+    private readonly prisma: PrismaService,
+    @InjectPinoLogger(InngestExecutionService.name)
+    private readonly logger: PinoLogger,
+  ) {}
+  
+  async enqueueFlow(
+    executionId: string,
+    flowId: string,
+    context: TenantContext,
+    variables: Record<string, unknown> = {}
+  ) {
+    const event = {
+      name: 'flow/execute',
+      data: {
+        executionId,
+        flowId,
+        orgId: context.orgId,
+        userId: context.userId,
+        variables,
+        timestamp: new Date().toISOString()
+      }
+    };
+    
+    await this.inngest.send(event);
+    
+    this.logger.info('Flow enqueued for execution', {
+      executionId,
+      flowId,
+      orgId: context.orgId
+    });
+    
+    return { executionId, status: 'queued' };
+  }
+}
+```
+
+## Workflow Definitions
+
+### Flow Execution Workflow
+```typescript
+// src/flows/inngest/workflows/flow-execution.function.ts
+import { createFunction } from 'inngest';
+
+export const flowExecutionFunction = createFunction(
+  { id: 'flow-execution' },
+  { event: 'flow/execute' },
+  async ({ event, step }) => {
+    const { executionId, flowId, orgId, userId, variables } = event.data;
+    
+    // Step 1: Initialize execution
+    await step.run('initialize-execution', async () => {
+      await prisma.executionLog.create({
+        data: {
+          id: executionId,
+          flowId,
+          orgId,
+          userId,
+          status: 'started',
+          inputs: variables,
+          stepKey: 'initialization'
+        }
+      });
+      
+      return { status: 'initialized' };
+    });
+    
+    // Step 2: Load flow definition
+    const flow = await step.run('load-flow', async () => {
+      return await prisma.flow.findUnique({
+        where: { id: flowId },
+        include: { organization: true }
+      });
+    });
+    
+    if (!flow) {
+      throw new Error(`Flow ${flowId} not found`);
+    }
+    
+    // Step 3: Execute each step
+    const steps = flow.steps as FlowStep[];
+    let stepResults: Record<string, any> = {};
+    
+    for (const [index, flowStep] of steps.entries()) {
+      const stepResult = await step.run(`execute-step-${index}`, async () => {
+        try {
+          // Log step start
+          await prisma.executionLog.create({
+            data: {
+              id: `${executionId}-step-${index}`,
+              flowId,
+              orgId,
+              userId,
+              executionId,
+              stepKey: flowStep.key,
+              status: 'started',
+              inputs: { ...variables, ...stepResults }
+            }
+          });
+          
+          // Execute step logic
+          const result = await executeFlowStep(flowStep, {
+            variables,
+            stepResults,
+            context: { orgId, userId }
+          });
+          
+          // Log step completion
+          await prisma.executionLog.update({
+            where: { id: `${executionId}-step-${index}` },
+            data: {
+              status: 'completed',
+              outputs: result,
+              updatedAt: new Date()
+            }
+          });
+          
+          return result;
+        } catch (error) {
+          // Log step failure
+          await prisma.executionLog.update({
+            where: { id: `${executionId}-step-${index}` },
+            data: {
+              status: 'failed',
+              error: {
+                message: error.message,
+                stack: error.stack,
+                timestamp: new Date().toISOString()
+              },
+              updatedAt: new Date()
+            }
+          });
+          
+          throw error;
+        }
+      });
+      
+      stepResults[flowStep.key] = stepResult;
+    }
+    
+    // Step 4: Finalize execution
+    await step.run('finalize-execution', async () => {
+      await prisma.executionLog.update({
+        where: { id: executionId },
+        data: {
+          status: 'completed',
+          outputs: stepResults,
+          updatedAt: new Date()
+        }
+      });
+      
+      // Send completion webhook
+      await step.sendEvent('webhook/flow-completed', {
+        executionId,
+        flowId,
+        orgId,
+        results: stepResults
+      });
+      
+      return { status: 'completed', results: stepResults };
+    });
+  }
+);
+```
+
+### Webhook Dispatch Workflow
+```typescript
+// src/webhooks/inngest/webhook-dispatch.function.ts
+export const webhookDispatchFunction = createFunction(
+  { id: 'webhook-dispatch', retries: 3 },
+  { event: 'webhook/dispatch' },
+  async ({ event, step }) => {
+    const { webhookId, eventType, payload } = event.data;
+    
+    // Step 1: Load webhook configuration
+    const webhook = await step.run('load-webhook', async () => {
+      return await prisma.webhook.findUnique({
+        where: { id: webhookId },
+        include: { organization: true }
+      });
+    });
+    
+    if (!webhook || !webhook.enabled) {
+      return { status: 'skipped', reason: 'webhook disabled or not found' };
+    }
+    
+    // Step 2: Generate signature
+    const signature = await step.run('generate-signature', async () => {
+      if (webhook.secret) {
+        return generateHMACSignature(JSON.stringify(payload), webhook.secret);
+      }
+      return null;
+    });
+    
+    // Step 3: Send HTTP request
+    const response = await step.run('send-webhook', async () => {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Tolstoy-Webhooks/1.0',
+        'X-Tolstoy-Event': eventType,
+        'X-Tolstoy-Delivery': generateDeliveryId()
+      };
+      
+      if (signature) {
+        headers['X-Tolstoy-Signature'] = `sha256=${signature}`;
+      }
+      
+      if (webhook.headers) {
+        Object.assign(headers, webhook.headers);
+      }
+      
+      const startTime = Date.now();
+      
+      try {
+        const response = await fetch(webhook.url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          timeout: 30000 // 30 seconds
+        });
+        
+        const duration = Date.now() - startTime;
+        
+        // Log dispatch
+        await prisma.webhookDispatchLog.create({
+          data: {
+            webhookId,
+            orgId: webhook.orgId,
+            eventType,
+            url: webhook.url,
+            status: response.ok ? 'success' : 'failure',
+            statusCode: response.status,
+            duration,
+            deliveryId: headers['X-Tolstoy-Delivery']
+          }
+        });
+        
+        return {
+          status: response.ok ? 'success' : 'failure',
+          statusCode: response.status,
+          duration
+        };
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        
+        await prisma.webhookDispatchLog.create({
+          data: {
+            webhookId,
+            orgId: webhook.orgId,
+            eventType,
+            url: webhook.url,
+            status: 'failure',
+            statusCode: 0,
+            duration,
+            error: { message: error.message },
+            deliveryId: headers['X-Tolstoy-Delivery']
+          }
+        });
+        
+        throw error;
+      }
+    });
+    
+    return response;
+  }
+);
+```
+
+## Event-Driven Architecture
+
+### Event Types
+```typescript
+// Event definitions
+interface FlowExecuteEvent {
+  name: 'flow/execute';
+  data: {
+    executionId: string;
+    flowId: string;
+    orgId: string;
+    userId: string;
+    variables: Record<string, unknown>;
+  };
+}
+
+interface WebhookDispatchEvent {
+  name: 'webhook/dispatch';
+  data: {
+    webhookId: string;
+    eventType: string;
+    payload: unknown;
+  };
+}
+
+interface UserCreatedEvent {
+  name: 'user/created';
+  data: {
+    userId: string;
+    orgId: string;
+    email: string;
+    timestamp: string;
+  };
+}
+```
+
+### Event Publishing
+```typescript
+// Publish events from services
+@Injectable()
+export class UserService {
+  constructor(private readonly inngest: InngestService) {}
+  
+  async createUser(userData: CreateUserDto, context: TenantContext) {
+    const user = await this.prisma.user.create({
+      data: {
+        ...userData,
+        orgId: context.orgId
+      }
+    });
+    
+    // Publish event for downstream processing
+    await this.inngest.send({
+      name: 'user/created',
+      data: {
+        userId: user.id,
+        orgId: user.orgId,
+        email: user.email,
+        timestamp: new Date().toISOString()
+      }
+    });
+    
+    return user;
+  }
+}
+```
+
+## Error Handling & Retries
+
+### Retry Configuration
+```typescript
+export const resilientWorkflow = createFunction(
+  {
+    id: 'resilient-workflow',
+    retries: 5, // Retry up to 5 times
+    rateLimit: {
+      limit: 100,
+      period: '1m' // 100 executions per minute
+    }
+  },
+  { event: 'process/data' },
+  async ({ event, step, attempt }) => {
+    // Built-in retry logic with exponential backoff
+    await step.run('process-external-api', async () => {
+      try {
+        return await callExternalAPI(event.data);
+      } catch (error) {
+        // Log retry attempts
+        console.log(`Attempt ${attempt} failed:`, error.message);
+        
+        // Custom retry logic for specific errors
+        if (error.code === 'RATE_LIMITED') {
+          await step.sleep('wait-for-rate-limit', '5m');
+        }
+        
+        throw error;
+      }
+    });
+  }
+);
+```
+
+### Dead Letter Queue
+```typescript
+export const deadLetterHandler = createFunction(
+  { id: 'dead-letter-handler' },
+  { event: 'inngest/function.failed' },
+  async ({ event, step }) => {
+    const { function_id, error, original_event } = event.data;
+    
+    // Log failed execution
+    await step.run('log-failure', async () => {
+      await prisma.executionLog.create({
+        data: {
+          id: `failed-${Date.now()}`,
+          orgId: original_event.data.orgId,
+          flowId: original_event.data.flowId,
+          status: 'failed',
+          error: {
+            function_id,
+            message: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString()
+          }
+        }
+      });
+    });
+    
+    // Send alert to admin
+    await step.run('send-alert', async () => {
+      await this.sendSlackAlert({
+        channel: '#alerts-production',
+        message: `🚨 Workflow failed permanently: ${function_id}`,
+        details: { error: error.message, event: original_event }
+      });
+    });
+  }
+);
+```
+
+## Scheduling & Cron Jobs
+
+### Scheduled Workflows
+```typescript
+export const dailyCleanup = createFunction(
+  { id: 'daily-cleanup' },
+  { cron: '0 2 * * *' }, // Run daily at 2 AM UTC
+  async ({ step }) => {
+    // Clean up old execution logs
+    await step.run('cleanup-logs', async () => {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const deleted = await prisma.executionLog.deleteMany({
+        where: {
+          createdAt: { lt: thirtyDaysAgo },
+          status: { in: ['completed', 'failed'] }
+        }
+      });
+      
+      return { deletedCount: deleted.count };
+    });
+    
+    // Clean up webhook dispatch logs
+    await step.run('cleanup-webhook-logs', async () => {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      const deleted = await prisma.webhookDispatchLog.deleteMany({
+        where: { createdAt: { lt: sevenDaysAgo } }
+      });
+      
+      return { deletedCount: deleted.count };
+    });
+  }
+);
+```
+
+### Delayed Execution
+```typescript
+// Send delayed notifications
+await inngest.send({
+  name: 'notification/send',
+  data: { userId, message },
+  timestamp: Date.now() + (24 * 60 * 60 * 1000) // 24 hours later
+});
+```
+
+## Monitoring & Observability
+
+### Custom Metrics
+```typescript
+export const metricsCollector = createFunction(
+  { id: 'metrics-collector' },
+  { cron: '*/5 * * * *' }, // Every 5 minutes
+  async ({ step }) => {
+    // Collect execution metrics
+    const metrics = await step.run('collect-metrics', async () => {
+      const executions = await prisma.executionLog.groupBy({
+        by: ['status', 'orgId'],
+        where: {
+          createdAt: { gte: new Date(Date.now() - 5 * 60 * 1000) }
+        },
+        _count: true
+      });
+      
+      return executions.map(metric => ({
+        metric: 'flow_executions',
+        value: metric._count,
+        tags: {
+          status: metric.status,
+          org_id: metric.orgId
+        }
+      }));
+    });
+    
+    // Send to monitoring service
+    await step.run('send-metrics', async () => {
+      await this.metricsService.sendBatch(metrics);
+    });
+  }
+);
+```
+
+### Health Checks
+```typescript
+// Health check workflow
+export const healthCheck = createFunction(
+  { id: 'health-check' },
+  { cron: '*/1 * * * *' }, // Every minute
+  async ({ step }) => {
+    const checks = await step.run('run-checks', async () => {
+      const results = await Promise.allSettled([
+        this.checkDatabase(),
+        this.checkRedis(),
+        this.checkExternalAPIs()
+      ]);
+      
+      return results.map((result, index) => ({
+        service: ['database', 'redis', 'external-apis'][index],
+        status: result.status === 'fulfilled' ? 'healthy' : 'unhealthy',
+        error: result.status === 'rejected' ? result.reason : null
+      }));
+    });
+    
+    const unhealthy = checks.filter(check => check.status === 'unhealthy');
+    
+    if (unhealthy.length > 0) {
+      await step.run('send-alert', async () => {
+        await this.sendAlert({
+          level: 'critical',
+          message: 'Health check failures detected',
+          services: unhealthy
+        });
+      });
+    }
+  }
+);
+```
+
+## Development & Testing
+
+### Local Development
+```typescript
+// Development configuration
+const inngest = new Inngest({
+  id: 'tolstoy-dev',
+  eventKey: process.env.INNGEST_EVENT_KEY,
+  isDev: process.env.NODE_ENV === 'development'
+});
+```
+
+### Testing Workflows
+```typescript
+// Test helpers
+describe('Flow Execution Workflow', () => {
+  it('should execute all steps successfully', async () => {
+    const mockEvent = {
+      name: 'flow/execute',
+      data: {
+        executionId: 'test-exec-1',
+        flowId: 'test-flow-1',
+        orgId: 'org-1',
+        userId: 'user-1',
+        variables: { testVar: 'value' }
+      }
+    };
+    
+    const result = await runWorkflow(flowExecutionFunction, mockEvent);
+    
+    expect(result.status).toBe('completed');
+    expect(result.results).toHaveProperty('step1');
+  });
+});
+```
+
+## Best Practices
+
+### Workflow Design
+- Keep steps small and focused
+- Use descriptive step names
+- Handle errors gracefully
+- Implement idempotent operations
+- Use appropriate timeouts
+
+### Event Naming
+- Use hierarchical naming: `entity/action`
+- Include version if schema changes
+- Use consistent verb tenses
+- Avoid abbreviations
+
+### Performance
+- Batch similar operations
+- Use appropriate rate limits
+- Monitor execution times
+- Optimize database queries
+
+### Security
+- Validate all input data
+- Use secrets for sensitive data
+- Implement proper access controls
+- Log security-relevant events
+
+## Cost Optimization
+
+### Execution Efficiency
+```typescript
+// Optimize step execution
+await step.run('batch-operations', async () => {
+  // Batch multiple operations together
+  const operations = await Promise.all([
+    operation1(),
+    operation2(),
+    operation3()
+  ]);
+  
+  return operations;
+});
+
+// Use conditional steps
+if (shouldExecuteStep) {
+  await step.run('conditional-operation', async () => {
+    return await expensiveOperation();
+  });
+}
+```
+
+### Resource Management
+- Set appropriate timeouts
+- Use rate limiting
+- Monitor execution costs
+- Clean up old data regularly

@@ -1,0 +1,1320 @@
+---
+title: 'Development Workflow'
+description: 'Complete development workflow guide including local setup, testing strategies, code review process, and contribution guidelines'
+---
+
+# Development Workflow
+
+This document provides comprehensive guidance for developers working on the Tolstoy platform, covering local development setup, testing strategies, code review processes, and contribution guidelines.
+
+## Development Environment Setup
+
+### Prerequisites
+
+<CardGroup cols={2}>
+  <Card title="Required Tools" icon="tools">
+    Node.js 18+, Docker, Kubernetes CLI, Git, and development IDE
+  </Card>
+  <Card title="Optional Tools" icon="plus">
+    Postman, pgAdmin, Redis CLI, and platform-specific tools
+  </Card>
+  <Card title="Cloud Access" icon="cloud">
+    AWS CLI configured with development environment access
+  </Card>
+  <Card title="Monitoring Tools" icon="chart-line">
+    Local Prometheus, Grafana, and Jaeger for observability
+  </Card>
+</CardGroup>
+
+### Local Environment Setup
+
+#### Initial Setup Script
+
+```bash
+#!/bin/bash
+# setup-dev-environment.sh
+
+set -e
+
+echo "🚀 Setting up Tolstoy development environment..."
+
+# Check prerequisites
+check_prerequisites() {
+    echo "Checking prerequisites..."
+    
+    # Check Node.js version
+    if ! command -v node &> /dev/null; then
+        echo "❌ Node.js is required but not installed"
+        exit 1
+    fi
+    
+    NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
+    if [ "$NODE_VERSION" -lt 18 ]; then
+        echo "❌ Node.js 18+ is required (current: v$(node -v))"
+        exit 1
+    fi
+    
+    # Check Docker
+    if ! command -v docker &> /dev/null; then
+        echo "❌ Docker is required but not installed"
+        exit 1
+    fi
+    
+    # Check kubectl
+    if ! command -v kubectl &> /dev/null; then
+        echo "❌ kubectl is required but not installed"
+        exit 1
+    fi
+    
+    echo "✅ Prerequisites check passed"
+}
+
+# Setup environment variables
+setup_env() {
+    echo "Setting up environment variables..."
+    
+    if [ ! -f .env.local ]; then
+        cp .env.example .env.local
+        echo "📝 Created .env.local from template"
+        echo "Please update .env.local with your configuration"
+    fi
+    
+    # Load environment variables
+    set -a
+    source .env.local
+    set +a
+}
+
+# Install dependencies
+install_dependencies() {
+    echo "Installing dependencies..."
+    
+    # Install root dependencies
+    npm install
+    
+    # Install service dependencies
+    for service in services/*/; do
+        if [ -f "$service/package.json" ]; then
+            echo "Installing dependencies for $(basename "$service")"
+            (cd "$service" && npm install)
+        fi
+    done
+    
+    echo "✅ Dependencies installed"
+}
+
+# Setup local databases
+setup_databases() {
+    echo "Setting up local databases..."
+    
+    # Start Docker containers
+    docker-compose -f docker-compose.dev.yml up -d postgres redis elasticsearch
+    
+    # Wait for databases to be ready
+    echo "Waiting for databases to be ready..."
+    sleep 10
+    
+    # Run database migrations
+    npm run db:migrate
+    
+    # Seed development data
+    npm run db:seed
+    
+    echo "✅ Databases setup complete"
+}
+
+# Setup local Kubernetes cluster
+setup_k8s() {
+    echo "Setting up local Kubernetes cluster..."
+    
+    # Check if kind cluster exists
+    if ! kind get clusters | grep -q "tolstoy-dev"; then
+        # Create kind cluster
+        kind create cluster --config=.dev/kind-cluster.yaml --name=tolstoy-dev
+        
+        # Install ingress controller
+        kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+        
+        echo "✅ Local Kubernetes cluster created"
+    else
+        echo "✅ Local Kubernetes cluster already exists"
+    fi
+    
+    # Set kubectl context
+    kubectl cluster-info --context kind-tolstoy-dev
+}
+
+# Setup monitoring stack
+setup_monitoring() {
+    echo "Setting up monitoring stack..."
+    
+    # Deploy Prometheus
+    kubectl apply -f .dev/monitoring/prometheus/
+    
+    # Deploy Grafana
+    kubectl apply -f .dev/monitoring/grafana/
+    
+    # Deploy Jaeger
+    kubectl apply -f .dev/monitoring/jaeger/
+    
+    echo "✅ Monitoring stack deployed"
+    echo "📊 Grafana: http://localhost:3001 (admin/admin)"
+    echo "🔍 Jaeger: http://localhost:16686"
+}
+
+# Run setup
+main() {
+    check_prerequisites
+    setup_env
+    install_dependencies
+    setup_databases
+    setup_k8s
+    setup_monitoring
+    
+    echo ""
+    echo "🎉 Development environment setup complete!"
+    echo ""
+    echo "Next steps:"
+    echo "1. Update .env.local with your configuration"
+    echo "2. Run 'npm run dev' to start all services"
+    echo "3. Visit http://localhost:3000 to access the platform"
+    echo ""
+}
+
+main "$@"
+```
+
+#### Docker Compose for Development
+
+```yaml
+# docker-compose.dev.yml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: tolstoy_dev
+      POSTGRES_USER: tolstoy
+      POSTGRES_PASSWORD: dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tolstoy -d tolstoy_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  elasticsearch:
+    image: elasticsearch:8.8.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025" # SMTP
+      - "8025:8025" # Web UI
+
+volumes:
+  postgres_data:
+  redis_data:
+  elasticsearch_data:
+```
+
+#### Local Kubernetes Configuration
+
+```yaml
+# .dev/kind-cluster.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: tolstoy-dev
+nodes:
+- role: control-plane
+  kubeadmConfigPatches:
+  - |
+    kind: InitConfiguration
+    nodeRegistration:
+      kubeletExtraArgs:
+        node-labels: "ingress-ready=true"
+  extraPortMappings:
+  - containerPort: 80
+    hostPort: 80
+    protocol: TCP
+  - containerPort: 443
+    hostPort: 443
+    protocol: TCP
+- role: worker
+- role: worker
+```
+
+### Development Scripts
+
+#### Package.json Scripts
+
+```json
+{
+  "scripts": {
+    "dev": "concurrently \"npm run dev:*\"",
+    "dev:api-gateway": "cd services/api-gateway && npm run dev",
+    "dev:workflow-service": "cd services/workflow-service && npm run dev",
+    "dev:execution-engine": "cd services/execution-engine && npm run dev",
+    "dev:integration-service": "cd services/integration-service && npm run dev",
+    "dev:user-service": "cd services/user-service && npm run dev",
+    
+    "build": "npm run build:services",
+    "build:services": "concurrently \"npm run build:*\"",
+    "build:api-gateway": "cd services/api-gateway && npm run build",
+    "build:workflow-service": "cd services/workflow-service && npm run build",
+    
+    "test": "npm run test:unit && npm run test:integration",
+    "test:unit": "jest --config=jest.config.js",
+    "test:integration": "jest --config=jest.integration.config.js",
+    "test:e2e": "jest --config=jest.e2e.config.js",
+    "test:coverage": "jest --coverage --config=jest.config.js",
+    
+    "lint": "npm run lint:services",
+    "lint:services": "concurrently \"npm run lint:*\"",
+    "lint:api-gateway": "cd services/api-gateway && npm run lint",
+    "lint:workflow-service": "cd services/workflow-service && npm run lint",
+    
+    "typecheck": "npm run typecheck:services",
+    "typecheck:services": "concurrently \"npm run typecheck:*\"",
+    "typecheck:api-gateway": "cd services/api-gateway && npm run typecheck",
+    "typecheck:workflow-service": "cd services/workflow-service && npm run typecheck",
+    
+    "db:migrate": "npm run db:migrate:services",
+    "db:migrate:services": "concurrently \"npm run db:migrate:*\"",
+    "db:migrate:workflow-service": "cd services/workflow-service && npm run db:migrate",
+    "db:migrate:user-service": "cd services/user-service && npm run db:migrate",
+    
+    "db:seed": "npm run db:seed:services",
+    "db:seed:services": "concurrently \"npm run db:seed:*\"",
+    "db:seed:workflow-service": "cd services/workflow-service && npm run db:seed",
+    "db:seed:user-service": "cd services/user-service && npm run db:seed",
+    
+    "k8s:deploy": "kubectl apply -f k8s/dev/",
+    "k8s:delete": "kubectl delete -f k8s/dev/",
+    "k8s:logs": "kubectl logs -f -l app=tolstoy --all-containers=true",
+    
+    "docker:build": "npm run docker:build:services",
+    "docker:build:services": "concurrently \"npm run docker:build:*\"",
+    "docker:build:api-gateway": "docker build -t tolstoy/api-gateway:dev services/api-gateway/",
+    
+    "clean": "npm run clean:services && npm run clean:deps",
+    "clean:services": "concurrently \"npm run clean:*\"",
+    "clean:api-gateway": "cd services/api-gateway && rm -rf dist node_modules",
+    "clean:deps": "rm -rf node_modules"
+  }
+}
+```
+
+## Development Workflow Process
+
+### Git Workflow
+
+#### Branch Strategy
+
+```mermaid
+gitGraph
+    commit id: "main"
+    branch develop
+    commit id: "dev-1"
+    
+    branch feature/auth-improvements
+    commit id: "feat-1"
+    commit id: "feat-2"
+    checkout develop
+    merge feature/auth-improvements
+    commit id: "dev-2"
+    
+    branch release/v2.1.0
+    commit id: "rel-1"
+    commit id: "rel-2"
+    checkout main
+    merge release/v2.1.0
+    commit id: "v2.1.0"
+    
+    checkout develop
+    merge main
+    commit id: "dev-3"
+    
+    branch hotfix/critical-bug
+    checkout main
+    checkout hotfix/critical-bug
+    commit id: "fix-1"
+    checkout main
+    merge hotfix/critical-bug
+    commit id: "v2.1.1"
+    checkout develop
+    merge main
+```
+
+#### Branch Naming Conventions
+
+```bash
+# Feature branches
+feature/user-authentication
+feature/workflow-templates
+feature/integration-slack
+
+# Bug fix branches  
+bugfix/execution-timeout
+bugfix/user-registration
+
+# Hotfix branches
+hotfix/security-vulnerability
+hotfix/data-loss-issue
+
+# Release branches
+release/v2.1.0
+release/v2.2.0
+
+# Chore branches
+chore/dependency-updates
+chore/documentation-update
+```
+
+#### Commit Message Format
+
+```bash
+# Format: type(scope): description [optional body] [optional footer]
+
+# Types:
+feat: new feature
+fix: bug fix
+docs: documentation changes
+style: code style changes (formatting, etc)
+refactor: code refactoring
+test: adding or updating tests
+chore: maintenance tasks
+
+# Examples:
+feat(auth): add OAuth2 integration with Google
+fix(workflow): resolve execution timeout issue
+docs(api): update authentication documentation
+test(integration): add end-to-end workflow tests
+refactor(database): optimize query performance
+chore(deps): upgrade Node.js dependencies
+```
+
+### Development Process
+
+#### 1. Feature Development
+
+```bash
+#!/bin/bash
+# Feature development workflow
+
+# 1. Create feature branch
+git checkout develop
+git pull origin develop
+git checkout -b feature/new-feature
+
+# 2. Development cycle
+while [ $FEATURE_COMPLETE != "yes" ]; do
+    # Write code
+    # Write tests
+    npm run test:unit
+    npm run lint
+    npm run typecheck
+    git add .
+    git commit -m "feat(scope): implement feature functionality"
+done
+
+# 3. Final checks before PR
+npm run test
+npm run test:integration
+npm run build
+
+# 4. Push and create PR
+git push -u origin feature/new-feature
+# Create PR via GitHub/GitLab
+```
+
+#### 2. Code Review Process
+
+```typescript
+// .github/pull_request_template.md
+## Description
+Brief description of the changes
+
+## Type of Change
+- [ ] Bug fix (non-breaking change which fixes an issue)
+- [ ] New feature (non-breaking change which adds functionality)  
+- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
+- [ ] Documentation update
+
+## Testing
+- [ ] Unit tests pass
+- [ ] Integration tests pass
+- [ ] E2E tests pass
+- [ ] Manual testing completed
+
+## Code Quality
+- [ ] Code follows style guidelines
+- [ ] Self-review completed
+- [ ] Code is properly documented
+- [ ] No console.log or debug statements
+
+## Security
+- [ ] No hardcoded secrets or credentials
+- [ ] Input validation implemented
+- [ ] Authorization checks in place
+- [ ] Security implications considered
+
+## Performance
+- [ ] Performance impact assessed
+- [ ] Database queries optimized
+- [ ] Caching implemented where appropriate
+- [ ] Memory usage considered
+
+## Deployment
+- [ ] Database migrations included
+- [ ] Environment variables documented
+- [ ] Deployment instructions updated
+- [ ] Monitoring/alerting updated
+
+## Screenshots
+Add screenshots for UI changes
+
+## Additional Notes
+Any additional information for reviewers
+```
+
+#### 3. Review Checklist
+
+```typescript
+// code-review-checklist.ts
+interface CodeReviewChecklist {
+  // Functionality
+  requirementsImplemented: boolean;
+  edgeCasesHandled: boolean;
+  errorHandlingAdequate: boolean;
+  
+  // Code Quality
+  codeReadable: boolean;
+  functionsSmallAndFocused: boolean;
+  duplicationMinimized: boolean;
+  namingClear: boolean;
+  
+  // Architecture
+  designPatternsFollowed: boolean;
+  separationOfConcerns: boolean;
+  dependenciesManaged: boolean;
+  
+  // Testing
+  unitTestsComprehensive: boolean;
+  integrationTestsCover: boolean;
+  testNamesDescriptive: boolean;
+  
+  // Security
+  inputValidated: boolean;
+  outputSanitized: boolean;
+  authenticationChecked: boolean;
+  authorizationEnforced: boolean;
+  
+  // Performance
+  queryOptimized: boolean;
+  cachingImplemented: boolean;
+  resourcesReleased: boolean;
+  
+  // Documentation
+  codeDocumented: boolean;
+  apiDocumented: boolean;
+  changelogUpdated: boolean;
+}
+
+// Automated review checks
+export class AutomatedReviewChecks {
+  static async runChecks(pullRequest: PullRequest): Promise<ReviewResult> {
+    const checks = {
+      linting: await this.runLintCheck(),
+      testing: await this.runTestSuite(),
+      security: await this.runSecurityScan(),
+      performance: await this.runPerformanceTests(),
+      coverage: await this.checkTestCoverage(),
+    };
+
+    return {
+      passed: Object.values(checks).every(check => check.passed),
+      details: checks,
+    };
+  }
+}
+```
+
+## Testing Strategy
+
+### Test Structure
+
+#### Unit Testing
+
+```typescript
+// Example unit test structure
+// tests/unit/services/workflow.service.test.ts
+import { WorkflowService } from '../../../src/services/workflow.service';
+import { DatabaseService } from '../../../src/services/database.service';
+import { EventPublisher } from '../../../src/services/event-publisher.service';
+
+// Mock dependencies
+jest.mock('../../../src/services/database.service');
+jest.mock('../../../src/services/event-publisher.service');
+
+describe('WorkflowService', () => {
+  let workflowService: WorkflowService;
+  let mockDatabaseService: jest.Mocked<DatabaseService>;
+  let mockEventPublisher: jest.Mocked<EventPublisher>;
+
+  beforeEach(() => {
+    mockDatabaseService = new DatabaseService() as jest.Mocked<DatabaseService>;
+    mockEventPublisher = new EventPublisher() as jest.Mocked<EventPublisher>;
+    workflowService = new WorkflowService(mockDatabaseService, mockEventPublisher);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  describe('createWorkflow', () => {
+    it('should create workflow successfully', async () => {
+      // Arrange
+      const workflowData = {
+        name: 'Test Workflow',
+        description: 'Test description',
+        trigger: { type: 'manual' },
+        actions: [{ type: 'log', config: { message: 'Hello' } }],
+        organizationId: 'org-123',
+        createdBy: 'user-123',
+      };
+
+      const expectedWorkflow = {
+        id: 'workflow-123',
+        ...workflowData,
+        status: 'draft',
+        version: 1,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      mockDatabaseService.create.mockResolvedValue(expectedWorkflow);
+
+      // Act
+      const result = await workflowService.createWorkflow(workflowData);
+
+      // Assert
+      expect(result).toEqual(expectedWorkflow);
+      expect(mockDatabaseService.create).toHaveBeenCalledWith('workflows', workflowData);
+      expect(mockEventPublisher.publishEvent).toHaveBeenCalledWith({
+        type: 'workflow.created',
+        aggregate_id: expectedWorkflow.id,
+        data: expectedWorkflow,
+      });
+    });
+
+    it('should throw error for invalid workflow data', async () => {
+      // Arrange
+      const invalidWorkflowData = {
+        name: '', // Invalid: empty name
+        organizationId: 'org-123',
+      };
+
+      // Act & Assert
+      await expect(workflowService.createWorkflow(invalidWorkflowData))
+        .rejects.toThrow('Workflow name is required');
+    });
+  });
+
+  describe('executeWorkflow', () => {
+    it('should execute workflow successfully', async () => {
+      // Arrange
+      const workflowId = 'workflow-123';
+      const input = { data: 'test' };
+      const workflow = {
+        id: workflowId,
+        name: 'Test Workflow',
+        actions: [{ type: 'log', config: { message: 'Hello' } }],
+      };
+
+      mockDatabaseService.findById.mockResolvedValue(workflow);
+
+      // Act
+      const result = await workflowService.executeWorkflow(workflowId, input);
+
+      // Assert
+      expect(result.status).toBe('completed');
+      expect(mockDatabaseService.create).toHaveBeenCalledWith(
+        'executions',
+        expect.objectContaining({
+          workflow_id: workflowId,
+          input_data: input,
+          status: 'pending',
+        })
+      );
+    });
+  });
+});
+```
+
+#### Integration Testing
+
+```typescript
+// tests/integration/api/workflows.test.ts
+import request from 'supertest';
+import { app } from '../../../src/app';
+import { DatabaseService } from '../../../src/services/database.service';
+import { testHelpers } from '../../helpers/test-helpers';
+
+describe('Workflows API Integration Tests', () => {
+  let authToken: string;
+  let organizationId: string;
+
+  beforeAll(async () => {
+    await testHelpers.setupTestDatabase();
+    const { token, orgId } = await testHelpers.createTestUser();
+    authToken = token;
+    organizationId = orgId;
+  });
+
+  afterAll(async () => {
+    await testHelpers.cleanupTestDatabase();
+  });
+
+  beforeEach(async () => {
+    await testHelpers.cleanupTestData();
+  });
+
+  describe('POST /v1/workflows', () => {
+    it('should create workflow with valid data', async () => {
+      const workflowData = {
+        name: 'Integration Test Workflow',
+        description: 'Test workflow for integration testing',
+        trigger: { type: 'manual' },
+        actions: [
+          {
+            type: 'http_request',
+            config: {
+              url: 'https://httpbin.org/post',
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            },
+          },
+        ],
+      };
+
+      const response = await request(app)
+        .post('/v1/workflows')
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('X-Organization-ID', organizationId)
+        .send(workflowData)
+        .expect(201);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data).toMatchObject({
+        name: workflowData.name,
+        description: workflowData.description,
+        status: 'draft',
+        version: 1,
+      });
+
+      // Verify database state
+      const dbWorkflow = await DatabaseService.findById('workflows', response.body.data.id);
+      expect(dbWorkflow).toBeTruthy();
+      expect(dbWorkflow.name).toBe(workflowData.name);
+    });
+
+    it('should return 400 for invalid workflow data', async () => {
+      const invalidData = {
+        name: '', // Invalid: empty name
+        trigger: {}, // Invalid: empty trigger
+      };
+
+      const response = await request(app)
+        .post('/v1/workflows')
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('X-Organization-ID', organizationId)
+        .send(invalidData)
+        .expect(400);
+
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.message).toContain('validation');
+    });
+
+    it('should return 401 without authentication', async () => {
+      const workflowData = {
+        name: 'Test Workflow',
+        trigger: { type: 'manual' },
+        actions: [],
+      };
+
+      await request(app)
+        .post('/v1/workflows')
+        .send(workflowData)
+        .expect(401);
+    });
+  });
+
+  describe('GET /v1/workflows', () => {
+    beforeEach(async () => {
+      await testHelpers.createTestWorkflows(organizationId, 5);
+    });
+
+    it('should list workflows with pagination', async () => {
+      const response = await request(app)
+        .get('/v1/workflows?limit=3&offset=0')
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('X-Organization-ID', organizationId)
+        .expect(200);
+
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.workflows).toHaveLength(3);
+      expect(response.body.data.total).toBe(5);
+      expect(response.body.data.pagination).toEqual({
+        limit: 3,
+        offset: 0,
+        total: 5,
+        pages: 2,
+      });
+    });
+
+    it('should filter workflows by status', async () => {
+      await testHelpers.updateWorkflowStatus(organizationId, 'active', 2);
+
+      const response = await request(app)
+        .get('/v1/workflows?status=active')
+        .set('Authorization', `Bearer ${authToken}`)
+        .set('X-Organization-ID', organizationId)
+        .expect(200);
+
+      expect(response.body.data.workflows).toHaveLength(2);
+      expect(response.body.data.workflows.every(w => w.status === 'active')).toBe(true);
+    });
+  });
+});
+```
+
+#### End-to-End Testing
+
+```typescript
+// tests/e2e/workflow-execution.test.ts
+import { Browser, Page, chromium } from 'playwright';
+import { testHelpers } from '../helpers/test-helpers';
+
+describe('Workflow Execution E2E Tests', () => {
+  let browser: Browser;
+  let page: Page;
+  let baseURL: string;
+
+  beforeAll(async () => {
+    browser = await chromium.launch({ headless: !process.env.DEBUG });
+    baseURL = process.env.E2E_BASE_URL || 'http://localhost:3000';
+  });
+
+  afterAll(async () => {
+    await browser.close();
+  });
+
+  beforeEach(async () => {
+    page = await browser.newPage();
+    await testHelpers.setupE2ETest();
+  });
+
+  afterEach(async () => {
+    await page.close();
+    await testHelpers.cleanupE2ETest();
+  });
+
+  it('should create and execute workflow end-to-end', async () => {
+    // Login
+    await page.goto(`${baseURL}/login`);
+    await page.fill('[data-testid="email-input"]', 'test@example.com');
+    await page.fill('[data-testid="password-input"]', 'password123');
+    await page.click('[data-testid="login-button"]');
+    
+    // Wait for dashboard
+    await page.waitForSelector('[data-testid="dashboard"]');
+
+    // Navigate to workflows
+    await page.click('[data-testid="workflows-nav"]');
+    await page.waitForSelector('[data-testid="workflows-list"]');
+
+    // Create new workflow
+    await page.click('[data-testid="create-workflow-button"]');
+    await page.waitForSelector('[data-testid="workflow-builder"]');
+
+    // Fill workflow details
+    await page.fill('[data-testid="workflow-name"]', 'E2E Test Workflow');
+    await page.fill('[data-testid="workflow-description"]', 'End-to-end test workflow');
+
+    // Add trigger
+    await page.click('[data-testid="add-trigger-button"]');
+    await page.selectOption('[data-testid="trigger-type"]', 'manual');
+
+    // Add action
+    await page.click('[data-testid="add-action-button"]');
+    await page.selectOption('[data-testid="action-type"]', 'http_request');
+    await page.fill('[data-testid="action-url"]', 'https://httpbin.org/post');
+    await page.selectOption('[data-testid="action-method"]', 'POST');
+
+    // Save workflow
+    await page.click('[data-testid="save-workflow-button"]');
+    await page.waitForSelector('[data-testid="workflow-saved-message"]');
+
+    // Execute workflow
+    await page.click('[data-testid="execute-workflow-button"]');
+    await page.waitForSelector('[data-testid="execution-modal"]');
+    await page.fill('[data-testid="execution-input"]', '{"test": "data"}');
+    await page.click('[data-testid="start-execution-button"]');
+
+    // Wait for execution completion
+    await page.waitForSelector('[data-testid="execution-completed"]', { timeout: 30000 });
+
+    // Verify execution results
+    const status = await page.textContent('[data-testid="execution-status"]');
+    expect(status).toBe('Completed');
+
+    const output = await page.textContent('[data-testid="execution-output"]');
+    const outputData = JSON.parse(output);
+    expect(outputData.json).toEqual({ test: 'data' });
+  });
+
+  it('should handle workflow execution errors', async () => {
+    // Setup workflow with failing action
+    await testHelpers.createFailingWorkflow();
+
+    await page.goto(`${baseURL}/workflows`);
+    await page.click('[data-testid="execute-failing-workflow"]');
+
+    // Wait for execution to fail
+    await page.waitForSelector('[data-testid="execution-failed"]', { timeout: 30000 });
+
+    const errorMessage = await page.textContent('[data-testid="execution-error"]');
+    expect(errorMessage).toContain('Connection timeout');
+  });
+});
+```
+
+### Test Utilities and Helpers
+
+```typescript
+// tests/helpers/test-helpers.ts
+import { DatabaseService } from '../../src/services/database.service';
+import { AuthService } from '../../src/services/auth.service';
+
+export class TestHelpers {
+  static async setupTestDatabase(): Promise<void> {
+    // Setup test database
+    await DatabaseService.connect(process.env.TEST_DATABASE_URL);
+    await DatabaseService.runMigrations();
+  }
+
+  static async cleanupTestDatabase(): Promise<void> {
+    await DatabaseService.dropAllTables();
+    await DatabaseService.disconnect();
+  }
+
+  static async cleanupTestData(): Promise<void> {
+    const tables = ['executions', 'workflows', 'integrations', 'users', 'organizations'];
+    for (const table of tables) {
+      await DatabaseService.truncate(table);
+    }
+  }
+
+  static async createTestUser(): Promise<{ token: string; orgId: string; userId: string }> {
+    const organization = await DatabaseService.create('organizations', {
+      name: 'Test Organization',
+      slug: 'test-org',
+      plan: 'free',
+    });
+
+    const user = await DatabaseService.create('users', {
+      email: 'test@example.com',
+      password_hash: await AuthService.hashPassword('password123'),
+      first_name: 'Test',
+      last_name: 'User',
+    });
+
+    await DatabaseService.create('organization_members', {
+      organization_id: organization.id,
+      user_id: user.id,
+      role: 'owner',
+    });
+
+    const token = AuthService.generateToken(user.id, organization.id);
+
+    return {
+      token,
+      orgId: organization.id,
+      userId: user.id,
+    };
+  }
+
+  static async createTestWorkflows(organizationId: string, count: number): Promise<any[]> {
+    const workflows = [];
+    for (let i = 0; i < count; i++) {
+      const workflow = await DatabaseService.create('workflows', {
+        organization_id: organizationId,
+        name: `Test Workflow ${i + 1}`,
+        description: `Description for workflow ${i + 1}`,
+        trigger: { type: 'manual' },
+        actions: [{ type: 'log', config: { message: 'Test' } }],
+        status: 'draft',
+        created_by: 'test-user',
+      });
+      workflows.push(workflow);
+    }
+    return workflows;
+  }
+
+  static async updateWorkflowStatus(
+    organizationId: string,
+    status: string,
+    count: number
+  ): Promise<void> {
+    const workflows = await DatabaseService.findMany('workflows', {
+      organization_id: organizationId,
+      limit: count,
+    });
+
+    for (const workflow of workflows) {
+      await DatabaseService.update('workflows', workflow.id, { status });
+    }
+  }
+
+  static createMockRequest(overrides: any = {}): any {
+    return {
+      headers: {},
+      body: {},
+      params: {},
+      query: {},
+      user: { id: 'test-user', organizationId: 'test-org' },
+      correlationId: 'test-correlation-id',
+      ...overrides,
+    };
+  }
+
+  static createMockResponse(): any {
+    const res: any = {};
+    res.status = jest.fn().mockReturnValue(res);
+    res.json = jest.fn().mockReturnValue(res);
+    res.send = jest.fn().mockReturnValue(res);
+    res.setHeader = jest.fn().mockReturnValue(res);
+    return res;
+  }
+
+  static async waitForCondition(
+    condition: () => boolean | Promise<boolean>,
+    timeout = 5000
+  ): Promise<void> {
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeout) {
+      if (await condition()) {
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    throw new Error(`Condition not met within ${timeout}ms`);
+  }
+}
+```
+
+## Continuous Integration
+
+### GitHub Actions Workflow
+
+```yaml
+# .github/workflows/ci.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  NODE_VERSION: '18'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  lint-and-typecheck:
+    name: Lint and Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run linting
+        run: npm run lint
+
+      - name: Run type checking
+        run: npm run typecheck
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm run test:unit -- --coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tolstoy_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run database migrations
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tolstoy_test
+          REDIS_URL: redis://localhost:6379
+
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tolstoy_test
+          REDIS_URL: redis://localhost:6379
+          NODE_ENV: test
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Start application
+        run: |
+          npm run build
+          npm start &
+          sleep 30
+        env:
+          NODE_ENV: test
+          PORT: 3000
+
+      - name: Run E2E tests
+        run: npm run test:e2e
+        env:
+          E2E_BASE_URL: http://localhost:3000
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck, unit-tests, integration-tests]
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    strategy:
+      matrix:
+        service: [api-gateway, workflow-service, execution-engine, integration-service]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: services/${{ matrix.service }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [build-and-push]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Deploy to EKS
+        run: |
+          aws eks update-kubeconfig --region us-east-1 --name tolstoy-staging
+          kubectl set image deployment/api-gateway api-gateway=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/api-gateway:${{ github.sha }} -n staging
+          kubectl set image deployment/workflow-service workflow-service=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/workflow-service:${{ github.sha }} -n staging
+          kubectl rollout status deployment/api-gateway -n staging
+          kubectl rollout status deployment/workflow-service -n staging
+
+      - name: Run smoke tests
+        run: npm run test:smoke
+        env:
+          STAGING_URL: https://api-staging.tolstoy.com
+```
+
+This comprehensive development workflow documentation provides the foundation for efficient, collaborative, and high-quality software development on the Tolstoy platform.

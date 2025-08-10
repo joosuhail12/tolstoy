@@ -1,0 +1,711 @@
+---
+title: 'API Functionality & Limitations'
+description: 'Comprehensive documentation of API capabilities, rate limits, quotas, constraints, and usage patterns'
+---
+
+# API Functionality & Limitations
+
+This document provides detailed information about API capabilities, rate limits, quotas, constraints, and usage patterns across all Tolstoy platform services.
+
+## API Overview
+
+### Service Endpoints
+
+<CardGroup cols={2}>
+  <Card title="API Gateway" icon="gateway">
+    Primary entry point for all external API requests with authentication and routing
+  </Card>
+  <Card title="GraphQL Gateway" icon="code">
+    Modern GraphQL API with real-time subscriptions and efficient data fetching
+  </Card>
+  <Card title="Webhook Endpoints" icon="webhook">
+    Dedicated webhook receivers with signature validation and event processing
+  </Card>
+  <Card title="Admin API" icon="shield">
+    Administrative endpoints for organization management and system operations
+  </Card>
+</CardGroup>
+
+### API Versions & Compatibility
+
+| Version | Status | Support Until | Notes |
+|---------|--------|---------------|--------|
+| v2.4 | Current | Active | Latest features and improvements |
+| v2.3 | Maintained | 2024-06-01 | Security updates only |
+| v2.2 | Deprecated | 2024-03-01 | Critical fixes only |
+| v1.x | End of Life | Ended | Migrate to v2.x immediately |
+
+## Rate Limits & Quotas
+
+### Global Rate Limits
+
+#### Per Organization Limits
+```yaml
+# Rate limiting configuration by organization tier
+rate_limits:
+  free_tier:
+    requests_per_minute: 100
+    requests_per_hour: 1000
+    requests_per_day: 10000
+    burst_capacity: 50
+    
+  pro_tier:
+    requests_per_minute: 1000
+    requests_per_hour: 10000
+    requests_per_day: 100000
+    burst_capacity: 200
+    
+  enterprise_tier:
+    requests_per_minute: 5000
+    requests_per_hour: 50000
+    requests_per_day: 1000000
+    burst_capacity: 1000
+    custom_limits: true
+```
+
+#### Per API Key Limits
+```yaml
+api_key_limits:
+  default:
+    requests_per_minute: 60
+    requests_per_hour: 1000
+    concurrent_requests: 10
+    
+  elevated:
+    requests_per_minute: 300
+    requests_per_hour: 5000
+    concurrent_requests: 50
+    
+  admin:
+    requests_per_minute: 1000
+    requests_per_hour: 20000
+    concurrent_requests: 100
+```
+
+### Service-Specific Limits
+
+#### Workflow Service
+
+**Functionality:**
+- Complete CRUD operations for workflows
+- Template management and marketplace access
+- Version control and branching
+- Bulk operations and batch processing
+- Real-time validation and testing
+
+**Rate Limits:**
+```json
+{
+  "workflow_operations": {
+    "create": "10/minute",
+    "read": "1000/minute", 
+    "update": "50/minute",
+    "delete": "10/minute",
+    "list": "100/minute"
+  },
+  "template_operations": {
+    "browse": "500/minute",
+    "download": "50/minute",
+    "upload": "5/minute"
+  },
+  "validation": {
+    "syntax_check": "200/minute",
+    "full_validation": "50/minute",
+    "test_execution": "20/minute"
+  }
+}
+```
+
+**Resource Constraints:**
+- **Max Workflow Size**: 10MB JSON payload
+- **Max Actions per Workflow**: 1000 actions
+- **Max Variables**: 500 per workflow
+- **Max Nesting Depth**: 20 levels
+- **Template Upload Size**: 50MB
+- **Concurrent Validations**: 10 per organization
+
+**Known Limitations:**
+- Complex validations may timeout after 30 seconds
+- Template downloads require authenticated requests
+- Workflow names must be unique within organization
+- Version branching limited to 10 active branches
+
+#### Execution Engine
+
+**Functionality:**
+- Workflow execution orchestration
+- Step-by-step execution with state management
+- Parallel and sequential processing
+- Error handling and retry logic
+- Real-time execution monitoring
+- Resource allocation and cleanup
+
+**Rate Limits:**
+```json
+{
+  "execution_operations": {
+    "start_execution": "100/minute",
+    "get_status": "1000/minute",
+    "cancel_execution": "50/minute",
+    "retry_execution": "20/minute"
+  },
+  "monitoring": {
+    "execution_logs": "500/minute",
+    "metrics": "200/minute",
+    "events": "unlimited"
+  }
+}
+```
+
+**Resource Constraints:**
+- **Max Concurrent Executions**: 1000 per organization
+- **Max Execution Duration**: 24 hours
+- **Max Memory per Execution**: 2GB
+- **Max CPU Time**: 4 hours
+- **Log Retention**: 30 days
+- **Max Input Payload**: 100MB
+
+**Performance Characteristics:**
+- **Execution Startup Time**: &lt;5 seconds
+- **Step Processing Time**: &lt;1 second average
+- **Throughput**: 10,000 executions/hour
+- **Success Rate**: >99.5%
+
+#### Integration Service
+
+**Functionality:**
+- External API integration management
+- OAuth 2.0 and API key authentication
+- Request/response transformation
+- Rate limiting per integration
+- Health monitoring and alerting
+- Batch operations and bulk processing
+
+**Rate Limits:**
+```json
+{
+  "integration_management": {
+    "create_integration": "10/minute",
+    "update_config": "20/minute",
+    "test_connection": "30/minute",
+    "delete_integration": "5/minute"
+  },
+  "api_calls": {
+    "per_integration": "1000/minute",
+    "total_organization": "10000/minute",
+    "batch_operations": "100/minute"
+  },
+  "monitoring": {
+    "health_checks": "60/minute",
+    "logs": "200/minute",
+    "metrics": "500/minute"
+  }
+}
+```
+
+**Resource Constraints:**
+- **Max Integrations**: 100 per organization
+- **Request Timeout**: 30 seconds default, 300 seconds max
+- **Payload Size**: 50MB per request
+- **Batch Size**: 1000 operations per batch
+- **Connection Pool**: 50 connections per integration
+- **Retry Attempts**: 3 with exponential backoff
+
+**Integration Limits:**
+- **HTTP/REST**: Unlimited endpoints
+- **GraphQL**: 10 schemas per integration
+- **Database**: 5 connections per integration
+- **File Systems**: 10GB storage per integration
+- **WebSocket**: 100 concurrent connections
+
+#### User Service
+
+**Functionality:**
+- User authentication and authorization
+- Multi-factor authentication (MFA)
+- Session management
+- Profile and preference management
+- OAuth provider integration
+- Audit logging and security events
+
+**Rate Limits:**
+```json
+{
+  "authentication": {
+    "login_attempts": "10/minute",
+    "password_reset": "3/hour",
+    "mfa_verification": "20/minute",
+    "token_refresh": "100/minute"
+  },
+  "user_management": {
+    "create_user": "20/minute",
+    "update_profile": "50/minute",
+    "list_users": "100/minute",
+    "delete_user": "5/minute"
+  },
+  "security": {
+    "change_password": "3/hour",
+    "enable_mfa": "5/hour",
+    "api_key_generation": "10/hour"
+  }
+}
+```
+
+**Security Constraints:**
+- **Password Requirements**: 12+ characters, mixed case, numbers, symbols
+- **Session Duration**: 24 hours (configurable)
+- **MFA Methods**: TOTP, SMS, Hardware keys (FIDO2)
+- **Failed Login Lockout**: 5 attempts = 15-minute lockout
+- **API Key Rotation**: Maximum 90 days
+
+## GraphQL API
+
+### Query Complexity
+
+**Functionality:**
+- Single endpoint for all data operations
+- Real-time subscriptions
+- Efficient data fetching with field selection
+- Nested queries with relationship loading
+- Custom scalar types and enums
+
+**Complexity Limits:**
+```yaml
+query_analysis:
+  max_depth: 15
+  max_complexity: 1000
+  max_nodes: 10000
+  timeout: 30_seconds
+  
+rate_limits:
+  queries_per_minute: 500
+  mutations_per_minute: 100
+  subscriptions_per_connection: 10
+  max_concurrent_subscriptions: 100
+```
+
+**Query Examples with Complexity:**
+```graphql
+# Simple query (Complexity: 5)
+query GetWorkflows {
+  workflows {
+    id
+    name
+    status
+  }
+}
+
+# Complex nested query (Complexity: 45)
+query GetWorkflowDetails($id: ID!) {
+  workflow(id: $id) {
+    id
+    name
+    description
+    actions {
+      id
+      type
+      config
+      integrations {
+        id
+        name
+        provider
+      }
+    }
+    executions(first: 10) {
+      edges {
+        node {
+          id
+          status
+          createdAt
+          steps {
+            id
+            status
+            duration
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Subscription Limits
+
+```yaml
+subscriptions:
+  max_per_connection: 10
+  max_connection_duration: 24_hours
+  heartbeat_interval: 30_seconds
+  max_payload_size: 1MB
+  
+subscription_types:
+  workflow_updates: "Real-time workflow state changes"
+  execution_progress: "Live execution step updates"  
+  integration_events: "Integration status notifications"
+  user_notifications: "User-specific notifications"
+```
+
+## Webhook System
+
+### Webhook Functionality
+
+**Core Features:**
+- Event-driven HTTP callbacks
+- Signature-based authentication
+- Automatic retry with exponential backoff
+- Event filtering and routing
+- Delivery tracking and analytics
+- Bulk webhook operations
+
+**Event Types:**
+```typescript
+interface WebhookEvents {
+  'workflow.created': WorkflowCreatedPayload;
+  'workflow.updated': WorkflowUpdatedPayload;
+  'workflow.deleted': WorkflowDeletedPayload;
+  'execution.started': ExecutionStartedPayload;
+  'execution.completed': ExecutionCompletedPayload;
+  'execution.failed': ExecutionFailedPayload;
+  'integration.connected': IntegrationConnectedPayload;
+  'integration.failed': IntegrationFailedPayload;
+  'user.created': UserCreatedPayload;
+  'organization.updated': OrganizationUpdatedPayload;
+}
+```
+
+### Webhook Limits
+
+```yaml
+webhook_configuration:
+  max_webhooks_per_org: 100
+  max_events_per_webhook: 20
+  payload_size_limit: 10MB
+  timeout: 30_seconds
+  
+delivery_configuration:
+  max_retries: 5
+  retry_delays: [1s, 5s, 25s, 125s, 625s]
+  dead_letter_queue: true
+  batch_size: 1000
+  
+rate_limits:
+  delivery_rate: "10000/minute"
+  configuration_changes: "20/minute"
+  test_deliveries: "10/minute"
+```
+
+### Webhook Security
+
+```yaml
+security:
+  signature_algorithm: "HMAC-SHA256"
+  timestamp_tolerance: 300_seconds
+  required_headers:
+    - "X-Tolstoy-Signature"
+    - "X-Tolstoy-Timestamp"
+    - "X-Tolstoy-Event-Type"
+  
+ssl_requirements:
+  https_only: true
+  certificate_validation: strict
+  tls_version: "1.2+"
+```
+
+## Error Handling & Response Codes
+
+### HTTP Status Codes
+
+```yaml
+success_codes:
+  200: "OK - Request successful"
+  201: "Created - Resource created successfully"
+  202: "Accepted - Request accepted for processing"
+  204: "No Content - Request successful, no response body"
+
+client_error_codes:
+  400: "Bad Request - Invalid request format or parameters"
+  401: "Unauthorized - Authentication required or failed"
+  403: "Forbidden - Insufficient permissions"
+  404: "Not Found - Resource not found"
+  409: "Conflict - Resource conflict or constraint violation"
+  413: "Payload Too Large - Request exceeds size limits"
+  422: "Unprocessable Entity - Validation errors"
+  429: "Too Many Requests - Rate limit exceeded"
+
+server_error_codes:
+  500: "Internal Server Error - Unexpected server error"
+  502: "Bad Gateway - Upstream service error"
+  503: "Service Unavailable - Service temporarily unavailable"
+  504: "Gateway Timeout - Upstream service timeout"
+```
+
+### Error Response Format
+
+```typescript
+interface ErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: Record<string, any>;
+    timestamp: string;
+    request_id: string;
+    documentation_url?: string;
+  };
+  meta?: {
+    rate_limit?: {
+      limit: number;
+      remaining: number;
+      reset_at: string;
+    };
+  };
+}
+
+// Example error responses
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Workflow validation failed",
+    "details": {
+      "field": "actions[0].config.url",
+      "issue": "Invalid URL format",
+      "expected": "Valid HTTP/HTTPS URL"
+    },
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_abc123def456",
+    "documentation_url": "https://docs.tolstoy.com/errors#validation-error"
+  }
+}
+```
+
+## Performance Metrics & SLAs
+
+### Service Level Agreements
+
+```yaml
+sla_targets:
+  api_availability: 99.9%
+  api_response_time_p95: 200ms
+  api_response_time_p99: 500ms
+  workflow_execution_success_rate: 99.5%
+  webhook_delivery_success_rate: 99.0%
+  
+monitoring:
+  uptime_monitoring: "24/7 automated monitoring"
+  performance_tracking: "Real-time metrics collection"
+  alerting: "Immediate notification for SLA breaches"
+  reporting: "Monthly SLA reports available"
+```
+
+### Performance Benchmarks
+
+#### API Gateway Performance
+```yaml
+throughput:
+  requests_per_second: 10000
+  concurrent_connections: 5000
+  
+response_times:
+  authentication: 50ms
+  routing: 10ms
+  rate_limiting: 5ms
+  
+resource_usage:
+  cpu_utilization: 60%
+  memory_usage: 70%
+  network_io: 100MB/s
+```
+
+#### Database Performance
+```yaml
+postgresql:
+  read_operations: 50000/second
+  write_operations: 10000/second
+  connection_pool_size: 100
+  query_timeout: 30_seconds
+  
+redis:
+  operations_per_second: 100000
+  memory_usage: 4GB
+  hit_ratio: 95%
+  
+elasticsearch:
+  search_queries: 1000/second
+  indexing_rate: 50000/second
+  storage_size: 500GB
+```
+
+## Usage Patterns & Best Practices
+
+### Optimal API Usage
+
+#### Batch Operations
+```typescript
+// Efficient: Batch create workflows
+const workflows = await tolstoy.workflows.createBatch([
+  { name: "Workflow 1", ... },
+  { name: "Workflow 2", ... },
+  { name: "Workflow 3", ... }
+]);
+
+// Inefficient: Individual creates
+for (const workflow of workflows) {
+  await tolstoy.workflows.create(workflow); // Rate limit risk
+}
+```
+
+#### Pagination Best Practices
+```typescript
+// Cursor-based pagination (recommended)
+let cursor = null;
+do {
+  const response = await tolstoy.workflows.list({
+    limit: 100,
+    cursor
+  });
+  
+  processWorkflows(response.data);
+  cursor = response.pagination.next_cursor;
+} while (cursor);
+
+// Offset pagination (less efficient for large datasets)
+const response = await tolstoy.workflows.list({
+  limit: 100,
+  offset: 1000 // Expensive for large offsets
+});
+```
+
+#### Caching Strategies
+```typescript
+// Implement client-side caching
+const cache = new Map();
+
+async function getWorkflow(id: string) {
+  if (cache.has(id)) {
+    return cache.get(id);
+  }
+  
+  const workflow = await tolstoy.workflows.get(id);
+  cache.set(id, workflow);
+  
+  // Set TTL for cache invalidation
+  setTimeout(() => cache.delete(id), 300000); // 5 minutes
+  
+  return workflow;
+}
+```
+
+### Common Anti-patterns
+
+#### 1. Polling for Status
+```typescript
+// ❌ Don't poll frequently
+setInterval(async () => {
+  const status = await tolstoy.executions.get(executionId);
+  if (status.status === 'completed') {
+    handleCompletion(status);
+  }
+}, 1000); // This will hit rate limits
+
+// ✅ Use webhooks or long polling
+tolstoy.webhooks.subscribe('execution.completed', handleCompletion);
+```
+
+#### 2. Synchronous Bulk Operations
+```typescript
+// ❌ Don't process synchronously
+for (const workflow of workflows) {
+  await tolstoy.workflows.execute(workflow.id); // Slow and rate-limited
+}
+
+// ✅ Use batch operations or async processing
+const executions = await tolstoy.workflows.executeBatch(
+  workflows.map(w => w.id)
+);
+```
+
+## Troubleshooting Common Issues
+
+### Rate Limit Exceeded (429)
+```yaml
+issue: "Rate limit exceeded"
+status_code: 429
+solutions:
+  - "Implement exponential backoff retry logic"
+  - "Use batch operations to reduce request count"
+  - "Upgrade to higher tier for increased limits"
+  - "Implement client-side caching"
+  
+headers:
+  X-RateLimit-Limit: "1000"
+  X-RateLimit-Remaining: "0"  
+  X-RateLimit-Reset: "1642252800"
+  Retry-After: "60"
+```
+
+### Authentication Issues (401/403)
+```yaml
+common_causes:
+  - "Expired API key or JWT token"
+  - "Invalid API key format"
+  - "Insufficient permissions for operation"
+  - "IP address not whitelisted"
+  
+debugging_steps:
+  1. "Verify API key is active and not expired"
+  2. "Check request headers contain proper authorization"
+  3. "Confirm user has required permissions"
+  4. "Validate request is coming from allowed IP"
+```
+
+### Webhook Delivery Failures
+```yaml
+common_issues:
+  - "Invalid SSL certificate on receiving endpoint"
+  - "Webhook endpoint returning non-2xx status codes"
+  - "Signature verification failures"
+  - "Timeout on webhook endpoint response"
+  
+debugging:
+  - "Check webhook delivery logs in dashboard"
+  - "Test webhook endpoint manually"
+  - "Verify signature verification logic"
+  - "Monitor webhook endpoint performance"
+```
+
+## Monitoring & Observability
+
+### Available Metrics
+
+#### API Metrics
+- Request rate (requests/second)
+- Response time percentiles (p50, p95, p99)
+- Error rate by endpoint and status code
+- Rate limit hit rate
+- Authentication success/failure rate
+
+#### Business Metrics  
+- Workflow creation rate
+- Execution success rate
+- Integration health status
+- User activity metrics
+- Organization usage patterns
+
+### Alerting Thresholds
+
+```yaml
+critical_alerts:
+  api_error_rate: ">5%"
+  api_response_time_p95: ">500ms"
+  workflow_execution_failure_rate: ">2%"
+  integration_failure_rate: ">5%"
+  
+warning_alerts:
+  api_error_rate: ">1%"
+  api_response_time_p95: ">200ms"
+  rate_limit_hit_rate: ">10%"
+  webhook_delivery_failure_rate: ">5%"
+```
+
+This comprehensive API documentation provides developers and operators with detailed information about platform capabilities, constraints, and best practices for optimal usage.

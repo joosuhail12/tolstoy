@@ -1,0 +1,1048 @@
+---
+title: "Error Handling"
+description: "Comprehensive guide to API error codes, responses, and troubleshooting"
+---
+
+# Error Handling
+
+The Tolstoy API uses conventional HTTP response codes and structured error responses to indicate the success or failure of API requests. This guide covers all error types, codes, and recommended handling strategies.
+
+## Error Response Format
+
+All API errors follow a consistent JSON structure:
+
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Human-readable error description",
+    "type": "error_category",
+    "details": "Additional context or suggestions",
+    "field": "field_name",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+### **Error Object Fields**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `code` | string | Unique error identifier for programmatic handling |
+| `message` | string | Human-readable error description |
+| `type` | string | Error category (validation, authentication, rate_limit, etc.) |
+| `details` | string | Additional context, suggestions, or help |
+| `field` | string | Specific field that caused the error (for validation errors) |
+| `timestamp` | string | ISO 8601 timestamp of when the error occurred |
+| `request_id` | string | Unique identifier for the request (useful for support) |
+
+## HTTP Status Codes
+
+### **Success Codes (2xx)**
+
+| Code | Status | Description |
+|------|--------|-------------|
+| `200` | OK | Request successful |
+| `201` | Created | Resource successfully created |
+| `202` | Accepted | Request accepted for processing |
+| `204` | No Content | Request successful, no content returned |
+
+### **Client Error Codes (4xx)**
+
+| Code | Status | Description |
+|------|--------|-------------|
+| `400` | Bad Request | Invalid request syntax or parameters |
+| `401` | Unauthorized | Missing or invalid authentication |
+| `403` | Forbidden | Insufficient permissions |
+| `404` | Not Found | Resource doesn't exist |
+| `405` | Method Not Allowed | HTTP method not supported |
+| `409` | Conflict | Resource conflict (duplicate, dependency) |
+| `422` | Unprocessable Entity | Validation failed |
+| `429` | Too Many Requests | Rate limit exceeded |
+
+### **Server Error Codes (5xx)**
+
+| Code | Status | Description |
+|------|--------|-------------|
+| `500` | Internal Server Error | Unexpected server error |
+| `502` | Bad Gateway | Upstream service error |
+| `503` | Service Unavailable | Service temporarily unavailable |
+| `504` | Gateway Timeout | Upstream service timeout |
+
+## Common Error Types
+
+### **Authentication Errors (401)**
+
+<CodeGroup>
+
+```json Missing API Key
+{
+  "error": {
+    "code": "MISSING_API_KEY",
+    "message": "API key is required",
+    "type": "authentication",
+    "details": "Include your API key in the Authorization header: 'Bearer YOUR_API_KEY'",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Invalid API Key
+{
+  "error": {
+    "code": "INVALID_API_KEY",
+    "message": "The provided API key is invalid",
+    "type": "authentication", 
+    "details": "Verify your API key is correct and hasn't expired",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Expired API Key
+{
+  "error": {
+    "code": "EXPIRED_API_KEY",
+    "message": "API key has expired",
+    "type": "authentication",
+    "details": "Generate a new API key to continue making requests",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+### **Authorization Errors (403)**
+
+<CodeGroup>
+
+```json Insufficient Permissions
+{
+  "error": {
+    "code": "INSUFFICIENT_PERMISSIONS",
+    "message": "Your API key doesn't have the required permissions",
+    "type": "authorization",
+    "details": "This endpoint requires 'write' permission",
+    "required_permission": "write",
+    "current_permissions": ["read"],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Resource Access Denied
+{
+  "error": {
+    "code": "RESOURCE_ACCESS_DENIED", 
+    "message": "Access denied to the requested resource",
+    "type": "authorization",
+    "details": "This resource belongs to a different organization",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+### **Validation Errors (422)**
+
+<CodeGroup>
+
+```json Missing Required Field
+{
+  "error": {
+    "code": "MISSING_REQUIRED_FIELD",
+    "message": "Required field is missing",
+    "type": "validation",
+    "field": "name",
+    "details": "The 'name' field is required and cannot be empty",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Invalid Field Value
+{
+  "error": {
+    "code": "INVALID_FIELD_VALUE",
+    "message": "Field contains an invalid value",
+    "type": "validation",
+    "field": "authType",
+    "details": "authType must be one of: 'none', 'api_key', 'oauth2'",
+    "allowed_values": ["none", "api_key", "oauth2"],
+    "received_value": "invalid_type",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Multiple Validation Errors
+{
+  "error": {
+    "code": "VALIDATION_FAILED",
+    "message": "Multiple validation errors",
+    "type": "validation",
+    "details": "Please fix the following validation errors",
+    "errors": [
+      {
+        "field": "name",
+        "code": "MISSING_REQUIRED_FIELD",
+        "message": "Name is required"
+      },
+      {
+        "field": "baseUrl", 
+        "code": "INVALID_URL_FORMAT",
+        "message": "Must be a valid URL"
+      },
+      {
+        "field": "method",
+        "code": "INVALID_FIELD_VALUE", 
+        "message": "Method must be GET, POST, PUT, or DELETE"
+      }
+    ],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+### **Resource Errors (404, 409)**
+
+<CodeGroup>
+
+```json Resource Not Found
+{
+  "error": {
+    "code": "RESOURCE_NOT_FOUND",
+    "message": "The requested resource was not found",
+    "type": "resource",
+    "details": "Flow with ID 'flow_123' does not exist or has been deleted",
+    "resource_type": "flow",
+    "resource_id": "flow_123",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Resource Conflict
+{
+  "error": {
+    "code": "RESOURCE_CONFLICT",
+    "message": "Resource already exists",
+    "type": "conflict",
+    "details": "Action with key 'send_email' already exists in this organization",
+    "resource_type": "action", 
+    "conflicting_field": "key",
+    "conflicting_value": "send_email",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Dependency Error
+{
+  "error": {
+    "code": "DEPENDENCY_ERROR",
+    "message": "Cannot delete resource due to dependencies",
+    "type": "conflict",
+    "details": "This tool is used by 3 actions and cannot be deleted",
+    "dependencies": [
+      {"type": "action", "id": "action_123", "name": "Send Slack Message"},
+      {"type": "action", "id": "action_456", "name": "Post to Channel"},
+      {"type": "action", "id": "action_789", "name": "Send Alert"}
+    ],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+### **Rate Limiting Errors (429)**
+
+<CodeGroup>
+
+```json Rate Limit Exceeded
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Rate limit exceeded",
+    "type": "rate_limit",
+    "details": "You have exceeded the rate limit. Please wait before making more requests",
+    "limit": 2000,
+    "window": 3600,
+    "retry_after": 1800,
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Execution Rate Limit
+{
+  "error": {
+    "code": "EXECUTION_RATE_LIMIT_EXCEEDED", 
+    "message": "Execution rate limit exceeded",
+    "type": "rate_limit",
+    "details": "You have exceeded the execution rate limit",
+    "resource": "flow_execution",
+    "limit": 100,
+    "window": 3600,
+    "retry_after": 2400,
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+### **Server Errors (5xx)**
+
+<CodeGroup>
+
+```json Internal Server Error
+{
+  "error": {
+    "code": "INTERNAL_SERVER_ERROR",
+    "message": "An internal server error occurred",
+    "type": "server_error",
+    "details": "Please try again later. If the problem persists, contact support",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Service Unavailable
+{
+  "error": {
+    "code": "SERVICE_UNAVAILABLE",
+    "message": "Service temporarily unavailable",
+    "type": "server_error", 
+    "details": "The service is undergoing maintenance. Please try again later",
+    "retry_after": 300,
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json Execution Error
+{
+  "error": {
+    "code": "EXECUTION_FAILED",
+    "message": "Workflow execution failed", 
+    "type": "execution_error",
+    "details": "Step 'send_email' failed: SMTP connection timeout",
+    "execution_id": "exec_123456789",
+    "step_id": "send_email",
+    "step_error": "SMTP connection timeout after 30 seconds",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+## Error Handling Best Practices
+
+### **Robust Error Handling Implementation**
+
+<CodeGroup>
+
+```javascript JavaScript Error Handling
+class TolstoyClient {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseURL = 'https://api.tolstoy.dev';
+  }
+  
+  async handleRequest(endpoint, options = {}) {
+    try {
+      const response = await fetch(`${this.baseURL}${endpoint}`, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+          ...options.headers
+        }
+      });
+      
+      if (!response.ok) {
+        await this.handleError(response);
+      }
+      
+      return response.json();
+      
+    } catch (error) {
+      if (error.name === 'TolstoyAPIError') {
+        throw error;
+      }
+      
+      // Network or unexpected errors
+      throw new TolstoyAPIError({
+        code: 'NETWORK_ERROR',
+        message: 'Network request failed',
+        details: error.message
+      });
+    }
+  }
+  
+  async handleError(response) {
+    const errorData = await response.json();
+    const error = errorData.error;
+    
+    // Create custom error with full context
+    const apiError = new TolstoyAPIError(error);
+    
+    // Handle specific error types
+    switch (error.code) {
+      case 'INVALID_API_KEY':
+      case 'EXPIRED_API_KEY':
+        console.error('🔑 Authentication error:', error.message);
+        // Could trigger re-authentication flow
+        break;
+        
+      case 'RATE_LIMIT_EXCEEDED':
+        console.warn('🚦 Rate limit exceeded, will retry after:', error.retry_after);
+        // Implement backoff strategy
+        break;
+        
+      case 'VALIDATION_FAILED':
+        console.error('📝 Validation errors:', error.errors);
+        // Show field-specific error messages
+        break;
+        
+      case 'RESOURCE_NOT_FOUND':
+        console.error('🔍 Resource not found:', error.details);
+        break;
+        
+      case 'INTERNAL_SERVER_ERROR':
+        console.error('🔥 Server error (request_id:', error.request_id + ')');
+        // Log for support team
+        break;
+    }
+    
+    throw apiError;
+  }
+}
+
+// Custom error class
+class TolstoyAPIError extends Error {
+  constructor(errorData) {
+    super(errorData.message);
+    this.name = 'TolstoyAPIError';
+    this.code = errorData.code;
+    this.type = errorData.type;
+    this.details = errorData.details;
+    this.field = errorData.field;
+    this.timestamp = errorData.timestamp;
+    this.requestId = errorData.request_id;
+    
+    // For validation errors
+    this.errors = errorData.errors;
+    
+    // For rate limiting
+    this.retryAfter = errorData.retry_after;
+    this.limit = errorData.limit;
+  }
+  
+  isRetryable() {
+    return ['RATE_LIMIT_EXCEEDED', 'SERVICE_UNAVAILABLE', 'INTERNAL_SERVER_ERROR'].includes(this.code);
+  }
+  
+  isAuthError() {
+    return ['INVALID_API_KEY', 'EXPIRED_API_KEY', 'MISSING_API_KEY'].includes(this.code);
+  }
+  
+  isValidationError() {
+    return this.type === 'validation';
+  }
+}
+
+// Usage example
+const client = new TolstoyClient(process.env.TOLSTOY_API_KEY);
+
+try {
+  const flows = await client.handleRequest('/flows');
+  console.log('✅ Flows retrieved:', flows.length);
+} catch (error) {
+  if (error instanceof TolstoyAPIError) {
+    console.error(`API Error [${error.code}]:`, error.message);
+    
+    if (error.isValidationError()) {
+      error.errors?.forEach(err => {
+        console.error(`  - ${err.field}: ${err.message}`);
+      });
+    }
+    
+    if (error.isRetryable()) {
+      console.log('Will retry request...');
+    }
+  } else {
+    console.error('Unexpected error:', error.message);
+  }
+}
+```
+
+```python Python Error Handling
+import requests
+import time
+from datetime import datetime
+from typing import Dict, Any, Optional
+
+class TolstoyAPIError(Exception):
+    """Custom exception for Tolstoy API errors"""
+    
+    def __init__(self, error_data: Dict[str, Any]):
+        self.code = error_data.get('code')
+        self.message = error_data.get('message')
+        self.type = error_data.get('type')
+        self.details = error_data.get('details')
+        self.field = error_data.get('field')
+        self.timestamp = error_data.get('timestamp')
+        self.request_id = error_data.get('request_id')
+        
+        # Validation errors
+        self.errors = error_data.get('errors', [])
+        
+        # Rate limiting
+        self.retry_after = error_data.get('retry_after')
+        self.limit = error_data.get('limit')
+        
+        super().__init__(self.message)
+    
+    def is_retryable(self) -> bool:
+        """Check if the error is retryable"""
+        return self.code in [
+            'RATE_LIMIT_EXCEEDED',
+            'SERVICE_UNAVAILABLE', 
+            'INTERNAL_SERVER_ERROR',
+            'GATEWAY_TIMEOUT'
+        ]
+    
+    def is_auth_error(self) -> bool:
+        """Check if the error is authentication-related"""
+        return self.code in [
+            'INVALID_API_KEY',
+            'EXPIRED_API_KEY',
+            'MISSING_API_KEY'
+        ]
+    
+    def is_validation_error(self) -> bool:
+        """Check if the error is validation-related"""
+        return self.type == 'validation'
+
+class TolstoyClient:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = 'https://api.tolstoy.dev'
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        })
+    
+    def _handle_response(self, response: requests.Response) -> Dict[str, Any]:
+        """Handle API response and errors"""
+        
+        if response.ok:
+            return response.json()
+        
+        try:
+            error_data = response.json()
+            error = error_data.get('error', {})
+        except ValueError:
+            # Non-JSON error response
+            error = {
+                'code': f'HTTP_{response.status_code}',
+                'message': response.reason,
+                'type': 'http_error'
+            }
+        
+        # Log error details
+        print(f"❌ API Error [{error.get('code')}]: {error.get('message')}")
+        if error.get('request_id'):
+            print(f"   Request ID: {error.get('request_id')}")
+        
+        # Handle specific error types
+        if error.get('code') == 'RATE_LIMIT_EXCEEDED':
+            retry_after = error.get('retry_after', 60)
+            print(f"🚦 Rate limited, retry after {retry_after} seconds")
+        
+        elif error.get('type') == 'validation':
+            print("📝 Validation errors:")
+            for err in error.get('errors', []):
+                print(f"   - {err.get('field')}: {err.get('message')}")
+        
+        elif error.get('code') in ['INVALID_API_KEY', 'EXPIRED_API_KEY']:
+            print("🔑 Authentication error - check your API key")
+        
+        raise TolstoyAPIError(error)
+    
+    def get_organizations(self) -> Dict[str, Any]:
+        """Get organizations with error handling"""
+        response = self.session.get(f'{self.base_url}/organizations')
+        return self._handle_response(response)
+    
+    def create_flow(self, flow_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create flow with error handling"""
+        response = self.session.post(
+            f'{self.base_url}/flows',
+            json=flow_data
+        )
+        return self._handle_response(response)
+    
+    def execute_with_retry(self, method: str, endpoint: str, max_retries: int = 3, **kwargs) -> Dict[str, Any]:
+        """Execute request with automatic retry for retryable errors"""
+        
+        for attempt in range(max_retries):
+            try:
+                response = self.session.request(method, f'{self.base_url}{endpoint}', **kwargs)
+                return self._handle_response(response)
+                
+            except TolstoyAPIError as e:
+                if not e.is_retryable() or attempt == max_retries - 1:
+                    raise
+                
+                # Calculate retry delay
+                if e.retry_after:
+                    delay = e.retry_after
+                else:
+                    delay = (2 ** attempt) + 1  # Exponential backoff
+                
+                print(f"⏳ Retrying in {delay} seconds (attempt {attempt + 1}/{max_retries})")
+                time.sleep(delay)
+        
+        raise TolstoyAPIError({
+            'code': 'MAX_RETRIES_EXCEEDED',
+            'message': f'Max retries ({max_retries}) exceeded'
+        })
+
+# Usage example
+client = TolstoyClient('your-api-key')
+
+try:
+    # Try to get organizations
+    orgs = client.get_organizations()
+    print(f"✅ Retrieved {len(orgs)} organizations")
+    
+    # Try to create a flow with retry
+    flow_data = {
+        'name': 'Test Flow',
+        'steps': []
+    }
+    
+    flow = client.execute_with_retry('POST', '/flows', json=flow_data)
+    print(f"✅ Created flow: {flow['id']}")
+    
+except TolstoyAPIError as e:
+    print(f"API Error: {e.message}")
+    
+    if e.is_validation_error():
+        print("Validation issues:")
+        for err in e.errors:
+            print(f"  {err['field']}: {err['message']}")
+    
+    elif e.is_auth_error():
+        print("Please check your API key configuration")
+    
+    elif e.code == 'RESOURCE_NOT_FOUND':
+        print("The requested resource was not found")
+
+except Exception as e:
+    print(f"Unexpected error: {e}")
+```
+
+</CodeGroup>
+
+### **Validation Error Handling**
+
+For validation errors, provide clear feedback to users:
+
+<CodeGroup>
+
+```javascript Form Validation Handling
+function handleValidationErrors(error) {
+  if (!error.isValidationError()) return;
+  
+  const fieldErrors = {};
+  
+  if (error.errors) {
+    // Multiple field errors
+    error.errors.forEach(err => {
+      fieldErrors[err.field] = err.message;
+    });
+  } else if (error.field) {
+    // Single field error
+    fieldErrors[error.field] = error.message;
+  }
+  
+  // Update UI with field-specific errors
+  Object.entries(fieldErrors).forEach(([field, message]) => {
+    const fieldElement = document.getElementById(field);
+    if (fieldElement) {
+      fieldElement.classList.add('error');
+      
+      // Show error message
+      const errorElement = fieldElement.parentNode.querySelector('.error-message');
+      if (errorElement) {
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+      }
+    }
+  });
+}
+
+// Usage in form submission
+async function submitForm(formData) {
+  try {
+    const result = await client.createAction(formData);
+    console.log('✅ Action created successfully');
+    
+  } catch (error) {
+    if (error.isValidationError()) {
+      handleValidationErrors(error);
+    } else {
+      showGeneralError(error.message);
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+## Error Monitoring and Logging
+
+### **Structured Error Logging**
+
+<CodeGroup>
+
+```javascript Error Logging
+class ErrorLogger {
+  static log(error, context = {}) {
+    const logEntry = {
+      timestamp: new Date().toISOString(),
+      level: this.getLogLevel(error),
+      error: {
+        code: error.code,
+        message: error.message,
+        type: error.type,
+        details: error.details,
+        requestId: error.requestId
+      },
+      context: {
+        endpoint: context.endpoint,
+        method: context.method,
+        userId: context.userId,
+        organizationId: context.organizationId,
+        ...context
+      }
+    };
+    
+    // Send to logging service
+    if (this.shouldAlert(error)) {
+      this.sendAlert(logEntry);
+    }
+    
+    console.error('API Error:', JSON.stringify(logEntry, null, 2));
+  }
+  
+  static getLogLevel(error) {
+    if (error.code?.includes('SERVER_ERROR')) return 'error';
+    if (error.type === 'rate_limit') return 'warning';
+    if (error.type === 'validation') return 'info';
+    return 'error';
+  }
+  
+  static shouldAlert(error) {
+    return [
+      'INTERNAL_SERVER_ERROR',
+      'SERVICE_UNAVAILABLE',
+      'EXECUTION_FAILED'
+    ].includes(error.code);
+  }
+  
+  static async sendAlert(logEntry) {
+    // Send to monitoring service (Sentry, DataDog, etc.)
+    await fetch('/api/alerts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(logEntry)
+    });
+  }
+}
+
+// Usage
+try {
+  const result = await client.executeFlow(flowId, inputs);
+} catch (error) {
+  ErrorLogger.log(error, {
+    endpoint: `/flows/${flowId}/execute`,
+    method: 'POST',
+    flowId,
+    userId: getCurrentUser().id
+  });
+  throw error;
+}
+```
+
+</CodeGroup>
+
+## Troubleshooting Guide
+
+### **Common Issues and Solutions**
+
+<AccordionGroup>
+  <Accordion title="401 - Authentication Failed">
+    **Common Causes:**
+    - Missing or malformed API key
+    - Expired API key
+    - Wrong authorization header format
+    
+    **Solutions:**
+    ```bash
+    # ✅ Correct format
+    curl -H "Authorization: Bearer your-api-key-here"
+    
+    # ❌ Common mistakes
+    curl -H "Authorization: your-api-key-here"           # Missing "Bearer"
+    curl -H "Authorization: Bearer: your-api-key-here"   # Extra colon
+    curl -H "Auth: Bearer your-api-key-here"             # Wrong header name
+    ```
+    
+    **Debugging Steps:**
+    1. Verify API key format and validity
+    2. Check if key has expired
+    3. Test with a simple GET request first
+    4. Verify organization context
+  </Accordion>
+  
+  <Accordion title="422 - Validation Errors">
+    **Common Causes:**
+    - Missing required fields
+    - Invalid field values
+    - Incorrect data types
+    - Field length constraints
+    
+    **Solutions:**
+    ```javascript
+    // Check validation error details
+    if (error.isValidationError()) {
+      error.errors?.forEach(err => {
+        console.log(`Field: ${err.field}`);
+        console.log(`Error: ${err.message}`);
+        console.log(`Code: ${err.code}`);
+      });
+    }
+    ```
+    
+    **Debugging Steps:**
+    1. Check API documentation for required fields
+    2. Validate data types and formats
+    3. Verify field constraints (length, enum values)
+    4. Test with minimal valid payload first
+  </Accordion>
+  
+  <Accordion title="429 - Rate Limit Exceeded">
+    **Common Causes:**
+    - Too many requests in short time
+    - Inefficient API usage patterns
+    - Missing rate limit handling
+    
+    **Solutions:**
+    ```javascript
+    // Implement exponential backoff
+    async function requestWithBackoff(request, maxRetries = 3) {
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          return await request();
+        } catch (error) {
+          if (error.code === 'RATE_LIMIT_EXCEEDED' && i < maxRetries - 1) {
+            const delay = error.retryAfter || (2 ** i * 1000);
+            await sleep(delay);
+            continue;
+          }
+          throw error;
+        }
+      }
+    }
+    ```
+    
+    **Prevention:**
+    - Implement request batching
+    - Add request delays
+    - Use caching for repeated requests
+    - Monitor rate limit headers
+  </Accordion>
+  
+  <Accordion title="500 - Server Errors">
+    **Common Causes:**
+    - Temporary service issues
+    - Invalid execution configurations
+    - Resource constraints
+    
+    **Solutions:**
+    - Retry with exponential backoff
+    - Check service status page
+    - Contact support with request_id
+    
+    **When to Contact Support:**
+    - Error persists after retries
+    - Multiple users affected  
+    - Critical workflow failures
+    - Execution timeouts
+  </Accordion>
+</AccordionGroup>
+
+## Error Response Examples
+
+### **Complete Error Handling Example**
+
+<CodeGroup>
+
+```javascript Complete Example
+async function robustWorkflowExecution(flowId, inputs) {
+  const maxRetries = 3;
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`🚀 Executing workflow (attempt ${attempt}/${maxRetries})`);
+      
+      const execution = await client.executeFlow(flowId, inputs);
+      
+      // Poll for completion
+      const result = await client.waitForExecution(flowId, execution.id);
+      
+      if (result.status === 'completed') {
+        console.log('✅ Workflow completed successfully');
+        return result;
+      } else if (result.status === 'failed') {
+        throw new Error(`Workflow failed: ${result.error}`);
+      }
+      
+    } catch (error) {
+      lastError = error;
+      console.error(`❌ Attempt ${attempt} failed:`, error.message);
+      
+      // Handle specific error types
+      if (error.isAuthError()) {
+        console.error('🔑 Authentication error - stopping retries');
+        break;
+      }
+      
+      if (error.isValidationError()) {
+        console.error('📝 Validation error - stopping retries');
+        error.errors?.forEach(err => {
+          console.error(`   ${err.field}: ${err.message}`);
+        });
+        break;
+      }
+      
+      if (!error.isRetryable()) {
+        console.error('🚫 Non-retryable error - stopping retries');
+        break;
+      }
+      
+      // Wait before retry
+      if (attempt < maxRetries) {
+        const delay = error.retryAfter || (2 ** attempt * 1000);
+        console.log(`⏳ Waiting ${delay}ms before retry...`);
+        await sleep(delay);
+      }
+    }
+  }
+  
+  throw new Error(`Workflow execution failed after ${maxRetries} attempts: ${lastError.message}`);
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Usage
+try {
+  const result = await robustWorkflowExecution('flow_123', {
+    userId: 'user_456',
+    email: 'user@example.com'
+  });
+  
+  console.log('🎉 Workflow result:', result.outputs);
+  
+} catch (error) {
+  console.error('💥 Final error:', error.message);
+  
+  // Report to monitoring service
+  reportError(error, {
+    operation: 'workflow_execution',
+    flowId: 'flow_123',
+    severity: 'high'
+  });
+}
+```
+
+</CodeGroup>
+
+## Getting Help
+
+### **Support Resources**
+
+<CardGroup cols={2}>
+  <Card title="Status Page" icon="chart-line" href="https://status.tolstoy.dev">
+    Check real-time system status and incidents
+  </Card>
+  <Card title="Support Team" icon="headset" href="mailto:support@tolstoy.dev">
+    Get help from our technical support team
+  </Card>
+  <Card title="API Documentation" icon="book" href="/api/overview">
+    Browse comprehensive API documentation
+  </Card>
+  <Card title="Community Forum" icon="comments" href="https://community.tolstoy.dev">
+    Connect with other developers
+  </Card>
+</CardGroup>
+
+### **When Contacting Support**
+
+Always include these details in support requests:
+
+- **Request ID** from error response
+- **API endpoint** and HTTP method
+- **Complete error response**
+- **Steps to reproduce**
+- **Expected vs actual behavior**
+- **Organization ID** (if applicable)
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Pagination" icon="list" href="/api/pagination">
+    Learn about paginated responses
+  </Card>
+  <Card title="Rate Limiting" icon="gauge" href="/api/rate-limiting">
+    Understand rate limits and optimization
+  </Card>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    Master API authentication methods
+  </Card>
+  <Card title="Best Practices" icon="star" href="/best-practices">
+    API usage best practices
+  </Card>
+</CardGroup>

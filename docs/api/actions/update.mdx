@@ -1,0 +1,465 @@
+---
+title: "Update Action"
+description: "Update an existing action configuration"
+---
+
+# Update Action
+
+<Badge variant="info">PATCH</Badge> `/actions/{action_id}`
+
+Update an existing action's configuration, metadata, or status. Partial updates are supported.
+
+## Request
+
+### **HTTP Request**
+
+```http
+PATCH https://api.tolstoy.dev/actions/{action_id}
+```
+
+### **Path Parameters**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `action_id` | string | Yes | The unique identifier of the action |
+
+### **Request Body**
+
+All fields are optional. Only include fields you want to update.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `display_name` | string | Human-readable action name |
+| `description` | string | Detailed action description |
+| `status` | string | Action status (`active`, `draft`, `deprecated`) |
+| `category` | string | Action category for organization |
+| `tags` | array | Tags for filtering and organization |
+| `configuration` | object | Action configuration (inputs, outputs, settings) |
+| `permissions` | object | Required permissions and rate limits |
+
+## Response
+
+### **Success Response**
+
+<CodeGroup>
+
+```json 200 OK
+{
+  "action": {
+    "id": "act_abc123xyz456",
+    "name": "send_slack_notification",
+    "display_name": "Send Slack Alert",
+    "description": "Send priority alerts to Slack channels",
+    "type": "integration",
+    "status": "active",
+    "version": "1.3.0",
+    "category": "communication",
+    "tags": ["notifications", "slack", "alerts", "priority"],
+    "configuration": {
+      "inputs": [
+        {
+          "name": "channel",
+          "type": "string",
+          "required": true,
+          "description": "Slack channel ID or name",
+          "validation": {
+            "pattern": "^[#@].*",
+            "max_length": 100
+          }
+        },
+        {
+          "name": "message",
+          "type": "string",
+          "required": true,
+          "description": "Alert message content",
+          "validation": {
+            "max_length": 4000
+          }
+        },
+        {
+          "name": "priority",
+          "type": "string",
+          "required": false,
+          "description": "Alert priority level",
+          "default": "medium",
+          "validation": {
+            "enum": ["low", "medium", "high", "critical"]
+          }
+        },
+        {
+          "name": "attachments",
+          "type": "array",
+          "required": false,
+          "description": "Message attachments"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "message_id",
+          "type": "string",
+          "description": "Slack message timestamp ID"
+        },
+        {
+          "name": "thread_ts",
+          "type": "string",
+          "description": "Thread timestamp for replies"
+        },
+        {
+          "name": "channel_id",
+          "type": "string",
+          "description": "Actual channel ID where message was posted"
+        }
+      ],
+      "timeout": 30000,
+      "retry_policy": {
+        "max_retries": 3,
+        "backoff_multiplier": 2,
+        "retryable_errors": ["RATE_LIMIT", "TIMEOUT"]
+      }
+    },
+    "permissions": {
+      "scopes": ["slack:write", "channels:read"],
+      "rate_limit": {
+        "requests_per_minute": 100,
+        "burst_limit": 20
+      }
+    },
+    "updated_at": "2024-01-15T20:30:00Z",
+    "last_modified_by": "user_current123"
+  },
+  "changes": {
+    "display_name": {
+      "old": "Send Slack Notification",
+      "new": "Send Slack Alert"
+    },
+    "description": {
+      "old": "Sends a formatted message to a Slack channel",
+      "new": "Send priority alerts to Slack channels"
+    },
+    "configuration.inputs": {
+      "added": ["priority"],
+      "modified": ["message"],
+      "removed": []
+    },
+    "tags": {
+      "added": ["alerts", "priority"],
+      "removed": ["messaging"]
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+## Examples
+
+### **Update Basic Metadata**
+
+<CodeGroup>
+
+```bash cURL
+curl -X PATCH 'https://api.tolstoy.dev/actions/act_abc123xyz456' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "display_name": "Send Slack Alert",
+    "description": "Send priority alerts to Slack channels",
+    "tags": ["notifications", "slack", "alerts", "priority"]
+  }'
+```
+
+```javascript JavaScript
+const actionId = 'act_abc123xyz456';
+
+const updates = {
+  display_name: "Send Slack Alert",
+  description: "Send priority alerts to Slack channels",
+  tags: ["notifications", "slack", "alerts", "priority"]
+};
+
+const response = await fetch(`https://api.tolstoy.dev/actions/${actionId}`, {
+  method: 'PATCH',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(updates)
+});
+
+const data = await response.json();
+console.log('Updated action:', data.action.id);
+console.log('Changes applied:', data.changes);
+```
+
+</CodeGroup>
+
+### **Update Configuration**
+
+<CodeGroup>
+
+```javascript Add New Input Parameter
+const actionId = 'act_abc123xyz456';
+
+// Add a new optional input parameter
+const configUpdate = {
+  configuration: {
+    inputs: [
+      // Include all existing inputs
+      {
+        name: "channel",
+        type: "string",
+        required: true,
+        description: "Slack channel ID or name",
+        validation: {
+          pattern: "^[#@].*",
+          max_length: 100
+        }
+      },
+      {
+        name: "message",
+        type: "string",
+        required: true,
+        description: "Alert message content",
+        validation: {
+          max_length: 4000
+        }
+      },
+      // Add new input
+      {
+        name: "priority",
+        type: "string",
+        required: false,
+        description: "Alert priority level",
+        default: "medium",
+        validation: {
+          enum: ["low", "medium", "high", "critical"]
+        }
+      },
+      {
+        name: "attachments",
+        type: "array",
+        required: false,
+        description: "Message attachments"
+      }
+    ]
+  }
+};
+
+const response = await fetch(`https://api.tolstoy.dev/actions/${actionId}`, {
+  method: 'PATCH',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(configUpdate)
+});
+```
+
+```python Python Update Rate Limits
+import requests
+
+action_id = 'act_abc123xyz456'
+
+# Update rate limits
+rate_limit_update = {
+    "permissions": {
+        "rate_limit": {
+            "requests_per_minute": 100,
+            "requests_per_hour": 3000,
+            "burst_limit": 20,
+            "concurrent_limit": 5
+        }
+    }
+}
+
+response = requests.patch(
+    f'https://api.tolstoy.dev/actions/{action_id}',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    },
+    json=rate_limit_update
+)
+
+if response.status_code == 200:
+    data = response.json()
+    print(f"Updated rate limits for action: {data['action']['id']}")
+```
+
+</CodeGroup>
+
+### **Update Status**
+
+<CodeGroup>
+
+```bash Deprecate Action
+curl -X PATCH 'https://api.tolstoy.dev/actions/act_old_version' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "status": "deprecated",
+    "description": "DEPRECATED: Please use send_email_v2 instead"
+  }'
+```
+
+```javascript Activate Draft Action
+const actionId = 'act_draft_123';
+
+const response = await fetch(`https://api.tolstoy.dev/actions/${actionId}`, {
+  method: 'PATCH',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    status: "active"
+  })
+});
+
+if (response.ok) {
+  const data = await response.json();
+  console.log(`Action ${data.action.id} is now active`);
+}
+```
+
+</CodeGroup>
+
+## Validation Rules
+
+### **Update Restrictions**
+
+- Cannot change action `name` (immutable identifier)
+- Cannot change action `type` (immutable)
+- Cannot remove required inputs that are used in existing flows
+- Status transitions must be valid:
+  - `draft` → `active` (allowed)
+  - `active` → `deprecated` (allowed)
+  - `deprecated` → `active` (requires approval)
+  - `active` → `draft` (not allowed)
+
+### **Configuration Validation**
+
+When updating configuration:
+- All existing required inputs must be preserved
+- New required inputs can only be added with defaults
+- Output schema changes may break dependent flows
+- Timeout must be between 1000ms and 300000ms
+
+## Error Responses
+
+<CodeGroup>
+
+```json 400 Bad Request
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid update request",
+    "type": "validation",
+    "details": [
+      {
+        "field": "configuration.inputs",
+        "issue": "Cannot remove required input 'channel' - used in 15 active flows"
+      }
+    ],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json 409 Conflict
+{
+  "error": {
+    "code": "VERSION_CONFLICT",
+    "message": "Action has been modified by another user",
+    "type": "conflict",
+    "details": {
+      "current_version": "1.3.0",
+      "your_version": "1.2.0"
+    },
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+## API Playground
+
+Try updating an action:
+
+<ApiPlayground
+  method="PATCH"
+  endpoint="/actions/{action_id}"
+  baseUrl="https://api.tolstoy.dev"
+  auth={{
+    type: "bearer",
+    placeholder: "Your API Key"
+  }}
+  pathParams={[
+    {
+      name: "action_id",
+      placeholder: "act_abc123xyz456",
+      description: "The unique identifier of the action to update",
+      required: true
+    }
+  ]}
+  body={{
+    type: "json",
+    schema: {
+      display_name: {
+        type: "string",
+        placeholder: "Send Slack Alert",
+        description: "Updated display name"
+      },
+      description: {
+        type: "string",
+        placeholder: "Send priority alerts to Slack channels",
+        description: "Updated description"
+      },
+      status: {
+        type: "select",
+        options: ["active", "draft", "deprecated"],
+        description: "Update action status"
+      },
+      tags: {
+        type: "array",
+        placeholder: ["notifications", "slack", "alerts"],
+        description: "Updated tags"
+      }
+    }
+  }}
+  sampleResponse={{
+    "action": {
+      "id": "act_abc123xyz456",
+      "name": "send_slack_notification",
+      "display_name": "Send Slack Alert",
+      "status": "active",
+      "updated_at": "2024-01-15T20:30:00Z"
+    },
+    "changes": {
+      "display_name": {
+        "old": "Send Slack Notification",
+        "new": "Send Slack Alert"
+      }
+    }
+  }}
+/>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Get Action" icon="file" href="/api/actions/get">
+    Retrieve action details
+  </Card>
+  <Card title="Delete Action" icon="trash" href="/api/actions/delete">
+    Delete an action
+  </Card>
+  <Card title="Version Action" icon="code-branch" href="/api/actions/version">
+    Create a new version
+  </Card>
+  <Card title="Test Action" icon="vial" href="/api/actions/test">
+    Test action configuration
+  </Card>
+</CardGroup>

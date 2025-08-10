@@ -1,0 +1,1209 @@
+---
+title: 'Migration & Upgrade Procedures'
+description: 'Comprehensive migration guides, upgrade procedures, version compatibility, rollback strategies, and maintenance protocols for the Tolstoy platform'
+---
+
+# Migration & Upgrade Procedures
+
+This document provides detailed migration guides, upgrade procedures, version compatibility matrices, rollback strategies, and maintenance protocols for the Tolstoy platform.
+
+## Migration Strategy Overview
+
+### Migration Types
+
+<CardGroup cols={2}>
+  <Card title="Version Upgrades" icon="arrow-up">
+    Major, minor, and patch version updates with automated migration tools
+  </Card>
+  <Card title="Infrastructure Migration" icon="server">
+    Cloud provider changes, region migrations, and infrastructure modernization
+  </Card>
+  <Card title="Data Migration" icon="database">
+    Database schema changes, data format updates, and storage migrations
+  </Card>
+  <Card title="Platform Migration" icon="exchange-alt">
+    External platform integrations and third-party service migrations
+  </Card>
+</CardGroup>
+
+### Migration Principles
+
+```yaml
+migration_principles:
+  zero_downtime:
+    description: "All migrations must maintain service availability"
+    techniques: ["blue-green deployment", "rolling updates", "feature flags"]
+    
+  data_integrity:
+    description: "Ensure data consistency throughout migration process"
+    techniques: ["checksums", "validation", "rollback capability"]
+    
+  backward_compatibility:
+    description: "Maintain API compatibility during transition periods"
+    duration: "minimum 90 days overlap"
+    
+  observability:
+    description: "Comprehensive monitoring and logging during migrations"
+    requirements: ["metrics", "alerts", "detailed logging"]
+    
+  testing_first:
+    description: "Thorough testing in non-production environments"
+    stages: ["development", "staging", "canary", "production"]
+```
+
+## Version Upgrade Procedures
+
+### Automated Upgrade System
+
+#### Upgrade Command Line Tool
+```bash
+#!/bin/bash
+# tolstoy-upgrade.sh - Automated platform upgrade tool
+
+set -euo pipefail
+
+CURRENT_VERSION=""
+TARGET_VERSION=""
+ENVIRONMENT=""
+DRY_RUN=false
+ROLLBACK=false
+
+usage() {
+    cat << EOF
+Tolstoy Platform Upgrade Tool
+
+Usage: $0 [OPTIONS]
+
+Options:
+    -c, --current VERSION     Current platform version
+    -t, --target VERSION      Target platform version  
+    -e, --environment ENV     Environment (dev/staging/prod)
+    -d, --dry-run            Perform dry run without actual changes
+    -r, --rollback           Rollback to previous version
+    -h, --help              Show this help message
+
+Examples:
+    $0 -c 2.3.0 -t 2.4.0 -e production
+    $0 -r -e production  # Rollback last deployment
+    $0 -d -c 2.3.0 -t 2.4.0 -e staging  # Dry run
+EOF
+}
+
+parse_arguments() {
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            -c|--current)
+                CURRENT_VERSION="$2"
+                shift 2
+                ;;
+            -t|--target)
+                TARGET_VERSION="$2"
+                shift 2
+                ;;
+            -e|--environment)
+                ENVIRONMENT="$2"
+                shift 2
+                ;;
+            -d|--dry-run)
+                DRY_RUN=true
+                shift
+                ;;
+            -r|--rollback)
+                ROLLBACK=true
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            *)
+                echo "Unknown option: $1"
+                usage
+                exit 1
+                ;;
+        esac
+    done
+}
+
+validate_prerequisites() {
+    echo "🔍 Validating prerequisites..."
+    
+    # Check required tools
+    command -v kubectl >/dev/null 2>&1 || { echo "kubectl is required"; exit 1; }
+    command -v helm >/dev/null 2>&1 || { echo "helm is required"; exit 1; }
+    command -v jq >/dev/null 2>&1 || { echo "jq is required"; exit 1; }
+    
+    # Verify cluster access
+    kubectl cluster-info >/dev/null 2>&1 || { echo "Cannot connect to Kubernetes cluster"; exit 1; }
+    
+    # Check backup status
+    LAST_BACKUP=$(kubectl get job -l app=backup-job -o jsonpath='{.items[0].status.completionTime}' 2>/dev/null || echo "")
+    if [[ -z "$LAST_BACKUP" ]]; then
+        echo "⚠️  No recent backup found. Creating backup before upgrade..."
+        ./scripts/create-backup.sh --environment="$ENVIRONMENT"
+    fi
+    
+    echo "✅ Prerequisites validated"
+}
+
+check_compatibility() {
+    echo "🔍 Checking version compatibility..."
+    
+    local compatibility_matrix="config/compatibility-matrix.json"
+    
+    if ! jq -e ".versions.\"$CURRENT_VERSION\".upgradeTo | index(\"$TARGET_VERSION\")" "$compatibility_matrix" >/dev/null; then
+        echo "❌ Direct upgrade from $CURRENT_VERSION to $TARGET_VERSION is not supported"
+        
+        # Suggest upgrade path
+        local upgrade_path
+        upgrade_path=$(jq -r ".versions.\"$CURRENT_VERSION\".recommendedPath.\"$TARGET_VERSION\" // \"No path available\"" "$compatibility_matrix")
+        
+        if [[ "$upgrade_path" != "No path available" ]]; then
+            echo "💡 Recommended upgrade path: $upgrade_path"
+            echo "   Use: $0 --path \"$upgrade_path\" -e $ENVIRONMENT"
+        fi
+        exit 1
+    fi
+    
+    echo "✅ Compatibility check passed"
+}
+
+perform_pre_upgrade_tasks() {
+    echo "🚀 Performing pre-upgrade tasks..."
+    
+    # 1. Scale down non-essential services
+    kubectl scale deployment webhook-service --replicas=1 -n "$ENVIRONMENT" || true
+    kubectl scale deployment notification-service --replicas=1 -n "$ENVIRONMENT" || true
+    
+    # 2. Pause workflow executions for critical workflows
+    ./scripts/pause-critical-workflows.sh --environment="$ENVIRONMENT"
+    
+    # 3. Create application-level backup
+    ./scripts/backup-application-data.sh --environment="$ENVIRONMENT"
+    
+    # 4. Verify system health
+    ./scripts/health-check.sh --environment="$ENVIRONMENT" --strict
+    
+    echo "✅ Pre-upgrade tasks completed"
+}
+
+upgrade_database() {
+    echo "🗄️  Upgrading database schema..."
+    
+    local migration_script="migrations/upgrade-${CURRENT_VERSION}-to-${TARGET_VERSION}.sql"
+    
+    if [[ ! -f "$migration_script" ]]; then
+        echo "❌ Migration script not found: $migration_script"
+        exit 1
+    fi
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "🔍 Dry run - would execute: $migration_script"
+        return 0
+    fi
+    
+    # Execute migration with transaction
+    kubectl exec -i $(kubectl get pod -l app=postgres -o jsonpath='{.items[0].metadata.name}' -n "$ENVIRONMENT") -- \
+        psql -U tolstoy -d tolstoy_$ENVIRONMENT -v ON_ERROR_STOP=1 < "$migration_script"
+    
+    # Verify migration
+    local migration_version
+    migration_version=$(kubectl exec $(kubectl get pod -l app=postgres -o jsonpath='{.items[0].metadata.name}' -n "$ENVIRONMENT") -- \
+        psql -U tolstoy -d tolstoy_$ENVIRONMENT -t -c "SELECT version FROM schema_migrations ORDER BY version DESC LIMIT 1;")
+    
+    echo "✅ Database upgraded to version: $migration_version"
+}
+
+upgrade_services() {
+    echo "🔄 Upgrading platform services..."
+    
+    local services=("api-gateway" "workflow-service" "execution-engine" "integration-service" "user-service")
+    
+    for service in "${services[@]}"; do
+        echo "Upgrading $service..."
+        
+        if [[ "$DRY_RUN" == "true" ]]; then
+            echo "🔍 Dry run - would upgrade $service to $TARGET_VERSION"
+            continue
+        fi
+        
+        # Rolling update with health checks
+        kubectl set image deployment/$service $service=tolstoy/$service:$TARGET_VERSION -n "$ENVIRONMENT"
+        
+        # Wait for rollout to complete
+        kubectl rollout status deployment/$service -n "$ENVIRONMENT" --timeout=600s
+        
+        # Verify service health
+        sleep 30
+        if ! ./scripts/service-health-check.sh --service="$service" --environment="$ENVIRONMENT"; then
+            echo "❌ Health check failed for $service"
+            echo "🔄 Initiating rollback..."
+            kubectl rollout undo deployment/$service -n "$ENVIRONMENT"
+            exit 1
+        fi
+        
+        echo "✅ $service upgraded successfully"
+    done
+}
+
+update_configurations() {
+    echo "⚙️  Updating configurations..."
+    
+    # Update ConfigMaps
+    kubectl patch configmap platform-config -n "$ENVIRONMENT" --patch="$(cat config/configmap-$TARGET_VERSION.patch)"
+    
+    # Update Secrets if needed
+    if [[ -f "config/secrets-$TARGET_VERSION.patch" ]]; then
+        kubectl patch secret platform-secrets -n "$ENVIRONMENT" --patch="$(cat config/secrets-$TARGET_VERSION.patch)"
+    fi
+    
+    # Update feature flags
+    ./scripts/update-feature-flags.sh --version="$TARGET_VERSION" --environment="$ENVIRONMENT"
+    
+    echo "✅ Configurations updated"
+}
+
+perform_post_upgrade_tasks() {
+    echo "🏁 Performing post-upgrade tasks..."
+    
+    # 1. Comprehensive health check
+    ./scripts/health-check.sh --environment="$ENVIRONMENT" --comprehensive
+    
+    # 2. Resume paused workflows
+    ./scripts/resume-critical-workflows.sh --environment="$ENVIRONMENT"
+    
+    # 3. Scale services back to normal
+    kubectl scale deployment webhook-service --replicas=3 -n "$ENVIRONMENT"
+    kubectl scale deployment notification-service --replicas=2 -n "$ENVIRONMENT"
+    
+    # 4. Run smoke tests
+    ./scripts/smoke-tests.sh --environment="$ENVIRONMENT"
+    
+    # 5. Update monitoring dashboards
+    ./scripts/update-monitoring-dashboards.sh --version="$TARGET_VERSION"
+    
+    # 6. Clean up old resources
+    ./scripts/cleanup-old-resources.sh --version="$CURRENT_VERSION" --environment="$ENVIRONMENT"
+    
+    echo "✅ Post-upgrade tasks completed"
+}
+
+main() {
+    parse_arguments "$@"
+    
+    if [[ "$ROLLBACK" == "true" ]]; then
+        ./scripts/rollback.sh --environment="$ENVIRONMENT"
+        exit 0
+    fi
+    
+    echo "🚀 Starting Tolstoy Platform upgrade..."
+    echo "   Current Version: $CURRENT_VERSION"
+    echo "   Target Version: $TARGET_VERSION"
+    echo "   Environment: $ENVIRONMENT"
+    echo "   Dry Run: $DRY_RUN"
+    echo ""
+    
+    validate_prerequisites
+    check_compatibility
+    perform_pre_upgrade_tasks
+    upgrade_database
+    upgrade_services
+    update_configurations
+    perform_post_upgrade_tasks
+    
+    echo ""
+    echo "🎉 Upgrade completed successfully!"
+    echo "   Platform version: $TARGET_VERSION"
+    echo "   Environment: $ENVIRONMENT"
+    echo "   Upgrade duration: $(date)"
+}
+
+# Execute main function with all arguments
+main "$@"
+```
+
+### Version Compatibility Matrix
+
+```json
+{
+  "compatibility_matrix": {
+    "versions": {
+      "2.4.0": {
+        "upgradeTo": ["2.4.1", "2.4.2", "2.5.0"],
+        "rollbackTo": ["2.3.2", "2.3.1"],
+        "breakingChanges": [
+          "API response format changes for parallel execution",
+          "Database schema updates for execution tracking"
+        ],
+        "deprecations": [
+          "Legacy workflow format (removal in v3.0)",
+          "API v1 endpoints (removal in v2.6)"
+        ],
+        "recommendedPath": {
+          "3.0.0": "2.4.0 → 2.5.0 → 2.6.0 → 3.0.0"
+        }
+      },
+      "2.3.2": {
+        "upgradeTo": ["2.3.3", "2.4.0"],
+        "rollbackTo": ["2.3.1", "2.3.0"],
+        "breakingChanges": [],
+        "deprecations": [
+          "Old webhook signature format"
+        ]
+      },
+      "2.3.1": {
+        "upgradeTo": ["2.3.2", "2.4.0"],
+        "rollbackTo": ["2.3.0", "2.2.5"],
+        "breakingChanges": [],
+        "deprecations": []
+      }
+    },
+    "migration_requirements": {
+      "2.3.x_to_2.4.0": {
+        "database_migration": true,
+        "config_migration": true,
+        "data_migration": false,
+        "downtime_required": false,
+        "estimated_duration": "30-45 minutes"
+      },
+      "2.4.x_to_2.5.0": {
+        "database_migration": true,
+        "config_migration": true,
+        "data_migration": true,
+        "downtime_required": false,
+        "estimated_duration": "1-2 hours"
+      }
+    }
+  }
+}
+```
+
+## Database Migration Procedures
+
+### Migration Script Template
+
+```sql
+-- Migration: Upgrade from 2.3.0 to 2.4.0
+-- Description: Add parallel execution support and workflow optimization features
+-- Estimated time: 15-20 minutes
+-- Risk level: Medium
+
+BEGIN;
+
+-- Set migration metadata
+INSERT INTO schema_migrations (version, description, started_at) 
+VALUES ('20240115_v2_4_0', 'Parallel execution and workflow optimization', NOW());
+
+-- 1. Add new columns for parallel execution
+ALTER TABLE executions ADD COLUMN execution_mode VARCHAR(20) DEFAULT 'sequential';
+ALTER TABLE executions ADD COLUMN parallel_groups JSONB DEFAULT '[]';
+ALTER TABLE executions ADD COLUMN execution_summary JSONB DEFAULT '{}';
+
+-- 2. Update execution_steps table
+ALTER TABLE execution_steps ADD COLUMN parallel_group_id INTEGER;
+ALTER TABLE execution_steps ADD COLUMN depends_on UUID[];
+
+-- 3. Add indexes for performance
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_executions_mode_status 
+ON executions(execution_mode, status, started_at DESC);
+
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_execution_steps_parallel_group 
+ON execution_steps(execution_id, parallel_group_id, step_index);
+
+-- 4. Create new tables for workflow optimization
+CREATE TABLE IF NOT EXISTS workflow_performance_metrics (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workflow_id UUID NOT NULL REFERENCES workflows(id) ON DELETE CASCADE,
+    metric_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    avg_execution_time_ms INTEGER NOT NULL,
+    total_executions INTEGER NOT NULL,
+    success_rate DECIMAL(5,4) NOT NULL,
+    p95_execution_time_ms INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(workflow_id, metric_date)
+);
+
+-- 5. Migrate existing data
+UPDATE executions 
+SET execution_mode = 'sequential',
+    execution_summary = jsonb_build_object(
+        'total_steps', (SELECT COUNT(*) FROM execution_steps WHERE execution_id = executions.id),
+        'successful_steps', (SELECT COUNT(*) FROM execution_steps WHERE execution_id = executions.id AND status = 'completed'),
+        'parallel_groups', 0
+    )
+WHERE execution_mode IS NULL;
+
+-- 6. Add constraints
+ALTER TABLE executions ADD CONSTRAINT valid_execution_mode 
+CHECK (execution_mode IN ('sequential', 'parallel', 'mixed'));
+
+-- 7. Create triggers for performance metrics
+CREATE OR REPLACE FUNCTION update_workflow_performance_metrics()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF NEW.status = 'completed' AND OLD.status != 'completed' THEN
+        INSERT INTO workflow_performance_metrics (
+            workflow_id, 
+            metric_date,
+            avg_execution_time_ms,
+            total_executions,
+            success_rate,
+            p95_execution_time_ms
+        )
+        SELECT 
+            NEW.workflow_id,
+            CURRENT_DATE,
+            AVG(duration_ms),
+            COUNT(*),
+            COUNT(*) FILTER (WHERE status = 'completed')::DECIMAL / COUNT(*),
+            PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY duration_ms)
+        FROM executions 
+        WHERE workflow_id = NEW.workflow_id 
+        AND DATE(completed_at) = CURRENT_DATE
+        AND status IN ('completed', 'failed')
+        ON CONFLICT (workflow_id, metric_date) DO UPDATE SET
+            avg_execution_time_ms = EXCLUDED.avg_execution_time_ms,
+            total_executions = EXCLUDED.total_executions,
+            success_rate = EXCLUDED.success_rate,
+            p95_execution_time_ms = EXCLUDED.p95_execution_time_ms;
+    END IF;
+    
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_update_workflow_performance_metrics
+    AFTER UPDATE ON executions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_workflow_performance_metrics();
+
+-- 8. Update row-level security policies
+DROP POLICY IF EXISTS execution_org_policy ON executions;
+CREATE POLICY execution_org_policy ON executions
+    FOR ALL TO application_user
+    USING (workflow_id IN (
+        SELECT id FROM workflows 
+        WHERE organization_id = current_setting('app.current_org_id')::uuid
+        AND deleted_at IS NULL
+    ));
+
+-- 9. Refresh materialized views
+REFRESH MATERIALIZED VIEW CONCURRENTLY workflow_summary;
+
+-- 10. Analyze tables for query planner
+ANALYZE executions;
+ANALYZE execution_steps;
+ANALYZE workflow_performance_metrics;
+
+-- Complete migration
+UPDATE schema_migrations 
+SET completed_at = NOW(), status = 'completed'
+WHERE version = '20240115_v2_4_0';
+
+COMMIT;
+
+-- Post-migration verification
+DO $$
+DECLARE 
+    execution_count INTEGER;
+    metric_count INTEGER;
+BEGIN
+    SELECT COUNT(*) INTO execution_count FROM executions WHERE execution_mode IS NOT NULL;
+    SELECT COUNT(*) INTO metric_count FROM workflow_performance_metrics;
+    
+    RAISE NOTICE 'Migration verification:';
+    RAISE NOTICE '  - Updated executions: %', execution_count;
+    RAISE NOTICE '  - Performance metrics records: %', metric_count;
+    
+    IF execution_count = 0 THEN
+        RAISE EXCEPTION 'Migration failed: No executions updated';
+    END IF;
+END $$;
+```
+
+### Migration Rollback Script
+
+```sql
+-- Rollback Migration: 2.4.0 to 2.3.2
+-- Description: Rollback parallel execution and workflow optimization features
+-- Risk level: Low
+
+BEGIN;
+
+-- Log rollback start
+INSERT INTO schema_migrations (version, description, started_at) 
+VALUES ('20240115_rollback_v2_4_0', 'Rollback to 2.3.2', NOW());
+
+-- 1. Drop triggers
+DROP TRIGGER IF EXISTS trigger_update_workflow_performance_metrics ON executions;
+DROP FUNCTION IF EXISTS update_workflow_performance_metrics();
+
+-- 2. Drop new tables
+DROP TABLE IF EXISTS workflow_performance_metrics;
+
+-- 3. Remove new columns (in reverse order)
+ALTER TABLE execution_steps DROP COLUMN IF EXISTS depends_on;
+ALTER TABLE execution_steps DROP COLUMN IF EXISTS parallel_group_id;
+
+ALTER TABLE executions DROP COLUMN IF EXISTS execution_summary;
+ALTER TABLE executions DROP COLUMN IF EXISTS parallel_groups;
+ALTER TABLE executions DROP COLUMN IF EXISTS execution_mode;
+
+-- 4. Drop new indexes
+DROP INDEX IF EXISTS idx_executions_mode_status;
+DROP INDEX IF EXISTS idx_execution_steps_parallel_group;
+
+-- 5. Restore original RLS policy
+DROP POLICY IF EXISTS execution_org_policy ON executions;
+CREATE POLICY execution_org_policy ON executions
+    FOR ALL TO application_user
+    USING (workflow_id IN (
+        SELECT id FROM workflows WHERE organization_id = current_setting('app.current_org_id')::uuid
+    ));
+
+-- 6. Analyze tables
+ANALYZE executions;
+ANALYZE execution_steps;
+
+-- Complete rollback
+UPDATE schema_migrations 
+SET completed_at = NOW(), status = 'rolled_back'
+WHERE version = '20240115_rollback_v2_4_0';
+
+COMMIT;
+
+RAISE NOTICE 'Rollback to version 2.3.2 completed successfully';
+```
+
+## Infrastructure Migration
+
+### Cloud Provider Migration
+
+#### AWS to Multi-Cloud Migration
+```yaml
+multi_cloud_migration:
+  strategy: "gradual_migration"
+  duration: "6 months"
+  phases:
+    
+    phase_1_preparation:
+      duration: "1 month"
+      tasks:
+        - "Infrastructure audit and assessment"
+        - "Cost analysis and optimization planning"
+        - "Terraform code refactoring for multi-cloud"
+        - "CI/CD pipeline updates"
+        - "Team training and documentation"
+        
+    phase_2_pilot:
+      duration: "1 month"
+      tasks:
+        - "Deploy development environment to target cloud"
+        - "Migrate non-critical services"
+        - "Test disaster recovery procedures"
+        - "Performance benchmarking"
+        - "Network connectivity setup"
+        
+    phase_3_staging:
+      duration: "2 months"
+      tasks:
+        - "Deploy full staging environment"
+        - "Data replication setup"
+        - "End-to-end testing"
+        - "Load testing and optimization"
+        - "Security audit and compliance verification"
+        
+    phase_4_production:
+      duration: "2 months"
+      tasks:
+        - "Gradual production traffic migration"
+        - "Blue-green deployment strategy"
+        - "Monitoring and alerting setup"
+        - "Performance optimization"
+        - "Documentation and runbooks update"
+```
+
+#### Migration Automation Scripts
+```bash
+#!/bin/bash
+# cloud-migration.sh - Automated cloud provider migration
+
+set -euo pipefail
+
+SOURCE_CLOUD="aws"
+TARGET_CLOUD="gcp"
+MIGRATION_PHASE=""
+DRY_RUN=false
+
+migrate_data() {
+    local source_region="$1"
+    local target_region="$2"
+    local data_type="$3"
+    
+    echo "🔄 Migrating $data_type from $SOURCE_CLOUD:$source_region to $TARGET_CLOUD:$target_region"
+    
+    case $data_type in
+        "database")
+            migrate_database "$source_region" "$target_region"
+            ;;
+        "storage")
+            migrate_storage "$source_region" "$target_region"
+            ;;
+        "configurations")
+            migrate_configurations "$source_region" "$target_region"
+            ;;
+        *)
+            echo "❌ Unknown data type: $data_type"
+            exit 1
+            ;;
+    esac
+}
+
+migrate_database() {
+    local source_region="$1"
+    local target_region="$2"
+    
+    echo "📊 Starting database migration..."
+    
+    if [[ "$DRY_RUN" == "true" ]]; then
+        echo "🔍 Dry run - would migrate database"
+        return 0
+    fi
+    
+    # 1. Create read replica in target cloud
+    echo "Creating read replica in $TARGET_CLOUD..."
+    gcloud sql instances create tolstoy-replica \
+        --master-instance-name=tolstoy-primary-aws \
+        --replica-type=READ \
+        --region="$target_region"
+    
+    # 2. Monitor replication lag
+    while true; do
+        local lag=$(gcloud sql instances describe tolstoy-replica --format="value(replicaConfiguration.replicationLag)")
+        if [[ "$lag" -lt 60 ]]; then
+            echo "✅ Replication lag acceptable: ${lag}s"
+            break
+        fi
+        echo "⏳ Waiting for replication lag to decrease: ${lag}s"
+        sleep 30
+    done
+    
+    # 3. Promote replica to master (during maintenance window)
+    echo "🚀 Promoting replica to master..."
+    gcloud sql instances promote-replica tolstoy-replica
+    
+    # 4. Update application connection strings
+    kubectl patch secret database-credentials \
+        --patch='{"data":{"host":"'$(echo -n "tolstoy-replica.googleapis.com" | base64)'"}}'
+    
+    echo "✅ Database migration completed"
+}
+
+migrate_storage() {
+    local source_region="$1"
+    local target_region="$2"
+    
+    echo "📦 Starting storage migration..."
+    
+    # Use gsutil for efficient transfer
+    gsutil -m cp -r "s3://tolstoy-storage-$SOURCE_CLOUD-$source_region/*" \
+        "gs://tolstoy-storage-$TARGET_CLOUD-$target_region/"
+    
+    # Verify data integrity
+    local source_count=$(aws s3 ls "s3://tolstoy-storage-$SOURCE_CLOUD-$source_region/" --recursive | wc -l)
+    local target_count=$(gsutil ls -r "gs://tolstoy-storage-$TARGET_CLOUD-$target_region/" | wc -l)
+    
+    if [[ "$source_count" -eq "$target_count" ]]; then
+        echo "✅ Storage migration completed successfully"
+    else
+        echo "❌ Storage migration failed - object count mismatch"
+        exit 1
+    fi
+}
+
+# Network migration for Kubernetes clusters
+migrate_network_infrastructure() {
+    echo "🌐 Migrating network infrastructure..."
+    
+    # 1. Create VPC in target cloud
+    gcloud compute networks create tolstoy-vpc \
+        --subnet-mode=custom \
+        --bgp-routing-mode=global
+    
+    # 2. Create subnets
+    gcloud compute networks subnets create tolstoy-private-subnet \
+        --network=tolstoy-vpc \
+        --range=10.1.0.0/16 \
+        --region="$TARGET_REGION"
+    
+    # 3. Setup VPN connection between clouds
+    create_cloud_vpn_connection
+    
+    # 4. Configure DNS resolution
+    setup_cross_cloud_dns
+    
+    echo "✅ Network infrastructure migration completed"
+}
+
+# Main migration orchestration
+main() {
+    echo "🚀 Starting cloud migration from $SOURCE_CLOUD to $TARGET_CLOUD"
+    
+    case "$MIGRATION_PHASE" in
+        "preparation")
+            prepare_migration
+            ;;
+        "pilot")
+            execute_pilot_migration
+            ;;
+        "staging")
+            execute_staging_migration
+            ;;
+        "production")
+            execute_production_migration
+            ;;
+        *)
+            echo "❌ Invalid migration phase: $MIGRATION_PHASE"
+            exit 1
+            ;;
+    esac
+}
+```
+
+## Data Migration Strategies
+
+### Large Dataset Migration
+
+```python
+#!/usr/bin/env python3
+"""
+Large dataset migration utility with progress tracking and resume capability
+"""
+
+import asyncio
+import logging
+import hashlib
+import json
+import time
+from typing import Dict, List, Optional
+from dataclasses import dataclass
+from pathlib import Path
+
+@dataclass
+class MigrationProgress:
+    total_records: int
+    migrated_records: int
+    failed_records: int
+    start_time: float
+    current_table: str
+    resume_point: Optional[Dict] = None
+
+class DataMigrator:
+    def __init__(self, source_config: Dict, target_config: Dict, batch_size: int = 1000):
+        self.source_config = source_config
+        self.target_config = target_config
+        self.batch_size = batch_size
+        self.progress_file = Path("migration_progress.json")
+        self.logger = logging.getLogger(__name__)
+        
+    async def migrate_all_data(self) -> None:
+        """Migrate all data with progress tracking and resume capability"""
+        progress = self.load_progress()
+        
+        tables_to_migrate = [
+            "organizations",
+            "users", 
+            "workflows",
+            "executions",
+            "execution_steps",
+            "integrations",
+            "integration_logs"
+        ]
+        
+        try:
+            for table in tables_to_migrate:
+                if progress.resume_point and table < progress.current_table:
+                    self.logger.info(f"Skipping already migrated table: {table}")
+                    continue
+                    
+                progress.current_table = table
+                await self.migrate_table(table, progress)
+                self.save_progress(progress)
+                
+            self.logger.info("✅ All data migration completed successfully")
+            
+        except Exception as e:
+            self.logger.error(f"❌ Migration failed: {e}")
+            self.save_progress(progress)
+            raise
+
+    async def migrate_table(self, table_name: str, progress: MigrationProgress) -> None:
+        """Migrate a single table with batching and verification"""
+        self.logger.info(f"📊 Starting migration of table: {table_name}")
+        
+        # Get total record count
+        total_count = await self.get_record_count(table_name)
+        self.logger.info(f"Total records to migrate: {total_count:,}")
+        
+        migrated = 0
+        resume_offset = progress.resume_point.get(table_name, 0) if progress.resume_point else 0
+        
+        while migrated < total_count:
+            batch_start = time.time()
+            
+            # Extract batch from source
+            batch_data = await self.extract_batch(
+                table_name, 
+                offset=resume_offset + migrated, 
+                limit=self.batch_size
+            )
+            
+            if not batch_data:
+                break
+                
+            # Transform data if needed
+            transformed_data = await self.transform_batch(table_name, batch_data)
+            
+            # Load to target with retries
+            success_count = await self.load_batch_with_retries(
+                table_name, 
+                transformed_data
+            )
+            
+            migrated += success_count
+            progress.migrated_records += success_count
+            progress.failed_records += len(batch_data) - success_count
+            
+            # Log progress
+            batch_time = time.time() - batch_start
+            rate = len(batch_data) / batch_time if batch_time > 0 else 0
+            
+            self.logger.info(
+                f"Migrated {migrated:,}/{total_count:,} records from {table_name} "
+                f"({rate:.1f} records/sec)"
+            )
+            
+            # Update resume point
+            if not progress.resume_point:
+                progress.resume_point = {}
+            progress.resume_point[table_name] = resume_offset + migrated
+            
+            # Save progress every 10 batches
+            if migrated % (self.batch_size * 10) == 0:
+                self.save_progress(progress)
+                
+        # Verify table migration
+        await self.verify_table_migration(table_name)
+        self.logger.info(f"✅ Table {table_name} migration completed")
+
+    async def extract_batch(self, table_name: str, offset: int, limit: int) -> List[Dict]:
+        """Extract a batch of records from source database"""
+        # Implementation depends on source database type
+        # This is a simplified example
+        query = f"SELECT * FROM {table_name} ORDER BY id OFFSET {offset} LIMIT {limit}"
+        
+        # Execute query and return results
+        # In real implementation, use proper database connection
+        return []
+    
+    async def transform_batch(self, table_name: str, batch_data: List[Dict]) -> List[Dict]:
+        """Transform data format if needed during migration"""
+        transformed = []
+        
+        for record in batch_data:
+            # Apply table-specific transformations
+            if table_name == "workflows":
+                record = await self.transform_workflow_record(record)
+            elif table_name == "executions":
+                record = await self.transform_execution_record(record)
+                
+            transformed.append(record)
+            
+        return transformed
+    
+    async def load_batch_with_retries(self, table_name: str, batch_data: List[Dict]) -> int:
+        """Load batch to target database with retry logic"""
+        max_retries = 3
+        retry_delay = 1
+        
+        for attempt in range(max_retries):
+            try:
+                success_count = await self.load_batch(table_name, batch_data)
+                return success_count
+                
+            except Exception as e:
+                self.logger.warning(f"Load attempt {attempt + 1} failed: {e}")
+                
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(retry_delay * (2 ** attempt))
+                else:
+                    self.logger.error(f"Failed to load batch after {max_retries} attempts")
+                    raise
+                    
+        return 0
+    
+    async def verify_table_migration(self, table_name: str) -> None:
+        """Verify data integrity after table migration"""
+        source_count = await self.get_record_count(table_name, source=True)
+        target_count = await self.get_record_count(table_name, source=False)
+        
+        if source_count != target_count:
+            raise Exception(
+                f"Record count mismatch for {table_name}: "
+                f"source={source_count}, target={target_count}"
+            )
+            
+        # Additional integrity checks
+        await self.verify_data_checksums(table_name)
+        
+    async def verify_data_checksums(self, table_name: str) -> None:
+        """Verify data integrity using checksums"""
+        source_checksum = await self.calculate_table_checksum(table_name, source=True)
+        target_checksum = await self.calculate_table_checksum(table_name, source=False)
+        
+        if source_checksum != target_checksum:
+            raise Exception(
+                f"Data checksum mismatch for {table_name}: "
+                f"source={source_checksum}, target={target_checksum}"
+            )
+    
+    def save_progress(self, progress: MigrationProgress) -> None:
+        """Save migration progress to file"""
+        progress_data = {
+            "total_records": progress.total_records,
+            "migrated_records": progress.migrated_records,
+            "failed_records": progress.failed_records,
+            "start_time": progress.start_time,
+            "current_table": progress.current_table,
+            "resume_point": progress.resume_point,
+            "last_updated": time.time()
+        }
+        
+        with open(self.progress_file, 'w') as f:
+            json.dump(progress_data, f, indent=2)
+    
+    def load_progress(self) -> MigrationProgress:
+        """Load migration progress from file"""
+        if not self.progress_file.exists():
+            return MigrationProgress(
+                total_records=0,
+                migrated_records=0,
+                failed_records=0,
+                start_time=time.time(),
+                current_table=""
+            )
+            
+        with open(self.progress_file, 'r') as f:
+            data = json.load(f)
+            
+        return MigrationProgress(**data)
+
+# Usage example
+async def main():
+    source_config = {
+        "host": "old-db.amazonaws.com",
+        "database": "tolstoy_prod",
+        "user": "migration_user",
+        "password": "secure_password"
+    }
+    
+    target_config = {
+        "host": "new-db.googleapis.com", 
+        "database": "tolstoy_prod_v2",
+        "user": "migration_user",
+        "password": "secure_password"
+    }
+    
+    migrator = DataMigrator(source_config, target_config, batch_size=5000)
+    await migrator.migrate_all_data()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+## Rollback Procedures
+
+### Automated Rollback System
+
+```bash
+#!/bin/bash
+# automated-rollback.sh - Comprehensive rollback system
+
+set -euo pipefail
+
+ENVIRONMENT=""
+ROLLBACK_TYPE=""
+TARGET_VERSION=""
+REASON=""
+
+perform_application_rollback() {
+    echo "🔄 Performing application rollback..."
+    
+    # 1. Rollback Helm releases
+    helm rollback tolstoy-platform -n "$ENVIRONMENT"
+    
+    # 2. Wait for rollback completion
+    kubectl rollout status deployment/api-gateway -n "$ENVIRONMENT" --timeout=600s
+    kubectl rollout status deployment/workflow-service -n "$ENVIRONMENT" --timeout=600s
+    kubectl rollout status deployment/execution-engine -n "$ENVIRONMENT" --timeout=600s
+    
+    # 3. Verify rollback success
+    sleep 30
+    ./scripts/health-check.sh --environment="$ENVIRONMENT"
+    
+    echo "✅ Application rollback completed"
+}
+
+perform_database_rollback() {
+    echo "🗄️  Performing database rollback..."
+    
+    # Identify rollback script
+    local rollback_script="migrations/rollback-to-${TARGET_VERSION}.sql"
+    
+    if [[ ! -f "$rollback_script" ]]; then
+        echo "❌ Rollback script not found: $rollback_script"
+        exit 1
+    fi
+    
+    # Execute rollback with confirmation
+    read -p "⚠️  This will rollback database schema. Continue? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "Rollback cancelled"
+        exit 1
+    fi
+    
+    # Execute rollback
+    kubectl exec -i $(kubectl get pod -l app=postgres -o jsonpath='{.items[0].metadata.name}' -n "$ENVIRONMENT") -- \
+        psql -U tolstoy -d tolstoy_$ENVIRONMENT -v ON_ERROR_STOP=1 < "$rollback_script"
+    
+    echo "✅ Database rollback completed"
+}
+
+perform_configuration_rollback() {
+    echo "⚙️  Rolling back configurations..."
+    
+    # Rollback ConfigMaps
+    kubectl rollout undo deployment/api-gateway -n "$ENVIRONMENT"
+    kubectl rollout undo configmap/platform-config -n "$ENVIRONMENT"
+    
+    # Rollback feature flags
+    ./scripts/rollback-feature-flags.sh --environment="$ENVIRONMENT" --version="$TARGET_VERSION"
+    
+    echo "✅ Configuration rollback completed"
+}
+
+create_rollback_report() {
+    local report_file="rollback-report-$(date +%Y%m%d_%H%M%S).json"
+    
+    cat > "$report_file" << EOF
+{
+  "rollback_summary": {
+    "timestamp": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+    "environment": "$ENVIRONMENT",
+    "rollback_type": "$ROLLBACK_TYPE",
+    "target_version": "$TARGET_VERSION",
+    "reason": "$REASON",
+    "duration": "$(($(date +%s) - $START_TIME)) seconds",
+    "status": "completed"
+  },
+  "services_rolled_back": [
+    "api-gateway",
+    "workflow-service", 
+    "execution-engine",
+    "integration-service"
+  ],
+  "verification_results": {
+    "health_check": "passed",
+    "smoke_tests": "passed",
+    "database_integrity": "verified"
+  }
+}
+EOF
+
+    echo "📋 Rollback report created: $report_file"
+}
+```
+
+## Maintenance Procedures
+
+### Scheduled Maintenance
+
+```yaml
+maintenance_procedures:
+  weekly_maintenance:
+    schedule: "Sunday 02:00 UTC"
+    duration: "2 hours"
+    tasks:
+      - "Database maintenance and optimization"
+      - "Log rotation and cleanup"
+      - "Security updates and patches" 
+      - "Backup verification"
+      - "Performance tuning"
+      
+  monthly_maintenance:
+    schedule: "First Sunday 00:00 UTC"
+    duration: "4 hours"
+    tasks:
+      - "Major database optimization"
+      - "Infrastructure updates"
+      - "Security audits"
+      - "Disaster recovery testing"
+      - "Capacity planning review"
+      
+  quarterly_maintenance:
+    schedule: "First Sunday of quarter"
+    duration: "8 hours"
+    tasks:
+      - "Major version upgrades"
+      - "Infrastructure modernization"
+      - "Security penetration testing"
+      - "Business continuity testing"
+      - "Documentation updates"
+```
+
+### Pre-Maintenance Checklist
+
+```bash
+#!/bin/bash
+# pre-maintenance-checklist.sh
+
+echo "🔍 Pre-maintenance verification checklist"
+
+# 1. Verify backup status
+echo "Checking backup status..."
+LAST_BACKUP=$(kubectl get job backup-job -o jsonpath='{.status.completionTime}' 2>/dev/null || echo "")
+if [[ -z "$LAST_BACKUP" || $(date -d "$LAST_BACKUP" +%s) -lt $(date -d "24 hours ago" +%s) ]]; then
+    echo "❌ Recent backup not found. Creating backup..."
+    ./scripts/create-backup.sh
+else
+    echo "✅ Recent backup verified"
+fi
+
+# 2. Check system health
+echo "Checking system health..."
+./scripts/health-check.sh --comprehensive
+
+# 3. Verify monitoring alerts
+echo "Checking for active alerts..."
+ACTIVE_ALERTS=$(curl -s "http://alertmanager:9093/api/v1/alerts" | jq '.data | length')
+if [[ "$ACTIVE_ALERTS" -gt 0 ]]; then
+    echo "⚠️  $ACTIVE_ALERTS active alerts found"
+    echo "Review alerts before proceeding with maintenance"
+fi
+
+# 4. Check scheduled executions
+echo "Checking for scheduled workflow executions..."
+SCHEDULED_COUNT=$(kubectl exec deployment/workflow-service -- \
+    curl -s localhost:3000/internal/scheduled-count | jq '.count')
+
+if [[ "$SCHEDULED_COUNT" -gt 0 ]]; then
+    echo "⚠️  $SCHEDULED_COUNT workflows scheduled during maintenance window"
+    echo "Consider rescheduling or extending maintenance window"
+fi
+
+echo "✅ Pre-maintenance checklist completed"
+```
+
+This comprehensive migration and upgrade documentation provides systematic approaches to maintaining, upgrading, and migrating the Tolstoy platform safely and efficiently.

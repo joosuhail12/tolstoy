@@ -1,0 +1,479 @@
+---
+title: "List Actions"
+description: "Retrieve a paginated list of actions in your organization"
+---
+
+# List Actions
+
+<Badge variant="success">GET</Badge> `/actions`
+
+Retrieve a paginated list of actions available in your organization. Actions are individual workflow steps that can be executed independently or combined into flows.
+
+## Request
+
+### **HTTP Request**
+
+```http
+GET https://api.tolstoy.dev/actions
+```
+
+### **Query Parameters**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | 20 | Number of actions per page (1-100) |
+| `cursor` | string | - | Pagination cursor for next page |
+| `sort` | string | `created_at` | Sort field (`name`, `created_at`, `updated_at`, `last_executed`) |
+| `order` | string | `desc` | Sort order (`asc` or `desc`) |
+| `search` | string | - | Search actions by name or description |
+| `type` | string | - | Filter by action type (`http`, `database`, `script`, `integration`) |
+| `status` | string | - | Filter by status (`active`, `draft`, `deprecated`) |
+| `tag` | string | - | Filter by tag |
+| `created_after` | string | - | Filter by creation date (ISO 8601) |
+| `created_before` | string | - | Filter by creation date (ISO 8601) |
+
+## Response
+
+### **Success Response**
+
+<CodeGroup>
+
+```json 200 OK
+{
+  "actions": [
+    {
+      "id": "act_abc123xyz456",
+      "name": "send_slack_notification",
+      "display_name": "Send Slack Notification",
+      "description": "Sends a formatted message to a Slack channel",
+      "type": "integration",
+      "status": "active",
+      "version": "1.2.0",
+      "category": "communication",
+      "tags": ["notifications", "slack", "messaging"],
+      "configuration": {
+        "inputs": [
+          {
+            "name": "channel",
+            "type": "string",
+            "required": true,
+            "description": "Slack channel ID or name",
+            "validation": {
+              "pattern": "^[#@].*",
+              "max_length": 100
+            }
+          },
+          {
+            "name": "message",
+            "type": "string",
+            "required": true,
+            "description": "Message content",
+            "validation": {
+              "max_length": 4000
+            }
+          },
+          {
+            "name": "attachments",
+            "type": "array",
+            "required": false,
+            "description": "Message attachments"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "message_id",
+            "type": "string",
+            "description": "Slack message timestamp ID"
+          },
+          {
+            "name": "thread_ts",
+            "type": "string",
+            "description": "Thread timestamp for replies"
+          }
+        ],
+        "timeout": 30000,
+        "retry_policy": {
+          "max_retries": 3,
+          "backoff_multiplier": 2,
+          "retryable_errors": ["RATE_LIMIT", "TIMEOUT"]
+        }
+      },
+      "permissions": {
+        "scopes": ["slack:write", "channels:read"],
+        "rate_limit": {
+          "requests_per_minute": 60,
+          "burst_limit": 10
+        }
+      },
+      "statistics": {
+        "total_executions": 1542,
+        "successful_executions": 1498,
+        "failed_executions": 44,
+        "average_duration_ms": 850,
+        "last_executed_at": "2024-01-15T18:30:00Z"
+      },
+      "created_by": "user_789def",
+      "created_at": "2023-08-10T14:20:00Z",
+      "updated_at": "2024-01-10T09:15:00Z"
+    },
+    {
+      "id": "act_def456uvw789",
+      "name": "query_database",
+      "display_name": "Query PostgreSQL Database",
+      "description": "Execute SQL queries against PostgreSQL database",
+      "type": "database",
+      "status": "active",
+      "version": "2.1.0",
+      "category": "data",
+      "tags": ["database", "postgresql", "sql"],
+      "configuration": {
+        "inputs": [
+          {
+            "name": "query",
+            "type": "string",
+            "required": true,
+            "description": "SQL query to execute",
+            "validation": {
+              "max_length": 10000
+            }
+          },
+          {
+            "name": "parameters",
+            "type": "object",
+            "required": false,
+            "description": "Query parameters for prepared statements"
+          },
+          {
+            "name": "connection_id",
+            "type": "string",
+            "required": true,
+            "description": "Database connection identifier"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "rows",
+            "type": "array",
+            "description": "Query result rows"
+          },
+          {
+            "name": "row_count",
+            "type": "integer",
+            "description": "Number of rows affected or returned"
+          },
+          {
+            "name": "columns",
+            "type": "array",
+            "description": "Column metadata"
+          }
+        ],
+        "timeout": 60000,
+        "max_rows": 10000
+      },
+      "permissions": {
+        "scopes": ["database:read", "database:write"],
+        "rate_limit": {
+          "requests_per_minute": 100,
+          "concurrent_limit": 5
+        }
+      },
+      "statistics": {
+        "total_executions": 8234,
+        "successful_executions": 8001,
+        "failed_executions": 233,
+        "average_duration_ms": 1250,
+        "last_executed_at": "2024-01-15T19:45:00Z"
+      },
+      "created_by": "user_456abc",
+      "created_at": "2023-06-15T10:30:00Z",
+      "updated_at": "2024-01-12T16:20:00Z"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "count": 2,
+    "has_more": true,
+    "next_cursor": "eyJsYXN0X2lkIjoiYWN0X2RlZjQ1NnV2dzc4OSIsImxhc3RfY3JlYXRlZCI6MTcwNTMzOTIwMDAwMH0=",
+    "prev_cursor": null,
+    "total_estimate": 47
+  }
+}
+```
+
+</CodeGroup>
+
+### **Action Object**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique action identifier |
+| `name` | string | Action name (used in API and flows) |
+| `display_name` | string | Human-readable action name |
+| `description` | string | Detailed action description |
+| `type` | string | Action type (`http`, `database`, `script`, `integration`) |
+| `status` | string | Action status (`active`, `draft`, `deprecated`) |
+| `version` | string | Semantic version number |
+| `category` | string | Action category for organization |
+| `tags` | array | Tags for filtering and organization |
+| `configuration` | object | Input/output configuration and settings |
+| `permissions` | object | Required permissions and rate limits |
+| `statistics` | object | Execution statistics |
+| `created_by` | string | User ID who created the action |
+| `created_at` | string | ISO 8601 timestamp of creation |
+| `updated_at` | string | ISO 8601 timestamp of last update |
+
+## Examples
+
+### **Basic Request**
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET 'https://api.tolstoy.dev/actions' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.tolstoy.dev/actions', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  }
+});
+
+const data = await response.json();
+console.log(`Found ${data.actions.length} actions`);
+
+data.actions.forEach(action => {
+  console.log(`- ${action.display_name} (${action.id})`);
+  console.log(`  Type: ${action.type}, Status: ${action.status}`);
+  console.log(`  Executions: ${action.statistics.total_executions}`);
+});
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    'https://api.tolstoy.dev/actions',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+)
+
+data = response.json()
+print(f"Found {len(data['actions'])} actions")
+
+for action in data['actions']:
+    print(f"- {action['display_name']} ({action['id']})")
+    print(f"  Type: {action['type']}, Status: {action['status']}")
+    print(f"  Executions: {action['statistics']['total_executions']}")
+```
+
+</CodeGroup>
+
+### **Filtered Request**
+
+<CodeGroup>
+
+```bash Search by Type
+curl -X GET 'https://api.tolstoy.dev/actions?type=integration&status=active' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript with Filters
+const params = new URLSearchParams({
+  type: 'integration',
+  status: 'active',
+  tag: 'notifications',
+  sort: 'last_executed',
+  order: 'desc',
+  limit: '50'
+});
+
+const response = await fetch(`https://api.tolstoy.dev/actions?${params}`, {
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  }
+});
+
+const data = await response.json();
+console.log('Active integration actions:', data.actions);
+```
+
+</CodeGroup>
+
+### **Pagination Example**
+
+<CodeGroup>
+
+```javascript Paginate Through All Actions
+async function getAllActions(apiKey) {
+  const actions = [];
+  let cursor = null;
+  
+  while (true) {
+    const params = new URLSearchParams({ limit: '100' });
+    if (cursor) {
+      params.set('cursor', cursor);
+    }
+    
+    const response = await fetch(`https://api.tolstoy.dev/actions?${params}`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    actions.push(...data.actions);
+    
+    if (!data.pagination.has_more) {
+      break;
+    }
+    
+    cursor = data.pagination.next_cursor;
+  }
+  
+  return actions;
+}
+
+// Usage
+const allActions = await getAllActions(apiKey);
+console.log(`Total actions: ${allActions.length}`);
+```
+
+</CodeGroup>
+
+## Error Responses
+
+<CodeGroup>
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Invalid or missing API key",
+    "type": "authentication",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json 403 Forbidden
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Insufficient permissions to list actions",
+    "type": "authorization",
+    "required_scopes": ["actions:read"],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+## API Playground
+
+Try this endpoint directly in your browser:
+
+<ApiPlayground
+  method="GET"
+  endpoint="/actions"
+  baseUrl="https://api.tolstoy.dev"
+  auth={{
+    type: "bearer",
+    placeholder: "Your API Key"
+  }}
+  parameters={[
+    {
+      name: "limit",
+      type: "integer",
+      defaultValue: 20,
+      description: "Number of actions per page (1-100)"
+    },
+    {
+      name: "sort",
+      type: "select",
+      options: ["name", "created_at", "updated_at", "last_executed"],
+      defaultValue: "created_at",
+      description: "Sort field"
+    },
+    {
+      name: "order",
+      type: "select",
+      options: ["asc", "desc"],
+      defaultValue: "desc",
+      description: "Sort order"
+    },
+    {
+      name: "search",
+      type: "string",
+      placeholder: "Search actions...",
+      description: "Search actions by name or description"
+    },
+    {
+      name: "type",
+      type: "select",
+      options: ["http", "database", "script", "integration"],
+      description: "Filter by action type"
+    },
+    {
+      name: "status",
+      type: "select",
+      options: ["active", "draft", "deprecated"],
+      description: "Filter by status"
+    },
+    {
+      name: "tag",
+      type: "string",
+      placeholder: "notifications",
+      description: "Filter by tag"
+    }
+  ]}
+  sampleResponse={{
+    "actions": [
+      {
+        "id": "act_abc123xyz456",
+        "name": "send_slack_notification",
+        "display_name": "Send Slack Notification",
+        "type": "integration",
+        "status": "active",
+        "statistics": {
+          "total_executions": 1542,
+          "success_rate": 0.971
+        }
+      }
+    ],
+    "pagination": {
+      "limit": 20,
+      "count": 1,
+      "has_more": false
+    }
+  }}
+/>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Get Action" icon="file" href="/api/actions/get">
+    Retrieve details for a specific action
+  </Card>
+  <Card title="Create Action" icon="plus" href="/api/actions/create">
+    Create a new action
+  </Card>
+  <Card title="Execute Action" icon="play" href="/api/actions/execute">
+    Execute an action directly
+  </Card>
+  <Card title="Action Versions" icon="code-branch" href="/api/actions/versions">
+    Manage action versions
+  </Card>
+</CardGroup>

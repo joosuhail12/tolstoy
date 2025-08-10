@@ -1,0 +1,348 @@
+---
+title: "Refresh Token"
+description: "Refresh an expired access token using a refresh token"
+---
+
+# Refresh Token
+
+<Badge variant="warning">POST</Badge> `/auth/refresh`
+
+Exchange a valid refresh token for a new access token when the current access token has expired.
+
+## Request
+
+### **HTTP Request**
+
+```http
+POST https://api.tolstoy.dev/auth/refresh
+```
+
+### **Request Body**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `refresh_token` | string | Yes | Valid refresh token |
+| `rotate_refresh` | boolean | No | Issue new refresh token (default: false) |
+
+## Response
+
+### **Success Response**
+
+<CodeGroup>
+
+```json 200 OK
+{
+  "auth": {
+    "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.new...",
+    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.same...",
+    "token_type": "Bearer",
+    "expires_in": 3600,
+    "refresh_expires_in": 2591400
+  },
+  "user": {
+    "id": "user_123456789",
+    "email": "john.doe@example.com",
+    "name": "John Doe",
+    "role": "admin",
+    "organization_id": "org_987654321"
+  }
+}
+```
+
+</CodeGroup>
+
+## Examples
+
+### **Basic Token Refresh**
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST 'https://api.tolstoy.dev/auth/refresh' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+  }'
+```
+
+```javascript JavaScript
+async function refreshAccessToken(refreshToken) {
+  const response = await fetch('https://api.tolstoy.dev/auth/refresh', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      refresh_token: refreshToken
+    })
+  });
+  
+  if (response.ok) {
+    const data = await response.json();
+    
+    // Update stored tokens
+    localStorage.setItem('access_token', data.auth.access_token);
+    
+    // Update axios default header
+    axios.defaults.headers.common['Authorization'] = 
+      `Bearer ${data.auth.access_token}`;
+    
+    return data.auth.access_token;
+  } else {
+    // Refresh failed, redirect to login
+    window.location.href = '/login';
+    throw new Error('Token refresh failed');
+  }
+}
+```
+
+```python Python
+import requests
+
+def refresh_access_token(refresh_token):
+    response = requests.post(
+        'https://api.tolstoy.dev/auth/refresh',
+        json={'refresh_token': refresh_token}
+    )
+    
+    if response.status_code == 200:
+        data = response.json()
+        new_access_token = data['auth']['access_token']
+        return new_access_token
+    else:
+        raise Exception('Token refresh failed')
+
+# Usage
+try:
+    new_token = refresh_access_token(stored_refresh_token)
+    headers = {'Authorization': f'Bearer {new_token}'}
+except Exception as e:
+    print('Need to login again:', e)
+```
+
+</CodeGroup>
+
+### **Auto-Refresh Interceptor**
+
+<CodeGroup>
+
+```javascript Axios Interceptor
+import axios from 'axios';
+
+let isRefreshing = false;
+let failedQueue = [];
+
+const processQueue = (error, token = null) => {
+  failedQueue.forEach(prom => {
+    if (error) {
+      prom.reject(error);
+    } else {
+      prom.resolve(token);
+    }
+  });
+  
+  failedQueue = [];
+};
+
+// Request interceptor
+axios.interceptors.request.use(
+  config => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers['Authorization'] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  error => Promise.reject(error)
+);
+
+// Response interceptor for auto-refresh
+axios.interceptors.response.use(
+  response => response,
+  async error => {
+    const originalRequest = error.config;
+    
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          failedQueue.push({ resolve, reject });
+        }).then(token => {
+          originalRequest.headers['Authorization'] = `Bearer ${token}`;
+          return axios(originalRequest);
+        }).catch(err => {
+          return Promise.reject(err);
+        });
+      }
+      
+      originalRequest._retry = true;
+      isRefreshing = true;
+      
+      const refreshToken = localStorage.getItem('refresh_token');
+      
+      return new Promise((resolve, reject) => {
+        axios.post('https://api.tolstoy.dev/auth/refresh', {
+          refresh_token: refreshToken
+        })
+          .then(({ data }) => {
+            const { access_token } = data.auth;
+            localStorage.setItem('access_token', access_token);
+            axios.defaults.headers.common['Authorization'] = 
+              `Bearer ${access_token}`;
+            processQueue(null, access_token);
+            resolve(axios(originalRequest));
+          })
+          .catch(err => {
+            processQueue(err, null);
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
+            window.location.href = '/login';
+            reject(err);
+          })
+          .finally(() => {
+            isRefreshing = false;
+          });
+      });
+    }
+    
+    return Promise.reject(error);
+  }
+);
+```
+
+</CodeGroup>
+
+### **Token Rotation**
+
+<CodeGroup>
+
+```javascript Rotate Refresh Token
+async function refreshWithRotation(currentRefreshToken) {
+  const response = await fetch('https://api.tolstoy.dev/auth/refresh', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      refresh_token: currentRefreshToken,
+      rotate_refresh: true  // Request new refresh token
+    })
+  });
+  
+  if (response.ok) {
+    const data = await response.json();
+    
+    // Store both new tokens
+    localStorage.setItem('access_token', data.auth.access_token);
+    localStorage.setItem('refresh_token', data.auth.refresh_token);
+    
+    console.log('Tokens refreshed and rotated');
+    return data.auth;
+  }
+  
+  throw new Error('Token refresh failed');
+}
+
+// Periodic rotation for enhanced security
+setInterval(async () => {
+  try {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (refreshToken) {
+      await refreshWithRotation(refreshToken);
+    }
+  } catch (error) {
+    console.error('Token rotation failed:', error);
+  }
+}, 24 * 60 * 60 * 1000); // Rotate daily
+```
+
+</CodeGroup>
+
+## Error Responses
+
+<CodeGroup>
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "INVALID_REFRESH_TOKEN",
+    "message": "Invalid or expired refresh token",
+    "type": "authentication",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json 403 Forbidden
+{
+  "error": {
+    "code": "TOKEN_REVOKED",
+    "message": "Refresh token has been revoked",
+    "type": "authentication",
+    "details": {
+      "revoked_at": "2024-01-14T15:00:00Z",
+      "reason": "user_logout"
+    },
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+## API Playground
+
+Try refreshing your token:
+
+<ApiPlayground
+  method="POST"
+  endpoint="/auth/refresh"
+  baseUrl="https://api.tolstoy.dev"
+  body={{
+    type: "json",
+    schema: {
+      refresh_token: {
+        type: "string",
+        placeholder: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        description: "Valid refresh token",
+        required: true
+      },
+      rotate_refresh: {
+        type: "boolean",
+        defaultValue: false,
+        description: "Issue new refresh token"
+      }
+    }
+  }}
+  sampleResponse={{
+    "auth": {
+      "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.new...",
+      "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.same...",
+      "token_type": "Bearer",
+      "expires_in": 3600
+    },
+    "user": {
+      "id": "user_123456789",
+      "email": "john.doe@example.com",
+      "name": "John Doe"
+    }
+  }}
+/>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Login" icon="right-to-bracket" href="/api/auth/login">
+    Initial authentication
+  </Card>
+  <Card title="Logout" icon="right-from-bracket" href="/api/auth/logout">
+    Invalidate tokens
+  </Card>
+  <Card title="Revoke Token" icon="ban" href="/api/auth/revoke">
+    Revoke specific tokens
+  </Card>
+  <Card title="Token Info" icon="info" href="/api/auth/token-info">
+    Get token details
+  </Card>
+</CardGroup>

@@ -1,0 +1,242 @@
+---
+title: "Update Organization"
+api: "PUT /organizations/{id}"
+description: "Update organization settings and configuration"
+---
+
+Update organization details, settings, and configuration. Only organization administrators can perform this operation.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the organization to update
+</ParamField>
+
+## Request Body
+
+<ParamField body="name" type="string">
+  Organization display name (3-100 characters)
+</ParamField>
+
+<ParamField body="slug" type="string">
+  URL-friendly organization identifier (3-50 characters, alphanumeric and hyphens only)
+</ParamField>
+
+<ParamField body="settings" type="object">
+  Organization configuration settings
+  
+  <Expandable title="settings">
+    <ParamField body="timezone" type="string">
+      Default timezone for the organization (IANA timezone identifier)
+    </ParamField>
+    
+    <ParamField body="dateFormat" type="string">
+      Preferred date format (MM/dd/yyyy, dd/MM/yyyy, yyyy-MM-dd)
+    </ParamField>
+    
+    <ParamField body="currency" type="string">
+      Default currency code (ISO 4217)
+    </ParamField>
+    
+    <ParamField body="theme" type="string">
+      UI theme preference (light, dark, auto)
+    </ParamField>
+    
+    <ParamField body="notifications" type="object">
+      Notification preferences
+      
+      <Expandable title="notifications">
+        <ParamField body="email" type="boolean">
+          Enable email notifications
+        </ParamField>
+        
+        <ParamField body="webhook" type="boolean">
+          Enable webhook notifications
+        </ParamField>
+        
+        <ParamField body="inApp" type="boolean">
+          Enable in-app notifications
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Custom metadata key-value pairs (max 20 keys, 255 chars per value)
+</ParamField>
+
+## Response
+
+Returns the updated organization object with the same structure as the [Get Organization](/api/organizations/get) endpoint.
+
+<RequestExample>
+```bash cURL
+curl -X PUT "https://api.tolstoy.dev/organizations/org_1234567890" \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_1234567890" \
+  -H "x-user-id: user_1234567890" \
+  -d '{
+    "name": "Acme Corporation Ltd",
+    "settings": {
+      "timezone": "Europe/London",
+      "theme": "dark",
+      "notifications": {
+        "email": true,
+        "webhook": true,
+        "inApp": false
+      }
+    },
+    "metadata": {
+      "industry": "technology",
+      "region": "EMEA"
+    }
+  }'
+```
+
+```javascript JavaScript
+const updatedOrg = await tolstoy.organizations.update('org_1234567890', {
+  name: 'Acme Corporation Ltd',
+  settings: {
+    timezone: 'Europe/London',
+    theme: 'dark',
+    notifications: {
+      email: true,
+      webhook: true,
+      inApp: false
+    }
+  },
+  metadata: {
+    industry: 'technology',
+    region: 'EMEA'
+  }
+});
+```
+
+```python Python
+updated_org = tolstoy.organizations.update('org_1234567890', {
+    'name': 'Acme Corporation Ltd',
+    'settings': {
+        'timezone': 'Europe/London',
+        'theme': 'dark',
+        'notifications': {
+            'email': True,
+            'webhook': True,
+            'in_app': False
+        }
+    },
+    'metadata': {
+        'industry': 'technology',
+        'region': 'EMEA'
+    }
+})
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "id": "org_1234567890",
+  "name": "Acme Corporation Ltd",
+  "slug": "acme-corp",
+  "settings": {
+    "timezone": "Europe/London",
+    "dateFormat": "MM/dd/yyyy",
+    "currency": "USD",
+    "theme": "dark",
+    "notifications": {
+      "email": true,
+      "webhook": true,
+      "inApp": false
+    }
+  },
+  "limits": {
+    "workflows": 100,
+    "executions": 10000,
+    "users": 25
+  },
+  "subscription": {
+    "plan": "professional",
+    "status": "active",
+    "expiresAt": "2024-12-31T23:59:59Z"
+  },
+  "metadata": {
+    "industry": "technology",
+    "region": "EMEA"
+  },
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-08-10T15:45:22Z"
+}
+```
+</ResponseExample>
+
+## Validation Rules
+
+<AccordionGroup>
+  <Accordion title="Name Validation">
+    - Must be 3-100 characters long
+    - Cannot contain only whitespace
+    - Must be unique within your account
+    - Special characters allowed: letters, numbers, spaces, hyphens, apostrophes
+  </Accordion>
+
+  <Accordion title="Slug Validation">
+    - Must be 3-50 characters long
+    - Only lowercase letters, numbers, and hyphens
+    - Cannot start or end with hyphen
+    - Must be globally unique across all organizations
+  </Accordion>
+
+  <Accordion title="Timezone Validation">
+    - Must be a valid IANA timezone identifier
+    - Examples: `America/New_York`, `Europe/London`, `Asia/Tokyo`
+    - See [timezone database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) for complete list
+  </Accordion>
+</AccordionGroup>
+
+## Error Responses
+
+<ResponseField name="400" type="error">
+  Invalid request data or validation failure
+  
+  ```json
+  {
+    "error": "validation_error",
+    "message": "Organization name must be between 3 and 100 characters",
+    "field": "name"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="403" type="error">
+  Insufficient permissions - only organization administrators can update settings
+</ResponseField>
+
+<ResponseField name="404" type="error">
+  Organization not found or access denied
+</ResponseField>
+
+<ResponseField name="409" type="error">
+  Conflict - slug already exists
+  
+  ```json
+  {
+    "error": "conflict",
+    "message": "Organization slug 'acme-corp' is already taken",
+    "field": "slug"
+  }
+  ```
+</ResponseField>
+
+## Use Cases
+
+- **Settings management**: Update organization preferences and configuration
+- **Branding updates**: Change organization name and display settings
+- **Notification configuration**: Enable/disable different notification channels
+- **Metadata management**: Store custom organization attributes
+
+## Related Endpoints
+
+- [Get Organization](/api/organizations/get) - Retrieve current settings
+- [List Organizations](/api/organizations/list) - View all organizations
+- [Delete Organization](/api/organizations/delete) - Remove organization

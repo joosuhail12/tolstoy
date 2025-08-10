@@ -121,7 +121,7 @@ Common issues and solutions
 4. **API Documentation Update** (from OpenAPI spec)
 5. **Validation & Link Checking** (quality assurance)
 6. **Placeholder Creation** (for missing pages)
-7. **Deployment to Mintlify** (live documentation)
+7. **Documentation Deployment** (live documentation)
 
 ### GitHub Actions Integration
 ```yaml
@@ -146,7 +146,7 @@ Common issues and solutions
 - **Build Time**: < 30 seconds for full documentation build
 - **Link Validation**: 100% of internal links validated automatically  
 - **Search Optimization**: All pages SEO-optimized with proper metadata
-- **Mobile Responsive**: Full mobile compatibility via Mintlify
+- **Mobile Responsive**: Full mobile compatibility
 
 ### User Experience Metrics
 - **Navigation Depth**: Maximum 3 clicks to reach any page
@@ -215,7 +215,7 @@ Common issues and solutions
 - **[Page Template](docs/.templates/page-template.mdx)** - Standard template for new pages
 - **[Style Guide](docs/.templates/style-guide.md)** - Writing and formatting guidelines
 - **[GitHub Workflow](.github/workflows/update-docs.yml)** - Automated documentation pipeline
-- **[Mintlify Configuration](docs.json)** - Navigation and site configuration
+- **Documentation Configuration** - Navigation and site configuration
 
 ---
 

@@ -11,14 +11,14 @@ Stainless automatically generates SDK code samples for every API endpoint in our
 ### `stainless.yml`
 Main configuration file that defines:
 - Project name: `tolstoy`
-- Code sample format: `mintlify` compatible
+- Code sample format configured
 - Supported languages: TypeScript, Python, Go, cURL
 - Multi-tenant authentication headers
 
 ### `docs.json` Integration
 - Points to Stainless-hosted OpenAPI spec: `https://stainless.app/projects/tolstoy/releases/latest/openapi.json`
 - Includes fallback to local spec: `docs/openapi.json`
-- Configures code samples display in Mintlify
+- Configures code samples display
 
 ## 🔄 Automation Pipeline
 
@@ -112,7 +112,7 @@ execution, err := client.Flows.Execute(ctx, &tolstoy.ExecuteFlowRequest{
 
 ### GitHub Repository
 - **Source Spec**: https://raw.githubusercontent.com/joosuhail12/tolstoy/main/docs/openapi.json
-- **Documentation**: View at your Mintlify docs site
+- **Documentation**: View at your documentation site
 - **Workflow Runs**: Check `.github/workflows/update-docs.yml`
 
 ## 🛠️ Manual Operations
@@ -146,7 +146,7 @@ curl -s https://stainless.app/projects/tolstoy/releases/latest/openapi.json | \
    - Confirm OpenAPI spec is valid JSON
 
 2. **Code samples not appearing**
-   - Verify Mintlify `docs.json` points to Stainless URL
+   - Verify documentation configuration points to Stainless URL
    - Check `showCodeSamples: true` is set
    - Clear browser cache and reload docs
 

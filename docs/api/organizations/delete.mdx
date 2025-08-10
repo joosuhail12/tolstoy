@@ -1,0 +1,228 @@
+---
+title: "Delete Organization"
+api: "DELETE /organizations/{id}"
+description: "Permanently delete an organization and all associated data"
+---
+
+<Warning>
+This action is **irreversible**. Deleting an organization will permanently remove all workflows, executions, users, and associated data. This operation requires organization owner privileges.
+</Warning>
+
+Permanently delete an organization and all its associated resources. This includes:
+
+- All workflows and their execution history
+- All users and their credentials
+- All tools and integrations
+- All webhooks and event logs
+- All organization settings and metadata
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the organization to delete
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="confirm" type="string" required>
+  Must be set to the organization's slug to confirm deletion
+</ParamField>
+
+<ParamField query="backup" type="boolean" default={false}>
+  Whether to create a data export before deletion (recommended)
+</ParamField>
+
+## Prerequisites
+
+<AccordionGroup>
+  <Accordion title="Permission Requirements">
+    - Must be the **organization owner**
+    - Cannot be performed by administrators or regular users
+    - Requires recent authentication (within last 30 minutes)
+  </Accordion>
+
+  <Accordion title="Account Status">
+    - Organization must not have active subscriptions
+    - All pending invoices must be resolved
+    - No ongoing data exports or migrations
+  </Accordion>
+
+  <Accordion title="Data Dependencies">
+    - Consider downloading execution logs and workflow definitions
+    - Ensure all API integrations are updated to use different credentials
+    - Notify team members of the impending deletion
+  </Accordion>
+</AccordionGroup>
+
+## Deletion Process
+
+The deletion process happens in phases:
+
+1. **Validation** (immediate)
+   - Verify user permissions
+   - Check account status
+   - Validate confirmation parameters
+
+2. **Data Export** (if requested, 5-30 minutes)
+   - Create downloadable backup of all data
+   - Generate export URL with 7-day expiration
+
+3. **Soft Delete** (immediate)
+   - Organization becomes inaccessible
+   - API requests return 404
+   - Billing stops immediately
+
+4. **Hard Delete** (after 7 days)
+   - All data permanently removed
+   - Cannot be recovered
+
+## Response
+
+<ResponseField name="id" type="string">
+  ID of the deleted organization
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Deletion status: "scheduled" or "processing"
+</ResponseField>
+
+<ResponseField name="scheduledAt" type="string">
+  ISO 8601 timestamp when hard deletion will occur
+</ResponseField>
+
+<ResponseField name="exportUrl" type="string">
+  Download URL for data backup (if backup=true)
+</ResponseField>
+
+<ResponseField name="exportExpiresAt" type="string">
+  When the export URL expires
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X DELETE "https://api.tolstoy.dev/organizations/org_1234567890?confirm=acme-corp&backup=true" \
+  -H "x-org-id: org_1234567890" \
+  -H "x-user-id: user_1234567890"
+```
+
+```javascript JavaScript
+const deletion = await tolstoy.organizations.delete('org_1234567890', {
+  confirm: 'acme-corp',
+  backup: true
+});
+console.log('Deletion scheduled for:', deletion.scheduledAt);
+console.log('Data export URL:', deletion.exportUrl);
+```
+
+```python Python
+deletion = tolstoy.organizations.delete('org_1234567890', 
+    confirm='acme-corp',
+    backup=True
+)
+print(f"Deletion scheduled for: {deletion.scheduled_at}")
+print(f"Data export URL: {deletion.export_url}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "id": "org_1234567890",
+  "status": "scheduled",
+  "scheduledAt": "2024-08-17T15:30:00Z",
+  "exportUrl": "https://exports.tolstoy.dev/org_1234567890_backup_20240810.zip?token=...",
+  "exportExpiresAt": "2024-08-17T15:30:00Z"
+}
+```
+</ResponseExample>
+
+## Recovery Options
+
+<Info>
+Organizations can be recovered within 7 days of deletion. Contact support immediately if you need to restore a deleted organization.
+</Info>
+
+During the 7-day grace period:
+
+- **Data restoration** is possible through support ticket
+- **Partial recovery** may be available for specific workflows
+- **Export download** remains available at the provided URL
+
+After 7 days, all data is permanently destroyed and cannot be recovered.
+
+## Error Responses
+
+<ResponseField name="400" type="error">
+  Invalid confirmation or missing parameters
+  
+  ```json
+  {
+    "error": "invalid_confirmation",
+    "message": "Confirmation slug does not match organization slug",
+    "required": "acme-corp",
+    "provided": "acme-corporation"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="403" type="error">
+  Insufficient permissions - only organization owners can delete
+  
+  ```json
+  {
+    "error": "insufficient_permissions",
+    "message": "Organization deletion requires owner privileges",
+    "userRole": "admin"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="409" type="error">
+  Cannot delete due to active dependencies
+  
+  ```json
+  {
+    "error": "active_dependencies",
+    "message": "Cannot delete organization with active subscription",
+    "blockers": ["active_subscription", "pending_invoices"]
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="429" type="error">
+  Rate limited - deletion attempts are limited to prevent abuse
+</ResponseField>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Pre-Deletion Checklist">
+    - [ ] Download all important workflow definitions
+    - [ ] Export execution logs and analytics data  
+    - [ ] Update any external systems using organization credentials
+    - [ ] Notify all team members with sufficient advance notice
+    - [ ] Cancel or transfer active subscriptions
+    - [ ] Remove organization references from external documentation
+  </Accordion>
+
+  <Accordion title="Alternative Options">
+    Before deletion, consider:
+    - **Downgrade** to free plan instead of deletion
+    - **Transfer ownership** to another user
+    - **Export specific workflows** and recreate in new organization
+    - **Suspend** organization temporarily instead of permanent deletion
+  </Accordion>
+
+  <Accordion title="Security Considerations">
+    - Revoke all API keys and webhooks immediately
+    - Remove organization from any CI/CD pipelines
+    - Update password managers and credential stores
+    - Audit any shared integrations or external tools
+  </Accordion>
+</AccordionGroup>
+
+## Related Endpoints
+
+- [Get Organization](/api/organizations/get) - View organization details before deletion
+- [Update Organization](/api/organizations/update) - Modify settings as alternative to deletion
+- [List Organizations](/api/organizations/list) - Find organization ID and slug

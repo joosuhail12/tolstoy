@@ -1,0 +1,627 @@
+---
+title: "Create Flow"
+description: "Create a new workflow flow in your organization"
+---
+
+# Create Flow
+
+<Badge variant="warning">POST</Badge> `/flows`
+
+Create a new flow to orchestrate multiple actions into a workflow. Flows can be triggered manually, by webhooks, on schedules, or by events.
+
+## Request
+
+### **HTTP Request**
+
+```http
+POST https://api.tolstoy.dev/flows
+```
+
+### **Request Body**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Unique flow identifier (alphanumeric, underscore) |
+| `display_name` | string | Yes | Human-readable flow name |
+| `description` | string | No | Detailed flow description |
+| `trigger` | object | Yes | Trigger configuration |
+| `steps` | array | Yes | Workflow steps defining the flow logic |
+| `variables` | object | No | Input variable definitions |
+| `settings` | object | No | Flow-level settings and limits |
+| `status` | string | No | Initial status (`draft` or `active`), defaults to `draft` |
+| `tags` | array | No | Tags for filtering and organization |
+
+### **Trigger Configuration**
+
+| Type | Required Fields | Description |
+|------|-----------------|-------------|
+| `manual` | - | Triggered via API call |
+| `webhook` | `endpoint`, `method` | Triggered by webhook |
+| `schedule` | `cron`, `timezone` | Triggered on schedule |
+| `event` | `event_type`, `filters` | Triggered by system events |
+
+### **Step Configuration**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | Yes | Unique step identifier |
+| `name` | string | Yes | Step name |
+| `action_id` | string | Yes* | Action to execute (*or `flow_id` for subflows) |
+| `type` | string | Yes | Step type (`action`, `condition`, `loop`, `subflow`) |
+| `depends_on` | array | No | Step dependencies for parallel execution |
+| `config` | object | No | Step-specific configuration |
+| `input_mapping` | object | No | Map flow variables to action inputs |
+| `output_mapping` | object | No | Map action outputs to flow variables |
+
+## Response
+
+### **Success Response**
+
+<CodeGroup>
+
+```json 201 Created
+{
+  "flow": {
+    "id": "flow_new789xyz456",
+    "name": "order_processing",
+    "display_name": "Order Processing Workflow",
+    "description": "Process new orders with inventory check, payment, and shipping",
+    "status": "draft",
+    "version": "1.0.0",
+    "trigger": {
+      "type": "webhook",
+      "config": {
+        "endpoint": "/webhooks/new-order",
+        "method": "POST",
+        "authentication": "api_key",
+        "headers": {
+          "X-Webhook-Secret": "{{SECRET_WEBHOOK_KEY}}"
+        }
+      }
+    },
+    "steps": [
+      {
+        "id": "step_validate",
+        "name": "validate_order",
+        "action_id": "act_validate_order",
+        "type": "action",
+        "config": {
+          "timeout": 5000,
+          "error_handling": "fail"
+        },
+        "input_mapping": {
+          "order_data": "{{trigger.body}}",
+          "customer_id": "{{trigger.body.customer_id}}"
+        },
+        "output_mapping": {
+          "validation_result": "{{output.is_valid}}",
+          "validation_errors": "{{output.errors}}"
+        }
+      },
+      {
+        "id": "step_check_inventory",
+        "name": "check_inventory",
+        "action_id": "act_check_inventory",
+        "type": "action",
+        "depends_on": ["step_validate"],
+        "config": {
+          "parallel": true
+        },
+        "input_mapping": {
+          "items": "{{trigger.body.items}}"
+        }
+      },
+      {
+        "id": "step_process_payment",
+        "name": "process_payment",
+        "action_id": "act_stripe_payment",
+        "type": "action",
+        "depends_on": ["step_validate"],
+        "config": {
+          "parallel": true,
+          "retry": {
+            "max_attempts": 3,
+            "backoff": "exponential"
+          }
+        },
+        "input_mapping": {
+          "amount": "{{trigger.body.total_amount}}",
+          "currency": "{{trigger.body.currency}}",
+          "customer_id": "{{trigger.body.customer_id}}"
+        }
+      },
+      {
+        "id": "step_condition",
+        "name": "check_payment_success",
+        "type": "condition",
+        "depends_on": ["step_process_payment"],
+        "config": {
+          "expression": "{{steps.step_process_payment.output.status}} == 'success'",
+          "on_true": "step_create_shipment",
+          "on_false": "step_payment_failed"
+        }
+      },
+      {
+        "id": "step_create_shipment",
+        "name": "create_shipment",
+        "action_id": "act_create_shipment",
+        "type": "action",
+        "depends_on": ["step_condition", "step_check_inventory"],
+        "input_mapping": {
+          "order_id": "{{trigger.body.order_id}}",
+          "items": "{{trigger.body.items}}",
+          "shipping_address": "{{trigger.body.shipping_address}}"
+        }
+      },
+      {
+        "id": "step_payment_failed",
+        "name": "handle_payment_failure",
+        "action_id": "act_send_payment_failed_email",
+        "type": "action",
+        "config": {
+          "skip": "{{steps.step_condition.result != false}}"
+        }
+      }
+    ],
+    "variables": {
+      "order_id": {
+        "type": "string",
+        "required": true,
+        "description": "Unique order identifier"
+      },
+      "customer_id": {
+        "type": "string",
+        "required": true,
+        "description": "Customer identifier"
+      },
+      "total_amount": {
+        "type": "number",
+        "required": true,
+        "validation": {
+          "min": 0
+        }
+      }
+    },
+    "settings": {
+      "timeout": 120000,
+      "max_retries": 2,
+      "error_notification": {
+        "enabled": true,
+        "channels": ["email", "slack"]
+      },
+      "rate_limit": {
+        "executions_per_minute": 50
+      },
+      "concurrency": {
+        "max_parallel_executions": 10
+      }
+    },
+    "tags": ["orders", "payments", "automation"],
+    "created_by": "user_current123",
+    "created_at": "2024-01-15T20:00:00Z",
+    "updated_at": "2024-01-15T20:00:00Z"
+  }
+}
+```
+
+</CodeGroup>
+
+## Examples
+
+### **Simple Sequential Flow**
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST 'https://api.tolstoy.dev/flows' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "name": "welcome_email_flow",
+    "display_name": "Welcome Email Flow",
+    "description": "Send welcome email to new users",
+    "trigger": {
+      "type": "webhook",
+      "config": {
+        "endpoint": "/webhooks/new-user",
+        "method": "POST"
+      }
+    },
+    "steps": [
+      {
+        "id": "step_1",
+        "name": "send_welcome_email",
+        "action_id": "act_send_email",
+        "type": "action",
+        "input_mapping": {
+          "to": "{{trigger.body.email}}",
+          "subject": "Welcome to Tolstoy!",
+          "template": "welcome_email"
+        }
+      },
+      {
+        "id": "step_2",
+        "name": "add_to_crm",
+        "action_id": "act_add_crm_contact",
+        "type": "action",
+        "depends_on": ["step_1"],
+        "input_mapping": {
+          "email": "{{trigger.body.email}}",
+          "name": "{{trigger.body.name}}"
+        }
+      }
+    ]
+  }'
+```
+
+```javascript JavaScript
+const newFlow = {
+  name: "daily_backup_flow",
+  display_name: "Daily Backup Flow",
+  description: "Automated daily database backup and upload",
+  trigger: {
+    type: "schedule",
+    config: {
+      cron: "0 2 * * *", // 2 AM daily
+      timezone: "UTC"
+    }
+  },
+  steps: [
+    {
+      id: "backup_db",
+      name: "create_backup",
+      action_id: "act_backup_database",
+      type: "action",
+      config: {
+        timeout: 300000 // 5 minutes
+      }
+    },
+    {
+      id: "upload_s3",
+      name: "upload_to_s3",
+      action_id: "act_upload_s3",
+      type: "action",
+      depends_on: ["backup_db"],
+      input_mapping: {
+        file_path: "{{steps.backup_db.output.backup_path}}",
+        bucket: "backups",
+        key: "db/{{steps.backup_db.output.timestamp}}.sql.gz"
+      }
+    },
+    {
+      id: "notify",
+      name: "send_notification",
+      action_id: "act_send_slack",
+      type: "action",
+      depends_on: ["upload_s3"],
+      input_mapping: {
+        channel: "#ops",
+        message: "Backup completed: {{steps.upload_s3.output.url}}"
+      }
+    }
+  ],
+  settings: {
+    timeout: 600000, // 10 minutes
+    error_notification: {
+      enabled: true,
+      channels: ["slack"]
+    }
+  },
+  tags: ["backup", "scheduled", "database"]
+};
+
+const response = await fetch('https://api.tolstoy.dev/flows', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify(newFlow)
+});
+
+const data = await response.json();
+console.log('Created flow:', data.flow.id);
+```
+
+</CodeGroup>
+
+### **Parallel Execution Flow**
+
+<CodeGroup>
+
+```javascript Parallel Steps
+const parallelFlow = {
+  name: "user_signup_parallel",
+  display_name: "User Signup (Parallel)",
+  description: "Process user signup with parallel tasks",
+  trigger: {
+    type: "event",
+    config: {
+      event_type: "user.created",
+      filters: {
+        plan: ["pro", "enterprise"]
+      }
+    }
+  },
+  steps: [
+    {
+      id: "validate",
+      name: "validate_user",
+      action_id: "act_validate_user",
+      type: "action"
+    },
+    // These three steps run in parallel after validation
+    {
+      id: "email",
+      name: "send_welcome_email",
+      action_id: "act_send_email",
+      type: "action",
+      depends_on: ["validate"],
+      config: { parallel: true }
+    },
+    {
+      id: "crm",
+      name: "create_crm_lead",
+      action_id: "act_create_salesforce_lead",
+      type: "action",
+      depends_on: ["validate"],
+      config: { parallel: true }
+    },
+    {
+      id: "analytics",
+      name: "track_signup",
+      action_id: "act_track_analytics",
+      type: "action",
+      depends_on: ["validate"],
+      config: { parallel: true }
+    },
+    // Final step waits for all parallel steps
+    {
+      id: "complete",
+      name: "mark_complete",
+      action_id: "act_update_user_status",
+      type: "action",
+      depends_on: ["email", "crm", "analytics"]
+    }
+  ]
+};
+```
+
+</CodeGroup>
+
+### **Conditional Flow with Loop**
+
+<CodeGroup>
+
+```python Python Complex Flow
+import requests
+
+complex_flow = {
+    "name": "batch_process_orders",
+    "display_name": "Batch Order Processing",
+    "description": "Process orders in batches with retry logic",
+    "trigger": {
+        "type": "manual"
+    },
+    "steps": [
+        {
+            "id": "fetch_orders",
+            "name": "get_pending_orders",
+            "action_id": "act_query_database",
+            "type": "action",
+            "input_mapping": {
+                "query": "SELECT * FROM orders WHERE status = 'pending' LIMIT 100"
+            }
+        },
+        {
+            "id": "loop_orders",
+            "name": "process_each_order",
+            "type": "loop",
+            "depends_on": ["fetch_orders"],
+            "config": {
+                "items": "{{steps.fetch_orders.output.rows}}",
+                "item_name": "order",
+                "max_iterations": 100,
+                "parallel": True,
+                "parallel_limit": 10
+            },
+            "steps": [
+                {
+                    "id": "process_order",
+                    "name": "process_single_order",
+                    "action_id": "act_process_order",
+                    "type": "action",
+                    "input_mapping": {
+                        "order_id": "{{loop.order.id}}",
+                        "amount": "{{loop.order.total}}"
+                    }
+                },
+                {
+                    "id": "check_success",
+                    "name": "check_processing_result",
+                    "type": "condition",
+                    "depends_on": ["process_order"],
+                    "config": {
+                        "expression": "{{steps.process_order.output.status}} == 'success'",
+                        "on_true": "update_success",
+                        "on_false": "update_failed"
+                    }
+                }
+            ]
+        },
+        {
+            "id": "send_summary",
+            "name": "send_batch_summary",
+            "action_id": "act_send_email",
+            "type": "action",
+            "depends_on": ["loop_orders"],
+            "input_mapping": {
+                "subject": "Batch Processing Complete",
+                "body": "Processed {{steps.loop_orders.output.processed_count}} orders"
+            }
+        }
+    ],
+    "settings": {
+        "timeout": 1800000,  # 30 minutes
+        "max_retries": 1
+    }
+}
+
+response = requests.post(
+    'https://api.tolstoy.dev/flows',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    },
+    json=complex_flow
+)
+
+if response.status_code == 201:
+    flow = response.json()['flow']
+    print(f"Created flow: {flow['id']}")
+```
+
+</CodeGroup>
+
+## Error Responses
+
+<CodeGroup>
+
+```json 400 Bad Request
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid flow configuration",
+    "type": "validation",
+    "details": [
+      {
+        "field": "steps[2].depends_on",
+        "issue": "Referenced step 'step_missing' does not exist"
+      },
+      {
+        "field": "trigger.config.cron",
+        "issue": "Invalid cron expression"
+      }
+    ],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json 409 Conflict
+{
+  "error": {
+    "code": "DUPLICATE_FLOW",
+    "message": "Flow with this name already exists",
+    "type": "conflict",
+    "details": {
+      "existing_flow_id": "flow_existing123",
+      "name": "order_processing"
+    },
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+## API Playground
+
+Try creating a flow:
+
+<ApiPlayground
+  method="POST"
+  endpoint="/flows"
+  baseUrl="https://api.tolstoy.dev"
+  auth={{
+    type: "bearer",
+    placeholder: "Your API Key"
+  }}
+  body={{
+    type: "json",
+    schema: {
+      name: {
+        type: "string",
+        placeholder: "welcome_email_flow",
+        description: "Unique flow identifier",
+        required: true
+      },
+      display_name: {
+        type: "string",
+        placeholder: "Welcome Email Flow",
+        description: "Human-readable flow name",
+        required: true
+      },
+      description: {
+        type: "string",
+        placeholder: "Send welcome email to new users",
+        description: "Flow description"
+      },
+      trigger: {
+        type: "object",
+        defaultValue: {
+          type: "webhook",
+          config: {
+            endpoint: "/webhooks/new-user",
+            method: "POST"
+          }
+        },
+        description: "Trigger configuration",
+        required: true
+      },
+      steps: {
+        type: "array",
+        defaultValue: [
+          {
+            id: "step_1",
+            name: "send_welcome_email",
+            action_id: "act_send_email",
+            type: "action"
+          }
+        ],
+        description: "Workflow steps",
+        required: true
+      },
+      tags: {
+        type: "array",
+        placeholder: ["welcome", "email"],
+        description: "Tags for organization"
+      }
+    }
+  }}
+  sampleResponse={{
+    "flow": {
+      "id": "flow_new789xyz456",
+      "name": "welcome_email_flow",
+      "display_name": "Welcome Email Flow",
+      "status": "draft",
+      "version": "1.0.0",
+      "trigger": {
+        "type": "webhook",
+        "config": {
+          "endpoint": "/webhooks/new-user"
+        }
+      },
+      "created_at": "2024-01-15T20:00:00Z"
+    }
+  }}
+/>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="List Flows" icon="list" href="/api/flows/list">
+    List all flows in your organization
+  </Card>
+  <Card title="Update Flow" icon="pencil" href="/api/flows/update">
+    Update an existing flow
+  </Card>
+  <Card title="Test Flow" icon="vial" href="/api/flows/test">
+    Test flow configuration
+  </Card>
+  <Card title="Deploy Flow" icon="rocket" href="/api/flows/deploy">
+    Deploy flow from draft to active
+  </Card>
+</CardGroup>

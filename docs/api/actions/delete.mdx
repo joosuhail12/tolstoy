@@ -1,0 +1,365 @@
+---
+title: "Delete Action"
+description: "Delete an action from your organization"
+---
+
+# Delete Action
+
+<Badge variant="danger">DELETE</Badge> `/actions/{action_id}`
+
+Permanently delete an action from your organization. This operation cannot be undone.
+
+## Request
+
+### **HTTP Request**
+
+```http
+DELETE https://api.tolstoy.dev/actions/{action_id}
+```
+
+### **Path Parameters**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `action_id` | string | Yes | The unique identifier of the action to delete |
+
+### **Query Parameters**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `force` | boolean | false | Force deletion even if action is used in flows |
+| `cascade` | boolean | false | Delete all related resources (logs, versions) |
+
+## Response
+
+### **Success Response**
+
+<CodeGroup>
+
+```json 200 OK
+{
+  "deleted": true,
+  "action": {
+    "id": "act_abc123xyz456",
+    "name": "deprecated_action",
+    "display_name": "Deprecated Action"
+  },
+  "cleanup": {
+    "logs_deleted": 1542,
+    "versions_deleted": 3,
+    "flow_references_removed": 0
+  },
+  "deleted_at": "2024-01-15T20:45:00Z",
+  "deleted_by": "user_current123"
+}
+```
+
+</CodeGroup>
+
+## Examples
+
+### **Basic Deletion**
+
+<CodeGroup>
+
+```bash cURL
+curl -X DELETE 'https://api.tolstoy.dev/actions/act_abc123xyz456' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript
+const actionId = 'act_abc123xyz456';
+
+const response = await fetch(`https://api.tolstoy.dev/actions/${actionId}`, {
+  method: 'DELETE',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  }
+});
+
+if (response.ok) {
+  const data = await response.json();
+  console.log(`Action ${data.action.id} deleted successfully`);
+  console.log(`Cleaned up ${data.cleanup.logs_deleted} logs`);
+}
+```
+
+```python Python
+import requests
+
+action_id = 'act_abc123xyz456'
+
+response = requests.delete(
+    f'https://api.tolstoy.dev/actions/{action_id}',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+)
+
+if response.status_code == 200:
+    data = response.json()
+    print(f"Deleted action: {data['action']['id']}")
+    print(f"Logs deleted: {data['cleanup']['logs_deleted']}")
+```
+
+</CodeGroup>
+
+### **Force Deletion**
+
+<CodeGroup>
+
+```bash Force Delete with Cascade
+curl -X DELETE 'https://api.tolstoy.dev/actions/act_abc123xyz456?force=true&cascade=true' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript Force Delete
+const actionId = 'act_abc123xyz456';
+
+// Force delete even if used in flows
+const params = new URLSearchParams({
+  force: 'true',
+  cascade: 'true'
+});
+
+const response = await fetch(
+  `https://api.tolstoy.dev/actions/${actionId}?${params}`,
+  {
+    method: 'DELETE',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  }
+);
+
+if (response.ok) {
+  const data = await response.json();
+  console.log('Force deletion completed');
+  console.log(`Flow references removed: ${data.cleanup.flow_references_removed}`);
+}
+```
+
+</CodeGroup>
+
+### **Safe Deletion with Validation**
+
+<CodeGroup>
+
+```javascript Check Before Delete
+async function safeDeleteAction(actionId, apiKey) {
+  // First, check if action is used in any flows
+  const checkResponse = await fetch(
+    `https://api.tolstoy.dev/actions/${actionId}/usage`,
+    {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  const usage = await checkResponse.json();
+  
+  if (usage.flows.length > 0) {
+    console.log(`Action is used in ${usage.flows.length} flows:`);
+    usage.flows.forEach(flow => {
+      console.log(`  - ${flow.name} (${flow.id})`);
+    });
+    
+    const confirm = await getUserConfirmation(
+      'Action is in use. Force delete?'
+    );
+    
+    if (!confirm) {
+      console.log('Deletion cancelled');
+      return false;
+    }
+    
+    // Force delete
+    const deleteResponse = await fetch(
+      `https://api.tolstoy.dev/actions/${actionId}?force=true`,
+      {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    return deleteResponse.ok;
+  }
+  
+  // Safe to delete
+  const deleteResponse = await fetch(
+    `https://api.tolstoy.dev/actions/${actionId}`,
+    {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    }
+  );
+  
+  return deleteResponse.ok;
+}
+```
+
+</CodeGroup>
+
+## Error Responses
+
+<CodeGroup>
+
+```json 404 Not Found
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Action not found",
+    "type": "resource",
+    "details": {
+      "action_id": "act_abc123xyz456"
+    },
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json 409 Conflict
+{
+  "error": {
+    "code": "RESOURCE_IN_USE",
+    "message": "Cannot delete action - currently used in active flows",
+    "type": "conflict",
+    "details": {
+      "flows_using_action": [
+        {
+          "id": "flow_123",
+          "name": "Customer Onboarding",
+          "status": "active"
+        },
+        {
+          "id": "flow_456",
+          "name": "Order Processing",
+          "status": "active"
+        }
+      ]
+    },
+    "hint": "Use force=true parameter to override or remove action from flows first",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json 403 Forbidden
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Insufficient permissions to delete actions",
+    "type": "authorization",
+    "required_scopes": ["actions:delete"],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+## Deletion Behavior
+
+### **What Gets Deleted**
+
+When an action is deleted:
+- The action definition is permanently removed
+- All execution logs are deleted (if `cascade=true`)
+- All version history is deleted (if `cascade=true`)
+- References in flows are removed or cause error (based on `force` flag)
+
+### **What Is Preserved**
+
+- Audit logs of the deletion
+- Historical analytics data (anonymized)
+- Backups (retained for 30 days per policy)
+
+### **Recovery Options**
+
+Deleted actions cannot be recovered through the API. Options:
+- Contact support within 30 days for backup restoration
+- Recreate the action with the same configuration
+- Use action versioning instead of deletion for deprecation
+
+## API Playground
+
+Try deleting an action:
+
+<ApiPlayground
+  method="DELETE"
+  endpoint="/actions/{action_id}"
+  baseUrl="https://api.tolstoy.dev"
+  auth={{
+    type: "bearer",
+    placeholder: "Your API Key"
+  }}
+  pathParams={[
+    {
+      name: "action_id",
+      placeholder: "act_abc123xyz456",
+      description: "The unique identifier of the action to delete",
+      required: true
+    }
+  ]}
+  parameters={[
+    {
+      name: "force",
+      type: "boolean",
+      defaultValue: false,
+      description: "Force deletion even if action is used in flows"
+    },
+    {
+      name: "cascade",
+      type: "boolean",
+      defaultValue: false,
+      description: "Delete all related resources (logs, versions)"
+    }
+  ]}
+  sampleResponse={{
+    "deleted": true,
+    "action": {
+      "id": "act_abc123xyz456",
+      "name": "deprecated_action",
+      "display_name": "Deprecated Action"
+    },
+    "cleanup": {
+      "logs_deleted": 1542,
+      "versions_deleted": 3,
+      "flow_references_removed": 0
+    },
+    "deleted_at": "2024-01-15T20:45:00Z"
+  }}
+/>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Get Action" icon="file" href="/api/actions/get">
+    Retrieve action details before deletion
+  </Card>
+  <Card title="Update Action" icon="pencil" href="/api/actions/update">
+    Consider deprecating instead of deleting
+  </Card>
+  <Card title="Action Usage" icon="chart-line" href="/api/actions/usage">
+    Check where action is being used
+  </Card>
+  <Card title="Export Action" icon="download" href="/api/actions/export">
+    Export action configuration before deletion
+  </Card>
+</CardGroup>

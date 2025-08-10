@@ -1,0 +1,357 @@
+---
+title: "Get Action"
+description: "Retrieve details for a specific action"
+---
+
+# Get Action
+
+<Badge variant="success">GET</Badge> `/actions/{action_id}`
+
+Retrieve detailed information about a specific action by its ID.
+
+## Request
+
+### **HTTP Request**
+
+```http
+GET https://api.tolstoy.dev/actions/{action_id}
+```
+
+### **Path Parameters**
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `action_id` | string | Yes | The unique identifier of the action |
+
+### **Query Parameters**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `include_statistics` | boolean | true | Include execution statistics |
+| `include_versions` | boolean | false | Include version history |
+
+## Response
+
+### **Success Response**
+
+<CodeGroup>
+
+```json 200 OK
+{
+  "action": {
+    "id": "act_abc123xyz456",
+    "name": "send_email_notification",
+    "display_name": "Send Email Notification",
+    "description": "Send formatted email notifications to users",
+    "type": "integration",
+    "status": "active",
+    "version": "2.1.0",
+    "category": "communication",
+    "tags": ["email", "notifications", "smtp"],
+    "configuration": {
+      "inputs": [
+        {
+          "name": "to",
+          "type": "array",
+          "required": true,
+          "description": "Recipient email addresses",
+          "validation": {
+            "min_items": 1,
+            "max_items": 50
+          }
+        },
+        {
+          "name": "subject",
+          "type": "string",
+          "required": true,
+          "description": "Email subject line",
+          "validation": {
+            "max_length": 200
+          }
+        },
+        {
+          "name": "body",
+          "type": "string",
+          "required": true,
+          "description": "Email body content (HTML supported)"
+        },
+        {
+          "name": "cc",
+          "type": "array",
+          "required": false,
+          "description": "CC recipients"
+        },
+        {
+          "name": "attachments",
+          "type": "array",
+          "required": false,
+          "description": "File attachments"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "message_id",
+          "type": "string",
+          "description": "Email message ID"
+        },
+        {
+          "name": "status",
+          "type": "string",
+          "description": "Delivery status"
+        },
+        {
+          "name": "sent_at",
+          "type": "string",
+          "description": "Timestamp when email was sent"
+        }
+      ],
+      "timeout": 30000,
+      "retry_policy": {
+        "max_retries": 3,
+        "backoff_multiplier": 2,
+        "retryable_errors": ["TIMEOUT", "NETWORK_ERROR"]
+      },
+      "provider": {
+        "name": "sendgrid",
+        "api_version": "v3"
+      }
+    },
+    "permissions": {
+      "scopes": ["email:send", "users:read"],
+      "rate_limit": {
+        "requests_per_minute": 100,
+        "requests_per_hour": 2000,
+        "concurrent_limit": 10
+      }
+    },
+    "statistics": {
+      "total_executions": 45234,
+      "successful_executions": 44891,
+      "failed_executions": 343,
+      "average_duration_ms": 1250,
+      "p95_duration_ms": 2100,
+      "p99_duration_ms": 3500,
+      "last_executed_at": "2024-01-15T18:30:00Z",
+      "executions_last_24h": 892,
+      "executions_last_7d": 5421,
+      "success_rate": 0.9924
+    },
+    "versions": [
+      {
+        "version": "2.1.0",
+        "released_at": "2024-01-10T09:00:00Z",
+        "changes": ["Added attachment support", "Improved error handling"]
+      },
+      {
+        "version": "2.0.0",
+        "released_at": "2023-12-01T10:00:00Z",
+        "changes": ["Breaking: Changed input schema", "Added CC/BCC support"]
+      }
+    ],
+    "dependencies": {
+      "actions": [],
+      "connections": ["conn_sendgrid_primary"],
+      "secrets": ["SENDGRID_API_KEY"]
+    },
+    "created_by": "user_789def",
+    "created_at": "2023-06-15T10:30:00Z",
+    "updated_at": "2024-01-10T09:00:00Z",
+    "last_modified_by": "user_456abc"
+  }
+}
+```
+
+</CodeGroup>
+
+## Examples
+
+### **Basic Request**
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET 'https://api.tolstoy.dev/actions/act_abc123xyz456' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript
+const actionId = 'act_abc123xyz456';
+
+const response = await fetch(`https://api.tolstoy.dev/actions/${actionId}`, {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  }
+});
+
+const data = await response.json();
+console.log('Action details:', data.action);
+console.log('Success rate:', `${(data.action.statistics.success_rate * 100).toFixed(2)}%`);
+```
+
+```python Python
+import requests
+
+action_id = 'act_abc123xyz456'
+
+response = requests.get(
+    f'https://api.tolstoy.dev/actions/{action_id}',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+)
+
+if response.status_code == 200:
+    action = response.json()['action']
+    print(f"Action: {action['display_name']}")
+    print(f"Type: {action['type']}")
+    print(f"Status: {action['status']}")
+    print(f"Success rate: {action['statistics']['success_rate']:.2%}")
+```
+
+</CodeGroup>
+
+### **Request with Version History**
+
+<CodeGroup>
+
+```bash Include Versions
+curl -X GET 'https://api.tolstoy.dev/actions/act_abc123xyz456?include_versions=true' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript with Options
+const actionId = 'act_abc123xyz456';
+const params = new URLSearchParams({
+  include_statistics: 'true',
+  include_versions: 'true'
+});
+
+const response = await fetch(
+  `https://api.tolstoy.dev/actions/${actionId}?${params}`,
+  {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  }
+);
+
+const data = await response.json();
+
+// Display version history
+data.action.versions.forEach(version => {
+  console.log(`Version ${version.version} - ${version.released_at}`);
+  version.changes.forEach(change => {
+    console.log(`  - ${change}`);
+  });
+});
+```
+
+</CodeGroup>
+
+## Error Responses
+
+<CodeGroup>
+
+```json 404 Not Found
+{
+  "error": {
+    "code": "NOT_FOUND",
+    "message": "Action not found",
+    "type": "resource",
+    "details": {
+      "action_id": "act_abc123xyz456"
+    },
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json 403 Forbidden
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Insufficient permissions to view this action",
+    "type": "authorization",
+    "required_scopes": ["actions:read"],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+## API Playground
+
+Try retrieving action details:
+
+<ApiPlayground
+  method="GET"
+  endpoint="/actions/{action_id}"
+  baseUrl="https://api.tolstoy.dev"
+  auth={{
+    type: "bearer",
+    placeholder: "Your API Key"
+  }}
+  pathParams={[
+    {
+      name: "action_id",
+      placeholder: "act_abc123xyz456",
+      description: "The unique identifier of the action",
+      required: true
+    }
+  ]}
+  parameters={[
+    {
+      name: "include_statistics",
+      type: "boolean",
+      defaultValue: true,
+      description: "Include execution statistics"
+    },
+    {
+      name: "include_versions",
+      type: "boolean",
+      defaultValue: false,
+      description: "Include version history"
+    }
+  ]}
+  sampleResponse={{
+    "action": {
+      "id": "act_abc123xyz456",
+      "name": "send_email_notification",
+      "display_name": "Send Email Notification",
+      "type": "integration",
+      "status": "active",
+      "version": "2.1.0",
+      "statistics": {
+        "total_executions": 45234,
+        "success_rate": 0.9924,
+        "average_duration_ms": 1250
+      }
+    }
+  }}
+/>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="List Actions" icon="list" href="/api/actions/list">
+    List all actions in your organization
+  </Card>
+  <Card title="Update Action" icon="pencil" href="/api/actions/update">
+    Update action configuration
+  </Card>
+  <Card title="Execute Action" icon="play" href="/api/actions/execute">
+    Execute the action
+  </Card>
+  <Card title="Action Logs" icon="scroll" href="/api/actions/logs">
+    View action execution logs
+  </Card>
+</CardGroup>

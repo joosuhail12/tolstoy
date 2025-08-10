@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tolstoy API - Advanced Documentation & Playground</title>
+    <link rel="stylesheet" type="text/css" href="node_modules/swagger-ui-dist/swagger-ui-bundle.css" />
+    <link rel="stylesheet" href="node_modules/highlight.js/styles/github.css">
+    <link rel="icon" type="image/png" href="node_modules/swagger-ui-dist/favicon-32x32.png" sizes="32x32" />
+    
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-light: #3b82f6;
+            --primary-dark: #1d4ed8;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --error: #ef4444;
+            --purple: #8b5cf6;
+            --gray-50: #f9fafb;
+            --gray-100: #f3f4f6;
+            --gray-200: #e5e7eb;
+            --gray-300: #d1d5db;
+            --gray-600: #4b5563;
+            --gray-700: #374151;
+            --gray-800: #1f2937;
+            --gray-900: #111827;
+        }
+        
+        * { box-sizing: border-box; }
+        
+        body {
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: var(--gray-50);
+        }
+        
+        /* Custom Header */
+        .custom-header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 50%, var(--purple) 100%);
+            color: white;
+            padding: 2rem 0;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .custom-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
+        }
+        
+        .header-content {
+            position: relative;
+            z-index: 1;
+        }
+        
+        .custom-header h1 {
+            margin: 0;
+            font-size: 3rem;
+            font-weight: 800;
+            letter-spacing: -0.025em;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .custom-header p {
+            margin: 0.75rem 0 0 0;
+            font-size: 1.25rem;
+            opacity: 0.95;
+            font-weight: 400;
+        }
+        
+        .header-badges {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .badge {
+            background: rgba(255, 255, 255, 0.2);
+            backdrop-filter: blur(10px);
+            padding: 0.5rem 1rem;
+            border-radius: 50px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        /* Advanced Control Panel */
+        .control-panel {
+            background: white;
+            margin: 2rem auto;
+            max-width: 1400px;
+            border-radius: 16px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--gray-200);
+        }
+        
+        .panel-header {
+            background: var(--gray-50);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--gray-200);
+            border-radius: 16px 16px 0 0;
+        }
+        
+        .panel-title {
+            margin: 0;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--gray-900);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .panel-content {
+            padding: 2rem;
+        }
+        
+        .control-tabs {
+            display: flex;
+            gap: 0.25rem;
+            margin-bottom: 2rem;
+            background: var(--gray-100);
+            padding: 0.25rem;
+            border-radius: 12px;
+        }
+        
+        .control-tab {
+            flex: 1;
+            padding: 0.75rem 1rem;
+            border: none;
+            background: transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--gray-600);
+            transition: all 0.2s ease;
+        }
+        
+        .control-tab.active {
+            background: white;
+            color: var(--primary);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .tab-content {
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Authentication Panel */
+        .auth-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+        
+        .auth-section {
+            background: var(--gray-50);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--gray-200);
+        }
+        
+        .auth-section h4 {
+            margin: 0 0 1rem 0;
+            color: var(--gray-900);
+            font-size: 1rem;
+            font-weight: 600;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--gray-700);
+            font-size: 0.875rem;
+        }
+        
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid var(--gray-300);
+            border-radius: 8px;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            background: white;
+        }
+        
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+        
+        .form-textarea {
+            min-height: 100px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+            font-size: 0.8rem;
+        }
+        
+        /* Buttons */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 25px rgba(37, 99, 235, 0.3);
+        }
+        
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            background: var(--gray-200);
+            color: var(--gray-700);
+        }
+        
+        .btn-secondary:hover {
+            background: var(--gray-300);
+        }
+        
+        .btn-danger {
+            background: var(--error);
+            color: white;
+        }
+        
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.8rem;
+        }
+        
+        /* Request History */
+        .history-item {
+            background: white;
+            border: 1px solid var(--gray-200);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            transition: all 0.2s ease;
+        }
+        
+        .history-item:hover {
+            border-color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+        
+        .history-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+        
+        .history-method {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .history-url {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+            color: var(--gray-600);
+            margin: 0.25rem 0;
+        }
+        
+        .history-status {
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .status-200, .status-201 { color: var(--success); }
+        .status-400, .status-401, .status-403, .status-404 { color: var(--error); }
+        .status-500 { color: var(--error); }
+        
+        /* Environment Variables */
+        .env-var {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            background: white;
+            border-radius: 8px;
+            border: 1px solid var(--gray-200);
+        }
+        
+        .env-var-name {
+            min-width: 120px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .env-var-input {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid var(--gray-300);
+            border-radius: 6px;
+            font-size: 0.875rem;
+        }
+        
+        /* Code Preview */
+        .code-preview {
+            background: var(--gray-900);
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 12px;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 0.875rem;
+            line-height: 1.6;
+            overflow-x: auto;
+            position: relative;
+        }
+        
+        .code-header {
+            display: flex;
+            justify-content: between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid #374151;
+        }
+        
+        .code-lang {
+            background: var(--primary);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .copy-btn {
+            background: transparent;
+            color: #9ca3af;
+            border: 1px solid #374151;
+            padding: 0.5rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .copy-btn:hover {
+            color: white;
+            border-color: var(--primary);
+        }
+        
+        /* Swagger UI Overrides */
+        .swagger-ui {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--gray-200);
+        }
+        
+        .swagger-ui .topbar { display: none; }
+        .swagger-ui .info { margin: 2rem; }
+        .swagger-ui .scheme-container { background: var(--gray-50); padding: 1rem 2rem; }
+        
+        /* Enhanced Method Badges */
+        .swagger-ui .opblock.opblock-get { border-color: var(--success); background: rgba(16, 185, 129, 0.05); }
+        .swagger-ui .opblock.opblock-post { border-color: var(--primary); background: rgba(37, 99, 235, 0.05); }
+        .swagger-ui .opblock.opblock-put { border-color: var(--warning); background: rgba(245, 158, 11, 0.05); }
+        .swagger-ui .opblock.opblock-delete { border-color: var(--error); background: rgba(239, 68, 68, 0.05); }
+        .swagger-ui .opblock.opblock-patch { border-color: var(--purple); background: rgba(139, 92, 246, 0.05); }
+        
+        .swagger-ui .opblock.opblock-get .opblock-summary-method { background: var(--success); }
+        .swagger-ui .opblock.opblock-post .opblock-summary-method { background: var(--primary); }
+        .swagger-ui .opblock.opblock-put .opblock-summary-method { background: var(--warning); }
+        .swagger-ui .opblock.opblock-delete .opblock-summary-method { background: var(--error); }
+        .swagger-ui .opblock.opblock-patch .opblock-summary-method { background: var(--purple); }
+        
+        /* Enhanced Buttons */
+        .swagger-ui .btn.authorize {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            border: none;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .swagger-ui .btn.execute {
+            background: var(--success);
+            border: none;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .swagger-ui .btn.try-out__btn {
+            background: var(--primary-light);
+            border: none;
+            color: white;
+            font-weight: 600;
+        }
+        
+        /* Response Enhancement */
+        .swagger-ui .responses-wrapper {
+            background: var(--gray-50);
+            border-radius: 12px;
+            border: 1px solid var(--gray-200);
+        }
+        
+        .swagger-ui .response {
+            border-radius: 8px;
+            margin: 0.5rem;
+        }
+        
+        /* Parameters Enhancement */
+        .swagger-ui .parameters-container {
+            background: var(--gray-50);
+            border-radius: 12px;
+            padding: 1rem;
+            border: 1px solid var(--gray-200);
+        }
+        
+        /* Custom Footer */
+        .custom-footer {
+            background: var(--gray-900);
+            color: var(--gray-300);
+            text-align: center;
+            padding: 3rem 0;
+            margin-top: 4rem;
+        }
+        
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+        
+        .footer-link {
+            color: var(--primary-light);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s ease;
+        }
+        
+        .footer-link:hover {
+            color: white;
+        }
+        
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .custom-header h1 { font-size: 2rem; }
+            .control-panel { margin: 1rem; }
+            .panel-content { padding: 1rem; }
+            .auth-grid { grid-template-columns: 1fr; }
+            .control-tabs { flex-direction: column; }
+            .footer-links { flex-direction: column; gap: 1rem; }
+        }
+        
+        /* Loading States */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--gray-300);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Success/Error States */
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+        }
+        
+        .alert-success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success);
+            color: #065f46;
+        }
+        
+        .alert-error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid var(--error);
+            color: #991b1b;
+        }
+        
+        /* Floating Action Button */
+        .fab {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 8px 32px rgba(37, 99, 235, 0.3);
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            z-index: 1000;
+        }
+        
+        .fab:hover {
+            transform: scale(1.1);
+            box-shadow: 0 12px 40px rgba(37, 99, 235, 0.4);
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Custom Header -->
+    <div class="custom-header">
+        <div class="header-content">
+            <h1>🚀 Tolstoy API</h1>
+            <p>Enterprise Workflow Automation Platform</p>
+            <div class="header-badges">
+                <span class="badge">📊 54 Endpoints</span>
+                <span class="badge">🔐 Multi-tenant Auth</span>
+                <span class="badge">⚡ Real-time Testing</span>
+                <span class="badge">🎯 Full Playground</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Advanced Control Panel -->
+    <div class="control-panel">
+        <div class="panel-header">
+            <h2 class="panel-title">
+                🎛️ Advanced API Control Center
+            </h2>
+        </div>
+        <div class="panel-content">
+            <div class="control-tabs">
+                <button class="control-tab active" onclick="switchControlTab('auth')">🔐 Authentication</button>
+                <button class="control-tab" onclick="switchControlTab('environment')">🌍 Environment</button>
+                <button class="control-tab" onclick="switchControlTab('history')">📜 Request History</button>
+                <button class="control-tab" onclick="switchControlTab('examples')">💡 Code Examples</button>
+            </div>
+
+            <!-- Authentication Tab -->
+            <div id="auth-tab" class="tab-content active">
+                <div class="auth-grid">
+                    <div class="auth-section">
+                        <h4>🏢 Organization Authentication</h4>
+                        <div class="form-group">
+                            <label class="form-label">Organization ID *</label>
+                            <input type="text" id="org-id" class="form-input" placeholder="your-organization-id" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">User ID *</label>
+                            <input type="text" id="user-id" class="form-input" placeholder="your-user-id" />
+                        </div>
+                        <button class="btn btn-primary" onclick="saveCredentials()">
+                            💾 Save Credentials
+                        </button>
+                    </div>
+
+                    <div class="auth-section">
+                        <h4>🎯 Base URL Configuration</h4>
+                        <div class="form-group">
+                            <label class="form-label">API Base URL</label>
+                            <select id="base-url" class="form-select">
+                                <option value="https://tolstoy.getpullse.com">Production</option>
+                                <option value="https://staging.tolstoy.getpullse.com">Staging</option>
+                                <option value="http://localhost:3000">Local Development</option>
+                                <option value="custom">Custom URL...</option>
+                            </select>
+                            <input type="text" id="custom-url" class="form-input" placeholder="Enter custom URL" style="display: none; margin-top: 0.5rem;" />
+                        </div>
+                    </div>
+
+                    <div class="auth-section">
+                        <h4>⚙️ Request Configuration</h4>
+                        <div class="form-group">
+                            <label class="form-label">Request Timeout (ms)</label>
+                            <input type="number" id="timeout" class="form-input" value="30000" />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">
+                                <input type="checkbox" id="debug-mode" style="margin-right: 0.5rem;" />
+                                Enable Debug Mode
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Environment Tab -->
+            <div id="environment-tab" class="tab-content">
+                <h4>🌍 Environment Variables</h4>
+                <div id="env-variables">
+                    <!-- Environment variables will be populated here -->
+                </div>
+                <button class="btn btn-secondary btn-small" onclick="addEnvironmentVariable()">
+                    ➕ Add Variable
+                </button>
+            </div>
+
+            <!-- History Tab -->
+            <div id="history-tab" class="tab-content">
+                <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 1rem;">
+                    <h4>📜 Request History</h4>
+                    <button class="btn btn-danger btn-small" onclick="clearHistory()">
+                        🗑️ Clear History
+                    </button>
+                </div>
+                <div id="request-history">
+                    <p style="color: var(--gray-600); text-align: center; padding: 2rem;">No requests yet. Start testing endpoints to see your history here!</p>
+                </div>
+            </div>
+
+            <!-- Examples Tab -->
+            <div id="examples-tab" class="tab-content">
+                <h4>💡 Generated Code Examples</h4>
+                <div class="form-group">
+                    <label class="form-label">Select Language/Tool</label>
+                    <select id="code-language" class="form-select" onchange="updateCodeExample()">
+                        <option value="curl">cURL</option>
+                        <option value="javascript">JavaScript (fetch)</option>
+                        <option value="python">Python (requests)</option>
+                        <option value="go">Go (net/http)</option>
+                        <option value="postman">Postman Collection</option>
+                    </select>
+                </div>
+                <div class="code-preview">
+                    <div class="code-header">
+                        <span class="code-lang">cURL</span>
+                        <button class="copy-btn" onclick="copyCode()">📋 Copy</button>
+                    </div>
+                    <pre id="code-example">Select an endpoint from Swagger UI below to generate code examples</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Status Bar -->
+    <div id="status-bar" class="alert" style="display: none; position: sticky; top: 0; z-index: 999;"></div>
+
+    <!-- Swagger UI Container -->
+    <div id="swagger-ui"></div>
+
+    <!-- Floating Action Button -->
+    <button class="fab" onclick="scrollToTop()" title="Scroll to top">
+        ↑
+    </button>
+
+    <!-- Custom Footer -->
+    <div class="custom-footer">
+        <div class="footer-content">
+            <div class="footer-links">
+                <a href="https://tolstoy.getpullse.com" class="footer-link">🏠 Platform Home</a>
+                <a href="https://github.com/joosuhail12/tolstoy" class="footer-link">📚 GitHub Repository</a>
+                <a href="/docs/guides" class="footer-link">📖 API Guides</a>
+                <a href="/support" class="footer-link">🆘 Support</a>
+            </div>
+            <p style="margin: 0; opacity: 0.8;">
+                <strong>Tolstoy API Documentation</strong> - Built with Swagger UI & Advanced Playground Features
+            </p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="node_modules/swagger-ui-dist/swagger-ui-bundle.js"></script>
+    <script src="node_modules/swagger-ui-dist/swagger-ui-standalone-preset.js"></script>
+    <script src="node_modules/highlight.js/lib/core.js"></script>
+    <script src="node_modules/highlight.js/lib/languages/bash.js"></script>
+    <script src="node_modules/highlight.js/lib/languages/javascript.js"></script>
+    <script src="node_modules/highlight.js/lib/languages/python.js"></script>
+    <script src="node_modules/highlight.js/lib/languages/go.js"></script>
+    <script src="node_modules/js-beautify/js/lib/beautify.js"></script>
+    <script>
+        // Global state management
+        const AppState = {
+            requestHistory: JSON.parse(localStorage.getItem('tolstoy-request-history') || '[]'),
+            environmentVars: JSON.parse(localStorage.getItem('tolstoy-env-vars') || '{}'),
+            currentEndpoint: null,
+            swaggerSpec: null
+        };
+
+        // Initialize application
+        window.onload = function() {
+            initializeSwaggerUI();
+            initializeControlPanel();
+            loadSavedData();
+        };
+
+        function initializeSwaggerUI() {
+            window.ui = SwaggerUIBundle({
+                url: 'docs/openapi.json',
+                dom_id: '#swagger-ui',
+                deepLinking: true,
+                presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+                plugins: [SwaggerUIBundle.plugins.DownloadUrl],
+                layout: "StandaloneLayout",
+                tryItOutEnabled: true,
+                filter: true,
+                showRequestHeaders: true,
+                showCommonExtensions: true,
+                persistAuthorization: true,
+                defaultModelsExpandDepth: 2,
+                defaultModelRendering: 'model',
+                docExpansion: 'list',
+                operationsSorter: 'alpha',
+                tagsSorter: 'alpha',
+                
+                // Advanced request interceptor
+                requestInterceptor: (request) => {
+                    const orgId = document.getElementById('org-id').value;
+                    const userId = document.getElementById('user-id').value;
+                    const baseUrl = getSelectedBaseUrl();
+                    const debugMode = document.getElementById('debug-mode').checked;
+                    
+                    // Apply custom base URL
+                    if (baseUrl !== 'https://tolstoy.getpullse.com') {
+                        request.url = request.url.replace('https://tolstoy.getpullse.com', baseUrl);
+                    }
+                    
+                    // Add authentication headers
+                    if (!request.url.includes('/health')) {
+                        request.headers = request.headers || {};
+                        if (orgId) request.headers['x-org-id'] = orgId;
+                        if (userId) request.headers['x-user-id'] = userId;
+                        
+                        // Add environment variables as headers
+                        Object.entries(AppState.environmentVars).forEach(([key, value]) => {
+                            if (key.startsWith('HEADER_')) {
+                                request.headers[key.replace('HEADER_', '').toLowerCase()] = value;
+                            }
+                        });
+                    }
+                    
+                    // Debug logging
+                    if (debugMode) {
+                        console.group('🚀 API Request');
+                        console.log('URL:', request.url);
+                        console.log('Method:', request.method);
+                        console.log('Headers:', request.headers);
+                        console.log('Body:', request.body);
+                        console.groupEnd();
+                    }
+                    
+                    // Store current request for history
+                    AppState.currentRequest = {
+                        url: request.url,
+                        method: request.method,
+                        headers: request.headers,
+                        body: request.body,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    showStatus(`Sending ${request.method.toUpperCase()} request to ${request.url}`, 'info');
+                    
+                    return request;
+                },
+                
+                // Advanced response interceptor
+                responseInterceptor: (response) => {
+                    const debugMode = document.getElementById('debug-mode').checked;
+                    
+                    if (debugMode) {
+                        console.group('📥 API Response');
+                        console.log('Status:', response.status, response.statusText);
+                        console.log('Headers:', response.headers);
+                        console.log('URL:', response.url);
+                        console.groupEnd();
+                    }
+                    
+                    // Add to request history
+                    if (AppState.currentRequest) {
+                        const historyItem = {
+                            ...AppState.currentRequest,
+                            response: {
+                                status: response.status,
+                                statusText: response.statusText,
+                                headers: response.headers,
+                                url: response.url
+                            }
+                        };
+                        
+                        AppState.requestHistory.unshift(historyItem);
+                        AppState.requestHistory = AppState.requestHistory.slice(0, 50); // Keep last 50
+                        
+                        localStorage.setItem('tolstoy-request-history', JSON.stringify(AppState.requestHistory));
+                        updateRequestHistoryDisplay();
+                    }
+                    
+                    // Show status
+                    const statusClass = response.status >= 200 && response.status < 300 ? 'success' : 'error';
+                    showStatus(`Response: ${response.status} ${response.statusText}`, statusClass);
+                    
+                    return response;
+                },
+                
+                onComplete: () => {
+                    // Fetch and store the OpenAPI spec
+                    fetch('docs/openapi.json')
+                        .then(response => response.json())
+                        .then(spec => {
+                            AppState.swaggerSpec = spec;
+                            updateCodeExample();
+                        });
+                    
+                    showStatus('API documentation loaded successfully!', 'success');
+                    
+                    // Add custom event listeners
+                    setTimeout(() => {
+                        addSwaggerUIEnhancements();
+                    }, 1000);
+                }
+            });
+        }
+
+        function initializeControlPanel() {
+            // Initialize environment variables
+            populateEnvironmentVariables();
+            updateRequestHistoryDisplay();
+            
+            // Base URL change handler
+            document.getElementById('base-url').addEventListener('change', function() {
+                const customUrlInput = document.getElementById('custom-url');
+                if (this.value === 'custom') {
+                    customUrlInput.style.display = 'block';
+                    customUrlInput.required = true;
+                } else {
+                    customUrlInput.style.display = 'none';
+                    customUrlInput.required = false;
+                }
+            });
+        }
+
+        function loadSavedData() {
+            // Load saved credentials
+            const savedOrgId = localStorage.getItem('tolstoy-org-id');
+            const savedUserId = localStorage.getItem('tolstoy-user-id');
+            
+            if (savedOrgId) document.getElementById('org-id').value = savedOrgId;
+            if (savedUserId) document.getElementById('user-id').value = savedUserId;
+        }
+
+        // Control Panel Functions
+        function switchControlTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.control-tab').forEach(tab => tab.classList.remove('active'));
+            event.target.classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(tabName + '-tab').classList.add('active');
+        }
+
+        function saveCredentials() {
+            const orgId = document.getElementById('org-id').value;
+            const userId = document.getElementById('user-id').value;
+            
+            if (orgId) localStorage.setItem('tolstoy-org-id', orgId);
+            if (userId) localStorage.setItem('tolstoy-user-id', userId);
+            
+            showStatus('Credentials saved successfully!', 'success');
+            
+            // Visual feedback
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '✅ Saved!';
+            button.style.background = 'var(--success)';
+            
+            setTimeout(() => {
+                button.innerHTML = originalText;
+                button.style.background = '';
+            }, 2000);
+        }
+
+        function getSelectedBaseUrl() {
+            const select = document.getElementById('base-url');
+            if (select.value === 'custom') {
+                return document.getElementById('custom-url').value || 'https://tolstoy.getpullse.com';
+            }
+            return select.value;
+        }
+
+        function populateEnvironmentVariables() {
+            const container = document.getElementById('env-variables');
+            container.innerHTML = '';
+            
+            // Add default environment variables if none exist
+            if (Object.keys(AppState.environmentVars).length === 0) {
+                AppState.environmentVars = {
+                    'API_VERSION': 'v1',
+                    'HEADER_Content-Type': 'application/json',
+                    'TIMEOUT': '30000'
+                };
+            }
+            
+            Object.entries(AppState.environmentVars).forEach(([key, value]) => {
+                addEnvironmentVariableRow(key, value);
+            });
+        }
+
+        function addEnvironmentVariable() {
+            addEnvironmentVariableRow('', '');
+        }
+
+        function addEnvironmentVariableRow(key = '', value = '') {
+            const container = document.getElementById('env-variables');
+            const row = document.createElement('div');
+            row.className = 'env-var';
+            row.innerHTML = `
+                <input type="text" class="env-var-name" placeholder="Variable name" value="${key}" onchange="updateEnvironmentVariable(this)">
+                <input type="text" class="env-var-input" placeholder="Variable value" value="${value}" onchange="updateEnvironmentVariable(this)">
+                <button class="btn btn-danger btn-small" onclick="removeEnvironmentVariable(this)">🗑️</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function updateEnvironmentVariable(input) {
+            const row = input.closest('.env-var');
+            const nameInput = row.querySelector('.env-var-name');
+            const valueInput = row.querySelector('.env-var-input');
+            
+            if (nameInput.value) {
+                AppState.environmentVars[nameInput.value] = valueInput.value;
+                localStorage.setItem('tolstoy-env-vars', JSON.stringify(AppState.environmentVars));
+            }
+        }
+
+        function removeEnvironmentVariable(button) {
+            const row = button.closest('.env-var');
+            const nameInput = row.querySelector('.env-var-name');
+            
+            if (nameInput.value && AppState.environmentVars[nameInput.value] !== undefined) {
+                delete AppState.environmentVars[nameInput.value];
+                localStorage.setItem('tolstoy-env-vars', JSON.stringify(AppState.environmentVars));
+            }
+            
+            row.remove();
+        }
+
+        function updateRequestHistoryDisplay() {
+            const container = document.getElementById('request-history');
+            
+            if (AppState.requestHistory.length === 0) {
+                container.innerHTML = '<p style="color: var(--gray-600); text-align: center; padding: 2rem;">No requests yet. Start testing endpoints to see your history here!</p>';
+                return;
+            }
+            
+            container.innerHTML = AppState.requestHistory.map(item => {
+                const method = item.method.toUpperCase();
+                const status = item.response?.status || 'Pending';
+                const statusClass = status >= 200 && status < 300 ? 'status-200' : 'status-400';
+                
+                return `
+                    <div class="history-item">
+                        <div class="history-header">
+                            <span class="history-method method-${method.toLowerCase()}">${method}</span>
+                            <span class="history-status ${statusClass}">${status}</span>
+                        </div>
+                        <div class="history-url">${item.url}</div>
+                        <div style="font-size: 0.75rem; color: var(--gray-500); margin-top: 0.5rem;">
+                            ${new Date(item.timestamp).toLocaleString()}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function clearHistory() {
+            AppState.requestHistory = [];
+            localStorage.removeItem('tolstoy-request-history');
+            updateRequestHistoryDisplay();
+            showStatus('Request history cleared!', 'success');
+        }
+
+        function updateCodeExample() {
+            const language = document.getElementById('code-language').value;
+            const codeElement = document.getElementById('code-example');
+            const langElement = document.querySelector('.code-lang');
+            
+            if (!AppState.swaggerSpec) {
+                codeElement.textContent = 'Loading API specification...';
+                return;
+            }
+            
+            const orgId = document.getElementById('org-id').value || 'your-org-id';
+            const userId = document.getElementById('user-id').value || 'your-user-id';
+            const baseUrl = getSelectedBaseUrl();
+            
+            // Generate examples for a sample endpoint (health check)
+            const examples = {
+                curl: `curl -X GET "${baseUrl}/health" \\
+  -H "Content-Type: application/json" \\
+  -H "x-org-id: ${orgId}" \\
+  -H "x-user-id: ${userId}"`,
+                
+                javascript: `const response = await fetch('${baseUrl}/health', {
+  method: 'GET',
+  headers: {
+    'Content-Type': 'application/json',
+    'x-org-id': '${orgId}',
+    'x-user-id': '${userId}'
+  }
+});
+
+const data = await response.json();
+console.log(data);`,
+                
+                python: `import requests
+
+headers = {
+    'Content-Type': 'application/json',
+    'x-org-id': '${orgId}',
+    'x-user-id': '${userId}'
+}
+
+response = requests.get('${baseUrl}/health', headers=headers)
+data = response.json()
+print(data)`,
+                
+                go: `package main
+
+import (
+    "fmt"
+    "io"
+    "net/http"
+)
+
+func main() {
+    client := &http.Client{}
+    req, _ := http.NewRequest("GET", "${baseUrl}/health", nil)
+    
+    req.Header.Add("Content-Type", "application/json")
+    req.Header.Add("x-org-id", "${orgId}")
+    req.Header.Add("x-user-id", "${userId}")
+    
+    resp, err := client.Do(req)
+    if err != nil {
+        panic(err)
+    }
+    defer resp.Body.Close()
+    
+    body, _ := io.ReadAll(resp.Body)
+    fmt.Println(string(body))
+}`,
+                
+                postman: `{
+  "info": {
+    "name": "Tolstoy API Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "noauth"
+  },
+  "variables": [
+    {
+      "key": "base_url",
+      "value": "${baseUrl}"
+    },
+    {
+      "key": "org_id",
+      "value": "${orgId}"
+    },
+    {
+      "key": "user_id",
+      "value": "${userId}"
+    }
+  ]
+}`
+            };
+            
+            langElement.textContent = language.charAt(0).toUpperCase() + language.slice(1);
+            codeElement.textContent = examples[language] || 'Example not available';
+            
+            // Apply syntax highlighting
+            if (window.hljs) {
+                hljs.highlightElement(codeElement);
+            }
+        }
+
+        function copyCode() {
+            const codeElement = document.getElementById('code-example');
+            navigator.clipboard.writeText(codeElement.textContent).then(() => {
+                showStatus('Code copied to clipboard!', 'success');
+                
+                const button = event.target;
+                const originalText = button.innerHTML;
+                button.innerHTML = '✅ Copied!';
+                
+                setTimeout(() => {
+                    button.innerHTML = originalText;
+                }, 2000);
+            });
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusBar = document.getElementById('status-bar');
+            statusBar.className = `alert alert-${type === 'info' ? 'success' : type}`;
+            statusBar.textContent = message;
+            statusBar.style.display = 'block';
+            
+            setTimeout(() => {
+                statusBar.style.display = 'none';
+            }, 5000);
+        }
+
+        function addSwaggerUIEnhancements() {
+            // Add click handlers to operation buttons for code generation
+            document.querySelectorAll('.swagger-ui .opblock').forEach(opblock => {
+                opblock.addEventListener('click', () => {
+                    setTimeout(() => {
+                        // Extract operation details for code generation
+                        const method = opblock.querySelector('.opblock-summary-method')?.textContent;
+                        const path = opblock.querySelector('.opblock-summary-path')?.textContent;
+                        
+                        if (method && path) {
+                            AppState.currentEndpoint = { method, path };
+                            updateCodeExample();
+                        }
+                    }, 100);
+                });
+            });
+        }
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch (e.key) {
+                    case 'k':
+                        e.preventDefault();
+                        // Focus on Swagger UI filter
+                        document.querySelector('.swagger-ui .filter input')?.focus();
+                        break;
+                    case '1':
+                        e.preventDefault();
+                        switchControlTab('auth');
+                        break;
+                    case '2':
+                        e.preventDefault();
+                        switchControlTab('environment');
+                        break;
+                    case '3':
+                        e.preventDefault();
+                        switchControlTab('history');
+                        break;
+                    case '4':
+                        e.preventDefault();
+                        switchControlTab('examples');
+                        break;
+                }
+            }
+        });
+
+        // Add method-specific styling to history items
+        const style = document.createElement('style');
+        style.textContent = `
+            .method-get { background: var(--success); color: white; }
+            .method-post { background: var(--primary); color: white; }
+            .method-put { background: var(--warning); color: white; }
+            .method-delete { background: var(--error); color: white; }
+            .method-patch { background: var(--purple); color: white; }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

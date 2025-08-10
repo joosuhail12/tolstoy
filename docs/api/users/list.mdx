@@ -1,0 +1,490 @@
+---
+title: "List Users"
+description: "Retrieve a paginated list of users in your organization"
+---
+
+# List Users
+
+<Badge variant="success">GET</Badge> `/users`
+
+Retrieve a paginated list of users in your organization with filtering and search capabilities.
+
+## Request
+
+### **HTTP Request**
+
+```http
+GET https://api.tolstoy.dev/users
+```
+
+### **Query Parameters**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | 20 | Number of users per page (1-100) |
+| `cursor` | string | - | Pagination cursor for next page |
+| `sort` | string | `created_at` | Sort field (`name`, `email`, `created_at`, `last_login`) |
+| `order` | string | `desc` | Sort order (`asc` or `desc`) |
+| `search` | string | - | Search users by name or email |
+| `role` | string | - | Filter by role (`admin`, `member`, `viewer`) |
+| `status` | string | - | Filter by status (`active`, `pending`, `suspended`) |
+| `created_after` | string | - | Filter by creation date (ISO 8601) |
+| `created_before` | string | - | Filter by creation date (ISO 8601) |
+
+## Response
+
+### **Success Response**
+
+<CodeGroup>
+
+```json 200 OK
+{
+  "users": [
+    {
+      "id": "user_123456789",
+      "email": "john.doe@example.com",
+      "name": "John Doe",
+      "role": "admin",
+      "status": "active",
+      "profile": {
+        "first_name": "John",
+        "last_name": "Doe",
+        "avatar_url": "https://cdn.tolstoy.dev/avatars/user_123456789.jpg",
+        "timezone": "America/New_York",
+        "phone": "+1-555-123-4567"
+      },
+      "organization": {
+        "id": "org_987654321",
+        "name": "Acme Corporation",
+        "role": "admin"
+      },
+      "permissions": [
+        "actions:read",
+        "actions:write",
+        "flows:read",
+        "flows:write",
+        "users:read",
+        "users:write"
+      ],
+      "preferences": {
+        "email_notifications": true,
+        "slack_notifications": false,
+        "theme": "dark",
+        "language": "en"
+      },
+      "security": {
+        "mfa_enabled": true,
+        "last_login": "2024-01-15T18:30:00Z",
+        "login_count": 342,
+        "password_changed_at": "2023-12-01T10:00:00Z"
+      },
+      "created_at": "2023-06-15T08:00:00Z",
+      "updated_at": "2024-01-10T14:20:00Z",
+      "invited_by": "user_789abc123"
+    },
+    {
+      "id": "user_456789012",
+      "email": "jane.smith@example.com",
+      "name": "Jane Smith",
+      "role": "member",
+      "status": "active",
+      "profile": {
+        "first_name": "Jane",
+        "last_name": "Smith",
+        "avatar_url": "https://cdn.tolstoy.dev/avatars/user_456789012.jpg",
+        "timezone": "America/Los_Angeles",
+        "phone": null
+      },
+      "organization": {
+        "id": "org_987654321",
+        "name": "Acme Corporation",
+        "role": "member"
+      },
+      "permissions": [
+        "actions:read",
+        "flows:read",
+        "flows:write"
+      ],
+      "preferences": {
+        "email_notifications": true,
+        "slack_notifications": true,
+        "theme": "light",
+        "language": "en"
+      },
+      "security": {
+        "mfa_enabled": false,
+        "last_login": "2024-01-15T16:45:00Z",
+        "login_count": 89,
+        "password_changed_at": "2024-01-01T09:00:00Z"
+      },
+      "created_at": "2023-11-20T12:30:00Z",
+      "updated_at": "2024-01-15T16:45:00Z",
+      "invited_by": "user_123456789"
+    },
+    {
+      "id": "user_789012345",
+      "email": "bob.wilson@example.com",
+      "name": "Bob Wilson",
+      "role": "viewer",
+      "status": "pending",
+      "profile": {
+        "first_name": "Bob",
+        "last_name": "Wilson",
+        "avatar_url": null,
+        "timezone": "UTC",
+        "phone": null
+      },
+      "organization": {
+        "id": "org_987654321",
+        "name": "Acme Corporation",
+        "role": "viewer"
+      },
+      "permissions": [
+        "actions:read",
+        "flows:read"
+      ],
+      "preferences": {
+        "email_notifications": true,
+        "slack_notifications": false,
+        "theme": "light",
+        "language": "en"
+      },
+      "security": {
+        "mfa_enabled": false,
+        "last_login": null,
+        "login_count": 0,
+        "password_changed_at": null,
+        "invitation_expires_at": "2024-01-22T12:00:00Z"
+      },
+      "created_at": "2024-01-15T12:00:00Z",
+      "updated_at": "2024-01-15T12:00:00Z",
+      "invited_by": "user_123456789"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "count": 3,
+    "has_more": false,
+    "next_cursor": null,
+    "prev_cursor": null,
+    "total_estimate": 3
+  }
+}
+```
+
+</CodeGroup>
+
+### **User Object**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique user identifier |
+| `email` | string | User email address |
+| `name` | string | Display name |
+| `role` | string | Organization role (`admin`, `member`, `viewer`) |
+| `status` | string | User status (`active`, `pending`, `suspended`) |
+| `profile` | object | User profile information |
+| `organization` | object | Organization details |
+| `permissions` | array | List of granted permissions |
+| `preferences` | object | User preferences |
+| `security` | object | Security-related information |
+| `created_at` | string | ISO 8601 timestamp of creation |
+| `updated_at` | string | ISO 8601 timestamp of last update |
+| `invited_by` | string | ID of user who sent invitation |
+
+## Examples
+
+### **Basic Request**
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET 'https://api.tolstoy.dev/users' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.tolstoy.dev/users', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  }
+});
+
+const data = await response.json();
+console.log(`Found ${data.users.length} users`);
+
+data.users.forEach(user => {
+  const lastLogin = user.security.last_login ? 
+    new Date(user.security.last_login).toLocaleDateString() : 
+    'Never';
+  
+  console.log(`- ${user.name} (${user.email})`);
+  console.log(`  Role: ${user.role}, Status: ${user.status}`);
+  console.log(`  Last login: ${lastLogin}`);
+  console.log(`  MFA: ${user.security.mfa_enabled ? 'Enabled' : 'Disabled'}`);
+});
+```
+
+```python Python
+import requests
+from datetime import datetime
+
+response = requests.get(
+    'https://api.tolstoy.dev/users',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+)
+
+if response.status_code == 200:
+    data = response.json()
+    print(f"Found {len(data['users'])} users")
+    
+    for user in data['users']:
+        last_login = 'Never'
+        if user['security']['last_login']:
+            last_login = datetime.fromisoformat(
+                user['security']['last_login'].replace('Z', '+00:00')
+            ).strftime('%Y-%m-%d')
+        
+        print(f"- {user['name']} ({user['email']})")
+        print(f"  Role: {user['role']}, Status: {user['status']}")
+        print(f"  Last login: {last_login}")
+```
+
+</CodeGroup>
+
+### **Filtered Request**
+
+<CodeGroup>
+
+```bash Filter by Role and Status
+curl -X GET 'https://api.tolstoy.dev/users?role=admin&status=active&sort=last_login&order=desc' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript with Filters
+const params = new URLSearchParams({
+  role: 'member',
+  status: 'active',
+  search: 'john',
+  sort: 'last_login',
+  order: 'desc',
+  limit: '50'
+});
+
+const response = await fetch(`https://api.tolstoy.dev/users?${params}`, {
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  }
+});
+
+const data = await response.json();
+
+// Find users who haven't logged in recently
+const inactiveThreshold = Date.now() - (30 * 24 * 60 * 60 * 1000); // 30 days
+const inactiveUsers = data.users.filter(user => {
+  if (!user.security.last_login) return true;
+  return new Date(user.security.last_login).getTime() < inactiveThreshold;
+});
+
+console.log(`Found ${inactiveUsers.length} inactive users`);
+```
+
+</CodeGroup>
+
+### **User Management Dashboard**
+
+<CodeGroup>
+
+```javascript User Analytics
+async function getUserAnalytics(apiKey) {
+  const response = await fetch('https://api.tolstoy.dev/users?limit=100', {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  
+  const { users } = await response.json();
+  
+  // Analyze user distribution
+  const analytics = {
+    total: users.length,
+    byRole: {},
+    byStatus: {},
+    mfaEnabled: 0,
+    recentlyActive: 0,
+    pendingInvitations: 0
+  };
+  
+  const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+  
+  users.forEach(user => {
+    // Count by role
+    analytics.byRole[user.role] = (analytics.byRole[user.role] || 0) + 1;
+    
+    // Count by status
+    analytics.byStatus[user.status] = (analytics.byStatus[user.status] || 0) + 1;
+    
+    // MFA adoption
+    if (user.security.mfa_enabled) {
+      analytics.mfaEnabled++;
+    }
+    
+    // Recent activity
+    if (user.security.last_login && 
+        new Date(user.security.last_login).getTime() > oneWeekAgo) {
+      analytics.recentlyActive++;
+    }
+    
+    // Pending invitations
+    if (user.status === 'pending') {
+      analytics.pendingInvitations++;
+    }
+  });
+  
+  console.log('User Analytics:');
+  console.log(`Total Users: ${analytics.total}`);
+  console.log('Role Distribution:', analytics.byRole);
+  console.log('Status Distribution:', analytics.byStatus);
+  console.log(`MFA Adoption: ${((analytics.mfaEnabled / analytics.total) * 100).toFixed(1)}%`);
+  console.log(`Recently Active: ${analytics.recentlyActive} (${((analytics.recentlyActive / analytics.total) * 100).toFixed(1)}%)`);
+  console.log(`Pending Invitations: ${analytics.pendingInvitations}`);
+  
+  return analytics;
+}
+
+// Usage
+const analytics = await getUserAnalytics(apiKey);
+```
+
+</CodeGroup>
+
+## Error Responses
+
+<CodeGroup>
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Invalid or missing API key",
+    "type": "authentication",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json 403 Forbidden
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Insufficient permissions to list users",
+    "type": "authorization",
+    "required_scopes": ["users:read"],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+## API Playground
+
+Try listing users:
+
+<ApiPlayground
+  method="GET"
+  endpoint="/users"
+  baseUrl="https://api.tolstoy.dev"
+  auth={{
+    type: "bearer",
+    placeholder: "Your API Key"
+  }}
+  parameters={[
+    {
+      name: "limit",
+      type: "integer",
+      defaultValue: 20,
+      description: "Number of users per page (1-100)"
+    },
+    {
+      name: "sort",
+      type: "select",
+      options: ["name", "email", "created_at", "last_login"],
+      defaultValue: "created_at",
+      description: "Sort field"
+    },
+    {
+      name: "order",
+      type: "select",
+      options: ["asc", "desc"],
+      defaultValue: "desc",
+      description: "Sort order"
+    },
+    {
+      name: "search",
+      type: "string",
+      placeholder: "Search users...",
+      description: "Search users by name or email"
+    },
+    {
+      name: "role",
+      type: "select",
+      options: ["admin", "member", "viewer"],
+      description: "Filter by role"
+    },
+    {
+      name: "status",
+      type: "select",
+      options: ["active", "pending", "suspended"],
+      description: "Filter by status"
+    }
+  ]}
+  sampleResponse={{
+    "users": [
+      {
+        "id": "user_123456789",
+        "email": "john.doe@example.com",
+        "name": "John Doe",
+        "role": "admin",
+        "status": "active",
+        "security": {
+          "mfa_enabled": true,
+          "last_login": "2024-01-15T18:30:00Z"
+        }
+      }
+    ],
+    "pagination": {
+      "limit": 20,
+      "count": 1,
+      "has_more": false
+    }
+  }}
+/>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Get User" icon="user" href="/api/users/get">
+    Retrieve details for a specific user
+  </Card>
+  <Card title="Create User" icon="user-plus" href="/api/users/create">
+    Invite a new user to your organization
+  </Card>
+  <Card title="Update User" icon="user-pen" href="/api/users/update">
+    Update user information
+  </Card>
+  <Card title="User Permissions" icon="shield-check" href="/api/users/permissions">
+    Manage user permissions
+  </Card>
+</CardGroup>

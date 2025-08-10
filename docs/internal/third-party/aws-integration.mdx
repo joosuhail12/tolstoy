@@ -1,0 +1,143 @@
+# AWS Integration
+
+Comprehensive guide to AWS services integration in Tolstoy.
+
+## AWS Secrets Manager
+
+### Overview
+Centralized secrets management using AWS Secrets Manager for secure configuration storage.
+
+### Configuration
+```typescript
+// src/aws-secrets.service.ts
+const secretName = 'tolstoy/env';
+const region = 'us-east-1';
+```
+
+### Secret Structure
+```json
+{
+  "STAINLESS_TOKEN": "sk_...",
+  "SENTRY_DSN": "https://...",
+  "INNGEST_EVENT_KEY": "evt_...",
+  "DAYTONA_API_KEY": "dyt_...",
+  "UPSTASH_REDIS_REST_URL": "https://...",
+  "UPSTASH_REDIS_REST_TOKEN": "..."
+}
+```
+
+### Usage Patterns
+- **Initialization**: Secrets loaded at application startup
+- **Caching**: Secrets cached in memory after first retrieval
+- **Fallback**: Environment variables used if AWS unavailable
+
+### Environment Variables
+```bash
+AWS_REGION=us-east-1
+AWS_SECRET_NAME=tolstoy/env
+USE_AWS_SECRETS=true
+```
+
+## EC2 Deployment
+
+### Instance Configuration
+- **Instance Type**: t3.medium or higher
+- **OS**: Ubuntu 22.04 LTS
+- **Node.js**: Version 20.x
+- **PM2**: Process manager for Node.js applications
+
+### IAM Role Requirements
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue"
+      ],
+      "Resource": "arn:aws:secretsmanager:us-east-1:*:secret:tolstoy/env*"
+    }
+  ]
+}
+```
+
+### Deployment Process
+1. **Code Deployment**: Git pull from main branch
+2. **Dependencies**: `npm ci --production=false`
+3. **Database**: Prisma client generation and migrations
+4. **Build**: TypeScript compilation to `dist/`
+5. **Process Management**: PM2 restart with new configuration
+
+### Health Monitoring
+- **Endpoint**: `GET /health`
+- **Timeout**: 30 seconds connection timeout
+- **Retries**: 6 attempts with 10-second intervals
+
+## GitHub Secrets Configuration
+
+### Required Secrets
+```yaml
+EC2_KEY: # Base64 encoded SSH private key
+EC2_USER: ubuntu
+EC2_HOST: # EC2 instance IP address
+DATABASE_URL: # PostgreSQL connection string
+DIRECT_URL: # Direct PostgreSQL connection
+STAINLESS_TOKEN: # Stainless API key
+INNGEST_EVENT_KEY: # Inngest API key
+DAYTONA_API_KEY: # Daytona sandbox API key
+DAYTONA_BASE_URL: # Daytona API endpoint
+UPSTASH_REDIS_REST_URL: # Redis REST endpoint
+UPSTASH_REDIS_REST_TOKEN: # Redis authentication token
+SENTRY_DSN: # Sentry error tracking DSN
+```
+
+### Security Best Practices
+- Secrets rotation every 90 days
+- Separate environments (dev/staging/prod)
+- Least privilege access policies
+- Encrypted GitHub repository secrets
+
+## Cost Optimization
+
+### AWS Services Usage
+- **Secrets Manager**: ~$0.40/month per secret
+- **EC2 Instance**: ~$20-50/month depending on size
+- **Data Transfer**: Minimal costs for API traffic
+
+### Monitoring
+- CloudWatch metrics for EC2 health
+- Cost alerts for unexpected usage spikes
+- Resource utilization dashboards
+
+## Troubleshooting
+
+### Common Issues
+1. **Secrets Access Denied**
+   - Verify IAM role attached to EC2
+   - Check secret name and region configuration
+
+2. **Deployment Failures**
+   - SSH key permissions (600)
+   - GitHub secrets configuration
+   - EC2 instance accessibility
+
+3. **Application Startup Issues**
+   - PM2 process status: `pm2 status`
+   - Application logs: `pm2 logs tolstoy-api`
+   - System resources: `free -h`, `df -h`
+
+### Debug Commands
+```bash
+# Check AWS configuration
+aws sts get-caller-identity
+
+# Test secrets access
+aws secretsmanager get-secret-value --secret-id tolstoy/env --region us-east-1
+
+# Monitor application logs
+pm2 logs tolstoy-api --lines 50
+
+# System health check
+curl http://localhost:3000/health
+```

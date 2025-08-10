@@ -1,0 +1,220 @@
+---
+title: "Get User"
+api: "GET /users/{id}"
+description: "Retrieve details of a specific user by ID"
+---
+
+Retrieve detailed information about a specific user, including their role, permissions, and activity status.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the user
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the user
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address
+</ResponseField>
+
+<ResponseField name="firstName" type="string">
+  User's first name
+</ResponseField>
+
+<ResponseField name="lastName" type="string">
+  User's last name
+</ResponseField>
+
+<ResponseField name="role" type="string">
+  User's role in the organization (owner, admin, member, viewer)
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Account status (active, pending, suspended, deactivated)
+</ResponseField>
+
+<ResponseField name="permissions" type="array">
+  Array of specific permissions granted to the user
+  
+  <Expandable title="Available Permissions">
+    - `workflows.read` - View workflows
+    - `workflows.write` - Create and edit workflows
+    - `workflows.execute` - Execute workflows
+    - `workflows.delete` - Delete workflows
+    - `users.read` - View user information
+    - `users.write` - Manage users
+    - `integrations.read` - View integrations
+    - `integrations.write` - Manage integrations
+    - `organization.read` - View organization settings
+    - `organization.write` - Modify organization settings
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="avatar" type="object">
+  User's profile picture information
+  
+  <Expandable title="avatar">
+    <ResponseField name="url" type="string">
+      URL to the user's profile picture
+    </ResponseField>
+    
+    <ResponseField name="placeholder" type="string">
+      Fallback placeholder image URL
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="preferences" type="object">
+  User's personal preferences
+  
+  <Expandable title="preferences">
+    <ResponseField name="timezone" type="string">
+      User's preferred timezone
+    </ResponseField>
+    
+    <ResponseField name="theme" type="string">
+      UI theme preference (light, dark, auto)
+    </ResponseField>
+    
+    <ResponseField name="notifications" type="object">
+      Notification preferences
+      
+      <Expandable title="notifications">
+        <ResponseField name="email" type="boolean">
+          Email notifications enabled
+        </ResponseField>
+        
+        <ResponseField name="push" type="boolean">
+          Push notifications enabled
+        </ResponseField>
+        
+        <ResponseField name="digest" type="string">
+          Email digest frequency (never, daily, weekly)
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="lastActive" type="string">
+  ISO 8601 timestamp of last activity
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp when the user was created
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO 8601 timestamp when the user was last updated
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://api.tolstoy.dev/users/user_1234567890" \
+  -H "x-org-id: org_1234567890" \
+  -H "x-user-id: user_admin123"
+```
+
+```javascript JavaScript
+const user = await tolstoy.users.get('user_1234567890');
+console.log(`${user.firstName} ${user.lastName} (${user.role})`);
+```
+
+```python Python
+user = tolstoy.users.get('user_1234567890')
+print(f"{user.first_name} {user.last_name} ({user.role})")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "id": "user_1234567890",
+  "email": "john.doe@acme.com",
+  "firstName": "John",
+  "lastName": "Doe",
+  "role": "admin",
+  "status": "active",
+  "permissions": [
+    "workflows.read",
+    "workflows.write",
+    "workflows.execute",
+    "users.read",
+    "integrations.read",
+    "integrations.write",
+    "organization.read"
+  ],
+  "avatar": {
+    "url": "https://cdn.tolstoy.dev/avatars/user_1234567890.jpg",
+    "placeholder": "https://cdn.tolstoy.dev/avatars/placeholder.png"
+  },
+  "preferences": {
+    "timezone": "America/New_York",
+    "theme": "dark",
+    "notifications": {
+      "email": true,
+      "push": false,
+      "digest": "weekly"
+    }
+  },
+  "lastActive": "2024-08-10T14:30:00Z",
+  "createdAt": "2024-02-01T09:15:00Z",
+  "updatedAt": "2024-08-10T10:20:00Z"
+}
+```
+</ResponseExample>
+
+## Privacy & Access Control
+
+<Info>
+Users can only view their own profile details or profiles they have permission to access based on their role:
+
+- **Owners** can view all users
+- **Admins** can view all users except other owners
+- **Members** can view basic info of other members
+- **Viewers** can only view their own profile
+</Info>
+
+The response will include different levels of detail based on the requester's permissions:
+
+<AccordionGroup>
+  <Accordion title="Full Access (Own Profile or Admin)">
+    All fields including personal preferences, last active time, and detailed permissions
+  </Accordion>
+
+  <Accordion title="Limited Access (Other Users)">
+    Basic information only: name, role, status, avatar, and general permissions
+  </Accordion>
+
+  <Accordion title="No Access">
+    Returns 403 Forbidden if user doesn't have permission to view the profile
+  </Accordion>
+</AccordionGroup>
+
+## Error Responses
+
+<ResponseField name="403" type="error">
+  Insufficient permissions to view this user
+</ResponseField>
+
+<ResponseField name="404" type="error">
+  User not found or not in the same organization
+</ResponseField>
+
+## Use Cases
+
+- **User management**: Display user information in admin dashboards
+- **Profile pages**: Show user profile in applications
+- **Permission checking**: Verify user capabilities before showing UI elements
+- **Activity monitoring**: Check when users were last active
+
+## Related Endpoints
+
+- [List Users](/api/users/list) - Get all users in organization
+- [Update User](/api/users/update) - Modify user information
+- [Delete User](/api/users/delete) - Remove user from organization

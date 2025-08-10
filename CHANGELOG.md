@@ -172,7 +172,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Structured logging with correlation IDs and request tracing
 
 - **📚 Comprehensive Documentation**: Professional documentation site with interactive features
-  - Complete MDX documentation with Mintlify-powered site
+  - Complete MDX documentation site
   - Interactive API reference with live examples and code snippets
   - SDK documentation with TypeScript examples and usage guides
   - Developer onboarding guides and contribution workflows
@@ -322,7 +322,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Production**: AWS (recommended)
 - **Development**: Docker Compose with local PostgreSQL
 - **CI/CD**: GitHub Actions with automated testing and deployment
-- **Documentation**: Mintlify-hosted with automatic updates
+- **Documentation**: Hosted with automatic updates
 
 ## Upcoming Features (v1.1.0)
 

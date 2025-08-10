@@ -1,0 +1,309 @@
+---
+title: "Create User"
+api: "POST /users"
+description: "Invite a new user to the organization"
+---
+
+Create a new user account and send an invitation email. The user will need to accept the invitation and set their password before they can access the organization.
+
+## Request Body
+
+<ParamField body="email" type="string" required>
+  User's email address (must be unique within the organization)
+</ParamField>
+
+<ParamField body="firstName" type="string" required>
+  User's first name (2-50 characters)
+</ParamField>
+
+<ParamField body="lastName" type="string" required>
+  User's last name (2-50 characters)
+</ParamField>
+
+<ParamField body="role" type="string" required>
+  User's role in the organization
+  
+  <Expandable title="Available Roles">
+    - `owner` - Full access including billing and organization deletion
+    - `admin` - Manage users, workflows, and organization settings
+    - `member` - Create and manage own workflows, view others
+    - `viewer` - Read-only access to workflows and data
+  </Expandable>
+</ParamField>
+
+<ParamField body="permissions" type="array">
+  Custom permissions to grant (optional, will use role defaults if not specified)
+</ParamField>
+
+<ParamField body="sendInvitation" type="boolean" default={true}>
+  Whether to send an invitation email immediately
+</ParamField>
+
+<ParamField body="message" type="string">
+  Optional welcome message to include in the invitation email (max 500 characters)
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Custom metadata key-value pairs (max 10 keys, 255 chars per value)
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the created user
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address
+</ResponseField>
+
+<ResponseField name="firstName" type="string">
+  User's first name
+</ResponseField>
+
+<ResponseField name="lastName" type="string">
+  User's last name
+</ResponseField>
+
+<ResponseField name="role" type="string">
+  User's assigned role
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Account status (will be "pending" for new invitations)
+</ResponseField>
+
+<ResponseField name="permissions" type="array">
+  Array of permissions granted to the user
+</ResponseField>
+
+<ResponseField name="invitation" type="object">
+  Invitation details
+  
+  <Expandable title="invitation">
+    <ResponseField name="token" type="string">
+      Invitation token (for manual invitation links)
+    </ResponseField>
+    
+    <ResponseField name="expiresAt" type="string">
+      When the invitation expires
+    </ResponseField>
+    
+    <ResponseField name="sent" type="boolean">
+      Whether the invitation email was sent
+    </ResponseField>
+    
+    <ResponseField name="acceptUrl" type="string">
+      Direct URL for accepting the invitation
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp when the user was created
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://api.tolstoy.dev/users" \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_1234567890" \
+  -H "x-user-id: user_admin123" \
+  -d '{
+    "email": "jane.smith@acme.com",
+    "firstName": "Jane",
+    "lastName": "Smith", 
+    "role": "member",
+    "sendInvitation": true,
+    "message": "Welcome to our workflow automation team! Looking forward to working with you.",
+    "metadata": {
+      "department": "Engineering",
+      "location": "San Francisco"
+    }
+  }'
+```
+
+```javascript JavaScript
+const newUser = await tolstoy.users.create({
+  email: 'jane.smith@acme.com',
+  firstName: 'Jane',
+  lastName: 'Smith',
+  role: 'member',
+  sendInvitation: true,
+  message: 'Welcome to our workflow automation team!',
+  metadata: {
+    department: 'Engineering',
+    location: 'San Francisco'
+  }
+});
+
+console.log('Invitation sent to:', newUser.email);
+console.log('Accept URL:', newUser.invitation.acceptUrl);
+```
+
+```python Python
+new_user = tolstoy.users.create({
+    'email': 'jane.smith@acme.com',
+    'first_name': 'Jane',
+    'last_name': 'Smith',
+    'role': 'member',
+    'send_invitation': True,
+    'message': 'Welcome to our workflow automation team!',
+    'metadata': {
+        'department': 'Engineering',
+        'location': 'San Francisco'
+    }
+})
+
+print(f"Invitation sent to: {new_user.email}")
+print(f"Accept URL: {new_user.invitation.accept_url}")
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "id": "user_9876543210",
+  "email": "jane.smith@acme.com",
+  "firstName": "Jane",
+  "lastName": "Smith",
+  "role": "member",
+  "status": "pending",
+  "permissions": [
+    "workflows.read",
+    "workflows.write",
+    "workflows.execute",
+    "integrations.read"
+  ],
+  "invitation": {
+    "token": "inv_abcdef123456",
+    "expiresAt": "2024-08-17T15:30:00Z",
+    "sent": true,
+    "acceptUrl": "https://app.tolstoy.dev/accept?token=inv_abcdef123456"
+  },
+  "metadata": {
+    "department": "Engineering",
+    "location": "San Francisco"
+  },
+  "createdAt": "2024-08-10T15:30:00Z"
+}
+```
+</ResponseExample>
+
+## Role Permissions
+
+Different roles come with different default permissions:
+
+<AccordionGroup>
+  <Accordion title="Owner">
+    - All workflow permissions
+    - All user management permissions
+    - All organization settings permissions
+    - Billing and subscription management
+    - Organization deletion rights
+  </Accordion>
+
+  <Accordion title="Admin">
+    - All workflow permissions
+    - User management (except owner role assignment)
+    - Organization settings (except billing)
+    - Integration management
+  </Accordion>
+
+  <Accordion title="Member">
+    - Create, edit, and execute workflows
+    - View all workflows in organization
+    - Manage own integrations
+    - Basic user profile permissions
+  </Accordion>
+
+  <Accordion title="Viewer">
+    - View workflows (read-only)
+    - View execution logs
+    - Basic profile management
+    - No creation or modification rights
+  </Accordion>
+</AccordionGroup>
+
+## Invitation Process
+
+<Steps>
+  <Step title="User Creation">
+    User account is created with "pending" status
+  </Step>
+  
+  <Step title="Email Invitation">
+    Invitation email sent with accept link (if sendInvitation=true)
+  </Step>
+  
+  <Step title="User Acceptance">
+    User clicks link and sets up their password
+  </Step>
+  
+  <Step title="Account Activation">
+    Status changes to "active" and user can access the organization
+  </Step>
+</Steps>
+
+## Error Responses
+
+<ResponseField name="400" type="error">
+  Invalid request data or validation failure
+  
+  ```json
+  {
+    "error": "validation_error",
+    "message": "Email address is already in use",
+    "field": "email"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="403" type="error">
+  Insufficient permissions to create users
+</ResponseField>
+
+<ResponseField name="409" type="error">
+  User already exists with this email
+  
+  ```json
+  {
+    "error": "user_exists",
+    "message": "A user with this email already exists in the organization",
+    "existingUserId": "user_existing123"
+  }
+  ```
+</ResponseField>
+
+<ResponseField name="429" type="error">
+  Too many invitations sent - rate limited
+</ResponseField>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Email Validation">
+    - Verify email addresses before sending invitations
+    - Use proper email format validation
+    - Consider domain restrictions for enterprise accounts
+  </Accordion>
+
+  <Accordion title="Role Assignment">
+    - Start with minimal permissions (viewer/member)
+    - Promote users as needed after they join
+    - Use custom permissions for fine-grained control
+  </Accordion>
+
+  <Accordion title="Invitation Management">
+    - Set appropriate expiration times
+    - Include helpful context in invitation messages
+    - Monitor invitation acceptance rates
+  </Accordion>
+</AccordionGroup>
+
+## Related Endpoints
+
+- [List Users](/api/users/list) - View all users in organization  
+- [Get User](/api/users/get) - Retrieve user details
+- [Update User](/api/users/update) - Modify user information
+- [Resend Invitation](/api/users/resend-invitation) - Send invitation again

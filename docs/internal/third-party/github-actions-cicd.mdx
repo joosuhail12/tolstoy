@@ -1,0 +1,525 @@
+# GitHub Actions CI/CD
+
+Comprehensive guide to GitHub Actions workflows for continuous integration and deployment.
+
+## Overview
+
+GitHub Actions provides automated CI/CD pipelines for code quality checks, testing, building, and deployment to production infrastructure.
+
+### Workflow Architecture
+- **Quality Checks**: ESLint, TypeScript, Prettier
+- **Testing**: Unit tests and smoke tests
+- **Build Process**: TypeScript compilation and asset bundling
+- **Deployment**: Automated EC2 deployment with health checks
+- **SDK Generation**: Stainless SDK code generation
+
+## Workflow Files
+
+### Simple CI Pipeline
+```yaml
+# .github/workflows/simple-ci.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Quality Checks & Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      
+      # Install dependencies
+      - run: npm ci
+      
+      # Quality checks
+      - run: npx eslint "src/**/*.ts"
+      - run: npx tsc --noEmit  
+      - run: npx prettier --check "src/**/*.ts"
+      
+      # Build
+      - run: npm run build
+      - run: echo "✅ All quality checks passed!"
+```
+
+### Production Deployment
+```yaml
+# Deployment workflow (continued from simple-ci.yml)
+deploy:
+  name: Deploy to Production
+  runs-on: ubuntu-latest
+  needs: test
+  if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  
+  steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup SSH key
+      run: |
+        echo "${{ secrets.EC2_KEY }}" | base64 -d > ssh_key.pem
+        chmod 600 ssh_key.pem
+
+    - name: Deploy to server
+      run: |
+        ssh -o StrictHostKeyChecking=no -i ssh_key.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" << 'EOF'
+          # Deployment commands
+          cd /home/ubuntu/tolstoy
+          git pull origin main
+          npm ci --production=false
+          npm run build
+          pm2 restart tolstoy-api
+        EOF
+```
+
+## Secrets Management
+
+### Required GitHub Secrets
+```yaml
+# Repository secrets configuration
+secrets:
+  # EC2 Deployment
+  EC2_KEY: "Base64 encoded SSH private key"
+  EC2_USER: "ubuntu"
+  EC2_HOST: "ec2-instance-ip-address"
+  
+  # Database
+  DATABASE_URL: "postgresql://user:pass@host:port/db"
+  DIRECT_URL: "postgresql://user:pass@host:port/db"
+  
+  # Third-party Services
+  STAINLESS_TOKEN: "sk_stainless_api_token"
+  INNGEST_EVENT_KEY: "evt_inngest_key"
+  DAYTONA_API_KEY: "dyt_daytona_key"
+  DAYTONA_BASE_URL: "https://api.daytona.io"
+  UPSTASH_REDIS_REST_URL: "https://redis-url.upstash.io"
+  UPSTASH_REDIS_REST_TOKEN: "redis_token"
+  SENTRY_DSN: "https://sentry-dsn"
+  
+  # Sentry Release Management
+  SENTRY_AUTH_TOKEN: "sentry_auth_token"
+  SENTRY_ORG: "organization-slug"
+  SENTRY_PROJECT: "project-name"
+```
+
+### Secrets Security Best Practices
+```yaml
+# Environment-specific secrets
+production:
+  DATABASE_URL: ${{ secrets.PROD_DATABASE_URL }}
+  SENTRY_DSN: ${{ secrets.PROD_SENTRY_DSN }}
+
+staging:
+  DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+  SENTRY_DSN: ${{ secrets.STAGING_SENTRY_DSN }}
+```
+
+## Stainless SDK Generation
+
+### Automated SDK Updates
+```yaml
+# .github/workflows/stainless.yml
+name: Stainless SDK Generation
+
+on:
+  pull_request:
+    paths: ['docs/openapi.json', 'stainless.yml']
+  push:
+    branches: [main]
+    paths: ['docs/openapi.json', 'stainless.yml']
+
+env:
+  STAINLESS_ORG: pullse-inc
+  STAINLESS_PROJECT: tolstoy-api
+  OAS_PATH: docs/openapi.json
+
+jobs:
+  preview:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      
+      - name: Run preview builds
+        uses: stainless-api/upload-openapi-spec-action@v1
+        with:
+          stainless_api_key: ${{ secrets.STAINLESS_TOKEN }}
+          org: ${{ env.STAINLESS_ORG }}
+          project: ${{ env.STAINLESS_PROJECT }}
+          oas_path: ${{ env.OAS_PATH }}
+          target: preview
+```
+
+### OpenAPI Spec Validation
+```yaml
+# Additional validation step
+- name: Validate OpenAPI Spec
+  run: |
+    npm install -g @apidevtools/swagger-cli
+    swagger-cli validate docs/openapi.json
+    
+    # Check spec size and complexity
+    echo "Spec size: $(wc -c < docs/openapi.json) bytes"
+    echo "Endpoints: $(jq '.paths | keys | length' docs/openapi.json)"
+```
+
+## Deployment Strategy
+
+### Blue-Green Deployment
+```yaml
+# Advanced deployment with zero downtime
+- name: Deploy with Zero Downtime
+  run: |
+    ssh -i ssh_key.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" << 'EOF'
+      cd /home/ubuntu/tolstoy
+      
+      # Create backup of current version
+      cp -r . ../tolstoy-backup-$(date +%s)
+      
+      # Pull latest code
+      git pull origin main
+      npm ci --production=false
+      npm run build
+      
+      # Start new instance on different port
+      PORT=3001 pm2 start dist/main.js --name tolstoy-api-new
+      
+      # Wait for health check
+      sleep 10
+      if curl -f http://localhost:3001/health; then
+        # Switch traffic
+        pm2 stop tolstoy-api
+        pm2 delete tolstoy-api
+        pm2 stop tolstoy-api-new
+        PORT=3000 pm2 start dist/main.js --name tolstoy-api
+        echo "✅ Deployment successful"
+      else
+        pm2 delete tolstoy-api-new
+        echo "❌ Health check failed, keeping old version"
+        exit 1
+      fi
+    EOF
+```
+
+### Database Migration Strategy
+```yaml
+- name: Run Database Migrations
+  run: |
+    ssh -i ssh_key.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" << 'EOF'
+      cd /home/ubuntu/tolstoy
+      
+      # Set database URLs from GitHub secrets
+      export DATABASE_URL="${{ secrets.DATABASE_URL }}"
+      export DIRECT_URL="${{ secrets.DIRECT_URL }}"
+      
+      # Create database backup
+      pg_dump $DATABASE_URL > backup_$(date +%Y%m%d_%H%M%S).sql
+      
+      # Run migrations with timeout
+      timeout 30 npm run db:migrate:deploy || {
+        echo "Migration timed out or failed"
+        # Could implement rollback logic here
+        exit 1
+      }
+      
+      echo "✅ Database migrations completed"
+    EOF
+```
+
+## Health Checks & Monitoring
+
+### Comprehensive Health Validation
+```yaml
+- name: Health check
+  run: |
+    echo "⏳ Waiting for application to start..."
+    sleep 20
+    
+    echo "🏥 Running health checks..."
+    for i in {1..6}; do
+      echo "Attempt $i/6..."
+      
+      # Basic health check
+      if curl -f --connect-timeout 10 --max-time 30 \
+         http://${{ secrets.EC2_HOST }}/health; then
+        echo "✅ Basic health check passed!"
+        
+        # Extended health checks
+        HEALTH_RESPONSE=$(curl -s http://${{ secrets.EC2_HOST }}/health)
+        
+        # Check database connectivity
+        if echo "$HEALTH_RESPONSE" | jq -e '.database == "healthy"' > /dev/null; then
+          echo "✅ Database connection healthy"
+        else
+          echo "⚠️ Database connection issues detected"
+        fi
+        
+        # Check external services
+        if echo "$HEALTH_RESPONSE" | jq -e '.redis == "healthy"' > /dev/null; then
+          echo "✅ Redis connection healthy"
+        else
+          echo "⚠️ Redis connection issues detected"
+        fi
+        
+        exit 0
+      fi
+      
+      if [ $i -lt 6 ]; then
+        echo "⏳ Waiting 10 seconds before retry..."
+        sleep 10
+      fi
+    done
+    
+    echo "❌ Health check failed after 6 attempts"
+    exit 1
+```
+
+### Deployment Rollback
+```yaml
+- name: Rollback on Failure
+  if: failure()
+  run: |
+    echo "🔄 Deployment failed, initiating rollback..."
+    
+    ssh -i ssh_key.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" << 'EOF'
+      # Find latest backup
+      BACKUP_DIR=$(ls -td ../tolstoy-backup-* | head -1)
+      
+      if [ -d "$BACKUP_DIR" ]; then
+        echo "Rolling back to: $BACKUP_DIR"
+        
+        # Stop current application
+        pm2 stop tolstoy-api || true
+        pm2 delete tolstoy-api || true
+        
+        # Restore from backup
+        cd "$BACKUP_DIR"
+        PORT=3000 pm2 start dist/main.js --name tolstoy-api
+        
+        echo "✅ Rollback completed"
+      else
+        echo "❌ No backup found for rollback"
+      fi
+    EOF
+```
+
+## Performance Optimization
+
+### Workflow Optimization
+```yaml
+# Optimize for speed and resource usage
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20]
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Only fetch what we need
+          fetch-depth: 1
+      
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: 'package-lock.json'
+      
+      # Parallel execution of independent tasks
+      - name: Install and Build
+        run: |
+          npm ci --prefer-offline --no-audit
+          npm run build
+        
+      - name: Run Tests in Parallel
+        run: |
+          # Run linting and type checking in parallel
+          npm run lint & 
+          npm run type-check &
+          wait
+          
+          # Run tests
+          npm test -- --coverage --ci
+```
+
+### Caching Strategy
+```yaml
+# Cache dependencies and build artifacts
+- name: Cache node modules
+  uses: actions/cache@v3
+  with:
+    path: ~/.npm
+    key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+    restore-keys: |
+      ${{ runner.os }}-node-
+
+- name: Cache build output
+  uses: actions/cache@v3
+  with:
+    path: dist
+    key: ${{ runner.os }}-build-${{ github.sha }}
+    restore-keys: |
+      ${{ runner.os }}-build-
+```
+
+## Security Scanning
+
+### Vulnerability Assessment
+```yaml
+# Security scanning workflow
+- name: Run Security Audit
+  run: |
+    # Check for known vulnerabilities
+    npm audit --audit-level=moderate
+    
+    # Check for outdated dependencies
+    npm outdated --depth=0 || true
+    
+    # License compliance check
+    npx license-checker --summary
+
+- name: CodeQL Analysis
+  uses: github/codeql-action/init@v2
+  with:
+    languages: typescript, javascript
+    
+- name: Perform CodeQL Analysis
+  uses: github/codeql-action/analyze@v2
+```
+
+### Secret Scanning
+```yaml
+# Prevent secret leaks
+- name: Secret Scanning
+  run: |
+    # Check for potential secrets in code
+    git log --all --full-history --grep="password\|secret\|key\|token" || true
+    
+    # Validate no secrets in environment files
+    if grep -r "password\|secret\|key.*=" . --exclude-dir=node_modules --exclude-dir=.git; then
+      echo "❌ Potential secrets found in code"
+      exit 1
+    fi
+```
+
+## Monitoring & Alerting
+
+### Deployment Notifications
+```yaml
+# Slack integration for deployment status
+- name: Notify Deployment Success
+  if: success()
+  uses: 8398a7/action-slack@v3
+  with:
+    status: success
+    text: "🚀 Deployment to production successful!"
+    webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+- name: Notify Deployment Failure
+  if: failure()
+  uses: 8398a7/action-slack@v3
+  with:
+    status: failure
+    text: "🚨 Production deployment failed!"
+    webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+```
+
+### Metrics Collection
+```yaml
+# Collect deployment metrics
+- name: Record Deployment Metrics
+  run: |
+    # Record deployment time
+    DEPLOY_TIME=$(date +%s)
+    
+    # Send to monitoring service
+    curl -X POST "https://api.datadog.com/api/v1/events" \
+      -H "Content-Type: application/json" \
+      -H "DD-API-KEY: ${{ secrets.DATADOG_API_KEY }}" \
+      -d '{
+        "title": "Tolstoy Production Deployment",
+        "text": "Deployment completed successfully",
+        "date_happened": '$DEPLOY_TIME',
+        "tags": ["environment:production", "service:tolstoy"]
+      }'
+```
+
+## Troubleshooting & Debugging
+
+### Common Issues
+1. **SSH Connection Failures**
+   - Verify EC2_KEY is properly base64 encoded
+   - Check security group allows SSH access
+   - Ensure SSH key has correct permissions (600)
+
+2. **Build Failures**
+   - Check Node.js version compatibility
+   - Verify all dependencies are listed in package.json
+   - Review TypeScript configuration
+
+3. **Deployment Timeouts**
+   - Increase timeout values for heavy operations
+   - Check server resources (CPU, memory, disk)
+   - Monitor network connectivity
+
+### Debug Commands
+```yaml
+# Debug deployment issues
+- name: Debug Server State
+  if: failure()
+  run: |
+    ssh -i ssh_key.pem "${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}" << 'EOF'
+      echo "=== System Resources ==="
+      free -h
+      df -h
+      
+      echo "=== Process Status ==="
+      pm2 status
+      
+      echo "=== Application Logs ==="
+      pm2 logs tolstoy-api --lines 50
+      
+      echo "=== Network Status ==="
+      ss -tlnp | grep :3000
+    EOF
+```
+
+## Best Practices
+
+### Workflow Design
+- Use matrix builds for testing multiple environments
+- Implement proper error handling and rollback procedures
+- Cache dependencies and build artifacts
+- Use environment-specific configurations
+
+### Security
+- Store all sensitive data in GitHub secrets
+- Use least privilege access for deployment keys
+- Implement secret scanning and vulnerability assessment
+- Rotate secrets regularly
+
+### Performance
+- Optimize workflow execution time
+- Use parallel execution where possible
+- Implement proper caching strategies
+- Monitor resource usage
+
+### Reliability
+- Implement comprehensive health checks
+- Use timeout configurations appropriately
+- Have rollback procedures ready
+- Monitor deployment success rates

@@ -1,0 +1,339 @@
+# Database & Prisma Integration
+
+Complete guide to PostgreSQL database setup and Prisma ORM integration.
+
+## Database Architecture
+
+### PostgreSQL Configuration
+- **Version**: PostgreSQL 15+
+- **Provider**: Neon, Railway, or self-hosted
+- **Connection Pooling**: Built-in Prisma connection pooling
+- **SSL**: Required for production connections
+
+### Connection Setup
+```typescript
+// prisma/schema.prisma
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+```
+
+### Environment Variables
+```bash
+# Connection pooler URL (for application queries)
+DATABASE_URL="postgresql://user:pass@pooler-host:5432/tolstoy?sslmode=require"
+
+# Direct connection URL (for migrations)
+DIRECT_URL="postgresql://user:pass@direct-host:5432/tolstoy?sslmode=require"
+```
+
+## Schema Overview
+
+### Core Models
+
+#### Organizations
+Multi-tenant architecture with organization-level data isolation.
+```prisma
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  users     User[]
+  tools     Tool[]
+  actions   Action[]
+  flows     Flow[]
+  webhooks  Webhook[]
+}
+```
+
+#### Users
+User management within organizations.
+```prisma
+model User {
+  id            String   @id @default(cuid())
+  orgId         String
+  email         String   @unique
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  organization  Organization @relation(fields: [orgId], references: [id])
+}
+```
+
+#### Tools & Actions
+External service integrations and their available actions.
+```prisma
+model Tool {
+  id          String @id @default(cuid())
+  orgId       String
+  name        String
+  baseUrl     String
+  authType    String
+  secretName  String?
+  
+  organization Organization @relation(fields: [orgId], references: [id])
+  actions      Action[]
+}
+
+model Action {
+  id           String @id @default(cuid())
+  name         String
+  key          String
+  method       String
+  endpoint     String
+  headers      Json
+  inputSchema  Json   // Enhanced schema with UI metadata
+  
+  @@unique([orgId, key])
+}
+```
+
+#### Flows & Execution
+Workflow definitions and execution tracking.
+```prisma
+model Flow {
+  id          String @id @default(cuid())
+  orgId       String
+  version     Int    @default(1)
+  steps       Json   // Flow step definitions
+  
+  executionLogs ExecutionLog[]
+}
+
+model ExecutionLog {
+  id          String   @id @default(cuid())
+  executionId String
+  stepKey     String
+  status      String   // 'started','completed','skipped','failed'
+  inputs      Json
+  outputs     Json?
+  error       Json?
+  
+  @@index([orgId, flowId, executionId])
+  @@index([executionId, stepKey])
+}
+```
+
+#### Webhooks
+Webhook configuration and delivery tracking.
+```prisma
+model Webhook {
+  id         String   @id @default(cuid())
+  orgId      String
+  name       String
+  url        String
+  eventTypes String[]
+  enabled    Boolean  @default(true)
+  
+  dispatchLogs WebhookDispatchLog[]
+  
+  @@index([orgId])
+  @@index([enabled])
+}
+```
+
+## Migration Management
+
+### Development Workflow
+```bash
+# Create and apply new migration
+npm run db:migrate:dev
+
+# Generate Prisma client
+npm run db:generate
+
+# Reset database (development only)
+npx prisma migrate reset
+```
+
+### Production Deployment
+```bash
+# Deploy migrations to production
+npm run db:migrate:deploy
+
+# Generate Prisma client with binary target
+PRISMA_BINARY_TARGET_ENV=1 npm run db:generate
+```
+
+### Migration Scripts
+Available in `package.json`:
+```json
+{
+  "scripts": {
+    "db:generate": "prisma generate",
+    "db:migrate:dev": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio"
+  }
+}
+```
+
+## Performance Optimization
+
+### Indexing Strategy
+Strategic indexes for query performance:
+```prisma
+// Execution logs optimized for filtering
+@@index([orgId, flowId, executionId])
+@@index([executionId, stepKey])
+
+// Webhooks optimized for event dispatch
+@@index([orgId])
+@@index([enabled])
+
+// Time-series data optimization
+@@index([orgId, createdAt])
+@@index([webhookId, createdAt])
+@@index([eventType, createdAt])
+```
+
+### Connection Pooling
+```typescript
+// Default connection pool configuration
+{
+  max: 10,           // Maximum connections
+  min: 2,            // Minimum connections
+  acquireTimeoutMillis: 30000,
+  createTimeoutMillis: 30000,
+  destroyTimeoutMillis: 5000,
+  idleTimeoutMillis: 30000,
+  reapIntervalMillis: 1000
+}
+```
+
+### Query Optimization
+- Use `select` for specific fields only
+- Implement proper pagination with cursor-based navigation
+- Batch operations where possible
+- Use transactions for data consistency
+
+## Data Types & JSON Fields
+
+### JSON Field Usage
+Strategic use of JSON fields for flexible schemas:
+- **Action.inputSchema**: Rich UI metadata and validation rules
+- **Action.headers**: Dynamic HTTP headers configuration
+- **Flow.steps**: Flexible workflow step definitions
+- **ExecutionLog.inputs/outputs**: Dynamic execution data
+
+### Type Safety
+```typescript
+// Prisma client type generation
+import { Prisma } from '@prisma/client';
+
+type ActionWithTool = Prisma.ActionGetPayload<{
+  include: { tool: true }
+}>;
+
+type FlowExecution = Prisma.ExecutionLogGetPayload<{
+  include: { 
+    flow: true, 
+    user: true, 
+    organization: true 
+  }
+}>;
+```
+
+## Backup & Recovery
+
+### Automated Backups
+Production databases should have:
+- Daily automated backups
+- Point-in-time recovery capability
+- Cross-region backup replication
+- Backup retention for 30 days minimum
+
+### Recovery Procedures
+```bash
+# Create manual backup
+pg_dump $DATABASE_URL > backup_$(date +%Y%m%d_%H%M%S).sql
+
+# Restore from backup
+psql $DATABASE_URL < backup_file.sql
+
+# Test restore on staging
+psql $STAGING_DATABASE_URL < production_backup.sql
+```
+
+## Monitoring & Observability
+
+### Key Metrics
+- Connection pool utilization
+- Query execution time
+- Lock wait time
+- Database size growth
+- Index usage statistics
+
+### Health Checks
+```typescript
+// Database health check implementation
+async healthCheck(): Promise<boolean> {
+  try {
+    await this.prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch (error) {
+    this.logger.error('Database health check failed', error);
+    return false;
+  }
+}
+```
+
+### Slow Query Monitoring
+Enable slow query logging for performance optimization:
+```sql
+-- PostgreSQL configuration
+log_min_duration_statement = 1000  -- Log queries > 1 second
+log_statement = 'all'              -- Log all statements
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Connection Pool Exhaustion**
+   - Symptoms: "All connection slots are occupied" errors
+   - Solution: Increase pool size or optimize query patterns
+
+2. **Migration Failures**
+   - Check migration file syntax
+   - Verify database permissions
+   - Review foreign key constraints
+
+3. **Type Generation Issues**
+   - Run `npm run db:generate` after schema changes
+   - Clear node_modules and reinstall if persistent
+
+### Debug Commands
+```bash
+# Check database connection
+npx prisma db pull
+
+# Validate schema
+npx prisma validate
+
+# View database structure
+npx prisma studio
+
+# Reset development database
+npx prisma migrate reset --force
+```
+
+## Security Considerations
+
+### Data Protection
+- Row-level security for multi-tenant isolation
+- Encrypted connections (SSL/TLS)
+- Secrets stored in AWS Secrets Manager
+- Regular security updates
+
+### Access Control
+- Principle of least privilege
+- Separate read-only and read-write connections
+- Database firewall rules
+- IP whitelisting for production access

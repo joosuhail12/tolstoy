@@ -1,0 +1,715 @@
+# Daytona Sandbox Integration
+
+Comprehensive guide to Daytona SDK integration for secure code execution and sandboxed environments.
+
+## Overview
+
+Daytona provides secure, isolated sandbox environments for executing untrusted code, API calls, and complex workflows safely.
+
+### Key Features
+- **Isolated Execution**: Secure sandboxed environments
+- **Multi-language Support**: Node.js, Python, Go, and more
+- **Resource Limits**: CPU, memory, and timeout controls
+- **Network Isolation**: Controlled external API access
+- **Artifact Management**: File and data persistence
+
+## Configuration
+
+### Environment Setup
+```bash
+DAYTONA_API_KEY=dyt_your_api_key_here
+DAYTONA_BASE_URL=https://api.daytona.io
+DAYTONA_DEFAULT_TIMEOUT=30000  # 30 seconds
+DAYTONA_MAX_MEMORY=512         # 512MB
+```
+
+### Service Implementation
+```typescript
+// src/daytona/daytona.service.ts
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Daytona } from '@daytonaio/sdk';
+
+@Injectable()
+export class DaytonaService implements OnModuleDestroy {
+  private client: Daytona | null = null;
+  private isInitialized = false;
+
+  async onModuleInit() {
+    const config = await this.loadConfiguration();
+    
+    this.client = new Daytona({
+      apiKey: config.apiKey,
+      apiUrl: config.apiUrl,
+      defaultTimeout: config.syncTimeout,
+      retries: 3
+    });
+
+    this.isInitialized = true;
+    this.logger.info('Daytona SDK initialized successfully');
+  }
+
+  private async loadConfiguration(): Promise<DaytonaConfig> {
+    const apiKey = await this.secretsService.get('DAYTONA_API_KEY');
+    const baseUrl = await this.secretsService.get('DAYTONA_BASE_URL');
+    
+    return {
+      apiKey,
+      apiUrl: baseUrl || 'https://api.daytona.io',
+      target: this.configService.get('DAYTONA_TARGET', 'default'),
+      syncTimeout: parseInt(this.configService.get('DAYTONA_SYNC_TIMEOUT', '30000')),
+      asyncTimeout: parseInt(this.configService.get('DAYTONA_ASYNC_TIMEOUT', '300000')),
+    };
+  }
+}
+```
+
+## HTTP Request Execution
+
+### Secure API Calls
+```typescript
+async executeHttpRequest(
+  request: HttpExecutionRequest,
+  context: TenantContext
+): Promise<HttpExecutionResponse> {
+  if (!this.isInitialized) {
+    throw new Error('Daytona service not initialized');
+  }
+
+  const executionId = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  try {
+    // Log execution start
+    await this.logExecution(executionId, 'started', context, {
+      url: request.url,
+      method: request.method,
+      sandboxed: true
+    });
+
+    const startTime = Date.now();
+    
+    // Execute in sandbox
+    const result = await this.client!.http.execute({
+      url: request.url,
+      method: request.method,
+      headers: request.headers,
+      body: request.body,
+      timeout: request.timeout || 30000,
+      followRedirects: false,
+      validateCertificates: true
+    });
+
+    const duration = Date.now() - startTime;
+
+    const response: HttpExecutionResponse = {
+      success: result.success,
+      statusCode: result.statusCode,
+      headers: result.headers,
+      data: result.data,
+      duration,
+      executionId,
+      executedInSandbox: true,
+      sandbox: {
+        workspaceId: result.workspaceId,
+        executionEnvironment: 'daytona',
+        resourceUsage: result.resourceUsage
+      }
+    };
+
+    // Log successful execution
+    await this.logExecution(executionId, 'completed', context, {
+      statusCode: result.statusCode,
+      duration,
+      resourceUsage: result.resourceUsage
+    });
+
+    return response;
+  } catch (error) {
+    // Log failed execution
+    await this.logExecution(executionId, 'failed', context, {
+      error: error.message,
+      stack: error.stack
+    });
+
+    throw new Error(`Sandbox execution failed: ${error.message}`);
+  }
+}
+```
+
+### Request Validation
+```typescript
+private validateHttpRequest(request: HttpExecutionRequest): void {
+  // URL validation
+  if (!this.isValidUrl(request.url)) {
+    throw new Error('Invalid or unsafe URL provided');
+  }
+
+  // Method validation
+  const allowedMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD'];
+  if (!allowedMethods.includes(request.method)) {
+    throw new Error(`HTTP method ${request.method} not allowed`);
+  }
+
+  // Header validation
+  this.validateHeaders(request.headers);
+
+  // Size limits
+  if (request.body && Buffer.byteLength(request.body, 'utf8') > 1024 * 1024) {
+    throw new Error('Request body too large (max 1MB)');
+  }
+}
+
+private isValidUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    
+    // Block internal/private networks
+    const blockedHostnames = [
+      'localhost',
+      '127.0.0.1',
+      '0.0.0.0',
+      '10.',
+      '172.16.',
+      '192.168.'
+    ];
+    
+    return !blockedHostnames.some(blocked => 
+      parsed.hostname.includes(blocked)
+    );
+  } catch {
+    return false;
+  }
+}
+```
+
+## Code Execution
+
+### Dynamic Script Execution
+```typescript
+async executeCode(
+  code: string,
+  language: 'javascript' | 'python' | 'go',
+  context: TenantContext,
+  inputs: Record<string, any> = {}
+): Promise<CodeExecutionResult> {
+  const executionId = `code_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  try {
+    // Validate code safety
+    this.validateCodeSafety(code, language);
+    
+    // Prepare execution environment
+    const environment = {
+      language,
+      runtime: this.getRuntimeVersion(language),
+      timeout: 30000,
+      memory: 256, // MB
+      network: 'restricted'
+    };
+
+    // Execute in sandbox
+    const result = await this.client!.code.execute({
+      code,
+      language,
+      environment,
+      inputs,
+      executionId
+    });
+
+    const response: CodeExecutionResult = {
+      executionId,
+      success: result.success,
+      output: result.output,
+      error: result.error,
+      duration: result.duration,
+      resourceUsage: {
+        cpuTime: result.cpuTime,
+        memoryUsed: result.memoryUsed,
+        networkRequests: result.networkRequests
+      },
+      metadata: {
+        language,
+        runtime: environment.runtime,
+        sandboxId: result.sandboxId
+      }
+    };
+
+    // Log execution
+    await this.logExecution(executionId, 
+      result.success ? 'completed' : 'failed', 
+      context, 
+      response
+    );
+
+    return response;
+  } catch (error) {
+    await this.logExecution(executionId, 'failed', context, {
+      error: error.message
+    });
+    throw error;
+  }
+}
+```
+
+### Code Safety Validation
+```typescript
+private validateCodeSafety(code: string, language: string): void {
+  const dangerousPatterns = {
+    javascript: [
+      /require\s*\(\s*['"`]fs['"`]\s*\)/,
+      /require\s*\(\s*['"`]child_process['"`]\s*\)/,
+      /process\.exit/,
+      /eval\s*\(/,
+      /Function\s*\(/,
+      /import\s+.*['"`]fs['"`]/
+    ],
+    python: [
+      /import\s+os/,
+      /import\s+sys/,
+      /import\s+subprocess/,
+      /exec\s*\(/,
+      /eval\s*\(/,
+      /__import__\s*\(/,
+      /open\s*\(/
+    ],
+    go: [
+      /os\.Exec/,
+      /os\.Exit/,
+      /syscall\./,
+      /unsafe\./
+    ]
+  };
+
+  const patterns = dangerousPatterns[language] || [];
+  
+  for (const pattern of patterns) {
+    if (pattern.test(code)) {
+      throw new Error(`Dangerous code pattern detected: ${pattern.source}`);
+    }
+  }
+
+  // Check code length
+  if (code.length > 50000) {
+    throw new Error('Code too long (max 50KB)');
+  }
+}
+```
+
+## Workflow Step Execution
+
+### Sandbox Integration with Flow Executor
+```typescript
+// src/sandbox/sandbox.service.ts
+@Injectable()
+export class SandboxService {
+  constructor(
+    private readonly daytonaService: DaytonaService,
+    private readonly logger: PinoLogger
+  ) {}
+
+  async executeWorkflowStep(
+    step: FlowStep,
+    context: TenantContext,
+    variables: Record<string, any>
+  ): Promise<any> {
+    const shouldUseSandbox = this.shouldExecuteInSandbox(step);
+    
+    if (!shouldUseSandbox) {
+      return await this.executeDirectly(step, context, variables);
+    }
+
+    const executionRequest: HttpExecutionRequest = {
+      url: this.buildStepUrl(step, variables),
+      method: step.method as 'GET' | 'POST' | 'PUT' | 'DELETE',
+      headers: this.buildStepHeaders(step, context, variables),
+      body: step.method !== 'GET' ? JSON.stringify(step.body || {}) : undefined,
+      timeout: step.timeout || 30000
+    };
+
+    const result = await this.daytonaService.executeHttpRequest(
+      executionRequest,
+      context
+    );
+
+    // Transform response for workflow continuation
+    return {
+      success: result.success,
+      data: result.data,
+      statusCode: result.statusCode,
+      executionMetadata: {
+        duration: result.duration,
+        executionId: result.executionId,
+        sandboxed: true
+      }
+    };
+  }
+
+  private shouldExecuteInSandbox(step: FlowStep): boolean {
+    // Execute in sandbox if:
+    // 1. External URL (not internal services)
+    // 2. Untrusted action
+    // 3. User-defined scripts
+    // 4. High-risk operations
+    
+    const isExternalUrl = !step.url?.includes('internal.tolstoy.com');
+    const isUntrustedAction = step.metadata?.trusted !== true;
+    const hasCustomCode = step.customCode !== undefined;
+    
+    return isExternalUrl || isUntrustedAction || hasCustomCode;
+  }
+}
+```
+
+## File Management
+
+### Artifact Handling
+```typescript
+async uploadArtifact(
+  fileContent: Buffer,
+  fileName: string,
+  context: TenantContext
+): Promise<string> {
+  const artifactId = `artifact_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  try {
+    const result = await this.client!.files.upload({
+      content: fileContent,
+      filename: fileName,
+      workspace: `org_${context.orgId}`,
+      metadata: {
+        uploadedBy: context.userId,
+        uploadedAt: new Date().toISOString(),
+        orgId: context.orgId
+      }
+    });
+
+    // Store artifact reference
+    await this.prisma.artifact.create({
+      data: {
+        id: artifactId,
+        orgId: context.orgId,
+        userId: context.userId,
+        fileName,
+        fileSize: fileContent.length,
+        mimeType: this.getMimeType(fileName),
+        sandboxPath: result.path,
+        sandboxWorkspace: result.workspace,
+        status: 'uploaded'
+      }
+    });
+
+    return artifactId;
+  } catch (error) {
+    this.logger.error('Artifact upload failed', {
+      error: error.message,
+      fileName,
+      orgId: context.orgId
+    });
+    throw error;
+  }
+}
+
+async downloadArtifact(artifactId: string, context: TenantContext): Promise<Buffer> {
+  const artifact = await this.prisma.artifact.findFirst({
+    where: {
+      id: artifactId,
+      orgId: context.orgId // Ensure access control
+    }
+  });
+
+  if (!artifact) {
+    throw new Error('Artifact not found or access denied');
+  }
+
+  const content = await this.client!.files.download({
+    path: artifact.sandboxPath,
+    workspace: artifact.sandboxWorkspace
+  });
+
+  return Buffer.from(content);
+}
+```
+
+## Resource Management
+
+### Quota & Limits
+```typescript
+@Injectable()
+export class SandboxResourceManager {
+  private resourceUsage: Map<string, ResourceUsage> = new Map();
+
+  async checkResourceQuota(orgId: string): Promise<boolean> {
+    const usage = await this.getResourceUsage(orgId);
+    const limits = await this.getOrgLimits(orgId);
+
+    return (
+      usage.executionsToday < limits.dailyExecutions &&
+      usage.computeMinutes < limits.monthlyComputeMinutes &&
+      usage.storageUsed < limits.storageLimit
+    );
+  }
+
+  async trackExecution(
+    orgId: string,
+    duration: number,
+    memoryUsed: number
+  ): Promise<void> {
+    const current = this.resourceUsage.get(orgId) || {
+      executionsToday: 0,
+      computeMinutes: 0,
+      storageUsed: 0,
+      lastReset: new Date()
+    };
+
+    current.executionsToday++;
+    current.computeMinutes += Math.ceil(duration / 60000); // Convert to minutes
+
+    this.resourceUsage.set(orgId, current);
+
+    // Persist to database
+    await this.updateResourceUsage(orgId, current);
+  }
+
+  async enforceTimeout(executionId: string, timeout: number): Promise<void> {
+    setTimeout(async () => {
+      try {
+        await this.client?.execution.cancel(executionId);
+        this.logger.warn('Execution timed out and was cancelled', {
+          executionId,
+          timeout
+        });
+      } catch (error) {
+        this.logger.error('Failed to cancel timed out execution', {
+          executionId,
+          error: error.message
+        });
+      }
+    }, timeout);
+  }
+}
+```
+
+## Security & Isolation
+
+### Network Security
+```typescript
+class NetworkSecurityPolicy {
+  private allowedDomains: Set<string> = new Set([
+    'api.github.com',
+    'api.stripe.com',
+    'hooks.slack.com',
+    // Add more trusted domains
+  ]);
+
+  private blockedDomains: Set<string> = new Set([
+    'localhost',
+    '127.0.0.1',
+    'metadata.google.internal',
+    '169.254.169.254' // AWS metadata
+  ]);
+
+  isUrlAllowed(url: string): boolean {
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname.toLowerCase();
+
+      // Check blocked domains first
+      if (this.blockedDomains.has(hostname)) {
+        return false;
+      }
+
+      // Check if domain is in allow list
+      return this.allowedDomains.has(hostname) || 
+             this.isPublicDomain(hostname);
+    } catch {
+      return false;
+    }
+  }
+
+  private isPublicDomain(hostname: string): boolean {
+    // Allow public domains, block private networks
+    const privatePatterns = [
+      /^10\./,
+      /^172\.(1[6-9]|2[0-9]|3[01])\./,
+      /^192\.168\./,
+      /^127\./,
+      /^0\.0\.0\.0/,
+      /localhost/i
+    ];
+
+    return !privatePatterns.some(pattern => pattern.test(hostname));
+  }
+}
+```
+
+### Data Sanitization
+```typescript
+class DataSanitizer {
+  sanitizeInput(data: any): any {
+    if (typeof data === 'string') {
+      return this.sanitizeString(data);
+    } else if (Array.isArray(data)) {
+      return data.map(item => this.sanitizeInput(item));
+    } else if (typeof data === 'object' && data !== null) {
+      return this.sanitizeObject(data);
+    }
+    return data;
+  }
+
+  private sanitizeString(str: string): string {
+    // Remove potential script injections
+    return str
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/javascript:/gi, '')
+      .replace(/on\w+\s*=/gi, '')
+      .trim()
+      .slice(0, 1000); // Limit length
+  }
+
+  private sanitizeObject(obj: Record<string, any>): Record<string, any> {
+    const sanitized: Record<string, any> = {};
+    
+    for (const [key, value] of Object.entries(obj)) {
+      // Skip potentially dangerous keys
+      if (this.isDangerousKey(key)) {
+        continue;
+      }
+      
+      sanitized[key] = this.sanitizeInput(value);
+    }
+    
+    return sanitized;
+  }
+
+  private isDangerousKey(key: string): boolean {
+    const dangerousKeys = [
+      '__proto__',
+      'constructor',
+      'prototype',
+      'eval',
+      'function'
+    ];
+    
+    return dangerousKeys.includes(key.toLowerCase());
+  }
+}
+```
+
+## Monitoring & Observability
+
+### Execution Metrics
+```typescript
+@Injectable()
+export class SandboxMetricsService {
+  private metrics = {
+    executionsTotal: 0,
+    executionsSuccessful: 0,
+    executionsFailed: 0,
+    averageExecutionTime: 0,
+    resourceUsage: {
+      totalCpuTime: 0,
+      totalMemoryUsed: 0,
+      totalNetworkRequests: 0
+    }
+  };
+
+  recordExecution(result: HttpExecutionResponse) {
+    this.metrics.executionsTotal++;
+    
+    if (result.success) {
+      this.metrics.executionsSuccessful++;
+    } else {
+      this.metrics.executionsFailed++;
+    }
+
+    // Update average execution time
+    this.updateAverageExecutionTime(result.duration);
+
+    // Track resource usage
+    if (result.sandbox?.resourceUsage) {
+      this.metrics.resourceUsage.totalCpuTime += result.sandbox.resourceUsage.cpuTime || 0;
+      this.metrics.resourceUsage.totalMemoryUsed += result.sandbox.resourceUsage.memoryUsed || 0;
+      this.metrics.resourceUsage.totalNetworkRequests += result.sandbox.resourceUsage.networkRequests || 0;
+    }
+  }
+
+  getSuccessRate(): number {
+    return this.metrics.executionsTotal > 0 
+      ? (this.metrics.executionsSuccessful / this.metrics.executionsTotal) * 100
+      : 0;
+  }
+}
+```
+
+### Health Monitoring
+```typescript
+async healthCheck(): Promise<{ status: string; details: any }> {
+  try {
+    // Test basic connectivity
+    const testResult = await this.client!.health.check();
+    
+    if (!testResult.healthy) {
+      return {
+        status: 'unhealthy',
+        details: {
+          reason: 'Daytona service unhealthy',
+          lastCheck: testResult.timestamp
+        }
+      };
+    }
+
+    // Test execution capability
+    const testExecution = await this.executeHttpRequest({
+      url: 'https://httpbin.org/status/200',
+      method: 'GET',
+      headers: { 'User-Agent': 'Tolstoy-HealthCheck/1.0' }
+    }, { orgId: 'health-check', userId: 'system' } as TenantContext);
+
+    return {
+      status: testExecution.success ? 'healthy' : 'degraded',
+      details: {
+        connectivity: 'ok',
+        execution: testExecution.success ? 'ok' : 'failed',
+        responseTime: testExecution.duration
+      }
+    };
+  } catch (error) {
+    return {
+      status: 'unhealthy',
+      details: {
+        error: error.message,
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
+}
+```
+
+## Best Practices
+
+### Execution Patterns
+- Always validate input data
+- Set appropriate timeouts
+- Monitor resource usage
+- Implement proper error handling
+- Use least privilege access
+
+### Security Guidelines
+- Sandbox all untrusted code
+- Validate URLs and domains
+- Sanitize input/output data
+- Monitor for suspicious activity
+- Implement rate limiting
+
+### Performance Optimization
+- Reuse sandbox environments when possible
+- Implement connection pooling
+- Cache execution results
+- Monitor and optimize resource usage
+- Set appropriate timeouts
+
+### Cost Management
+- Monitor execution quotas
+- Implement resource limits
+- Track usage by organization
+- Optimize execution efficiency
+- Clean up unused artifacts

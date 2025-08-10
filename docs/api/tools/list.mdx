@@ -1,0 +1,565 @@
+---
+title: "List Tools"
+description: "Retrieve a paginated list of tools in your organization"
+---
+
+# List Tools
+
+<Badge variant="success">GET</Badge> `/tools`
+
+Retrieve a paginated list of tools available in your organization. Tools are external integrations and services that can be used within actions and flows.
+
+## Request
+
+### **HTTP Request**
+
+```http
+GET https://api.tolstoy.dev/tools
+```
+
+### **Query Parameters**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | 20 | Number of tools per page (1-100) |
+| `cursor` | string | - | Pagination cursor for next page |
+| `sort` | string | `created_at` | Sort field (`name`, `created_at`, `updated_at`, `last_used`) |
+| `order` | string | `desc` | Sort order (`asc` or `desc`) |
+| `search` | string | - | Search tools by name or description |
+| `category` | string | - | Filter by category (`database`, `communication`, `storage`, `analytics`) |
+| `status` | string | - | Filter by status (`active`, `inactive`, `error`) |
+| `provider` | string | - | Filter by provider (`salesforce`, `slack`, `postgres`, `s3`) |
+
+## Response
+
+### **Success Response**
+
+<CodeGroup>
+
+```json 200 OK
+{
+  "tools": [
+    {
+      "id": "tool_postgres_main",
+      "name": "main_database",
+      "display_name": "Main PostgreSQL Database",
+      "description": "Primary application database for customer and order data",
+      "provider": "postgresql",
+      "category": "database",
+      "status": "active",
+      "version": "15.4",
+      "connection": {
+        "host": "db.example.com",
+        "port": 5432,
+        "database": "tolstoy_prod",
+        "ssl": true,
+        "pool_size": 20,
+        "timeout_ms": 30000
+      },
+      "credentials": {
+        "type": "secret_reference",
+        "secret_name": "POSTGRES_MAIN_CREDENTIALS",
+        "authentication": "username_password"
+      },
+      "capabilities": [
+        "query",
+        "insert",
+        "update",
+        "delete",
+        "transaction"
+      ],
+      "health": {
+        "status": "healthy",
+        "last_check": "2024-01-15T19:59:30Z",
+        "response_time_ms": 45,
+        "connection_count": 12,
+        "error_count_24h": 0
+      },
+      "usage": {
+        "total_queries": 145230,
+        "queries_last_24h": 2340,
+        "avg_query_time_ms": 120,
+        "peak_connections": 18,
+        "data_transferred_gb": 45.2
+      },
+      "tags": ["production", "primary", "postgres"],
+      "created_by": "user_123456789",
+      "created_at": "2023-06-15T10:00:00Z",
+      "updated_at": "2024-01-10T14:30:00Z"
+    },
+    {
+      "id": "tool_slack_alerts",
+      "name": "slack_alerts",
+      "display_name": "Slack Alerts Channel",
+      "description": "Slack workspace for system alerts and notifications",
+      "provider": "slack",
+      "category": "communication",
+      "status": "active",
+      "version": "1.0.0",
+      "connection": {
+        "workspace_id": "T1234567890",
+        "workspace_name": "Acme Corp",
+        "app_id": "A0987654321",
+        "scopes": [
+          "chat:write",
+          "channels:read",
+          "users:read"
+        ]
+      },
+      "credentials": {
+        "type": "oauth2",
+        "secret_name": "SLACK_BOT_TOKEN",
+        "authentication": "bearer_token"
+      },
+      "capabilities": [
+        "send_message",
+        "send_dm",
+        "create_channel",
+        "list_users",
+        "upload_file"
+      ],
+      "health": {
+        "status": "healthy",
+        "last_check": "2024-01-15T19:58:45Z",
+        "response_time_ms": 234,
+        "rate_limit_remaining": 985,
+        "error_count_24h": 2
+      },
+      "usage": {
+        "messages_sent": 8934,
+        "messages_last_24h": 45,
+        "channels_accessed": 8,
+        "files_uploaded": 123,
+        "api_calls_today": 156
+      },
+      "tags": ["alerts", "notifications", "slack"],
+      "created_by": "user_456789012",
+      "created_at": "2023-08-20T16:30:00Z",
+      "updated_at": "2024-01-15T09:15:00Z"
+    },
+    {
+      "id": "tool_s3_storage",
+      "name": "s3_backup_bucket",
+      "display_name": "AWS S3 Backup Storage",
+      "description": "S3 bucket for storing backups and large files",
+      "provider": "aws_s3",
+      "category": "storage",
+      "status": "active",
+      "version": "2023.11.09",
+      "connection": {
+        "bucket_name": "tolstoy-backups-prod",
+        "region": "us-east-1",
+        "endpoint": "s3.amazonaws.com",
+        "encryption": "AES256"
+      },
+      "credentials": {
+        "type": "iam_role",
+        "secret_name": "AWS_S3_CREDENTIALS",
+        "authentication": "access_key"
+      },
+      "capabilities": [
+        "upload_file",
+        "download_file",
+        "delete_file",
+        "list_files",
+        "generate_presigned_url"
+      ],
+      "health": {
+        "status": "healthy",
+        "last_check": "2024-01-15T19:57:20Z",
+        "response_time_ms": 89,
+        "storage_used_gb": 2340.5,
+        "error_count_24h": 0
+      },
+      "usage": {
+        "files_stored": 15234,
+        "uploads_last_24h": 89,
+        "downloads_last_24h": 156,
+        "bandwidth_gb_24h": 12.4,
+        "storage_cost_month": 45.67
+      },
+      "tags": ["backup", "storage", "aws"],
+      "created_by": "user_789012345",
+      "created_at": "2023-07-10T12:00:00Z",
+      "updated_at": "2024-01-12T11:20:00Z"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "count": 3,
+    "has_more": false,
+    "next_cursor": null,
+    "prev_cursor": null,
+    "total_estimate": 3
+  }
+}
+```
+
+</CodeGroup>
+
+### **Tool Object**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique tool identifier |
+| `name` | string | Tool name (used in actions) |
+| `display_name` | string | Human-readable tool name |
+| `description` | string | Detailed tool description |
+| `provider` | string | Tool provider/service type |
+| `category` | string | Tool category |
+| `status` | string | Tool status (`active`, `inactive`, `error`) |
+| `version` | string | Tool/service version |
+| `connection` | object | Connection configuration |
+| `credentials` | object | Authentication configuration |
+| `capabilities` | array | Available operations |
+| `health` | object | Current health status |
+| `usage` | object | Usage statistics |
+| `tags` | array | Tags for organization |
+| `created_by` | string | User who created the tool |
+| `created_at` | string | ISO 8601 timestamp of creation |
+| `updated_at` | string | ISO 8601 timestamp of last update |
+
+## Examples
+
+### **Basic Request**
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET 'https://api.tolstoy.dev/tools' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.tolstoy.dev/tools', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  }
+});
+
+const data = await response.json();
+console.log(`Found ${data.tools.length} tools`);
+
+data.tools.forEach(tool => {
+  const healthIcon = tool.health.status === 'healthy' ? '✅' : 
+                    tool.health.status === 'degraded' ? '⚠️' : '❌';
+  
+  console.log(`${healthIcon} ${tool.display_name}`);
+  console.log(`  Provider: ${tool.provider}, Category: ${tool.category}`);
+  console.log(`  Response time: ${tool.health.response_time_ms}ms`);
+  
+  if (tool.category === 'database') {
+    console.log(`  Connections: ${tool.health.connection_count}`);
+  } else if (tool.category === 'storage') {
+    console.log(`  Storage used: ${tool.health.storage_used_gb}GB`);
+  }
+});
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    'https://api.tolstoy.dev/tools',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+)
+
+if response.status_code == 200:
+    data = response.json()
+    print(f"Found {len(data['tools'])} tools")
+    
+    for tool in data['tools']:
+        status_icon = '✅' if tool['health']['status'] == 'healthy' else '❌'
+        print(f"{status_icon} {tool['display_name']}")
+        print(f"  Provider: {tool['provider']}, Category: {tool['category']}")
+        print(f"  Health: {tool['health']['status']}")
+```
+
+</CodeGroup>
+
+### **Filter by Category**
+
+<CodeGroup>
+
+```bash Filter Database Tools
+curl -X GET 'https://api.tolstoy.dev/tools?category=database&status=active' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript with Filters
+const params = new URLSearchParams({
+  category: 'communication',
+  status: 'active',
+  sort: 'last_used',
+  order: 'desc'
+});
+
+const response = await fetch(`https://api.tolstoy.dev/tools?${params}`, {
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  }
+});
+
+const data = await response.json();
+
+// Find tools with high usage
+const highUsageTools = data.tools.filter(tool => {
+  if (tool.category === 'database') {
+    return tool.usage.queries_last_24h > 1000;
+  } else if (tool.category === 'communication') {
+    return tool.usage.messages_last_24h > 50;
+  }
+  return false;
+});
+
+console.log(`High usage tools: ${highUsageTools.length}`);
+```
+
+</CodeGroup>
+
+### **Tool Health Monitor**
+
+<CodeGroup>
+
+```javascript Monitor Tool Health
+class ToolHealthMonitor {
+  constructor(apiKey, alertThresholds = {}) {
+    this.apiKey = apiKey;
+    this.thresholds = {
+      responseTimeMs: 1000,
+      errorCount24h: 5,
+      connectionThreshold: 0.8,
+      ...alertThresholds
+    };
+  }
+  
+  async checkAllTools() {
+    const response = await fetch('https://api.tolstoy.dev/tools', {
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const { tools } = await response.json();
+    const issues = [];
+    
+    tools.forEach(tool => {
+      const health = tool.health;
+      const usage = tool.usage;
+      
+      // Check response time
+      if (health.response_time_ms > this.thresholds.responseTimeMs) {
+        issues.push({
+          tool: tool.display_name,
+          type: 'performance',
+          message: `High response time: ${health.response_time_ms}ms`,
+          severity: 'warning'
+        });
+      }
+      
+      // Check error count
+      if (health.error_count_24h > this.thresholds.errorCount24h) {
+        issues.push({
+          tool: tool.display_name,
+          type: 'reliability',
+          message: `High error count: ${health.error_count_24h} errors in 24h`,
+          severity: 'error'
+        });
+      }
+      
+      // Database-specific checks
+      if (tool.category === 'database') {
+        const connectionUsage = health.connection_count / tool.connection.pool_size;
+        if (connectionUsage > this.thresholds.connectionThreshold) {
+          issues.push({
+            tool: tool.display_name,
+            type: 'capacity',
+            message: `High connection usage: ${Math.round(connectionUsage * 100)}%`,
+            severity: 'warning'
+          });
+        }
+      }
+      
+      // Storage-specific checks
+      if (tool.category === 'storage' && health.storage_used_gb > 1000) {
+        issues.push({
+          tool: tool.display_name,
+          type: 'capacity',
+          message: `High storage usage: ${health.storage_used_gb}GB`,
+          severity: 'info'
+        });
+      }
+    });
+    
+    return { tools, issues };
+  }
+  
+  async generateHealthReport() {
+    const { tools, issues } = await this.checkAllTools();
+    
+    console.log('Tool Health Report');
+    console.log('==================');
+    
+    const byCategory = tools.reduce((acc, tool) => {
+      acc[tool.category] = acc[tool.category] || [];
+      acc[tool.category].push(tool);
+      return acc;
+    }, {});
+    
+    Object.entries(byCategory).forEach(([category, categoryTools]) => {
+      console.log(`\n${category.toUpperCase()} (${categoryTools.length} tools):`);
+      
+      categoryTools.forEach(tool => {
+        const status = tool.health.status === 'healthy' ? '✅' : '❌';
+        console.log(`  ${status} ${tool.display_name}`);
+        console.log(`     Response: ${tool.health.response_time_ms}ms`);
+        console.log(`     Errors: ${tool.health.error_count_24h}/24h`);
+      });
+    });
+    
+    if (issues.length > 0) {
+      console.log('\nISSUES DETECTED:');
+      issues.forEach(issue => {
+        const icon = issue.severity === 'error' ? '🔴' : 
+                    issue.severity === 'warning' ? '🟡' : 'ℹ️';
+        console.log(`${icon} ${issue.tool}: ${issue.message}`);
+      });
+    } else {
+      console.log('\n✅ All tools are healthy!');
+    }
+    
+    return { tools, issues };
+  }
+}
+
+// Usage
+const monitor = new ToolHealthMonitor(apiKey);
+await monitor.generateHealthReport();
+```
+
+</CodeGroup>
+
+## Error Responses
+
+<CodeGroup>
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Invalid or missing API key",
+    "type": "authentication",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json 403 Forbidden
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Insufficient permissions to list tools",
+    "type": "authorization",
+    "required_scopes": ["tools:read"],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+## API Playground
+
+Try listing tools:
+
+<ApiPlayground
+  method="GET"
+  endpoint="/tools"
+  baseUrl="https://api.tolstoy.dev"
+  auth={{
+    type: "bearer",
+    placeholder: "Your API Key"
+  }}
+  parameters={[
+    {
+      name: "limit",
+      type: "integer",
+      defaultValue: 20,
+      description: "Number of tools per page (1-100)"
+    },
+    {
+      name: "sort",
+      type: "select",
+      options: ["name", "created_at", "updated_at", "last_used"],
+      defaultValue: "created_at",
+      description: "Sort field"
+    },
+    {
+      name: "category",
+      type: "select",
+      options: ["database", "communication", "storage", "analytics"],
+      description: "Filter by category"
+    },
+    {
+      name: "status",
+      type: "select",
+      options: ["active", "inactive", "error"],
+      description: "Filter by status"
+    },
+    {
+      name: "provider",
+      type: "select",
+      options: ["salesforce", "slack", "postgresql", "aws_s3"],
+      description: "Filter by provider"
+    }
+  ]}
+  sampleResponse={{
+    "tools": [
+      {
+        "id": "tool_postgres_main",
+        "name": "main_database",
+        "display_name": "Main PostgreSQL Database",
+        "provider": "postgresql",
+        "category": "database",
+        "status": "active",
+        "health": {
+          "status": "healthy",
+          "response_time_ms": 45
+        }
+      }
+    ],
+    "pagination": {
+      "limit": 20,
+      "count": 1,
+      "has_more": false
+    }
+  }}
+/>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Get Tool" icon="wrench" href="/api/tools/get">
+    Retrieve details for a specific tool
+  </Card>
+  <Card title="Create Tool" icon="plus" href="/api/tools/create">
+    Create a new tool integration
+  </Card>
+  <Card title="Test Tool" icon="vial" href="/api/tools/test">
+    Test tool connectivity
+  </Card>
+  <Card title="Tool Usage" icon="chart-bar" href="/api/tools/usage">
+    View detailed usage statistics
+  </Card>
+</CardGroup>

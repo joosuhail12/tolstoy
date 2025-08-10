@@ -1,0 +1,2010 @@
+---
+title: 'Internal Authentication Service'
+description: 'Comprehensive documentation for the Tolstoy internal authentication service, including service-to-service auth, JWT management, and security protocols'
+---
+
+# Internal Authentication Service
+
+The Authentication Service is the central authority for all authentication and authorization within the Tolstoy platform. It handles user authentication, service-to-service communication, API key management, and security token validation.
+
+## Service Overview
+
+### Architecture
+
+```mermaid
+graph TB
+    subgraph "Authentication Service"
+        API[Auth API Server]
+        JWT[JWT Manager]
+        MFA[MFA Handler]
+        OAUTH[OAuth Handler]
+        SESSION[Session Manager]
+    end
+    
+    subgraph "Data Stores"
+        DB[(User Database)]
+        CACHE[(Session Cache)]
+        SECRETS[(Secrets Store)]
+    end
+    
+    subgraph "External Providers"
+        GOOGLE[Google OAuth]
+        GITHUB[GitHub OAuth]
+        OKTA[Okta SAML]
+        LDAP[LDAP/AD]
+    end
+    
+    subgraph "Internal Services"
+        GW[API Gateway]
+        WF[Workflow Service]
+        ORG[Organization Service]
+    end
+
+    API --> JWT
+    API --> MFA
+    API --> OAUTH
+    API --> SESSION
+    
+    JWT --> DB
+    SESSION --> CACHE
+    OAUTH --> SECRETS
+    
+    OAUTH --> GOOGLE
+    OAUTH --> GITHUB
+    OAUTH --> OKTA
+    OAUTH --> LDAP
+    
+    GW --> API
+    WF --> API
+    ORG --> API
+```
+
+### Core Responsibilities
+
+- **User Authentication**: Login, logout, password management
+- **Service Authentication**: Service-to-service JWT tokens
+- **API Key Management**: Customer API key lifecycle
+- **Session Management**: User session creation and validation
+- **OAuth Integration**: Third-party authentication providers
+- **MFA Implementation**: Multi-factor authentication support
+- **Audit Logging**: Authentication event tracking
+
+## Service-to-Service Authentication
+
+### JWT Token Format
+
+```typescript
+interface ServiceJWT {
+  // Standard JWT claims
+  iss: string;        // Issuer (source service)
+  sub: string;        // Subject (service identity)
+  aud: string[];      // Audience (target services)
+  exp: number;        // Expiration timestamp
+  iat: number;        // Issued at timestamp
+  jti: string;        // Token ID (for revocation)
+  
+  // Custom claims
+  service_name: string;      // Service identifier
+  service_version: string;   // Service version
+  scopes: string[];         // Allowed operations
+  organization_id?: string;  // Organization context
+  user_id?: string;         // User context (if applicable)
+  
+  // Security context
+  ip_address: string;       // Source IP
+  trace_id: string;         // Distributed trace ID
+  security_level: 'low' | 'medium' | 'high';
+}
+```
+
+### Token Generation
+
+<CodeGroup>
+```typescript Service Token Generation
+// auth-service/src/services/jwt-manager.ts
+import { sign, verify } from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
+
+export class JWTManager {
+  private readonly secretKey: string;
+  private readonly defaultExpiry = 3600; // 1 hour
+  private readonly tokenCache = new Map<string, ServiceJWT>();
+
+  constructor() {
+    this.secretKey = process.env.SERVICE_JWT_SECRET!;
+    this.startTokenCleanup();
+  }
+
+  async generateServiceToken(
+    fromService: string,
+    toService: string,
+    scopes: string[],
+    options: {
+      expiresIn?: number;
+      organizationId?: string;
+      userId?: string;
+      securityLevel?: 'low' | 'medium' | 'high';
+    } = {}
+  ): Promise<string> {
+    const now = Math.floor(Date.now() / 1000);
+    const expiresIn = options.expiresIn || this.defaultExpiry;
+    
+    const payload: ServiceJWT = {
+      iss: fromService,
+      sub: fromService,
+      aud: [toService],
+      exp: now + expiresIn,
+      iat: now,
+      jti: randomUUID(),
+      service_name: fromService,
+      service_version: process.env.SERVICE_VERSION || '1.0.0',
+      scopes,
+      organization_id: options.organizationId,
+      user_id: options.userId,
+      ip_address: this.getServiceIP(),
+      trace_id: this.getCurrentTraceId(),
+      security_level: options.securityLevel || 'medium'
+    };
+
+    // Cache token for validation
+    this.tokenCache.set(payload.jti, payload);
+    
+    // Sign with RS256 for better security
+    const token = sign(payload, this.secretKey, {
+      algorithm: 'HS256',
+      header: {
+        typ: 'JWT',
+        alg: 'HS256',
+        kid: process.env.JWT_KEY_ID
+      }
+    });
+
+    await this.auditTokenGeneration(payload);
+    
+    return token;
+  }
+
+  async validateServiceToken(token: string, expectedAudience: string): Promise<ServiceJWT> {
+    try {
+      const decoded = verify(token, this.secretKey, {
+        algorithms: ['HS256'],
+        audience: expectedAudience,
+        clockTolerance: 30 // 30 second clock skew tolerance
+      }) as ServiceJWT;
+
+      // Check if token is revoked
+      if (await this.isTokenRevoked(decoded.jti)) {
+        throw new Error('Token has been revoked');
+      }
+
+      // Validate scopes
+      if (!this.validateTokenScopes(decoded.scopes, expectedAudience)) {
+        throw new Error('Insufficient token scopes');
+      }
+
+      await this.auditTokenValidation(decoded, true);
+      return decoded;
+      
+    } catch (error) {
+      await this.auditTokenValidation(null, false, error.message);
+      throw error;
+    }
+  }
+
+  async revokeToken(tokenId: string): Promise<void> {
+    // Add to revocation list
+    await this.redis.setex(`revoked:${tokenId}`, 3600, 'true');
+    
+    // Remove from cache
+    this.tokenCache.delete(tokenId);
+    
+    await this.auditTokenRevocation(tokenId);
+  }
+
+  private async isTokenRevoked(tokenId: string): Promise<boolean> {
+    const revoked = await this.redis.get(`revoked:${tokenId}`);
+    return revoked === 'true';
+  }
+
+  private validateTokenScopes(tokenScopes: string[], service: string): boolean {
+    const requiredScopes = this.getRequiredScopes(service);
+    return requiredScopes.every(scope => tokenScopes.includes(scope));
+  }
+
+  private async auditTokenGeneration(payload: ServiceJWT): Promise<void> {
+    await this.auditLogger.log({
+      event: 'service_token_generated',
+      service: payload.service_name,
+      target_service: payload.aud[0],
+      scopes: payload.scopes,
+      expires_at: new Date(payload.exp * 1000),
+      security_level: payload.security_level
+    });
+  }
+}
+```
+
+```python Service Token Generation
+# auth-service/src/services/jwt_manager.py
+import jwt
+import time
+import uuid
+from typing import Dict, List, Optional
+from dataclasses import dataclass
+
+@dataclass
+class ServiceJWT:
+    iss: str
+    sub: str
+    aud: List[str]
+    exp: int
+    iat: int
+    jti: str
+    service_name: str
+    service_version: str
+    scopes: List[str]
+    organization_id: Optional[str] = None
+    user_id: Optional[str] = None
+    ip_address: str = ""
+    trace_id: str = ""
+    security_level: str = "medium"
+
+class JWTManager:
+    def __init__(self):
+        self.secret_key = os.getenv('SERVICE_JWT_SECRET')
+        self.default_expiry = 3600  # 1 hour
+        self.token_cache = {}
+        
+        if not self.secret_key:
+            raise ValueError('SERVICE_JWT_SECRET environment variable required')
+    
+    async def generate_service_token(
+        self,
+        from_service: str,
+        to_service: str,
+        scopes: List[str],
+        expires_in: int = None,
+        organization_id: str = None,
+        user_id: str = None,
+        security_level: str = "medium"
+    ) -> str:
+        now = int(time.time())
+        expires_in = expires_in or self.default_expiry
+        
+        payload = {
+            'iss': from_service,
+            'sub': from_service,
+            'aud': [to_service],
+            'exp': now + expires_in,
+            'iat': now,
+            'jti': str(uuid.uuid4()),
+            'service_name': from_service,
+            'service_version': os.getenv('SERVICE_VERSION', '1.0.0'),
+            'scopes': scopes,
+            'organization_id': organization_id,
+            'user_id': user_id,
+            'ip_address': self.get_service_ip(),
+            'trace_id': self.get_current_trace_id(),
+            'security_level': security_level
+        }
+        
+        # Cache token for validation
+        self.token_cache[payload['jti']] = payload
+        
+        # Generate JWT
+        token = jwt.encode(
+            payload,
+            self.secret_key,
+            algorithm='HS256',
+            headers={
+                'typ': 'JWT',
+                'alg': 'HS256',
+                'kid': os.getenv('JWT_KEY_ID')
+            }
+        )
+        
+        await self.audit_token_generation(payload)
+        
+        return token
+    
+    async def validate_service_token(self, token: str, expected_audience: str) -> Dict:
+        try:
+            decoded = jwt.decode(
+                token,
+                self.secret_key,
+                algorithms=['HS256'],
+                audience=expected_audience,
+                options={'verify_aud': True, 'verify_exp': True}
+            )
+            
+            # Check if token is revoked
+            if await self.is_token_revoked(decoded['jti']):
+                raise jwt.InvalidTokenError('Token has been revoked')
+            
+            # Validate scopes
+            if not self.validate_token_scopes(decoded['scopes'], expected_audience):
+                raise jwt.InvalidTokenError('Insufficient token scopes')
+            
+            await self.audit_token_validation(decoded, True)
+            return decoded
+            
+        except Exception as error:
+            await self.audit_token_validation(None, False, str(error))
+            raise
+    
+    async def revoke_token(self, token_id: str):
+        # Add to revocation list
+        await self.redis.setex(f"revoked:{token_id}", 3600, 'true')
+        
+        # Remove from cache
+        self.token_cache.pop(token_id, None)
+        
+        await self.audit_token_revocation(token_id)
+```
+</CodeGroup>
+
+### Service Authentication Middleware
+
+<CodeGroup>
+```typescript Authentication Middleware
+// auth-service/src/middleware/service-auth.ts
+import { Request, Response, NextFunction } from 'express';
+import { JWTManager } from '../services/jwt-manager';
+
+interface AuthenticatedRequest extends Request {
+  serviceAuth?: {
+    service_name: string;
+    scopes: string[];
+    organization_id?: string;
+    user_id?: string;
+    security_level: string;
+    trace_id: string;
+  };
+}
+
+export class ServiceAuthMiddleware {
+  constructor(private jwtManager: JWTManager) {}
+
+  authenticate(requiredScopes: string[] = []) {
+    return async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+      try {
+        const authHeader = req.headers.authorization;
+        
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          return res.status(401).json({
+            error: 'Missing or invalid authorization header',
+            code: 'MISSING_AUTH_HEADER'
+          });
+        }
+
+        const token = authHeader.substring(7);
+        const serviceName = req.headers['x-service-name'] as string;
+        
+        if (!serviceName) {
+          return res.status(401).json({
+            error: 'Missing service name header',
+            code: 'MISSING_SERVICE_HEADER'
+          });
+        }
+
+        // Validate JWT token
+        const decoded = await this.jwtManager.validateServiceToken(token, serviceName);
+        
+        // Check required scopes
+        if (requiredScopes.length > 0) {
+          const hasRequiredScopes = requiredScopes.every(scope => 
+            decoded.scopes.includes(scope)
+          );
+          
+          if (!hasRequiredScopes) {
+            return res.status(403).json({
+              error: 'Insufficient permissions',
+              code: 'INSUFFICIENT_SCOPES',
+              required_scopes: requiredScopes,
+              provided_scopes: decoded.scopes
+            });
+          }
+        }
+
+        // Add service context to request
+        req.serviceAuth = {
+          service_name: decoded.service_name,
+          scopes: decoded.scopes,
+          organization_id: decoded.organization_id,
+          user_id: decoded.user_id,
+          security_level: decoded.security_level,
+          trace_id: decoded.trace_id
+        };
+
+        next();
+      } catch (error) {
+        return res.status(401).json({
+          error: 'Token validation failed',
+          code: 'INVALID_TOKEN',
+          message: error.message
+        });
+      }
+    };
+  }
+
+  // Organization-scoped authentication
+  requireOrganization() {
+    return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+      if (!req.serviceAuth?.organization_id) {
+        return res.status(403).json({
+          error: 'Organization context required',
+          code: 'MISSING_ORG_CONTEXT'
+        });
+      }
+      next();
+    };
+  }
+
+  // High security operations
+  requireHighSecurity() {
+    return (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
+      if (req.serviceAuth?.security_level !== 'high') {
+        return res.status(403).json({
+          error: 'High security clearance required',
+          code: 'INSUFFICIENT_SECURITY_LEVEL'
+        });
+      }
+      next();
+    };
+  }
+}
+```
+
+```python Authentication Middleware
+# auth-service/src/middleware/service_auth.py
+from fastapi import HTTPException, Depends, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from typing import List, Optional
+
+security = HTTPBearer()
+
+class ServiceAuthMiddleware:
+    def __init__(self, jwt_manager):
+        self.jwt_manager = jwt_manager
+    
+    def authenticate(self, required_scopes: List[str] = None):
+        async def auth_dependency(
+            request: Request,
+            credentials: HTTPAuthorizationCredentials = Depends(security)
+        ):
+            try:
+                token = credentials.credentials
+                service_name = request.headers.get('x-service-name')
+                
+                if not service_name:
+                    raise HTTPException(
+                        status_code=401,
+                        detail={
+                            "error": "Missing service name header",
+                            "code": "MISSING_SERVICE_HEADER"
+                        }
+                    )
+                
+                # Validate JWT token
+                decoded = await self.jwt_manager.validate_service_token(token, service_name)
+                
+                # Check required scopes
+                if required_scopes:
+                    has_required_scopes = all(
+                        scope in decoded['scopes'] for scope in required_scopes
+                    )
+                    
+                    if not has_required_scopes:
+                        raise HTTPException(
+                            status_code=403,
+                            detail={
+                                "error": "Insufficient permissions",
+                                "code": "INSUFFICIENT_SCOPES",
+                                "required_scopes": required_scopes,
+                                "provided_scopes": decoded['scopes']
+                            }
+                        )
+                
+                # Return service context
+                return {
+                    'service_name': decoded['service_name'],
+                    'scopes': decoded['scopes'],
+                    'organization_id': decoded.get('organization_id'),
+                    'user_id': decoded.get('user_id'),
+                    'security_level': decoded['security_level'],
+                    'trace_id': decoded['trace_id']
+                }
+                
+            except Exception as error:
+                raise HTTPException(
+                    status_code=401,
+                    detail={
+                        "error": "Token validation failed",
+                        "code": "INVALID_TOKEN",
+                        "message": str(error)
+                    }
+                )
+        
+        return auth_dependency
+    
+    def require_organization(self):
+        def org_dependency(service_auth: dict = Depends(self.authenticate())):
+            if not service_auth.get('organization_id'):
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error": "Organization context required",
+                        "code": "MISSING_ORG_CONTEXT"
+                    }
+                )
+            return service_auth
+        
+        return org_dependency
+    
+    def require_high_security(self):
+        def security_dependency(service_auth: dict = Depends(self.authenticate())):
+            if service_auth.get('security_level') != 'high':
+                raise HTTPException(
+                    status_code=403,
+                    detail={
+                        "error": "High security clearance required",
+                        "code": "INSUFFICIENT_SECURITY_LEVEL"
+                    }
+                )
+            return service_auth
+        
+        return security_dependency
+```
+</CodeGroup>
+
+## User Authentication
+
+### Authentication Flows
+
+#### Standard Login Flow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Auth
+    participant Database
+    participant Cache
+
+    Client->>Auth: POST /auth/login
+    Auth->>Database: Validate credentials
+    Database-->>Auth: User data
+    Auth->>Cache: Store session
+    Auth->>Client: JWT + Refresh token
+    
+    Note over Client,Cache: Subsequent requests
+    Client->>Auth: Request with JWT
+    Auth->>Cache: Validate session
+    Cache-->>Auth: Session data
+    Auth-->>Client: Authorized response
+```
+
+#### OAuth Flow
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Auth
+    participant Provider
+    participant Database
+
+    Client->>Auth: GET /auth/oauth/google
+    Auth->>Provider: Redirect to OAuth
+    Provider->>Client: Authorization code
+    Client->>Auth: POST /auth/oauth/callback
+    Auth->>Provider: Exchange code for token
+    Provider-->>Auth: Access token + profile
+    Auth->>Database: Create/update user
+    Auth->>Client: JWT + Refresh token
+```
+
+### Authentication API
+
+<CodeGroup>
+```typescript User Authentication API
+// auth-service/src/controllers/auth-controller.ts
+export class AuthController {
+  
+  // Standard email/password login
+  async login(req: Request, res: Response) {
+    const { email, password, mfa_code } = req.body;
+    
+    try {
+      // Validate input
+      await this.validateLoginInput(email, password);
+      
+      // Check user credentials
+      const user = await this.userService.validateCredentials(email, password);
+      
+      if (!user) {
+        await this.auditService.logFailedLogin(email, req.ip);
+        return res.status(401).json({
+          error: 'Invalid credentials',
+          code: 'INVALID_CREDENTIALS'
+        });
+      }
+
+      // Check MFA if enabled
+      if (user.mfa_enabled) {
+        if (!mfa_code) {
+          return res.status(200).json({
+            requires_mfa: true,
+            temp_token: await this.generateTempToken(user.id)
+          });
+        }
+        
+        const mfaValid = await this.mfaService.validateTOTP(user.id, mfa_code);
+        if (!mfaValid) {
+          return res.status(401).json({
+            error: 'Invalid MFA code',
+            code: 'INVALID_MFA'
+          });
+        }
+      }
+
+      // Generate tokens
+      const { accessToken, refreshToken } = await this.generateUserTokens(user);
+      
+      // Create session
+      await this.sessionService.createSession(user.id, {
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+        refresh_token: refreshToken
+      });
+
+      await this.auditService.logSuccessfulLogin(user.id, req.ip);
+
+      res.json({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        expires_in: 3600,
+        token_type: 'Bearer',
+        user: this.sanitizeUser(user)
+      });
+
+    } catch (error) {
+      await this.auditService.logLoginError(email, req.ip, error);
+      res.status(500).json({
+        error: 'Login failed',
+        code: 'LOGIN_ERROR'
+      });
+    }
+  }
+
+  // OAuth authentication
+  async oauthCallback(req: Request, res: Response) {
+    const { provider, code, state } = req.query;
+    
+    try {
+      // Validate OAuth state
+      await this.validateOAuthState(state as string);
+      
+      // Exchange code for tokens
+      const providerData = await this.oauthService.exchangeCode(
+        provider as string,
+        code as string
+      );
+      
+      // Get user profile from provider
+      const profile = await this.oauthService.getUserProfile(
+        provider as string,
+        providerData.access_token
+      );
+
+      // Find or create user
+      const user = await this.userService.findOrCreateFromOAuth(profile, provider as string);
+      
+      // Generate our tokens
+      const { accessToken, refreshToken } = await this.generateUserTokens(user);
+      
+      // Create session
+      await this.sessionService.createSession(user.id, {
+        ip_address: req.ip,
+        user_agent: req.headers['user-agent'],
+        refresh_token: refreshToken,
+        oauth_provider: provider as string
+      });
+
+      // Redirect to frontend with tokens
+      const redirectUrl = new URL(process.env.FRONTEND_URL!);
+      redirectUrl.searchParams.append('token', accessToken);
+      redirectUrl.searchParams.append('refresh', refreshToken);
+      
+      res.redirect(redirectUrl.toString());
+
+    } catch (error) {
+      await this.auditService.logOAuthError(provider as string, req.ip, error);
+      res.status(500).json({
+        error: 'OAuth authentication failed',
+        code: 'OAUTH_ERROR'
+      });
+    }
+  }
+
+  // Token refresh
+  async refreshToken(req: Request, res: Response) {
+    const { refresh_token } = req.body;
+    
+    try {
+      // Validate refresh token
+      const session = await this.sessionService.validateRefreshToken(refresh_token);
+      
+      if (!session) {
+        return res.status(401).json({
+          error: 'Invalid refresh token',
+          code: 'INVALID_REFRESH_TOKEN'
+        });
+      }
+
+      // Get user
+      const user = await this.userService.getById(session.user_id);
+      
+      // Generate new tokens
+      const { accessToken, refreshToken: newRefreshToken } = await this.generateUserTokens(user);
+      
+      // Update session
+      await this.sessionService.updateSession(session.id, {
+        refresh_token: newRefreshToken,
+        last_used: new Date()
+      });
+
+      res.json({
+        access_token: accessToken,
+        refresh_token: newRefreshToken,
+        expires_in: 3600,
+        token_type: 'Bearer'
+      });
+
+    } catch (error) {
+      res.status(500).json({
+        error: 'Token refresh failed',
+        code: 'REFRESH_ERROR'
+      });
+    }
+  }
+}
+```
+</CodeGroup>
+
+## API Key Management
+
+### Customer API Keys
+
+<CodeGroup>
+```typescript API Key Management
+// auth-service/src/services/api-key-service.ts
+interface APIKey {
+  id: string;
+  organization_id: string;
+  name: string;
+  key_prefix: string;
+  key_hash: string;
+  environment: 'production' | 'test';
+  permissions: string[];
+  rate_limit: number;
+  last_used_at?: Date;
+  expires_at?: Date;
+  created_at: Date;
+  created_by: string;
+}
+
+export class APIKeyService {
+  async createAPIKey(
+    organizationId: string,
+    userId: string,
+    options: {
+      name: string;
+      environment: 'production' | 'test';
+      permissions: string[];
+      expiresIn?: number;
+      rateLimit?: number;
+    }
+  ): Promise<{ apiKey: APIKey; secret: string }> {
+    
+    // Generate secure API key
+    const keyPrefix = options.environment === 'production' ? 'prod_sk' : 'test_sk';
+    const randomPart = this.generateSecureRandom(32);
+    const secret = `${keyPrefix}_${randomPart}`;
+    
+    // Hash for storage (never store plain key)
+    const keyHash = await this.hashAPIKey(secret);
+    
+    const apiKey: APIKey = {
+      id: randomUUID(),
+      organization_id: organizationId,
+      name: options.name,
+      key_prefix: `${keyPrefix}_${randomPart.substring(0, 8)}`,
+      key_hash: keyHash,
+      environment: options.environment,
+      permissions: options.permissions,
+      rate_limit: options.rateLimit || 1000,
+      expires_at: options.expiresIn ? 
+        new Date(Date.now() + options.expiresIn) : undefined,
+      created_at: new Date(),
+      created_by: userId
+    };
+
+    // Store in database
+    await this.database.insertAPIKey(apiKey);
+    
+    // Audit key creation
+    await this.auditService.logAPIKeyCreated(apiKey, userId);
+    
+    return { apiKey, secret };
+  }
+
+  async validateAPIKey(key: string): Promise<APIKey | null> {
+    try {
+      // Extract prefix for quick lookup
+      const keyPrefix = key.substring(0, key.lastIndexOf('_', 15));
+      
+      // Hash the provided key
+      const keyHash = await this.hashAPIKey(key);
+      
+      // Find matching key
+      const apiKey = await this.database.findAPIKeyByHash(keyHash);
+      
+      if (!apiKey) {
+        await this.auditService.logAPIKeyValidationFailed(keyPrefix);
+        return null;
+      }
+
+      // Check if expired
+      if (apiKey.expires_at && apiKey.expires_at < new Date()) {
+        await this.auditService.logExpiredAPIKeyUsed(apiKey.id);
+        return null;
+      }
+
+      // Update last used timestamp
+      await this.database.updateAPIKeyLastUsed(apiKey.id);
+      
+      await this.auditService.logAPIKeyUsed(apiKey.id);
+      
+      return apiKey;
+    } catch (error) {
+      console.error('API key validation error:', error);
+      return null;
+    }
+  }
+
+  async revokeAPIKey(keyId: string, userId: string): Promise<void> {
+    const apiKey = await this.database.getAPIKey(keyId);
+    
+    if (!apiKey) {
+      throw new Error('API key not found');
+    }
+
+    // Soft delete (maintain audit trail)
+    await this.database.updateAPIKey(keyId, {
+      status: 'revoked',
+      revoked_at: new Date(),
+      revoked_by: userId
+    });
+
+    // Invalidate cached permissions
+    await this.cache.del(`api_key:${keyId}:permissions`);
+    
+    await this.auditService.logAPIKeyRevoked(keyId, userId);
+  }
+
+  private async hashAPIKey(key: string): Promise<string> {
+    const salt = await bcrypt.genSalt(12);
+    return await bcrypt.hash(key, salt);
+  }
+
+  private generateSecureRandom(length: number): string {
+    return crypto.randomBytes(length).toString('base64url');
+  }
+}
+```
+</CodeGroup>
+
+### Permission System
+
+<CodeGroup>
+```typescript Permission Management
+// auth-service/src/services/permission-service.ts
+interface Permission {
+  resource: string;     // e.g., 'workflow', 'organization'
+  action: string;       // e.g., 'read', 'write', 'delete'
+  scope?: string;       // e.g., 'own', 'organization', 'global'
+}
+
+export class PermissionService {
+  private readonly permissionHierarchy = {
+    'global': ['organization', 'own'],
+    'organization': ['own'],
+    'own': []
+  };
+
+  async checkPermission(
+    subjectType: 'user' | 'service' | 'api_key',
+    subjectId: string,
+    permission: Permission,
+    context: {
+      organization_id?: string;
+      resource_owner_id?: string;
+    } = {}
+  ): Promise<boolean> {
+    
+    // Get subject permissions
+    const permissions = await this.getSubjectPermissions(subjectType, subjectId);
+    
+    // Check exact permission match
+    if (this.hasExactPermission(permissions, permission)) {
+      return this.validateScope(permission, context);
+    }
+
+    // Check wildcard permissions
+    if (this.hasWildcardPermission(permissions, permission)) {
+      return this.validateScope(permission, context);
+    }
+
+    // Check inherited permissions
+    return this.checkInheritedPermissions(permissions, permission, context);
+  }
+
+  private async getSubjectPermissions(type: string, id: string): Promise<Permission[]> {
+    const cacheKey = `permissions:${type}:${id}`;
+    
+    // Try cache first
+    const cached = await this.cache.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+
+    let permissions: Permission[] = [];
+
+    switch (type) {
+      case 'user':
+        permissions = await this.getUserPermissions(id);
+        break;
+      case 'service':
+        permissions = await this.getServicePermissions(id);
+        break;
+      case 'api_key':
+        permissions = await this.getAPIKeyPermissions(id);
+        break;
+    }
+
+    // Cache for 5 minutes
+    await this.cache.setex(cacheKey, 300, JSON.stringify(permissions));
+    
+    return permissions;
+  }
+
+  private async getUserPermissions(userId: string): Promise<Permission[]> {
+    // Get user's organization memberships
+    const memberships = await this.database.getUserMemberships(userId);
+    
+    const permissions: Permission[] = [];
+    
+    for (const membership of memberships) {
+      const rolePermissions = await this.getRolePermissions(membership.role);
+      permissions.push(...rolePermissions);
+    }
+
+    // Add user-specific permissions
+    const userPermissions = await this.database.getUserDirectPermissions(userId);
+    permissions.push(...userPermissions);
+    
+    return this.deduplicatePermissions(permissions);
+  }
+
+  private async getRolePermissions(role: string): Promise<Permission[]> {
+    const rolePermissionMap = {
+      'admin': [
+        { resource: '*', action: '*', scope: 'organization' }
+      ],
+      'manager': [
+        { resource: 'workflow', action: '*', scope: 'organization' },
+        { resource: 'user', action: 'read', scope: 'organization' },
+        { resource: 'organization', action: 'read', scope: 'own' }
+      ],
+      'developer': [
+        { resource: 'workflow', action: '*', scope: 'own' },
+        { resource: 'execution', action: 'read', scope: 'organization' },
+        { resource: 'tool', action: 'read', scope: 'organization' }
+      ],
+      'viewer': [
+        { resource: 'workflow', action: 'read', scope: 'organization' },
+        { resource: 'execution', action: 'read', scope: 'organization' }
+      ]
+    };
+
+    return rolePermissionMap[role] || [];
+  }
+
+  private hasExactPermission(permissions: Permission[], required: Permission): boolean {
+    return permissions.some(p => 
+      p.resource === required.resource &&
+      p.action === required.action &&
+      p.scope === required.scope
+    );
+  }
+
+  private hasWildcardPermission(permissions: Permission[], required: Permission): boolean {
+    return permissions.some(p => 
+      (p.resource === '*' || p.resource === required.resource) &&
+      (p.action === '*' || p.action === required.action) &&
+      this.isScopeCompatible(p.scope, required.scope)
+    );
+  }
+
+  private isScopeCompatible(grantedScope?: string, requiredScope?: string): boolean {
+    if (!grantedScope || !requiredScope) return true;
+    
+    const granted = this.permissionHierarchy[grantedScope] || [];
+    return grantedScope === requiredScope || granted.includes(requiredScope);
+  }
+}
+```
+</CodeGroup>
+
+## Multi-Factor Authentication
+
+### TOTP Implementation
+
+<CodeGroup>
+```typescript MFA Service
+// auth-service/src/services/mfa-service.ts
+import { authenticator } from 'otplib';
+import QRCode from 'qrcode';
+
+export class MFAService {
+  private readonly issuer = 'Tolstoy';
+  
+  async setupMFA(userId: string, userEmail: string): Promise<{
+    secret: string;
+    qrCode: string;
+    backupCodes: string[];
+  }> {
+    // Generate TOTP secret
+    const secret = authenticator.generateSecret();
+    
+    // Create service name for authenticator apps
+    const serviceName = `${this.issuer} (${userEmail})`;
+    const otpauth = authenticator.keyuri(userEmail, this.issuer, secret);
+    
+    // Generate QR code
+    const qrCode = await QRCode.toDataURL(otpauth);
+    
+    // Generate backup codes
+    const backupCodes = this.generateBackupCodes(8);
+    
+    // Store encrypted secret and backup codes
+    await this.userService.updateMFASettings(userId, {
+      mfa_secret: await this.encryptSecret(secret),
+      backup_codes: await this.hashBackupCodes(backupCodes),
+      mfa_enabled: false // Enable after verification
+    });
+
+    await this.auditService.logMFASetupInitiated(userId);
+
+    return {
+      secret,
+      qrCode,
+      backupCodes
+    };
+  }
+
+  async enableMFA(userId: string, totpCode: string): Promise<void> {
+    const user = await this.userService.getById(userId);
+    
+    if (!user.mfa_secret) {
+      throw new Error('MFA not set up');
+    }
+
+    // Verify TOTP code
+    const secret = await this.decryptSecret(user.mfa_secret);
+    const isValid = authenticator.verify({
+      token: totpCode,
+      secret
+    });
+
+    if (!isValid) {
+      throw new Error('Invalid TOTP code');
+    }
+
+    // Enable MFA
+    await this.userService.updateMFASettings(userId, {
+      mfa_enabled: true
+    });
+
+    await this.auditService.logMFAEnabled(userId);
+  }
+
+  async validateTOTP(userId: string, code: string): Promise<boolean> {
+    const user = await this.userService.getById(userId);
+    
+    if (!user.mfa_enabled || !user.mfa_secret) {
+      return false;
+    }
+
+    try {
+      const secret = await this.decryptSecret(user.mfa_secret);
+      
+      // Validate TOTP code with window for clock skew
+      const isValid = authenticator.verify({
+        token: code,
+        secret,
+        window: 2 // Allow 2 time steps before/after
+      });
+
+      if (isValid) {
+        await this.auditService.logMFASuccess(userId);
+        return true;
+      }
+
+      // Try backup codes if TOTP fails
+      return await this.validateBackupCode(userId, code);
+      
+    } catch (error) {
+      await this.auditService.logMFAValidationError(userId, error);
+      return false;
+    }
+  }
+
+  private async validateBackupCode(userId: string, code: string): Promise<boolean> {
+    const user = await this.userService.getById(userId);
+    
+    if (!user.backup_codes) {
+      return false;
+    }
+
+    // Check if code matches any backup code
+    const codeHash = await this.hashBackupCode(code);
+    const matchIndex = user.backup_codes.indexOf(codeHash);
+    
+    if (matchIndex === -1) {
+      return false;
+    }
+
+    // Remove used backup code
+    const updatedCodes = [...user.backup_codes];
+    updatedCodes.splice(matchIndex, 1);
+    
+    await this.userService.updateMFASettings(userId, {
+      backup_codes: updatedCodes
+    });
+
+    await this.auditService.logBackupCodeUsed(userId, matchIndex);
+    
+    return true;
+  }
+
+  private generateBackupCodes(count: number): string[] {
+    const codes = [];
+    for (let i = 0; i < count; i++) {
+      codes.push(crypto.randomBytes(4).toString('hex').toUpperCase());
+    }
+    return codes;
+  }
+
+  private async encryptSecret(secret: string): Promise<string> {
+    // Use application-level encryption
+    return await this.encryption.encrypt(secret);
+  }
+
+  private async decryptSecret(encryptedSecret: string): Promise<string> {
+    return await this.encryption.decrypt(encryptedSecret);
+  }
+}
+```
+</CodeGroup>
+
+## Session Management
+
+### Session Storage and Validation
+
+<CodeGroup>
+```typescript Session Management
+// auth-service/src/services/session-service.ts
+interface Session {
+  id: string;
+  user_id: string;
+  refresh_token_hash: string;
+  ip_address: string;
+  user_agent: string;
+  oauth_provider?: string;
+  expires_at: Date;
+  last_used: Date;
+  created_at: Date;
+}
+
+export class SessionService {
+  private readonly sessionDuration = 24 * 60 * 60 * 1000; // 24 hours
+  
+  async createSession(userId: string, sessionData: {
+    ip_address: string;
+    user_agent: string;
+    refresh_token: string;
+    oauth_provider?: string;
+  }): Promise<Session> {
+    
+    const session: Session = {
+      id: randomUUID(),
+      user_id: userId,
+      refresh_token_hash: await this.hashRefreshToken(sessionData.refresh_token),
+      ip_address: sessionData.ip_address,
+      user_agent: sessionData.user_agent,
+      oauth_provider: sessionData.oauth_provider,
+      expires_at: new Date(Date.now() + this.sessionDuration),
+      last_used: new Date(),
+      created_at: new Date()
+    };
+
+    // Store in database
+    await this.database.insertSession(session);
+    
+    // Cache in Redis for fast lookup
+    await this.cache.setex(
+      `session:${session.id}`,
+      this.sessionDuration / 1000,
+      JSON.stringify(session)
+    );
+
+    // Limit concurrent sessions per user
+    await this.enforceSessionLimit(userId);
+    
+    return session;
+  }
+
+  async validateSession(sessionId: string): Promise<Session | null> {
+    // Try cache first
+    const cached = await this.cache.get(`session:${sessionId}`);
+    if (cached) {
+      const session = JSON.parse(cached);
+      
+      // Check if expired
+      if (new Date(session.expires_at) < new Date()) {
+        await this.invalidateSession(sessionId);
+        return null;
+      }
+      
+      return session;
+    }
+
+    // Fallback to database
+    const session = await this.database.getSession(sessionId);
+    
+    if (!session || session.expires_at < new Date()) {
+      return null;
+    }
+
+    // Refresh cache
+    await this.cache.setex(
+      `session:${sessionId}`,
+      Math.floor((session.expires_at.getTime() - Date.now()) / 1000),
+      JSON.stringify(session)
+    );
+
+    return session;
+  }
+
+  async validateRefreshToken(refreshToken: string): Promise<Session | null> {
+    const tokenHash = await this.hashRefreshToken(refreshToken);
+    
+    const session = await this.database.findSessionByRefreshToken(tokenHash);
+    
+    if (!session || session.expires_at < new Date()) {
+      return null;
+    }
+
+    return session;
+  }
+
+  async invalidateSession(sessionId: string): Promise<void> {
+    // Remove from cache
+    await this.cache.del(`session:${sessionId}`);
+    
+    // Mark as expired in database
+    await this.database.updateSession(sessionId, {
+      expires_at: new Date()
+    });
+
+    await this.auditService.logSessionInvalidated(sessionId);
+  }
+
+  async invalidateAllUserSessions(userId: string): Promise<void> {
+    // Get all user sessions
+    const sessions = await this.database.getUserSessions(userId);
+    
+    // Invalidate each session
+    for (const session of sessions) {
+      await this.invalidateSession(session.id);
+    }
+
+    await this.auditService.logAllSessionsInvalidated(userId);
+  }
+
+  private async enforceSessionLimit(userId: string): Promise<void> {
+    const maxSessions = 10; // Maximum concurrent sessions
+    
+    const activeSessions = await this.database.getActiveUserSessions(userId);
+    
+    if (activeSessions.length > maxSessions) {
+      // Remove oldest sessions
+      const sessionsToRemove = activeSessions
+        .sort((a, b) => a.last_used.getTime() - b.last_used.getTime())
+        .slice(0, activeSessions.length - maxSessions);
+      
+      for (const session of sessionsToRemove) {
+        await this.invalidateSession(session.id);
+      }
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Security Features
+
+### Rate Limiting
+
+<CodeGroup>
+```typescript Rate Limiting
+// auth-service/src/middleware/rate-limiter.ts
+interface RateLimitConfig {
+  windowMs: number;
+  maxRequests: number;
+  skipSuccessfulRequests?: boolean;
+  keyGenerator?: (req: Request) => string;
+}
+
+export class AuthRateLimiter {
+  private readonly configs: Record<string, RateLimitConfig> = {
+    login: {
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      maxRequests: 5,
+      skipSuccessfulRequests: true
+    },
+    
+    password_reset: {
+      windowMs: 60 * 60 * 1000, // 1 hour
+      maxRequests: 3
+    },
+    
+    mfa_validation: {
+      windowMs: 5 * 60 * 1000, // 5 minutes
+      maxRequests: 10
+    },
+    
+    api_key_creation: {
+      windowMs: 60 * 60 * 1000, // 1 hour
+      maxRequests: 10,
+      keyGenerator: (req) => `api_key:${req.serviceAuth?.organization_id}`
+    }
+  };
+
+  createRateLimiter(configName: string) {
+    const config = this.configs[configName];
+    
+    return async (req: Request, res: Response, next: NextFunction) => {
+      const key = config.keyGenerator ? 
+        config.keyGenerator(req) : 
+        `${configName}:${req.ip}`;
+      
+      const current = await this.redis.get(key);
+      const count = current ? parseInt(current) : 0;
+      
+      if (count >= config.maxRequests) {
+        const ttl = await this.redis.ttl(key);
+        
+        return res.status(429).json({
+          error: 'Rate limit exceeded',
+          code: 'RATE_LIMIT_EXCEEDED',
+          retry_after: ttl,
+          limit: config.maxRequests,
+          window: config.windowMs / 1000
+        });
+      }
+
+      // Increment counter
+      await this.redis.multi()
+        .incr(key)
+        .expire(key, config.windowMs / 1000)
+        .exec();
+
+      // Add rate limit headers
+      res.set({
+        'X-RateLimit-Limit': config.maxRequests.toString(),
+        'X-RateLimit-Remaining': (config.maxRequests - count - 1).toString(),
+        'X-RateLimit-Reset': new Date(Date.now() + config.windowMs).toISOString()
+      });
+
+      next();
+    };
+  }
+}
+```
+</CodeGroup>
+
+### Audit Logging
+
+<CodeGroup>
+```typescript Audit Service
+// auth-service/src/services/audit-service.ts
+interface AuditEvent {
+  id: string;
+  event_type: string;
+  user_id?: string;
+  organization_id?: string;
+  service_name?: string;
+  resource_type?: string;
+  resource_id?: string;
+  ip_address: string;
+  user_agent?: string;
+  success: boolean;
+  error_message?: string;
+  metadata: Record<string, any>;
+  created_at: Date;
+}
+
+export class AuditService {
+  async logAuthEvent(
+    eventType: string,
+    success: boolean,
+    context: {
+      userId?: string;
+      organizationId?: string;
+      ipAddress: string;
+      userAgent?: string;
+      errorMessage?: string;
+      metadata?: Record<string, any>;
+    }
+  ): Promise<void> {
+    
+    const event: AuditEvent = {
+      id: randomUUID(),
+      event_type: eventType,
+      user_id: context.userId,
+      organization_id: context.organizationId,
+      ip_address: context.ipAddress,
+      user_agent: context.userAgent,
+      success,
+      error_message: context.errorMessage,
+      metadata: context.metadata || {},
+      created_at: new Date()
+    };
+
+    // Store in database
+    await this.database.insertAuditEvent(event);
+    
+    // Send to real-time analytics
+    await this.analytics.recordAuthEvent(event);
+    
+    // Check for security alerts
+    await this.securityMonitor.checkForThreats(event);
+  }
+
+  async logFailedLogin(email: string, ipAddress: string): Promise<void> {
+    await this.logAuthEvent('login_failed', false, {
+      ipAddress,
+      metadata: { email }
+    });
+    
+    // Check for brute force attacks
+    await this.checkBruteForceAttempts(email, ipAddress);
+  }
+
+  async logSuccessfulLogin(userId: string, ipAddress: string): Promise<void> {
+    await this.logAuthEvent('login_success', true, {
+      userId,
+      ipAddress
+    });
+  }
+
+  async logAPIKeyCreated(apiKey: APIKey, userId: string): Promise<void> {
+    await this.logAuthEvent('api_key_created', true, {
+      userId,
+      organizationId: apiKey.organization_id,
+      resourceType: 'api_key',
+      resourceId: apiKey.id,
+      ipAddress: '0.0.0.0', // Service-generated
+      metadata: {
+        key_name: apiKey.name,
+        environment: apiKey.environment,
+        permissions: apiKey.permissions
+      }
+    });
+  }
+
+  private async checkBruteForceAttempts(email: string, ipAddress: string): Promise<void> {
+    const timeWindow = 15 * 60 * 1000; // 15 minutes
+    const maxAttempts = 5;
+    
+    // Count recent failed attempts
+    const recentFailures = await this.database.countRecentFailedLogins(
+      email,
+      ipAddress,
+      new Date(Date.now() - timeWindow)
+    );
+
+    if (recentFailures >= maxAttempts) {
+      // Trigger security alert
+      await this.securityMonitor.triggerBruteForceAlert({
+        email,
+        ipAddress,
+        attemptCount: recentFailures,
+        timeWindow: timeWindow / 1000
+      });
+      
+      // Temporarily block IP
+      await this.securityService.blockIP(ipAddress, 60 * 60 * 1000); // 1 hour
+    }
+  }
+}
+```
+</CodeGroup>
+
+## Health Monitoring
+
+### Service Health Checks
+
+<CodeGroup>
+```typescript Health Monitoring
+// auth-service/src/controllers/health-controller.ts
+export class HealthController {
+  
+  async getHealthStatus(req: Request, res: Response) {
+    const health = {
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      service: 'auth-service',
+      version: process.env.SERVICE_VERSION,
+      uptime: process.uptime(),
+      checks: {}
+    };
+
+    try {
+      // Database health
+      const dbStart = Date.now();
+      await this.database.query('SELECT 1');
+      health.checks.database = {
+        status: 'healthy',
+        response_time: Date.now() - dbStart
+      };
+    } catch (error) {
+      health.checks.database = {
+        status: 'unhealthy',
+        error: error.message
+      };
+      health.status = 'unhealthy';
+    }
+
+    try {
+      // Redis health
+      const cacheStart = Date.now();
+      await this.cache.ping();
+      health.checks.cache = {
+        status: 'healthy',
+        response_time: Date.now() - cacheStart
+      };
+    } catch (error) {
+      health.checks.cache = {
+        status: 'unhealthy',
+        error: error.message
+      };
+      health.status = 'unhealthy';
+    }
+
+    // JWT signing capability
+    try {
+      const testToken = await this.jwtManager.generateServiceToken(
+        'auth-service',
+        'health-check',
+        ['health:read']
+      );
+      
+      await this.jwtManager.validateServiceToken(testToken, 'health-check');
+      
+      health.checks.jwt = {
+        status: 'healthy'
+      };
+    } catch (error) {
+      health.checks.jwt = {
+        status: 'unhealthy',
+        error: error.message
+      };
+      health.status = 'unhealthy';
+    }
+
+    const statusCode = health.status === 'healthy' ? 200 : 503;
+    res.status(statusCode).json(health);
+  }
+
+  async getReadinessStatus(req: Request, res: Response) {
+    const readiness = {
+      status: 'ready',
+      timestamp: new Date().toISOString(),
+      checks: {}
+    };
+
+    // Check if service can handle requests
+    try {
+      // Verify all critical dependencies
+      await Promise.all([
+        this.database.query('SELECT 1'),
+        this.cache.ping(),
+        this.verifyJWTCapability()
+      ]);
+      
+      readiness.checks.dependencies = {
+        status: 'ready'
+      };
+    } catch (error) {
+      readiness.checks.dependencies = {
+        status: 'not_ready',
+        error: error.message
+      };
+      readiness.status = 'not_ready';
+    }
+
+    const statusCode = readiness.status === 'ready' ? 200 : 503;
+    res.status(statusCode).json(readiness);
+  }
+
+  private async verifyJWTCapability(): Promise<void> {
+    // Test JWT generation and validation
+    const testToken = await this.jwtManager.generateServiceToken(
+      'auth-service',
+      'readiness-check',
+      ['test:read']
+    );
+    
+    await this.jwtManager.validateServiceToken(testToken, 'readiness-check');
+  }
+}
+```
+</CodeGroup>
+
+## Configuration and Deployment
+
+### Service Configuration
+
+<CodeGroup>
+```yaml Kubernetes Deployment
+# k8s/auth-service.yml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: production
+  labels:
+    app: auth-service
+    version: v1
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: auth-service
+      containers:
+      - name: auth-service
+        image: tolstoy/auth-service:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3000"
+        envFrom:
+        - configMapRef:
+            name: auth-service-config
+        - secretRef:
+            name: auth-service-secrets
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-service-config
+  namespace: production
+data:
+  LOG_LEVEL: "info"
+  JWT_ALGORITHM: "HS256"
+  SESSION_DURATION: "86400"
+  MFA_ISSUER: "Tolstoy"
+  RATE_LIMIT_ENABLED: "true"
+  AUDIT_ENABLED: "true"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: auth-service-secrets
+  namespace: production
+type: Opaque
+stringData:
+  DATABASE_URL: "postgresql://auth_user:password@postgres:5432/tolstoy_auth"
+  REDIS_URL: "redis://redis:6379/0"
+  SERVICE_JWT_SECRET: "your-jwt-secret-key-here"
+  ENCRYPTION_KEY: "your-encryption-key-here"
+  OAUTH_GOOGLE_CLIENT_SECRET: "google-oauth-secret"
+  OAUTH_GITHUB_CLIENT_SECRET: "github-oauth-secret"
+```
+</CodeGroup>
+
+## API Documentation
+
+### Internal Authentication Endpoints
+
+<ApiPlayground>
+
+**Base URL**: `http://auth-service:3000`
+
+#### Generate Service Token
+```http
+POST /internal/v1/tokens/service
+Content-Type: application/json
+X-Service-Name: workflow-service
+Authorization: Bearer service_jwt_token
+
+{
+  "target_service": "execution-engine",
+  "scopes": ["workflow:execute", "execution:read"],
+  "expires_in": 3600,
+  "organization_id": "org_12345",
+  "security_level": "high"
+}
+```
+
+**Response**:
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "scopes": ["workflow:execute", "execution:read"]
+}
+```
+
+#### Validate API Key
+```http
+POST /internal/v1/validate/api-key
+Content-Type: application/json
+X-Service-Name: api-gateway
+
+{
+  "api_key": "prod_sk_1234567890abcdef",
+  "required_permissions": ["workflow:read"]
+}
+```
+
+**Response**:
+```json
+{
+  "valid": true,
+  "organization_id": "org_12345",
+  "permissions": ["workflow:read", "workflow:write", "execution:read"],
+  "rate_limit": 1000,
+  "environment": "production"
+}
+```
+
+#### Create User Session
+```http
+POST /internal/v1/sessions
+Content-Type: application/json
+X-Service-Name: api-gateway
+
+{
+  "user_id": "user_12345",
+  "ip_address": "192.168.1.100",
+  "user_agent": "Mozilla/5.0...",
+  "oauth_provider": "google"
+}
+```
+
+**Response**:
+```json
+{
+  "session_id": "sess_abcdef123456",
+  "expires_at": "2024-01-16T10:30:00Z",
+  "refresh_token": "rt_fedcba654321"
+}
+```
+
+</ApiPlayground>
+
+## Monitoring and Metrics
+
+### Key Metrics
+
+<CodeGroup>
+```typescript Metrics Collection
+// auth-service/src/services/metrics-service.ts
+export class AuthMetricsService {
+  async recordAuthenticationEvent(
+    eventType: string,
+    success: boolean,
+    duration: number,
+    metadata: Record<string, any> = {}
+  ): Promise<void> {
+    
+    // Prometheus metrics
+    this.prometheus.counter('auth_events_total', {
+      event_type: eventType,
+      success: success.toString()
+    }).inc();
+
+    this.prometheus.histogram('auth_event_duration_ms', {
+      event_type: eventType
+    }).observe(duration);
+
+    // Custom metrics
+    switch (eventType) {
+      case 'login':
+        this.prometheus.counter('user_logins_total', {
+          success: success.toString(),
+          mfa_enabled: metadata.mfa_enabled?.toString() || 'false'
+        }).inc();
+        break;
+        
+      case 'api_key_validation':
+        this.prometheus.counter('api_key_validations_total', {
+          success: success.toString(),
+          environment: metadata.environment || 'unknown'
+        }).inc();
+        break;
+        
+      case 'service_token_generation':
+        this.prometheus.counter('service_tokens_generated_total', {
+          from_service: metadata.from_service || 'unknown',
+          to_service: metadata.to_service || 'unknown'
+        }).inc();
+        break;
+    }
+
+    // Real-time analytics
+    await this.analytics.recordEvent({
+      type: eventType,
+      success,
+      duration,
+      timestamp: Date.now(),
+      ...metadata
+    });
+  }
+
+  getMetrics() {
+    return {
+      active_sessions: this.sessionService.getActiveSessionCount(),
+      active_api_keys: this.apiKeyService.getActiveKeyCount(),
+      oauth_providers: this.oauthService.getConnectedProviders(),
+      mfa_enabled_users: this.mfaService.getMFAEnabledCount(),
+      recent_failed_logins: this.getRecentFailedLogins(),
+      service_token_cache_size: this.jwtManager.getCacheSize()
+    };
+  }
+}
+```
+</CodeGroup>
+
+### Alerting Rules
+
+<CodeGroup>
+```yaml Prometheus Alerts
+# auth-service-alerts.yml
+groups:
+- name: auth-service
+  rules:
+  - alert: HighFailedLoginRate
+    expr: rate(auth_events_total{event_type="login",success="false"}[5m]) > 0.1
+    for: 2m
+    labels:
+      severity: warning
+      service: auth-service
+    annotations:
+      summary: "High failed login rate detected"
+      description: "Failed login rate is {{ $value }} per second"
+
+  - alert: AuthServiceDown
+    expr: up{job="auth-service"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: auth-service
+    annotations:
+      summary: "Auth service is down"
+      description: "Auth service has been down for more than 1 minute"
+
+  - alert: JWTValidationErrors
+    expr: rate(auth_events_total{event_type="token_validation",success="false"}[5m]) > 0.05
+    for: 5m
+    labels:
+      severity: warning
+      service: auth-service
+    annotations:
+      summary: "High JWT validation error rate"
+      description: "JWT validation error rate is {{ $value }} per second"
+
+  - alert: MFABypassAttempts
+    expr: increase(auth_events_total{event_type="mfa_bypass_attempt"}[1h]) > 0
+    for: 0s
+    labels:
+      severity: critical
+      service: auth-service
+    annotations:
+      summary: "MFA bypass attempts detected"
+      description: "{{ $value }} MFA bypass attempts in the last hour"
+```
+</CodeGroup>
+
+## Security Considerations
+
+### Best Practices
+
+1. **Token Security**:
+   - Use strong, randomly generated secrets
+   - Implement token rotation
+   - Monitor for token abuse
+   - Use appropriate expiration times
+
+2. **Session Security**:
+   - Secure session storage
+   - Session timeout enforcement
+   - Concurrent session limits
+   - IP address validation
+
+3. **API Key Security**:
+   - Hash API keys in storage
+   - Implement key rotation
+   - Monitor key usage patterns
+   - Rate limit per key
+
+4. **Audit and Compliance**:
+   - Log all authentication events
+   - Monitor for suspicious patterns
+   - Implement automated threat detection
+   - Maintain audit trails for compliance
+
+## Next Steps
+
+For more information about the authentication service:
+
+- [Service Architecture](/internal/architecture/system-overview) - Overall platform architecture
+- [Development Guide](/internal/development) - Local development setup
+- [Operations Guide](/internal/operations) - Production operations and monitoring

@@ -151,7 +151,6 @@ settings:
   license: Apache-2.0
 
 openapi:
-  code_samples: 'mintlify'
 
 # `client_settings` define settings for the API client, such as extra constructor
 # arguments (used for authentication), retry behavior, idempotency, etc.

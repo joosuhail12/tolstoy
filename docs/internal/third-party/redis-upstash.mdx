@@ -1,0 +1,453 @@
+# Redis & Upstash Integration
+
+Comprehensive guide to Redis caching with Upstash serverless Redis integration.
+
+## Overview
+
+Upstash provides serverless Redis for high-performance caching, session storage, and real-time data operations.
+
+### Architecture
+- **Provider**: Upstash Serverless Redis
+- **Connection**: REST API over HTTPS
+- **Regions**: Global edge locations
+- **Persistence**: Optional persistent storage
+
+## Configuration
+
+### Environment Variables
+```bash
+UPSTASH_REDIS_REST_URL=https://your-redis-url.upstash.io
+UPSTASH_REDIS_REST_TOKEN=your_auth_token
+```
+
+### Service Implementation
+```typescript
+// src/cache/redis-cache.service.ts
+import { Redis } from '@upstash/redis';
+
+@Injectable()
+export class RedisCacheService {
+  private redis: Redis | null = null;
+  private isConnected = false;
+  
+  async onModuleInit() {
+    const restUrl = await this.secretsService.get('UPSTASH_REDIS_REST_URL');
+    const restToken = await this.secretsService.get('UPSTASH_REDIS_REST_TOKEN');
+    
+    this.redis = new Redis({
+      url: restUrl,
+      token: restToken,
+    });
+  }
+}
+```
+
+## Cache Strategies
+
+### Cache Keys Structure
+```typescript
+// src/cache/cache-keys.ts
+export class CacheKeys {
+  // Organization data
+  static orgUsers(orgId: string) = `org:${orgId}:users`;
+  static orgTools(orgId: string) = `org:${orgId}:tools`;
+  
+  // Flow execution cache
+  static flowExecution(executionId: string) = `flow:exec:${executionId}`;
+  static flowMetrics(flowId: string) = `flow:metrics:${flowId}`;
+  
+  // Tool authentication
+  static toolAuth(orgId: string, toolId: string) = `auth:${orgId}:${toolId}`;
+  static userCredentials(userId: string, toolId: string) = `cred:${userId}:${toolId}`;
+}
+```
+
+### TTL Configuration
+```typescript
+interface CacheConfig {
+  // Short-lived cache (5 minutes)
+  EXECUTION_STATE: 300;
+  
+  // Medium-lived cache (1 hour)
+  USER_CREDENTIALS: 3600;
+  TOOL_CONFIG: 3600;
+  
+  // Long-lived cache (24 hours)
+  ORGANIZATION_DATA: 86400;
+  FLOW_DEFINITIONS: 86400;
+  
+  // Persistent cache (no expiry)
+  WEBHOOK_SIGNATURES: null;
+}
+```
+
+## Caching Patterns
+
+### Read-Through Cache
+```typescript
+async getOrganizationUsers(orgId: string): Promise<User[]> {
+  const cacheKey = CacheKeys.orgUsers(orgId);
+  
+  // Try cache first
+  const cached = await this.cacheService.get(cacheKey);
+  if (cached) {
+    this.metrics.incrementCacheHits();
+    return JSON.parse(cached);
+  }
+  
+  // Fetch from database
+  const users = await this.prisma.user.findMany({
+    where: { orgId }
+  });
+  
+  // Cache the result
+  await this.cacheService.set(cacheKey, JSON.stringify(users), {
+    ttl: 3600 // 1 hour
+  });
+  
+  this.metrics.incrementCacheMisses();
+  return users;
+}
+```
+
+### Write-Through Cache
+```typescript
+async updateUserCredentials(userId: string, toolId: string, credentials: any) {
+  const cacheKey = CacheKeys.userCredentials(userId, toolId);
+  
+  // Update database
+  const updated = await this.prisma.userCredential.update({
+    where: { userId_toolId: { userId, toolId } },
+    data: credentials
+  });
+  
+  // Update cache immediately
+  await this.cacheService.set(cacheKey, JSON.stringify(updated), {
+    ttl: 3600
+  });
+  
+  return updated;
+}
+```
+
+### Cache Invalidation
+```typescript
+async invalidateOrgCache(orgId: string) {
+  const patterns = [
+    CacheKeys.orgUsers(orgId),
+    CacheKeys.orgTools(orgId),
+    `auth:${orgId}:*`,
+    `flow:org:${orgId}:*`
+  ];
+  
+  for (const pattern of patterns) {
+    await this.cacheService.delete(pattern);
+  }
+  
+  this.logger.info(`Cache invalidated for organization: ${orgId}`);
+}
+```
+
+## Performance Optimization
+
+### Batch Operations
+```typescript
+async batchGet(keys: string[]): Promise<Record<string, any>> {
+  // Use Redis pipeline for multiple operations
+  const pipeline = this.redis.pipeline();
+  
+  keys.forEach(key => {
+    pipeline.get(key);
+  });
+  
+  const results = await pipeline.exec();
+  
+  return keys.reduce((acc, key, index) => {
+    acc[key] = results[index];
+    return acc;
+  }, {});
+}
+```
+
+### Connection Pooling
+```typescript
+// Upstash handles connection pooling automatically
+// Configure timeouts and retry logic
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN,
+  retry: {
+    retries: 3,
+    retryDelayOnFailure: 100
+  },
+  timeout: 5000
+});
+```
+
+## Monitoring & Metrics
+
+### Cache Metrics
+```typescript
+export interface CacheMetrics {
+  hits: number;
+  misses: number;
+  hitRate: number;
+  operations: {
+    get: number;
+    set: number;
+    delete: number;
+  };
+}
+
+@Injectable()
+export class CacheMetricsService {
+  private metrics: CacheMetrics = {
+    hits: 0,
+    misses: 0,
+    hitRate: 0,
+    operations: { get: 0, set: 0, delete: 0 }
+  };
+  
+  incrementCacheHits() {
+    this.metrics.hits++;
+    this.updateHitRate();
+  }
+  
+  incrementCacheMisses() {
+    this.metrics.misses++;
+    this.updateHitRate();
+  }
+  
+  private updateHitRate() {
+    const total = this.metrics.hits + this.metrics.misses;
+    this.metrics.hitRate = total > 0 ? (this.metrics.hits / total) * 100 : 0;
+  }
+}
+```
+
+### Health Monitoring
+```typescript
+async healthCheck(): Promise<boolean> {
+  try {
+    const testKey = 'health:check';
+    const testValue = Date.now().toString();
+    
+    // Test write
+    await this.redis.set(testKey, testValue, { ex: 10 });
+    
+    // Test read
+    const retrieved = await this.redis.get(testKey);
+    
+    // Clean up
+    await this.redis.del(testKey);
+    
+    return retrieved === testValue;
+  } catch (error) {
+    this.logger.error('Redis health check failed', error);
+    return false;
+  }
+}
+```
+
+## Data Types & Storage
+
+### JSON Storage
+```typescript
+// Store complex objects as JSON
+await redis.set('flow:config', JSON.stringify({
+  flowId: 'flow_123',
+  steps: [...],
+  metadata: {...}
+}));
+
+// Retrieve and parse
+const config = await redis.get('flow:config');
+const flowConfig = JSON.parse(config);
+```
+
+### Lists & Sets
+```typescript
+// Maintain lists of active executions
+await redis.lpush('active:executions', executionId);
+await redis.expire('active:executions', 3600);
+
+// Track unique webhook events
+await redis.sadd('webhook:events', 'user.created', 'flow.completed');
+const events = await redis.smembers('webhook:events');
+```
+
+### Counters & Analytics
+```typescript
+// Track API usage
+await redis.incr(`api:usage:${orgId}:${date}`);
+await redis.expire(`api:usage:${orgId}:${date}`, 86400);
+
+// Rate limiting
+const key = `ratelimit:${userId}:${endpoint}`;
+const count = await redis.incr(key);
+if (count === 1) {
+  await redis.expire(key, 60); // 1 minute window
+}
+return count <= 100; // 100 requests per minute
+```
+
+## Error Handling & Resilience
+
+### Graceful Degradation
+```typescript
+async getWithFallback<T>(key: string, fallbackFn: () => Promise<T>): Promise<T> {
+  try {
+    const cached = await this.redis.get(key);
+    if (cached) {
+      return JSON.parse(cached);
+    }
+  } catch (error) {
+    this.logger.warn(`Cache read failed for key: ${key}`, error);
+  }
+  
+  // Fallback to primary data source
+  const result = await fallbackFn();
+  
+  // Try to cache the result (fire and forget)
+  this.setWithoutWaiting(key, JSON.stringify(result));
+  
+  return result;
+}
+
+private async setWithoutWaiting(key: string, value: string) {
+  try {
+    await this.redis.set(key, value);
+  } catch (error) {
+    this.logger.warn(`Cache write failed for key: ${key}`, error);
+  }
+}
+```
+
+### Circuit Breaker Pattern
+```typescript
+@Injectable()
+export class CacheCircuitBreaker {
+  private failures = 0;
+  private lastFailure = 0;
+  private isOpen = false;
+  
+  async execute<T>(operation: () => Promise<T>): Promise<T | null> {
+    if (this.isOpen && Date.now() - this.lastFailure < 30000) {
+      return null; // Circuit open
+    }
+    
+    try {
+      const result = await operation();
+      this.reset();
+      return result;
+    } catch (error) {
+      this.recordFailure();
+      throw error;
+    }
+  }
+  
+  private recordFailure() {
+    this.failures++;
+    this.lastFailure = Date.now();
+    
+    if (this.failures >= 5) {
+      this.isOpen = true;
+    }
+  }
+  
+  private reset() {
+    this.failures = 0;
+    this.isOpen = false;
+  }
+}
+```
+
+## Cost Optimization
+
+### Upstash Pricing Model
+- **Requests**: Pay per request (10,000 free requests)
+- **Storage**: Pay for stored data (256MB free)
+- **Bandwidth**: Included in request pricing
+
+### Cost Reduction Strategies
+```typescript
+// 1. Optimize TTL values
+const optimizedTTLs = {
+  frequentlyAccessed: 300,    // 5 minutes
+  moderatelyAccessed: 3600,   // 1 hour
+  rarelyAccessed: 86400      // 24 hours
+};
+
+// 2. Compress large objects
+async setCompressed(key: string, data: any) {
+  const compressed = await gzip(JSON.stringify(data));
+  await this.redis.set(key, compressed);
+}
+
+// 3. Use appropriate data structures
+// Lists for sequential data
+// Sets for unique collections
+// Hashes for object properties
+```
+
+## Troubleshooting
+
+### Common Issues
+1. **Connection Timeouts**
+   - Check network connectivity
+   - Verify Upstash endpoint URL
+   - Increase timeout configuration
+
+2. **Authentication Failures**
+   - Verify REST token validity
+   - Check token permissions
+   - Rotate tokens if compromised
+
+3. **Memory Usage**
+   - Monitor stored data size
+   - Implement cache eviction policies
+   - Use appropriate TTL values
+
+### Debug Commands
+```typescript
+// Connection test
+await redis.ping();
+
+// Key inspection
+const keys = await redis.keys('pattern:*');
+const ttl = await redis.ttl('key');
+const type = await redis.type('key');
+
+// Memory usage
+const info = await redis.info('memory');
+```
+
+### Performance Monitoring
+```typescript
+// Track operation latency
+const start = Date.now();
+const result = await redis.get(key);
+const latency = Date.now() - start;
+
+this.metricsService.recordCacheLatency('get', latency);
+```
+
+## Best Practices
+
+### Key Naming
+- Use hierarchical naming: `entity:type:id`
+- Include version numbers for schema changes
+- Use consistent delimiters (colon)
+- Avoid special characters
+
+### Security
+- Rotate auth tokens regularly
+- Use HTTPS for all connections
+- Implement proper access controls
+- Monitor for suspicious activity
+
+### Performance
+- Batch operations when possible
+- Use appropriate data types
+- Monitor memory usage
+- Implement proper TTL strategies

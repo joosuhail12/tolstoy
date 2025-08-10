@@ -1,0 +1,157 @@
+---
+title: "Get Organization"
+api: "GET /organizations/{id}"
+description: "Retrieve details of a specific organization by ID"
+---
+
+Retrieve detailed information about a specific organization, including configuration, limits, and metadata.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the organization
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the organization
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Organization display name
+</ResponseField>
+
+<ResponseField name="slug" type="string">
+  URL-friendly organization identifier
+</ResponseField>
+
+<ResponseField name="settings" type="object">
+  Organization configuration settings
+  
+  <Expandable title="settings">
+    <ResponseField name="timezone" type="string">
+      Default timezone for the organization
+    </ResponseField>
+    
+    <ResponseField name="dateFormat" type="string">
+      Preferred date format
+    </ResponseField>
+    
+    <ResponseField name="currency" type="string">
+      Default currency code
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="limits" type="object">
+  Organization usage limits
+  
+  <Expandable title="limits">
+    <ResponseField name="workflows" type="number">
+      Maximum number of workflows
+    </ResponseField>
+    
+    <ResponseField name="executions" type="number">
+      Monthly execution limit
+    </ResponseField>
+    
+    <ResponseField name="users" type="number">
+      Maximum number of users
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="subscription" type="object">
+  Subscription information
+  
+  <Expandable title="subscription">
+    <ResponseField name="plan" type="string">
+      Current subscription plan
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Subscription status (active, trial, suspended, cancelled)
+    </ResponseField>
+    
+    <ResponseField name="expiresAt" type="string">
+      Subscription expiration date
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp when the organization was created
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO 8601 timestamp when the organization was last updated
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://api.tolstoy.dev/organizations/org_1234567890" \
+  -H "x-org-id: org_1234567890" \
+  -H "x-user-id: user_1234567890"
+```
+
+```javascript JavaScript
+const organization = await tolstoy.organizations.get('org_1234567890');
+console.log(organization.name);
+```
+
+```python Python
+organization = tolstoy.organizations.get('org_1234567890')
+print(organization.name)
+```
+</RequestExample>
+
+<ResponseExample>
+```json Response
+{
+  "id": "org_1234567890",
+  "name": "Acme Corporation",
+  "slug": "acme-corp",
+  "settings": {
+    "timezone": "America/New_York",
+    "dateFormat": "MM/dd/yyyy",
+    "currency": "USD"
+  },
+  "limits": {
+    "workflows": 100,
+    "executions": 10000,
+    "users": 25
+  },
+  "subscription": {
+    "plan": "professional",
+    "status": "active",
+    "expiresAt": "2024-12-31T23:59:59Z"
+  },
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-08-10T14:22:30Z"
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseField name="404" type="error">
+  Organization not found or access denied
+</ResponseField>
+
+<ResponseField name="403" type="error">
+  Insufficient permissions to access this organization
+</ResponseField>
+
+## Use Cases
+
+- **Dashboard display**: Show organization information in admin dashboards
+- **Settings management**: Load current configuration before updates
+- **Billing integration**: Check subscription status and limits
+- **Access control**: Verify organization permissions
+
+## Related Endpoints
+
+- [List Organizations](/api/organizations/list) - Get all accessible organizations
+- [Update Organization](/api/organizations/update) - Modify organization settings
+- [Delete Organization](/api/organizations/delete) - Remove organization

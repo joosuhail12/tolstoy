@@ -1,0 +1,679 @@
+---
+title: "Rate Limiting"
+description: "API rate limits, quotas, and optimization strategies for the Tolstoy API"
+---
+
+# Rate Limiting
+
+The Tolstoy API implements rate limiting to ensure fair usage and optimal performance for all users. Rate limits are applied per organization and API key.
+
+## Rate Limit Overview
+
+### **Current Rate Limits**
+
+| Plan | Requests/Minute | Requests/Hour | Requests/Day | Executions/Hour |
+|------|-----------------|---------------|--------------|-----------------|
+| **Free** | 100 | 1,000 | 10,000 | 50 |
+| **Starter** | 500 | 10,000 | 100,000 | 500 |
+| **Professional** | 2,000 | 50,000 | 500,000 | 2,000 |
+| **Enterprise** | Custom | Custom | Custom | Custom |
+
+### **Rate Limit Headers**
+
+Every API response includes rate limit information in the headers:
+
+```http
+HTTP/1.1 200 OK
+X-RateLimit-Limit: 2000
+X-RateLimit-Remaining: 1847
+X-RateLimit-Reset: 1640995200
+X-RateLimit-Window: 60
+X-RateLimit-Resource: requests
+```
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum requests allowed in the current window |
+| `X-RateLimit-Remaining` | Remaining requests in the current window |
+| `X-RateLimit-Reset` | Unix timestamp when the rate limit resets |
+| `X-RateLimit-Window` | Window duration in seconds |
+| `X-RateLimit-Resource` | Type of rate limit (requests, executions) |
+
+## Rate Limit Types
+
+### **Request Rate Limits**
+
+Applied to all API endpoints based on the number of HTTP requests.
+
+<CodeGroup>
+
+```bash Check Rate Limits
+curl -I 'https://api.tolstoy.dev/organizations' \
+  -H 'Authorization: Bearer YOUR_API_KEY'
+
+# Response headers show current usage
+# X-RateLimit-Remaining: 1847 requests left
+# X-RateLimit-Reset: 1640995200 (resets in 45 seconds)
+```
+
+```javascript Monitor Rate Limits
+async function makeRequestWithRateLimit(url, options = {}) {
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'Authorization': `Bearer ${process.env.TOLSTOY_API_KEY}`,
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+  
+  // Check rate limit headers
+  const remaining = parseInt(response.headers.get('X-RateLimit-Remaining'));
+  const reset = parseInt(response.headers.get('X-RateLimit-Reset'));
+  
+  console.log(`Rate limit: ${remaining} requests remaining`);
+  
+  if (remaining < 10) {
+    const waitTime = (reset * 1000) - Date.now();
+    console.log(`⚠️  Rate limit low, resets in ${waitTime}ms`);
+  }
+  
+  return response;
+}
+```
+
+```python Python Rate Limit Monitoring
+import requests
+import time
+from datetime import datetime
+
+def check_rate_limits(response):
+    """Check and display rate limit information"""
+    headers = response.headers
+    
+    limit = int(headers.get('X-RateLimit-Limit', 0))
+    remaining = int(headers.get('X-RateLimit-Remaining', 0))
+    reset_time = int(headers.get('X-RateLimit-Reset', 0))
+    
+    reset_datetime = datetime.fromtimestamp(reset_time)
+    
+    print(f"Rate Limit: {remaining}/{limit} remaining")
+    print(f"Resets at: {reset_datetime}")
+    
+    if remaining < limit * 0.1:  # Less than 10% remaining
+        print("⚠️  Rate limit running low!")
+        
+    return remaining, reset_time
+
+# Usage
+response = requests.get(
+    'https://api.tolstoy.dev/organizations',
+    headers={'Authorization': f'Bearer {api_key}'}
+)
+
+check_rate_limits(response)
+```
+
+</CodeGroup>
+
+### **Execution Rate Limits**
+
+Special limits for resource-intensive operations like workflow and action executions.
+
+| Operation | Rate Limit | Burst Limit |
+|-----------|------------|-------------|
+| Flow Execution | 100/hour | 10/minute |
+| Action Execution | 500/hour | 25/minute |
+| Bulk Operations | 10/hour | 2/minute |
+
+<Info>
+Execution rate limits are separate from request rate limits. You could hit execution limits while still having request quota available.
+</Info>
+
+## Rate Limit Responses
+
+### **429 Too Many Requests**
+
+When rate limits are exceeded, the API returns a 429 status code:
+
+<CodeGroup>
+
+```json Standard Rate Limit
+{
+  "error": {
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "Rate limit exceeded",
+    "type": "requests",
+    "limit": 2000,
+    "window": 60,
+    "retry_after": 45
+  }
+}
+```
+
+```json Execution Rate Limit
+{
+  "error": {
+    "code": "EXECUTION_RATE_LIMIT_EXCEEDED", 
+    "message": "Execution rate limit exceeded",
+    "type": "executions",
+    "limit": 100,
+    "window": 3600,
+    "retry_after": 1800,
+    "resource": "flow_execution"
+  }
+}
+```
+
+```json Burst Limit
+{
+  "error": {
+    "code": "BURST_RATE_LIMIT_EXCEEDED",
+    "message": "Too many requests in short time period", 
+    "type": "burst",
+    "limit": 10,
+    "window": 60,
+    "retry_after": 30
+  }
+}
+```
+
+</CodeGroup>
+
+## Handling Rate Limits
+
+### **Exponential Backoff Strategy**
+
+Implement exponential backoff to handle rate limits gracefully:
+
+<CodeGroup>
+
+```javascript Exponential Backoff
+class TolstoyClient {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.baseURL = 'https://api.tolstoy.dev';
+  }
+  
+  async requestWithBackoff(endpoint, options = {}, maxRetries = 3) {
+    let retries = 0;
+    
+    while (retries < maxRetries) {
+      try {
+        const response = await fetch(`${this.baseURL}${endpoint}`, {
+          ...options,
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+            ...options.headers
+          }
+        });
+        
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After') || (2 ** retries);
+          const delay = parseInt(retryAfter) * 1000;
+          
+          console.log(`Rate limited, retrying in ${delay}ms (attempt ${retries + 1})`);
+          
+          await new Promise(resolve => setTimeout(resolve, delay));
+          retries++;
+          continue;
+        }
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return response;
+        
+      } catch (error) {
+        if (retries === maxRetries - 1) throw error;
+        
+        const delay = (2 ** retries) * 1000;
+        console.log(`Request failed, retrying in ${delay}ms`);
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+        retries++;
+      }
+    }
+  }
+  
+  // Usage methods
+  async getOrganizations() {
+    const response = await this.requestWithBackoff('/organizations');
+    return response.json();
+  }
+  
+  async executeFlow(flowId, inputs) {
+    const response = await this.requestWithBackoff(`/flows/${flowId}/execute`, {
+      method: 'POST',
+      body: JSON.stringify({ inputs })
+    });
+    return response.json();
+  }
+}
+```
+
+```python Python Backoff Implementation
+import requests
+import time
+import random
+from typing import Optional, Dict, Any
+
+class TolstoyClient:
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.base_url = 'https://api.tolstoy.dev'
+        self.session = requests.Session()
+        self.session.headers.update({
+            'Authorization': f'Bearer {api_key}',
+            'Content-Type': 'application/json'
+        })
+    
+    def request_with_backoff(
+        self, 
+        method: str, 
+        endpoint: str, 
+        max_retries: int = 3,
+        **kwargs
+    ) -> requests.Response:
+        """Make request with exponential backoff for rate limits"""
+        
+        for attempt in range(max_retries):
+            try:
+                response = self.session.request(
+                    method, 
+                    f'{self.base_url}{endpoint}', 
+                    **kwargs
+                )
+                
+                if response.status_code == 429:
+                    # Check for Retry-After header
+                    retry_after = response.headers.get('Retry-After')
+                    if retry_after:
+                        delay = int(retry_after)
+                    else:
+                        # Exponential backoff with jitter
+                        delay = (2 ** attempt) + random.uniform(0, 1)
+                    
+                    print(f"Rate limited, waiting {delay}s (attempt {attempt + 1})")
+                    time.sleep(delay)
+                    continue
+                
+                response.raise_for_status()
+                return response
+                
+            except requests.RequestException as e:
+                if attempt == max_retries - 1:
+                    raise e
+                
+                delay = (2 ** attempt) + random.uniform(0, 1)
+                print(f"Request failed, retrying in {delay}s")
+                time.sleep(delay)
+        
+        raise Exception(f"Max retries ({max_retries}) exceeded")
+    
+    def get_organizations(self) -> Dict[str, Any]:
+        """Get organizations with automatic retry"""
+        response = self.request_with_backoff('GET', '/organizations')
+        return response.json()
+    
+    def execute_flow(self, flow_id: str, inputs: Dict[str, Any]) -> Dict[str, Any]:
+        """Execute flow with automatic retry"""
+        response = self.request_with_backoff(
+            'POST', 
+            f'/flows/{flow_id}/execute',
+            json={'inputs': inputs}
+        )
+        return response.json()
+```
+
+</CodeGroup>
+
+### **Request Batching**
+
+Optimize API usage by batching multiple operations:
+
+<CodeGroup>
+
+```javascript Bulk Operations
+// Instead of multiple individual requests
+async function createMultipleActions(actions) {
+  // ❌ This will quickly hit rate limits
+  const results = [];
+  for (const action of actions) {
+    const response = await fetch('https://api.tolstoy.dev/actions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(action)
+    });
+    results.push(await response.json());
+  }
+  return results;
+}
+
+// ✅ Use bulk creation instead
+async function createActionsBulk(actions) {
+  const response = await fetch('https://api.tolstoy.dev/actions/bulk', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ actions })
+  });
+  
+  return response.json();
+}
+```
+
+```python Efficient Batching
+import asyncio
+import aiohttp
+from typing import List, Dict, Any
+
+class EfficientTolstoyClient:
+    def __init__(self, api_key: str, max_concurrent: int = 5):
+        self.api_key = api_key
+        self.base_url = 'https://api.tolstoy.dev'
+        self.max_concurrent = max_concurrent
+        self.semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async def _make_request(self, session, method: str, endpoint: str, **kwargs):
+        """Make a single request with semaphore control"""
+        async with self.semaphore:
+            async with session.request(
+                method,
+                f'{self.base_url}{endpoint}',
+                headers={
+                    'Authorization': f'Bearer {self.api_key}',
+                    'Content-Type': 'application/json'
+                },
+                **kwargs
+            ) as response:
+                if response.status == 429:
+                    # Wait for rate limit reset
+                    retry_after = int(response.headers.get('Retry-After', 60))
+                    await asyncio.sleep(retry_after)
+                    return await self._make_request(session, method, endpoint, **kwargs)
+                
+                return await response.json()
+    
+    async def create_actions_concurrent(self, actions: List[Dict[str, Any]]):
+        """Create multiple actions with controlled concurrency"""
+        async with aiohttp.ClientSession() as session:
+            tasks = [
+                self._make_request(session, 'POST', '/actions', json=action)
+                for action in actions
+            ]
+            
+            # Process in batches to respect rate limits
+            results = []
+            for i in range(0, len(tasks), self.max_concurrent):
+                batch = tasks[i:i + self.max_concurrent]
+                batch_results = await asyncio.gather(*batch, return_exceptions=True)
+                results.extend(batch_results)
+                
+                # Small delay between batches
+                await asyncio.sleep(1)
+            
+            return results
+```
+
+</CodeGroup>
+
+## Rate Limit Optimization
+
+### **Caching Strategies**
+
+Reduce API calls by implementing intelligent caching:
+
+<CodeGroup>
+
+```javascript Client-Side Caching
+class CachedTolstoyClient {
+  constructor(apiKey, cacheMaxAge = 300000) { // 5 minutes default
+    this.apiKey = apiKey;
+    this.cache = new Map();
+    this.cacheMaxAge = cacheMaxAge;
+  }
+  
+  _getCacheKey(endpoint, params = {}) {
+    return `${endpoint}:${JSON.stringify(params)}`;
+  }
+  
+  _isCacheValid(timestamp) {
+    return (Date.now() - timestamp) < this.cacheMaxAge;
+  }
+  
+  async getWithCache(endpoint, params = {}) {
+    const cacheKey = this._getCacheKey(endpoint, params);
+    const cached = this.cache.get(cacheKey);
+    
+    if (cached && this._isCacheValid(cached.timestamp)) {
+      console.log(`📦 Cache hit for ${endpoint}`);
+      return cached.data;
+    }
+    
+    console.log(`🌐 API call for ${endpoint}`);
+    const response = await fetch(`https://api.tolstoy.dev${endpoint}`, {
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    
+    // Cache the result
+    this.cache.set(cacheKey, {
+      data,
+      timestamp: Date.now()
+    });
+    
+    return data;
+  }
+  
+  // Cache-friendly methods
+  async getOrganizations() {
+    return this.getWithCache('/organizations');
+  }
+  
+  async getTools() {
+    return this.getWithCache('/tools');
+  }
+  
+  async getActions() {
+    return this.getWithCache('/actions');
+  }
+}
+```
+
+</CodeGroup>
+
+### **Pagination Optimization**
+
+Use appropriate page sizes to minimize requests:
+
+<CodeGroup>
+
+```javascript Efficient Pagination
+async function getAllFlowsEfficiently() {
+  const allFlows = [];
+  let page = 1;
+  const pageSize = 100; // Maximum allowed page size
+  
+  while (true) {
+    const response = await fetch(`https://api.tolstoy.dev/flows?page=${page}&limit=${pageSize}`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    allFlows.push(...data.flows);
+    
+    // Check if we have more pages
+    if (data.flows.length < pageSize) {
+      break; // Last page
+    }
+    
+    page++;
+    
+    // Small delay to respect rate limits
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  
+  return allFlows;
+}
+```
+
+```bash Optimal Page Sizes
+# ❌ Too many requests with small pages
+curl "https://api.tolstoy.dev/flows?limit=10&page=1"
+curl "https://api.tolstoy.dev/flows?limit=10&page=2"
+curl "https://api.tolstoy.dev/flows?limit=10&page=3"
+# ... 10 more requests for 100 items
+
+# ✅ Fewer requests with larger pages
+curl "https://api.tolstoy.dev/flows?limit=100&page=1"
+# Just 1 request for 100 items
+```
+
+</CodeGroup>
+
+## Monitoring Rate Limits
+
+### **Rate Limit Dashboard**
+
+Track your API usage with monitoring:
+
+<CodeGroup>
+
+```javascript Usage Monitoring
+class RateLimitMonitor {
+  constructor(apiKey) {
+    this.apiKey = apiKey;
+    this.metrics = {
+      requests: 0,
+      rateLimits: 0,
+      averageRemaining: 0
+    };
+  }
+  
+  async makeMonitoredRequest(url, options = {}) {
+    const response = await fetch(url, {
+      ...options,
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'Content-Type': 'application/json',
+        ...options.headers
+      }
+    });
+    
+    // Track metrics
+    this.metrics.requests++;
+    
+    const remaining = parseInt(response.headers.get('X-RateLimit-Remaining') || 0);
+    this.metrics.averageRemaining = 
+      (this.metrics.averageRemaining + remaining) / 2;
+    
+    if (response.status === 429) {
+      this.metrics.rateLimits++;
+      console.warn(`⚠️  Rate limit hit! Total hits: ${this.metrics.rateLimits}`);
+    }
+    
+    // Alert if usage is high
+    if (remaining < 100) {
+      console.warn(`🚨 Rate limit warning: Only ${remaining} requests remaining`);
+    }
+    
+    return response;
+  }
+  
+  getUsageStats() {
+    return {
+      totalRequests: this.metrics.requests,
+      rateLimitHits: this.metrics.rateLimits,
+      hitRate: (this.metrics.rateLimits / this.metrics.requests) * 100,
+      averageRemaining: Math.round(this.metrics.averageRemaining)
+    };
+  }
+}
+
+// Usage
+const monitor = new RateLimitMonitor(process.env.TOLSTOY_API_KEY);
+
+// Make monitored requests
+await monitor.makeMonitoredRequest('https://api.tolstoy.dev/organizations');
+await monitor.makeMonitoredRequest('https://api.tolstoy.dev/flows');
+
+// Check stats
+console.log(monitor.getUsageStats());
+// { totalRequests: 2, rateLimitHits: 0, hitRate: 0, averageRemaining: 1950 }
+```
+
+</CodeGroup>
+
+## Enterprise Rate Limits
+
+### **Custom Rate Limits**
+
+Enterprise customers can request custom rate limits based on their needs:
+
+<Tabs>
+  <Tab title="High Volume">
+    - **10,000** requests/minute
+    - **500,000** requests/hour  
+    - **5,000** executions/hour
+    - **Priority queue** for executions
+  </Tab>
+  
+  <Tab title="Real-time Systems">
+    - **20,000** requests/minute
+    - **No burst limits**
+    - **Dedicated infrastructure**
+    - **99.99% SLA**
+  </Tab>
+  
+  <Tab title="Batch Processing">
+    - **Standard request limits**
+    - **Unlimited execution** limits
+    - **Bulk operation** endpoints
+    - **Parallel execution** support
+  </Tab>
+</Tabs>
+
+### **Rate Limit Consultation**
+
+Contact our team for rate limit optimization:
+
+<CardGroup cols={2}>
+  <Card title="Enterprise Sales" icon="handshake" href="mailto:enterprise@tolstoy.dev">
+    Discuss custom rate limits and pricing
+  </Card>
+  <Card title="Technical Support" icon="headset" href="mailto:support@tolstoy.dev">
+    Get help optimizing your API usage
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/api/errors">
+    Learn about API error responses
+  </Card>
+  <Card title="Pagination" icon="list" href="/api/pagination">
+    Understand pagination patterns
+  </Card>
+  <Card title="Best Practices" icon="star" href="/best-practices">
+    API optimization techniques
+  </Card>
+  <Card title="Authentication" icon="key" href="/api/authentication">
+    API key management
+  </Card>
+</CardGroup>

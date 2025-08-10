@@ -1,0 +1,649 @@
+---
+title: "List Webhooks"
+description: "Retrieve a paginated list of webhook endpoints in your organization"
+---
+
+# List Webhooks
+
+<Badge variant="success">GET</Badge> `/webhooks`
+
+Retrieve a paginated list of webhook endpoints configured in your organization. Webhooks allow external systems to trigger flows and send data to Tolstoy.
+
+## Request
+
+### **HTTP Request**
+
+```http
+GET https://api.tolstoy.dev/webhooks
+```
+
+### **Query Parameters**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `limit` | integer | 20 | Number of webhooks per page (1-100) |
+| `cursor` | string | - | Pagination cursor for next page |
+| `sort` | string | `created_at` | Sort field (`name`, `created_at`, `updated_at`, `last_triggered`) |
+| `order` | string | `desc` | Sort order (`asc` or `desc`) |
+| `search` | string | - | Search webhooks by name or URL |
+| `status` | string | - | Filter by status (`active`, `inactive`, `paused`) |
+| `flow_id` | string | - | Filter by associated flow |
+| `created_after` | string | - | Filter by creation date (ISO 8601) |
+| `created_before` | string | - | Filter by creation date (ISO 8601) |
+
+## Response
+
+### **Success Response**
+
+<CodeGroup>
+
+```json 200 OK
+{
+  "webhooks": [
+    {
+      "id": "webhook_new_customer_123",
+      "name": "new_customer_webhook",
+      "display_name": "New Customer Registration",
+      "description": "Webhook endpoint for new customer registrations from the main website",
+      "url": "https://api.tolstoy.dev/webhooks/new_customer_123/trigger",
+      "status": "active",
+      "flow_id": "flow_customer_onboarding",
+      "flow_name": "Customer Onboarding Flow",
+      "config": {
+        "method": "POST",
+        "content_type": "application/json",
+        "authentication": {
+          "type": "signature",
+          "header": "X-Webhook-Signature",
+          "algorithm": "sha256",
+          "secret_name": "WEBHOOK_SECRET_123"
+        },
+        "rate_limit": {
+          "requests_per_minute": 100,
+          "burst_limit": 20
+        },
+        "timeout_ms": 30000,
+        "retry_policy": {
+          "max_retries": 3,
+          "backoff_multiplier": 2,
+          "retryable_status_codes": [502, 503, 504]
+        }
+      },
+      "validation": {
+        "required_fields": ["email", "name", "plan"],
+        "schema": {
+          "type": "object",
+          "properties": {
+            "email": {"type": "string", "format": "email"},
+            "name": {"type": "string", "minLength": 1},
+            "plan": {"type": "string", "enum": ["starter", "professional", "enterprise"]},
+            "company": {"type": "string"},
+            "metadata": {"type": "object"}
+          },
+          "required": ["email", "name", "plan"]
+        }
+      },
+      "security": {
+        "ip_whitelist": [
+          "192.168.1.0/24",
+          "10.0.0.0/8"
+        ],
+        "cors_enabled": false,
+        "https_required": true
+      },
+      "statistics": {
+        "total_requests": 15234,
+        "successful_requests": 14987,
+        "failed_requests": 247,
+        "success_rate": 0.9838,
+        "avg_response_time_ms": 245,
+        "last_triggered_at": "2024-01-15T19:45:00Z",
+        "requests_last_24h": 89,
+        "requests_last_7d": 567,
+        "error_breakdown": {
+          "validation_error": 123,
+          "authentication_failed": 45,
+          "rate_limited": 34,
+          "timeout": 28,
+          "server_error": 17
+        }
+      },
+      "tags": ["customer", "registration", "website"],
+      "created_by": "user_123456789",
+      "created_at": "2023-08-15T10:30:00Z",
+      "updated_at": "2024-01-10T16:20:00Z"
+    },
+    {
+      "id": "webhook_payment_complete_456",
+      "name": "payment_complete_webhook",
+      "display_name": "Payment Completed",
+      "description": "Webhook for Stripe payment completion notifications",
+      "url": "https://api.tolstoy.dev/webhooks/payment_complete_456/trigger",
+      "status": "active",
+      "flow_id": "flow_payment_processing",
+      "flow_name": "Payment Processing Flow",
+      "config": {
+        "method": "POST",
+        "content_type": "application/json",
+        "authentication": {
+          "type": "header",
+          "header": "Authorization",
+          "value_type": "bearer_token",
+          "secret_name": "STRIPE_WEBHOOK_SECRET"
+        },
+        "rate_limit": {
+          "requests_per_minute": 500,
+          "burst_limit": 100
+        },
+        "timeout_ms": 10000
+      },
+      "validation": {
+        "required_fields": ["type", "data"],
+        "schema": {
+          "type": "object",
+          "properties": {
+            "id": {"type": "string"},
+            "type": {"type": "string", "enum": ["payment_intent.succeeded"]},
+            "data": {
+              "type": "object",
+              "properties": {
+                "object": {
+                  "type": "object",
+                  "properties": {
+                    "id": {"type": "string"},
+                    "amount": {"type": "number"},
+                    "currency": {"type": "string"},
+                    "customer": {"type": "string"}
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "security": {
+        "ip_whitelist": [
+          "18.27.197.252/30",
+          "3.18.12.63/30"
+        ],
+        "cors_enabled": false,
+        "https_required": true
+      },
+      "statistics": {
+        "total_requests": 8934,
+        "successful_requests": 8901,
+        "failed_requests": 33,
+        "success_rate": 0.9963,
+        "avg_response_time_ms": 156,
+        "last_triggered_at": "2024-01-15T19:52:30Z",
+        "requests_last_24h": 145,
+        "requests_last_7d": 892,
+        "error_breakdown": {
+          "validation_error": 12,
+          "authentication_failed": 8,
+          "rate_limited": 5,
+          "timeout": 4,
+          "server_error": 4
+        }
+      },
+      "tags": ["payment", "stripe", "billing"],
+      "created_by": "user_456789012",
+      "created_at": "2023-09-22T14:15:00Z",
+      "updated_at": "2024-01-08T10:45:00Z"
+    },
+    {
+      "id": "webhook_github_deploy_789",
+      "name": "github_deployment_webhook",
+      "display_name": "GitHub Deployment",
+      "description": "Webhook triggered on GitHub deployment events",
+      "url": "https://api.tolstoy.dev/webhooks/github_deploy_789/trigger",
+      "status": "active",
+      "flow_id": "flow_deployment_pipeline",
+      "flow_name": "Deployment Pipeline Flow",
+      "config": {
+        "method": "POST",
+        "content_type": "application/json",
+        "authentication": {
+          "type": "signature",
+          "header": "X-Hub-Signature-256",
+          "algorithm": "sha256",
+          "secret_name": "GITHUB_WEBHOOK_SECRET"
+        },
+        "rate_limit": {
+          "requests_per_minute": 60,
+          "burst_limit": 10
+        },
+        "timeout_ms": 15000
+      },
+      "validation": {
+        "required_fields": ["action", "deployment"],
+        "schema": {
+          "type": "object",
+          "properties": {
+            "action": {"type": "string", "enum": ["created", "completed"]},
+            "deployment": {
+              "type": "object",
+              "properties": {
+                "id": {"type": "number"},
+                "environment": {"type": "string"},
+                "ref": {"type": "string"},
+                "sha": {"type": "string"}
+              }
+            }
+          }
+        }
+      },
+      "security": {
+        "ip_whitelist": [
+          "140.82.112.0/20",
+          "192.30.252.0/22"
+        ],
+        "cors_enabled": false,
+        "https_required": true
+      },
+      "statistics": {
+        "total_requests": 456,
+        "successful_requests": 443,
+        "failed_requests": 13,
+        "success_rate": 0.9715,
+        "avg_response_time_ms": 890,
+        "last_triggered_at": "2024-01-15T17:30:00Z",
+        "requests_last_24h": 3,
+        "requests_last_7d": 23,
+        "error_breakdown": {
+          "validation_error": 5,
+          "authentication_failed": 2,
+          "rate_limited": 0,
+          "timeout": 3,
+          "server_error": 3
+        }
+      },
+      "tags": ["github", "deployment", "ci-cd"],
+      "created_by": "user_789012345",
+      "created_at": "2023-11-05T11:00:00Z",
+      "updated_at": "2024-01-05T09:30:00Z"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "count": 3,
+    "has_more": false,
+    "next_cursor": null,
+    "prev_cursor": null,
+    "total_estimate": 3
+  }
+}
+```
+
+</CodeGroup>
+
+### **Webhook Object**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique webhook identifier |
+| `name` | string | Webhook name (used in API references) |
+| `display_name` | string | Human-readable webhook name |
+| `description` | string | Detailed webhook description |
+| `url` | string | Webhook endpoint URL |
+| `status` | string | Webhook status (`active`, `inactive`, `paused`) |
+| `flow_id` | string | Associated flow identifier |
+| `flow_name` | string | Associated flow display name |
+| `config` | object | Webhook configuration settings |
+| `validation` | object | Request validation rules |
+| `security` | object | Security and access controls |
+| `statistics` | object | Usage and performance statistics |
+| `tags` | array | Tags for organization |
+| `created_by` | string | User who created the webhook |
+| `created_at` | string | ISO 8601 timestamp of creation |
+| `updated_at` | string | ISO 8601 timestamp of last update |
+
+## Examples
+
+### **Basic Request**
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET 'https://api.tolstoy.dev/webhooks' \
+  -H 'Authorization: Bearer YOUR_API_KEY' \
+  -H 'Content-Type: application/json'
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.tolstoy.dev/webhooks', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiKey}`,
+    'Content-Type': 'application/json'
+  }
+});
+
+const data = await response.json();
+console.log(`Found ${data.webhooks.length} webhooks`);
+
+data.webhooks.forEach(webhook => {
+  const statusIcon = webhook.status === 'active' ? '✅' : 
+                    webhook.status === 'paused' ? '⏸️' : '❌';
+  
+  console.log(`${statusIcon} ${webhook.display_name}`);
+  console.log(`  URL: ${webhook.url}`);
+  console.log(`  Flow: ${webhook.flow_name}`);
+  console.log(`  Success rate: ${(webhook.statistics.success_rate * 100).toFixed(2)}%`);
+  console.log(`  Requests (24h): ${webhook.statistics.requests_last_24h}`);
+});
+```
+
+```python Python
+import requests
+from urllib.parse import urlparse
+
+response = requests.get(
+    'https://api.tolstoy.dev/webhooks',
+    headers={
+        'Authorization': f'Bearer {api_key}',
+        'Content-Type': 'application/json'
+    }
+)
+
+if response.status_code == 200:
+    data = response.json()
+    print(f"Found {len(data['webhooks'])} webhooks")
+    
+    for webhook in data['webhooks']:
+        status_icon = '✅' if webhook['status'] == 'active' else '❌'
+        print(f"{status_icon} {webhook['display_name']}")
+        print(f"  Flow: {webhook['flow_name']}")
+        print(f"  Success rate: {webhook['statistics']['success_rate']:.2%}")
+        
+        # Show recent activity
+        if webhook['statistics']['requests_last_24h'] > 0:
+            print(f"  Recent requests: {webhook['statistics']['requests_last_24h']} (24h)")
+```
+
+</CodeGroup>
+
+### **Webhook Analytics Dashboard**
+
+<CodeGroup>
+
+```javascript Webhook Analytics
+async function analyzeWebhookPerformance(apiKey) {
+  const response = await fetch('https://api.tolstoy.dev/webhooks?limit=100', {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  
+  const { webhooks } = await response.json();
+  
+  console.log('Webhook Performance Analysis');
+  console.log('============================');
+  
+  // Overall statistics
+  const totalRequests = webhooks.reduce((sum, w) => sum + w.statistics.total_requests, 0);
+  const totalSuccessful = webhooks.reduce((sum, w) => sum + w.statistics.successful_requests, 0);
+  const overallSuccessRate = totalRequests > 0 ? totalSuccessful / totalRequests : 0;
+  
+  console.log(`Total webhooks: ${webhooks.length}`);
+  console.log(`Total requests: ${totalRequests.toLocaleString()}`);
+  console.log(`Overall success rate: ${(overallSuccessRate * 100).toFixed(2)}%`);
+  console.log('');
+  
+  // Performance ranking
+  const sortedByPerformance = [...webhooks].sort((a, b) => {
+    // Sort by success rate, then by request volume
+    const aScore = a.statistics.success_rate * 0.7 + 
+                   (a.statistics.requests_last_24h / 1000) * 0.3;
+    const bScore = b.statistics.success_rate * 0.7 + 
+                   (b.statistics.requests_last_24h / 1000) * 0.3;
+    return bScore - aScore;
+  });
+  
+  console.log('Top Performing Webhooks:');
+  sortedByPerformance.slice(0, 5).forEach((webhook, index) => {
+    console.log(`${index + 1}. ${webhook.display_name}`);
+    console.log(`   Success rate: ${(webhook.statistics.success_rate * 100).toFixed(2)}%`);
+    console.log(`   Avg response: ${webhook.statistics.avg_response_time_ms}ms`);
+    console.log(`   24h requests: ${webhook.statistics.requests_last_24h}`);
+  });
+  
+  // Problem detection
+  const problemWebhooks = webhooks.filter(w => 
+    w.statistics.success_rate < 0.95 || 
+    w.statistics.avg_response_time_ms > 1000 ||
+    w.status !== 'active'
+  );
+  
+  if (problemWebhooks.length > 0) {
+    console.log('\nWebhooks Needing Attention:');
+    problemWebhooks.forEach(webhook => {
+      const issues = [];
+      if (webhook.statistics.success_rate < 0.95) {
+        issues.push(`Low success rate: ${(webhook.statistics.success_rate * 100).toFixed(2)}%`);
+      }
+      if (webhook.statistics.avg_response_time_ms > 1000) {
+        issues.push(`Slow response: ${webhook.statistics.avg_response_time_ms}ms`);
+      }
+      if (webhook.status !== 'active') {
+        issues.push(`Status: ${webhook.status}`);
+      }
+      
+      console.log(`⚠️  ${webhook.display_name}`);
+      issues.forEach(issue => console.log(`   - ${issue}`));
+      
+      // Show top error types
+      const errors = webhook.statistics.error_breakdown;
+      const topErrors = Object.entries(errors)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 2);
+      
+      if (topErrors.length > 0) {
+        console.log(`   Top errors: ${topErrors.map(([type, count]) => `${type}(${count})`).join(', ')}`);
+      }
+    });
+  }
+  
+  return {
+    total: webhooks.length,
+    totalRequests,
+    overallSuccessRate,
+    topPerforming: sortedByPerformance.slice(0, 3),
+    problemWebhooks
+  };
+}
+
+// Usage
+const analytics = await analyzeWebhookPerformance(apiKey);
+```
+
+</CodeGroup>
+
+### **Security Audit**
+
+<CodeGroup>
+
+```javascript Security Audit
+async function auditWebhookSecurity(apiKey) {
+  const response = await fetch('https://api.tolstoy.dev/webhooks', {
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    }
+  });
+  
+  const { webhooks } = await response.json();
+  const securityIssues = [];
+  
+  webhooks.forEach(webhook => {
+    const issues = [];
+    
+    // Check HTTPS requirement
+    if (!webhook.security.https_required) {
+      issues.push('HTTPS not required');
+    }
+    
+    // Check authentication
+    if (!webhook.config.authentication) {
+      issues.push('No authentication configured');
+    } else if (webhook.config.authentication.type === 'none') {
+      issues.push('Authentication disabled');
+    }
+    
+    // Check IP whitelist
+    if (!webhook.security.ip_whitelist || webhook.security.ip_whitelist.length === 0) {
+      issues.push('No IP restrictions');
+    }
+    
+    // Check rate limits
+    if (!webhook.config.rate_limit || webhook.config.rate_limit.requests_per_minute > 1000) {
+      issues.push('High/no rate limit');
+    }
+    
+    if (issues.length > 0) {
+      securityIssues.push({
+        webhook: webhook.display_name,
+        url: webhook.url,
+        issues
+      });
+    }
+  });
+  
+  console.log('Webhook Security Audit');
+  console.log('======================');
+  
+  if (securityIssues.length === 0) {
+    console.log('✅ All webhooks pass security checks');
+  } else {
+    console.log(`⚠️  Found ${securityIssues.length} webhooks with security issues:`);
+    securityIssues.forEach(item => {
+      console.log(`\n🔴 ${item.webhook}`);
+      item.issues.forEach(issue => console.log(`   - ${issue}`));
+    });
+  }
+  
+  return securityIssues;
+}
+
+// Usage
+const securityReport = await auditWebhookSecurity(apiKey);
+```
+
+</CodeGroup>
+
+## Error Responses
+
+<CodeGroup>
+
+```json 401 Unauthorized
+{
+  "error": {
+    "code": "UNAUTHORIZED",
+    "message": "Invalid or missing API key",
+    "type": "authentication",
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+```json 403 Forbidden
+{
+  "error": {
+    "code": "FORBIDDEN",
+    "message": "Insufficient permissions to list webhooks",
+    "type": "authorization",
+    "required_scopes": ["webhooks:read"],
+    "timestamp": "2024-01-15T10:30:00Z",
+    "request_id": "req_123456789"
+  }
+}
+```
+
+</CodeGroup>
+
+## API Playground
+
+Try listing webhooks:
+
+<ApiPlayground
+  method="GET"
+  endpoint="/webhooks"
+  baseUrl="https://api.tolstoy.dev"
+  auth={{
+    type: "bearer",
+    placeholder: "Your API Key"
+  }}
+  parameters={[
+    {
+      name: "limit",
+      type: "integer",
+      defaultValue: 20,
+      description: "Number of webhooks per page (1-100)"
+    },
+    {
+      name: "sort",
+      type: "select",
+      options: ["name", "created_at", "updated_at", "last_triggered"],
+      defaultValue: "created_at",
+      description: "Sort field"
+    },
+    {
+      name: "status",
+      type: "select",
+      options: ["active", "inactive", "paused"],
+      description: "Filter by status"
+    },
+    {
+      name: "flow_id",
+      type: "string",
+      placeholder: "flow_abc123",
+      description: "Filter by associated flow"
+    },
+    {
+      name: "search",
+      type: "string",
+      placeholder: "Search webhooks...",
+      description: "Search webhooks by name or URL"
+    }
+  ]}
+  sampleResponse={{
+    "webhooks": [
+      {
+        "id": "webhook_new_customer_123",
+        "name": "new_customer_webhook",
+        "display_name": "New Customer Registration",
+        "url": "https://api.tolstoy.dev/webhooks/new_customer_123/trigger",
+        "status": "active",
+        "flow_name": "Customer Onboarding Flow",
+        "statistics": {
+          "total_requests": 15234,
+          "success_rate": 0.9838
+        }
+      }
+    ],
+    "pagination": {
+      "limit": 20,
+      "count": 1,
+      "has_more": false
+    }
+  }}
+/>
+
+## Related Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Get Webhook" icon="link" href="/api/webhooks/get">
+    Retrieve details for a specific webhook
+  </Card>
+  <Card title="Create Webhook" icon="plus" href="/api/webhooks/create">
+    Create a new webhook endpoint
+  </Card>
+  <Card title="Test Webhook" icon="vial" href="/api/webhooks/test">
+    Test webhook configuration
+  </Card>
+  <Card title="Webhook Logs" icon="scroll" href="/api/webhooks/logs">
+    View webhook request logs
+  </Card>
+</CardGroup>

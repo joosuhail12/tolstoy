@@ -1,0 +1,676 @@
+# Ably Real-time Messaging
+
+Comprehensive guide to Ably integration for real-time messaging, live updates, and event streaming.
+
+## Overview
+
+Ably provides real-time messaging infrastructure for live flow execution updates, webhook delivery status, and system notifications.
+
+### Key Features
+- **Real-time Updates**: Live flow execution progress
+- **Pub/Sub Messaging**: Event-driven communication
+- **Presence**: Track active users and connections  
+- **Message History**: Retrieve past messages
+- **Connection Recovery**: Automatic reconnection handling
+
+## Configuration
+
+### Environment Setup
+```bash
+ABLY_API_KEY=your_ably_api_key
+ABLY_APP_ID=your_ably_app_id
+```
+
+### Service Implementation
+```typescript
+// src/ably/ably.service.ts
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { Realtime } from 'ably';
+
+@Injectable()
+export class AblyService implements OnModuleDestroy {
+  private ably: Realtime | null = null;
+  private isConnected = false;
+
+  async onModuleInit() {
+    const apiKey = await this.secretsService.get('ABLY_API_KEY');
+    
+    this.ably = new Realtime({
+      key: apiKey,
+      clientId: `tolstoy-server-${process.env.NODE_ENV}`,
+      autoConnect: true,
+      
+      // Connection options
+      disconnectedRetryTimeout: 15000,
+      suspendedRetryTimeout: 30000,
+      
+      // Transport options
+      transports: ['web_socket', 'xhr_polling'],
+      
+      // Log level
+      logLevel: process.env.NODE_ENV === 'development' ? 2 : 1
+    });
+
+    this.setupConnectionHandlers();
+    await this.waitForConnection();
+  }
+
+  private setupConnectionHandlers() {
+    this.ably?.connection.on('connected', () => {
+      this.isConnected = true;
+      this.logger.info('Ably connected successfully');
+    });
+
+    this.ably?.connection.on('disconnected', () => {
+      this.isConnected = false;
+      this.logger.warn('Ably disconnected');
+    });
+
+    this.ably?.connection.on('failed', (error) => {
+      this.isConnected = false;
+      this.logger.error('Ably connection failed', error);
+    });
+  }
+}
+```
+
+## Channel Architecture
+
+### Channel Naming Convention
+```typescript
+// Channel naming patterns
+class ChannelNames {
+  // Organization-level channels
+  static orgEvents(orgId: string) { return `org:${orgId}:events`; }
+  static orgNotifications(orgId: string) { return `org:${orgId}:notifications`; }
+  
+  // Flow execution channels
+  static flowExecution(orgId: string, executionId: string) {
+    return `flow:${orgId}:${executionId}`;
+  }
+  
+  static flowMetrics(orgId: string, flowId: string) {
+    return `metrics:${orgId}:${flowId}`;
+  }
+  
+  // Webhook channels
+  static webhookEvents(orgId: string) { return `webhooks:${orgId}:events`; }
+  
+  // User-specific channels
+  static userNotifications(userId: string) { return `user:${userId}:notifications`; }
+}
+```
+
+### Channel Permissions
+```typescript
+// Capability-based access control
+interface ChannelCapabilities {
+  subscribe?: string[];
+  publish?: string[];
+  presence?: string[];
+  history?: string[];
+}
+
+const channelRules: Record<string, ChannelCapabilities> = {
+  'flow:*': {
+    publish: ['server'],
+    subscribe: ['*'],
+    presence: ['authenticated']
+  },
+  'user:*:notifications': {
+    publish: ['server'],
+    subscribe: ['user-owner'],
+  },
+  'org:*:events': {
+    publish: ['server'],
+    subscribe: ['org-member']
+  }
+};
+```
+
+## Event Types & Schemas
+
+### Flow Step Events
+```typescript
+export interface FlowStepEvent {
+  stepId: string;
+  status: 'started' | 'completed' | 'failed' | 'skipped';
+  timestamp: string;
+  executionId: string;
+  orgId: string;
+  flowId: string;
+  stepName?: string;
+  output?: unknown;
+  error?: {
+    message: string;
+    code?: string;
+    stack?: string;
+  };
+  duration?: number;
+  skipReason?: string;
+  executeIf?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+```
+
+### Flow Execution Events
+```typescript
+export interface FlowExecutionEvent {
+  executionId: string;
+  flowId: string;
+  orgId: string;
+  userId: string;
+  status: 'started' | 'running' | 'completed' | 'failed' | 'cancelled';
+  progress: {
+    currentStep: number;
+    totalSteps: number;
+    completedSteps: number;
+    failedSteps: number;
+  };
+  startTime: string;
+  endTime?: string;
+  duration?: number;
+  variables?: Record<string, unknown>;
+  results?: Record<string, unknown>;
+  error?: {
+    message: string;
+    step?: string;
+    timestamp: string;
+  };
+}
+```
+
+### Webhook Delivery Events
+```typescript
+export interface WebhookDeliveryEvent {
+  webhookId: string;
+  orgId: string;
+  deliveryId: string;
+  eventType: string;
+  status: 'pending' | 'delivered' | 'failed' | 'retrying';
+  url: string;
+  statusCode?: number;
+  duration?: number;
+  attempt: number;
+  maxAttempts: number;
+  nextRetry?: string;
+  error?: {
+    message: string;
+    code?: string;
+  };
+  timestamp: string;
+}
+```
+
+## Real-time Flow Updates
+
+### Publishing Flow Progress
+```typescript
+// src/ably/ably.service.ts
+async publishFlowStepUpdate(
+  orgId: string,
+  executionId: string,
+  stepEvent: FlowStepEvent
+) {
+  if (!this.isConnected) {
+    this.logger.warn('Ably not connected, queuing message');
+    await this.queueMessage('flow-step', { orgId, executionId, stepEvent });
+    return;
+  }
+
+  const channel = this.ably?.channels.get(
+    ChannelNames.flowExecution(orgId, executionId)
+  );
+
+  await channel?.publish('step-update', stepEvent);
+
+  // Also publish to organization channel for dashboards
+  const orgChannel = this.ably?.channels.get(ChannelNames.orgEvents(orgId));
+  await orgChannel?.publish('flow-step', {
+    executionId,
+    stepEvent
+  });
+
+  this.logger.debug('Published flow step update', {
+    orgId,
+    executionId,
+    stepId: stepEvent.stepId,
+    status: stepEvent.status
+  });
+}
+
+async publishFlowExecution(
+  orgId: string,
+  executionEvent: FlowExecutionEvent
+) {
+  const channels = [
+    ChannelNames.flowExecution(orgId, executionEvent.executionId),
+    ChannelNames.orgEvents(orgId)
+  ];
+
+  for (const channelName of channels) {
+    const channel = this.ably?.channels.get(channelName);
+    await channel?.publish('execution-update', executionEvent);
+  }
+
+  this.logger.info('Published flow execution update', {
+    orgId,
+    executionId: executionEvent.executionId,
+    status: executionEvent.status
+  });
+}
+```
+
+### Subscribing to Updates
+```typescript
+// Client-side subscription example
+class FlowMonitorClient {
+  private ably: Realtime;
+  private subscriptions: Map<string, () => void> = new Map();
+
+  async subscribeToFlowExecution(
+    orgId: string,
+    executionId: string,
+    onUpdate: (event: FlowStepEvent) => void
+  ) {
+    const channelName = `flow:${orgId}:${executionId}`;
+    const channel = this.ably.channels.get(channelName);
+
+    const unsubscribe = channel.subscribe('step-update', (message) => {
+      onUpdate(message.data as FlowStepEvent);
+    });
+
+    this.subscriptions.set(channelName, unsubscribe);
+
+    // Request message history for missed updates
+    const history = await channel.history({ limit: 100 });
+    history.items.forEach(message => {
+      if (message.name === 'step-update') {
+        onUpdate(message.data as FlowStepEvent);
+      }
+    });
+  }
+
+  async unsubscribeFromFlowExecution(orgId: string, executionId: string) {
+    const channelName = `flow:${orgId}:${executionId}`;
+    const unsubscribe = this.subscriptions.get(channelName);
+    
+    if (unsubscribe) {
+      unsubscribe();
+      this.subscriptions.delete(channelName);
+    }
+  }
+}
+```
+
+## Webhook Delivery Tracking
+
+### Publishing Webhook Events
+```typescript
+async publishWebhookDelivery(
+  orgId: string,
+  webhookEvent: WebhookDeliveryEvent
+) {
+  const channel = this.ably?.channels.get(ChannelNames.webhookEvents(orgId));
+  
+  await channel?.publish('delivery-update', webhookEvent);
+
+  // Send notification for failed deliveries
+  if (webhookEvent.status === 'failed' && webhookEvent.attempt >= webhookEvent.maxAttempts) {
+    await this.publishNotification(orgId, {
+      type: 'webhook-failed',
+      title: 'Webhook Delivery Failed',
+      message: `Webhook ${webhookEvent.webhookId} failed permanently after ${webhookEvent.attempt} attempts`,
+      severity: 'error',
+      metadata: {
+        webhookId: webhookEvent.webhookId,
+        url: webhookEvent.url,
+        eventType: webhookEvent.eventType
+      }
+    });
+  }
+}
+```
+
+## User Presence & Activity
+
+### Presence Implementation
+```typescript
+async trackUserPresence(userId: string, orgId: string, metadata: any = {}) {
+  const channel = this.ably?.channels.get(ChannelNames.orgEvents(orgId));
+  
+  await channel?.presence.enter({
+    userId,
+    timestamp: new Date().toISOString(),
+    ...metadata
+  });
+
+  // Set up presence leave on disconnect
+  this.ably?.connection.on('disconnected', async () => {
+    await channel?.presence.leave();
+  });
+}
+
+async getActiveUsers(orgId: string): Promise<any[]> {
+  const channel = this.ably?.channels.get(ChannelNames.orgEvents(orgId));
+  const presence = await channel?.presence.get();
+  
+  return presence?.map(member => member.data) || [];
+}
+```
+
+## Message Queuing & Offline Support
+
+### Message Queue Implementation
+```typescript
+// Message queue for offline scenarios
+@Injectable()
+export class MessageQueueService {
+  private queue: Array<{
+    id: string;
+    type: string;
+    payload: any;
+    timestamp: number;
+    retries: number;
+  }> = [];
+
+  async queueMessage(type: string, payload: any) {
+    const message = {
+      id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type,
+      payload,
+      timestamp: Date.now(),
+      retries: 0
+    };
+
+    this.queue.push(message);
+    await this.persistQueue();
+  }
+
+  async processQueue() {
+    if (!this.ablyService.isConnected || this.queue.length === 0) {
+      return;
+    }
+
+    const batch = this.queue.splice(0, 10); // Process 10 at a time
+    
+    for (const message of batch) {
+      try {
+        await this.processMessage(message);
+      } catch (error) {
+        message.retries++;
+        
+        if (message.retries < 3) {
+          this.queue.unshift(message); // Retry later
+        } else {
+          this.logger.error('Message processing failed after 3 retries', {
+            messageId: message.id,
+            error: error.message
+          });
+        }
+      }
+    }
+
+    await this.persistQueue();
+  }
+
+  private async processMessage(message: any) {
+    switch (message.type) {
+      case 'flow-step':
+        await this.ablyService.publishFlowStepUpdate(
+          message.payload.orgId,
+          message.payload.executionId,
+          message.payload.stepEvent
+        );
+        break;
+      case 'webhook-delivery':
+        await this.ablyService.publishWebhookDelivery(
+          message.payload.orgId,
+          message.payload.webhookEvent
+        );
+        break;
+      default:
+        this.logger.warn('Unknown message type', { type: message.type });
+    }
+  }
+}
+```
+
+## Security & Authentication
+
+### Token-based Authentication
+```typescript
+// Generate client tokens with capabilities
+async generateClientToken(userId: string, orgId: string): Promise<string> {
+  const capabilities = {
+    [`flow:${orgId}:*`]: ['subscribe'],
+    [`org:${orgId}:events`]: ['subscribe'],
+    [`user:${userId}:notifications`]: ['subscribe'],
+    [`webhooks:${orgId}:events`]: ['subscribe']
+  };
+
+  const tokenRequest = {
+    clientId: userId,
+    capability: capabilities,
+    timestamp: Date.now(),
+    ttl: 3600000 // 1 hour
+  };
+
+  const token = await this.ably?.auth.createTokenRequest(tokenRequest);
+  return JSON.stringify(token);
+}
+```
+
+### Message Encryption
+```typescript
+// Encrypt sensitive message content
+async publishSecureMessage(
+  channelName: string,
+  eventName: string,
+  data: any,
+  orgId: string
+) {
+  const encryptionKey = await this.getOrgEncryptionKey(orgId);
+  
+  const channel = this.ably?.channels.get(channelName, {
+    cipher: { key: encryptionKey }
+  });
+  
+  await channel?.publish(eventName, data);
+}
+```
+
+## Performance Optimization
+
+### Connection Pooling
+```typescript
+// Optimize connection usage
+class AblyConnectionPool {
+  private connections: Map<string, Realtime> = new Map();
+  
+  getConnection(region: string): Realtime {
+    if (!this.connections.has(region)) {
+      const ably = new Realtime({
+        key: process.env.ABLY_API_KEY,
+        environment: region,
+        // Connection options optimized for server use
+        autoConnect: true,
+        queueMessages: true,
+        disconnectedRetryTimeout: 15000
+      });
+      
+      this.connections.set(region, ably);
+    }
+    
+    return this.connections.get(region)!;
+  }
+}
+```
+
+### Message Batching
+```typescript
+// Batch multiple updates together
+class MessageBatcher {
+  private batches: Map<string, any[]> = new Map();
+  private timers: Map<string, NodeJS.Timeout> = new Map();
+  
+  addToBatch(channelName: string, message: any) {
+    if (!this.batches.has(channelName)) {
+      this.batches.set(channelName, []);
+    }
+    
+    this.batches.get(channelName)!.push(message);
+    
+    // Set flush timer
+    if (!this.timers.has(channelName)) {
+      const timer = setTimeout(() => {
+        this.flushBatch(channelName);
+      }, 100); // 100ms batch window
+      
+      this.timers.set(channelName, timer);
+    }
+  }
+  
+  private async flushBatch(channelName: string) {
+    const batch = this.batches.get(channelName);
+    if (!batch || batch.length === 0) return;
+    
+    const channel = this.ably?.channels.get(channelName);
+    await channel?.publish('batch-update', batch);
+    
+    // Clean up
+    this.batches.delete(channelName);
+    const timer = this.timers.get(channelName);
+    if (timer) {
+      clearTimeout(timer);
+      this.timers.delete(channelName);
+    }
+  }
+}
+```
+
+## Monitoring & Analytics
+
+### Connection Metrics
+```typescript
+@Injectable()
+export class AblyMetricsService {
+  private metrics = {
+    connectionsActive: 0,
+    messagesPublished: 0,
+    messagesReceived: 0,
+    channelsActive: 0,
+    errors: 0
+  };
+
+  trackConnection(event: 'connect' | 'disconnect') {
+    if (event === 'connect') {
+      this.metrics.connectionsActive++;
+    } else {
+      this.metrics.connectionsActive--;
+    }
+  }
+
+  trackMessage(direction: 'published' | 'received') {
+    if (direction === 'published') {
+      this.metrics.messagesPublished++;
+    } else {
+      this.metrics.messagesReceived++;
+    }
+  }
+
+  getMetrics() {
+    return { ...this.metrics };
+  }
+}
+```
+
+### Health Monitoring
+```typescript
+async healthCheck(): Promise<{ status: string; details?: any }> {
+  try {
+    if (!this.isConnected) {
+      return { status: 'unhealthy', details: { reason: 'not connected' } };
+    }
+
+    // Test channel publish/subscribe
+    const testChannel = this.ably?.channels.get('health-check');
+    const testMessage = { timestamp: Date.now() };
+    
+    await testChannel?.publish('test', testMessage);
+    
+    return { 
+      status: 'healthy',
+      details: {
+        connectionState: this.ably?.connection.state,
+        connectionId: this.ably?.connection.id
+      }
+    };
+  } catch (error) {
+    return { 
+      status: 'unhealthy', 
+      details: { error: error.message } 
+    };
+  }
+}
+```
+
+## Best Practices
+
+### Channel Management
+- Use hierarchical channel names
+- Implement proper access controls
+- Clean up unused channels
+- Monitor channel activity
+
+### Message Design
+- Keep messages small and focused
+- Use consistent schemas
+- Include timestamps
+- Handle missing fields gracefully
+
+### Error Handling
+- Implement retry logic
+- Use dead letter queues
+- Monitor error rates
+- Alert on connection failures
+
+### Performance
+- Batch related messages
+- Use appropriate TTL values
+- Optimize channel subscriptions
+- Monitor bandwidth usage
+
+## Cost Optimization
+
+### Message Optimization
+```typescript
+// Optimize message size and frequency
+const optimizeMessage = (data: any) => {
+  // Remove unnecessary fields
+  const { largeField, ...essential } = data;
+  
+  // Compress timestamps
+  essential.ts = Date.now();
+  
+  return essential;
+};
+
+// Rate limiting for high-frequency updates
+class RateLimitedPublisher {
+  private lastPublish: Map<string, number> = new Map();
+  private minInterval = 100; // 100ms minimum between publishes
+  
+  async publishWithRateLimit(channel: string, event: string, data: any) {
+    const now = Date.now();
+    const lastTime = this.lastPublish.get(channel) || 0;
+    
+    if (now - lastTime < this.minInterval) {
+      return; // Skip this publish
+    }
+    
+    await this.ably.publish(channel, event, data);
+    this.lastPublish.set(channel, now);
+  }
+}
+```

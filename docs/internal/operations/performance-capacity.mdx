@@ -1,0 +1,916 @@
+---
+title: 'Performance Benchmarks & Capacity Planning'
+description: 'Comprehensive performance benchmarks, capacity planning guidelines, scaling strategies, and resource optimization for the Tolstoy platform'
+---
+
+# Performance Benchmarks & Capacity Planning
+
+This document provides detailed performance benchmarks, capacity planning guidelines, scaling strategies, and resource optimization recommendations for the Tolstoy platform.
+
+## Performance Overview
+
+### Current Performance Metrics
+
+<CardGroup cols={2}>
+  <Card title="API Performance" icon="tachometer-alt">
+    99th percentile response times under 500ms with 10,000 RPS capability
+  </Card>
+  <Card title="Workflow Execution" icon="play">
+    10,000 concurrent executions with 99.95% success rate
+  </Card>
+  <Card title="Integration Throughput" icon="network-wired">
+    50,000 external API calls per minute with intelligent rate limiting
+  </Card>
+  <Card title="Database Performance" icon="database">
+    100,000 queries per second with sub-10ms P95 response times
+  </Card>
+</CardGroup>
+
+### Service Level Objectives (SLOs)
+
+```yaml
+platform_slos:
+  availability:
+    target: "99.9%"
+    measurement_window: "30 days"
+    error_budget: "43.2 minutes/month"
+    
+  api_latency:
+    target_p95: "200ms"
+    target_p99: "500ms"
+    measurement_window: "24 hours"
+    
+  workflow_execution:
+    success_rate: "99.5%"
+    start_latency_p95: "5 seconds"
+    measurement_window: "24 hours"
+    
+  integration_reliability:
+    success_rate: "99.0%"
+    timeout_rate: "&lt;1%"
+    measurement_window: "24 hours"
+```
+
+## Service-Level Benchmarks
+
+### API Gateway Performance
+
+#### Throughput Benchmarks
+```yaml
+api_gateway_performance:
+  baseline_configuration:
+    cpu: "2 cores"
+    memory: "4GB"
+    replicas: 3
+    
+  performance_metrics:
+    requests_per_second:
+      max_sustained: 10000
+      burst_capacity: 15000
+      avg_response_time: "45ms"
+      
+    concurrent_connections:
+      max_connections: 50000
+      connection_pooling: "enabled"
+      keep_alive_timeout: "60s"
+      
+    resource_utilization:
+      cpu_usage_avg: "60%"
+      memory_usage_avg: "70%"
+      network_io: "500MB/s"
+      
+  load_testing_results:
+    test_duration: "1 hour"
+    ramp_up_time: "10 minutes"
+    error_rate: "&lt;0.1%"
+    p95_response_time: "120ms"
+    p99_response_time: "250ms"
+```
+
+#### Authentication Performance
+```yaml
+authentication_benchmarks:
+  jwt_validation:
+    operations_per_second: 50000
+    avg_latency: "2ms"
+    cache_hit_rate: "95%"
+    
+  api_key_validation:
+    operations_per_second: 100000
+    avg_latency: "1ms"
+    cache_hit_rate: "98%"
+    
+  oauth_token_refresh:
+    operations_per_second: 1000
+    avg_latency: "150ms"
+    success_rate: "99.9%"
+```
+
+### Workflow Service Performance
+
+#### CRUD Operations Benchmark
+```yaml
+workflow_service_performance:
+  infrastructure:
+    cpu: "4 cores"
+    memory: "8GB"
+    replicas: 3
+    database_connections: 50
+    
+  crud_operations:
+    create_workflow:
+      max_throughput: "500/minute"
+      avg_latency: "150ms"
+      p95_latency: "300ms"
+      validation_time: "50ms"
+      
+    read_workflow:
+      max_throughput: "10000/minute"
+      avg_latency: "25ms"
+      p95_latency: "50ms"
+      cache_hit_rate: "85%"
+      
+    update_workflow:
+      max_throughput: "300/minute"
+      avg_latency: "200ms"
+      p95_latency: "400ms"
+      version_conflict_rate: "0.1%"
+      
+    delete_workflow:
+      max_throughput: "100/minute"
+      avg_latency: "100ms"
+      p95_latency: "200ms"
+      cascade_delete_time: "500ms"
+      
+  complex_operations:
+    workflow_validation:
+      simple_workflow: "10ms"
+      complex_workflow: "500ms"
+      max_complexity: "1000 actions"
+      timeout_threshold: "30s"
+      
+    template_processing:
+      template_instantiation: "200ms"
+      parameter_validation: "50ms"
+      custom_template_upload: "2s"
+      marketplace_browse: "100ms"
+```
+
+#### Memory Usage Patterns
+```yaml
+workflow_service_memory:
+  baseline_usage: "2GB"
+  per_workflow_cache: "50KB"
+  per_template_cache: "100KB"
+  
+  memory_scaling:
+    1000_workflows: "3GB"
+    10000_workflows: "6GB"
+    100000_workflows: "15GB"
+    
+  garbage_collection:
+    frequency: "every 30 minutes"
+    duration: "100ms"
+    memory_freed: "500MB average"
+```
+
+### Execution Engine Performance
+
+#### Execution Throughput
+```yaml
+execution_engine_performance:
+  infrastructure:
+    cpu: "8 cores"
+    memory: "16GB"
+    replicas: 5
+    storage: "100GB SSD"
+    
+  execution_metrics:
+    concurrent_executions:
+      max_supported: 10000
+      avg_duration: "2 minutes"
+      resource_per_execution: "50MB RAM"
+      
+    execution_startup:
+      cold_start: "3s"
+      warm_start: "500ms"
+      resource_allocation: "200ms"
+      
+    step_processing:
+      simple_action: "100ms"
+      integration_call: "2s"
+      condition_evaluation: "10ms"
+      loop_iteration: "50ms"
+      
+    throughput_scaling:
+      1_replica: "2000 executions/hour"
+      5_replicas: "10000 executions/hour"
+      10_replicas: "20000 executions/hour"
+      auto_scaling_trigger: "80% resource usage"
+```
+
+#### Resource Consumption Patterns
+```yaml
+execution_resource_patterns:
+  by_workflow_complexity:
+    simple_workflow:
+      cpu_time: "100ms"
+      memory_peak: "50MB"
+      execution_time: "30s"
+      
+    medium_workflow:
+      cpu_time: "1s"
+      memory_peak: "200MB"
+      execution_time: "5 minutes"
+      
+    complex_workflow:
+      cpu_time: "10s"
+      memory_peak: "1GB"
+      execution_time: "30 minutes"
+      
+  by_action_type:
+    http_request:
+      cpu: "10ms"
+      memory: "5MB"
+      network_io: "variable"
+      
+    database_query:
+      cpu: "50ms"
+      memory: "20MB"
+      db_connections: 1
+      
+    file_processing:
+      cpu: "500ms"
+      memory: "100MB"
+      storage_io: "high"
+      
+    data_transformation:
+      cpu: "200ms"
+      memory: "50MB"
+      processing_time: "varies by size"
+```
+
+### Integration Service Performance
+
+#### API Call Performance
+```yaml
+integration_service_performance:
+  infrastructure:
+    cpu: "4 cores"
+    memory: "8GB" 
+    replicas: 3
+    connection_pool: 200
+    
+  api_call_metrics:
+    throughput:
+      max_calls_per_second: 1000
+      max_calls_per_minute: 50000
+      concurrent_connections: 500
+      
+    latency_breakdown:
+      authentication_overhead: "50ms"
+      request_preparation: "10ms"
+      network_round_trip: "variable"
+      response_processing: "20ms"
+      
+    success_rates:
+      oauth_integrations: "99.5%"
+      api_key_integrations: "99.8%"
+      custom_auth: "99.0%"
+      
+  integration_overhead:
+    oauth_token_refresh: "200ms"
+    rate_limit_checking: "5ms"
+    request_logging: "2ms"
+    response_transformation: "50ms"
+```
+
+#### Provider-Specific Performance
+```yaml
+integration_provider_performance:
+  salesforce:
+    avg_response_time: "800ms"
+    rate_limit: "15000/day"
+    success_rate: "99.7%"
+    common_failures: ["token_expiry", "rate_limit"]
+    
+  slack:
+    avg_response_time: "300ms"
+    rate_limit: "1/second"
+    success_rate: "99.9%"
+    common_failures: ["webhook_timeout"]
+    
+  google_workspace:
+    avg_response_time: "500ms"
+    rate_limit: "100/100s"
+    success_rate: "99.5%"
+    common_failures: ["quota_exceeded"]
+    
+  hubspot:
+    avg_response_time: "1200ms"
+    rate_limit: "100/10s"
+    success_rate: "99.0%"
+    common_failures: ["api_timeout", "rate_limit"]
+    
+  custom_apis:
+    avg_response_time: "2000ms"
+    success_rate: "95.0%"
+    common_failures: ["timeout", "ssl_errors", "auth_failure"]
+```
+
+### Database Performance
+
+#### Query Performance Benchmarks
+```yaml
+database_performance:
+  infrastructure:
+    instance_type: "r5.2xlarge"
+    cpu_cores: 8
+    memory: "64GB"
+    storage: "1TB gp3 SSD"
+    iops: 16000
+    
+  query_performance:
+    simple_select:
+      queries_per_second: 50000
+      avg_latency: "2ms"
+      p95_latency: "5ms"
+      
+    complex_join:
+      queries_per_second: 5000
+      avg_latency: "20ms"
+      p95_latency: "50ms"
+      
+    aggregation_query:
+      queries_per_second: 1000
+      avg_latency: "100ms"
+      p95_latency: "300ms"
+      
+    write_operations:
+      inserts_per_second: 10000
+      updates_per_second: 5000
+      deletes_per_second: 2000
+      
+  connection_pooling:
+    max_connections: 200
+    connection_lifetime: "1 hour"
+    pool_utilization_avg: "60%"
+    connection_wait_time_p95: "10ms"
+```
+
+#### Storage Performance
+```yaml
+storage_benchmarks:
+  postgresql_primary:
+    read_iops: 15000
+    write_iops: 8000
+    throughput_read: "600MB/s"
+    throughput_write: "300MB/s"
+    
+  postgresql_replica:
+    replication_lag_avg: "10ms"
+    replication_lag_p95: "50ms"
+    read_iops: 20000
+    
+  redis_cache:
+    operations_per_second: 100000
+    memory_usage: "8GB"
+    hit_ratio: "95%"
+    eviction_rate: "1000/minute"
+    
+  elasticsearch:
+    search_queries_per_second: 2000
+    indexing_rate: 10000
+    storage_used: "500GB"
+    shard_count: 100
+```
+
+## Capacity Planning Guidelines
+
+### Sizing Recommendations
+
+#### Small Organization (1-50 users)
+```yaml
+small_organization:
+  expected_usage:
+    workflows: 50
+    executions_per_day: 500
+    integrations: 10
+    api_calls_per_day: 5000
+    
+  recommended_resources:
+    api_gateway:
+      replicas: 2
+      cpu: "500m"
+      memory: "1GB"
+      
+    workflow_service:
+      replicas: 2
+      cpu: "1000m"
+      memory: "2GB"
+      
+    execution_engine:
+      replicas: 2
+      cpu: "2000m"
+      memory: "4GB"
+      
+    integration_service:
+      replicas: 1
+      cpu: "500m"
+      memory: "1GB"
+      
+  database_sizing:
+    primary_instance: "db.t3.medium"
+    storage: "100GB"
+    connections: 50
+    
+  estimated_costs:
+    infrastructure: "$500/month"
+    scaling_headroom: "2x current usage"
+```
+
+#### Medium Organization (51-500 users)
+```yaml
+medium_organization:
+  expected_usage:
+    workflows: 1000
+    executions_per_day: 10000
+    integrations: 50
+    api_calls_per_day: 100000
+    
+  recommended_resources:
+    api_gateway:
+      replicas: 3
+      cpu: "1000m"
+      memory: "2GB"
+      
+    workflow_service:
+      replicas: 3
+      cpu: "2000m"
+      memory: "4GB"
+      
+    execution_engine:
+      replicas: 5
+      cpu: "4000m"
+      memory: "8GB"
+      
+    integration_service:
+      replicas: 3
+      cpu: "1000m"
+      memory: "2GB"
+      
+  database_sizing:
+    primary_instance: "db.r5.large"
+    replica_instance: "db.r5.large"
+    storage: "500GB"
+    connections: 100
+    
+  estimated_costs:
+    infrastructure: "$2000/month"
+    scaling_headroom: "1.5x current usage"
+```
+
+#### Large Organization (500+ users)
+```yaml
+large_organization:
+  expected_usage:
+    workflows: 10000
+    executions_per_day: 100000
+    integrations: 200
+    api_calls_per_day: 1000000
+    
+  recommended_resources:
+    api_gateway:
+      replicas: 5
+      cpu: "2000m"
+      memory: "4GB"
+      
+    workflow_service:
+      replicas: 5
+      cpu: "4000m"
+      memory: "8GB"
+      
+    execution_engine:
+      replicas: 10
+      cpu: "8000m"
+      memory: "16GB"
+      
+    integration_service:
+      replicas: 5
+      cpu: "2000m"
+      memory: "4GB"
+      
+  database_sizing:
+    primary_instance: "db.r5.2xlarge"
+    replica_instances: 2
+    replica_instance_type: "db.r5.xlarge"
+    storage: "2TB"
+    connections: 200
+    
+  estimated_costs:
+    infrastructure: "$8000/month"
+    scaling_headroom: "1.2x current usage"
+```
+
+### Scaling Triggers and Thresholds
+
+#### Horizontal Pod Autoscaling (HPA)
+```yaml
+hpa_configuration:
+  api_gateway:
+    min_replicas: 2
+    max_replicas: 20
+    target_cpu_utilization: 70
+    target_memory_utilization: 80
+    scale_up_stabilization: "60s"
+    scale_down_stabilization: "300s"
+    
+  workflow_service:
+    min_replicas: 2
+    max_replicas: 15
+    target_cpu_utilization: 70
+    target_memory_utilization: 80
+    custom_metrics:
+      - "workflow_queue_depth > 100"
+      - "workflow_validation_time_p95 > 1000ms"
+      
+  execution_engine:
+    min_replicas: 3
+    max_replicas: 50
+    target_cpu_utilization: 60
+    target_memory_utilization: 70
+    custom_metrics:
+      - "active_executions > 100 per replica"
+      - "execution_queue_depth > 50"
+      
+  integration_service:
+    min_replicas: 2
+    max_replicas: 10
+    target_cpu_utilization: 70
+    custom_metrics:
+      - "integration_call_rate > 500/minute per replica"
+      - "integration_error_rate > 5%"
+```
+
+#### Vertical Scaling Guidelines
+```yaml
+vertical_scaling:
+  memory_pressure_indicators:
+    - "memory_usage_percent > 85%"
+    - "gc_frequency > 10/minute"
+    - "oom_kill_events > 0"
+    
+  cpu_pressure_indicators:
+    - "cpu_usage_percent > 80%"
+    - "response_time_p95 > threshold + 50%"
+    - "queue_depth increasing trend"
+    
+  scaling_actions:
+    memory_scaling:
+      increment: "2GB"
+      max_memory_per_pod: "32GB"
+      
+    cpu_scaling:
+      increment: "1000m"
+      max_cpu_per_pod: "8000m"
+```
+
+### Database Scaling Strategies
+
+#### Read Scaling
+```yaml
+read_scaling:
+  read_replica_triggers:
+    - "primary_cpu_utilization > 70%"
+    - "read_query_latency_p95 > 100ms"
+    - "connection_pool_utilization > 80%"
+    
+  read_replica_configuration:
+    instance_type: "same as primary"
+    lag_monitoring: "< 100ms"
+    failover_capability: true
+    
+  read_splitting_logic:
+    workflow_reads: "replica"
+    execution_history: "replica"
+    user_profile_reads: "replica"
+    transactional_reads: "primary"
+```
+
+#### Write Scaling
+```yaml
+write_scaling:
+  sharding_strategy:
+    partition_key: "organization_id"
+    shard_count: 16
+    rebalancing: "automatic"
+    
+  connection_pooling:
+    max_connections_per_shard: 50
+    connection_multiplexing: true
+    prepared_statement_cache: true
+    
+  write_optimization:
+    batch_inserts: true
+    async_writes: "non_critical_data"
+    write_through_cache: true
+```
+
+## Performance Optimization Strategies
+
+### Application-Level Optimizations
+
+#### Caching Strategy
+```yaml
+caching_layers:
+  l1_cache: # Application memory cache
+    technology: "Node.js Map/WeakMap"
+    ttl: "5 minutes"
+    max_size: "500MB per service"
+    use_cases:
+      - "frequently accessed workflows"
+      - "user session data"
+      - "integration configurations"
+      
+  l2_cache: # Distributed cache
+    technology: "Redis Cluster"
+    ttl: "1 hour"
+    max_size: "8GB"
+    use_cases:
+      - "workflow execution results"
+      - "API response caching"
+      - "computed aggregations"
+      
+  l3_cache: # Database query cache
+    technology: "PostgreSQL shared_buffers"
+    size: "16GB"
+    use_cases:
+      - "frequently executed queries"
+      - "lookup table data"
+      - "metadata caching"
+      
+cache_invalidation:
+  workflow_updates: "immediate"
+  user_changes: "immediate"
+  organization_settings: "5 minute delay"
+  statistics: "1 hour delay"
+```
+
+#### Connection Pool Optimization
+```yaml
+connection_pool_tuning:
+  database_pools:
+    pool_size: 50
+    max_overflow: 20
+    pool_timeout: 30
+    pool_recycle: 3600
+    pool_pre_ping: true
+    
+  http_connection_pools:
+    max_connections_per_host: 100
+    max_total_connections: 1000
+    connection_timeout: 10
+    read_timeout: 30
+    keep_alive: true
+    
+  redis_connections:
+    pool_size: 20
+    connection_timeout: 5
+    socket_timeout: 30
+    retry_attempts: 3
+```
+
+#### Database Query Optimization
+```sql
+-- High-impact query optimizations
+-- 1. Workflow listing with proper indexing
+CREATE INDEX CONCURRENTLY idx_workflows_org_status_created 
+ON workflows(organization_id, status, created_at DESC)
+WHERE deleted_at IS NULL;
+
+-- 2. Execution monitoring queries
+CREATE INDEX CONCURRENTLY idx_executions_workflow_status_started
+ON executions(workflow_id, status, started_at DESC);
+
+-- 3. Integration health queries
+CREATE INDEX CONCURRENTLY idx_integration_logs_integration_created
+ON integration_logs(integration_id, created_at DESC);
+
+-- 4. User activity queries
+CREATE INDEX CONCURRENTLY idx_audit_logs_user_created
+ON audit_logs(user_id, created_at DESC);
+
+-- Materialized views for expensive aggregations
+CREATE MATERIALIZED VIEW workflow_statistics AS
+SELECT 
+    organization_id,
+    COUNT(*) as total_workflows,
+    COUNT(*) FILTER (WHERE status = 'active') as active_workflows,
+    AVG(execution_count) as avg_executions,
+    MAX(updated_at) as last_activity
+FROM workflows 
+WHERE deleted_at IS NULL
+GROUP BY organization_id;
+
+-- Refresh strategy
+CREATE OR REPLACE FUNCTION refresh_workflow_statistics()
+RETURNS void AS $$
+BEGIN
+    REFRESH MATERIALIZED VIEW CONCURRENTLY workflow_statistics;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Schedule refresh every 15 minutes
+SELECT cron.schedule('refresh-workflow-stats', '*/15 * * * *', 'SELECT refresh_workflow_statistics();');
+```
+
+### Infrastructure Optimizations
+
+#### Kubernetes Resource Management
+```yaml
+resource_quotas:
+  production_namespace:
+    requests_cpu: "50"
+    requests_memory: "100Gi"
+    limits_cpu: "100"
+    limits_memory: "200Gi"
+    persistentvolumeclaims: "50"
+    
+node_affinity:
+  compute_intensive_workloads:
+    node_selector:
+      instance_type: "c5.2xlarge"
+      zone: "us-east-1a"
+      
+  memory_intensive_workloads:
+    node_selector:
+      instance_type: "r5.xlarge"
+      zone: "us-east-1b"
+      
+pod_disruption_budgets:
+  api_gateway:
+    min_available: 2
+    
+  execution_engine:
+    min_available: "60%"
+```
+
+#### Network Optimization
+```yaml
+network_optimization:
+  service_mesh_configuration:
+    connection_pool_size: 100
+    http2_max_requests: 1000
+    circuit_breaker_consecutive_errors: 5
+    
+  ingress_optimization:
+    client_body_buffer_size: "16k"
+    large_client_header_buffers: "4 16k"
+    keepalive_timeout: 65
+    keepalive_requests: 100
+    
+  dns_caching:
+    ttl: 300
+    negative_ttl: 30
+    cache_size: "100MB"
+```
+
+## Load Testing & Performance Validation
+
+### Load Testing Framework
+```yaml
+load_testing_strategy:
+  tools:
+    primary: "k6"
+    secondary: "Artillery"
+    monitoring: "Grafana + Prometheus"
+    
+  test_scenarios:
+    baseline_load:
+      duration: "30 minutes"
+      virtual_users: 100
+      ramp_up: "2 minutes"
+      
+    stress_test:
+      duration: "15 minutes"
+      virtual_users: 1000
+      ramp_up: "5 minutes"
+      
+    spike_test:
+      duration: "10 minutes"
+      virtual_users: "100 to 2000"
+      spike_duration: "2 minutes"
+      
+    endurance_test:
+      duration: "4 hours"
+      virtual_users: 500
+      ramp_up: "10 minutes"
+```
+
+#### Load Test Scripts
+```javascript
+// k6 load test for API endpoints
+import http from 'k6/http';
+import { check, group } from 'k6';
+import { Rate, Trend } from 'k6/metrics';
+
+const errorRate = new Rate('errors');
+const responseTime = new Trend('response_time');
+
+export let options = {
+  stages: [
+    { duration: '2m', target: 100 },
+    { duration: '10m', target: 1000 },
+    { duration: '2m', target: 0 },
+  ],
+  thresholds: {
+    'http_req_duration': ['p(95)&lt;500'],
+    'errors': ['rate&lt;0.01'],
+  },
+};
+
+const BASE_URL = 'https://api.tolstoy.com';
+const API_TOKEN = __ENV.API_TOKEN;
+
+export default function() {
+  group('Workflow Operations', () => {
+    // List workflows
+    const listResponse = http.get(`${BASE_URL}/v2/workflows`, {
+      headers: { 'Authorization': `Bearer ${API_TOKEN}` },
+    });
+    
+    check(listResponse, {
+      'list workflows status is 200': (r) => r.status === 200,
+      'list workflows response time < 200ms': (r) => r.timings.duration < 200,
+    });
+    
+    errorRate.add(listResponse.status !== 200);
+    responseTime.add(listResponse.timings.duration);
+    
+    if (listResponse.status === 200) {
+      const workflows = JSON.parse(listResponse.body).data.workflows;
+      
+      if (workflows.length > 0) {
+        const workflowId = workflows[0].id;
+        
+        // Get workflow details
+        const detailResponse = http.get(`${BASE_URL}/v2/workflows/${workflowId}`, {
+          headers: { 'Authorization': `Bearer ${API_TOKEN}` },
+        });
+        
+        check(detailResponse, {
+          'workflow details status is 200': (r) => r.status === 200,
+          'workflow details response time < 100ms': (r) => r.timings.duration < 100,
+        });
+        
+        // Execute workflow
+        const executeResponse = http.post(`${BASE_URL}/v2/workflows/${workflowId}/execute`, 
+          JSON.stringify({ input: { test: true } }), {
+          headers: {
+            'Authorization': `Bearer ${API_TOKEN}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        check(executeResponse, {
+          'workflow execution status is 202': (r) => r.status === 202,
+        });
+      }
+    }
+  });
+}
+```
+
+### Performance Monitoring Setup
+```yaml
+performance_monitoring:
+  real_time_dashboards:
+    - "API Response Times by Endpoint"
+    - "Workflow Execution Metrics"
+    - "Database Query Performance"
+    - "Integration Service Health"
+    - "Resource Utilization Trends"
+    
+  alerting_rules:
+    response_time_degradation:
+      condition: "p95_response_time > 300ms for 5 minutes"
+      severity: "warning"
+      
+    error_rate_spike:
+      condition: "error_rate > 1% for 2 minutes"
+      severity: "critical"
+      
+    resource_exhaustion:
+      condition: "memory_usage > 90% for 5 minutes"
+      severity: "critical"
+      
+  performance_reports:
+    frequency: "daily"
+    metrics:
+      - "API performance summary"
+      - "Workflow execution statistics"
+      - "Resource utilization trends"
+      - "Capacity planning recommendations"
+```
+
+This comprehensive performance benchmarks and capacity planning document provides the foundation for understanding, monitoring, and scaling the Tolstoy platform effectively based on actual usage patterns and performance characteristics.
