@@ -52,11 +52,14 @@ jobs:
             echo "📥 Pulling latest code..."
             # Handle any uncommitted changes by stashing them
             git stash || echo "No changes to stash"
-            # Clean any untracked files that might conflict (like generated docs/openapi.json)
+            # Reset any conflicted files (especially docs/openapi.json which gets regenerated)
+            git reset --hard || echo "No files to reset"
+            # Clean any untracked files that might conflict
             git clean -fd docs/ || echo "No untracked files to clean"
-            git pull origin main
-            # Restore stashed changes if any (this will handle conflicts gracefully)
-            git stash pop || echo "No stash to pop or merge conflicts - continuing"
+            # Force pull latest changes
+            git fetch origin main
+            git reset --hard origin/main
+            echo "✅ Repository synchronized with latest changes"
             
             echo "📦 Installing dependencies..."
             npm ci --production=false
