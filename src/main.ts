@@ -14,22 +14,7 @@ import fastifyHelmet from '@fastify/helmet';
 import fastifyCors from '@fastify/cors';
 import fastifyRateLimit from '@fastify/rate-limit';
 
-interface FastifyInstance {
-  route(options: {
-    method: string;
-    url: string;
-    handler: (request: FastifyRequest, reply: FastifyReply) => Promise<unknown>;
-  }): Promise<void>;
-}
-
-interface FastifyRequest {
-  [key: string]: unknown;
-}
-
-interface FastifyReply {
-  header(name: string, value: string): FastifyReply;
-  [key: string]: unknown;
-}
+// Removed unused FastifyInterface - no longer needed after removing custom OpenAPI route
 
 async function bootstrap() {
   const app: NestFastifyApplication = await NestFactory.create(
@@ -335,20 +320,26 @@ async function bootstrap() {
     `,
     swaggerOptions: {
       persistAuthorization: true,
-      requestInterceptor: function(request) {
+      requestInterceptor: function (request) {
         // This will be stringified, so keep it simple
+        // eslint-disable-next-line no-undef
         const orgId = localStorage.getItem('tolstoy-org-id');
+        // eslint-disable-next-line no-undef
         const userId = localStorage.getItem('tolstoy-user-id');
-        
+
         if (!request.url.includes('/health') && !request.url.includes('/openapi.json')) {
           request.headers = request.headers || {};
-          if (orgId) request.headers['x-org-id'] = orgId;
-          if (userId) request.headers['x-user-id'] = userId;
+          if (orgId) {
+            request.headers['x-org-id'] = orgId;
+          }
+          if (userId) {
+            request.headers['x-user-id'] = userId;
+          }
         }
-        
+
         return request;
-      }
-    }
+      },
+    },
   });
 
   // OpenAPI endpoint is now automatically created by SwaggerModule.setup with the jsonDocumentUrl option
