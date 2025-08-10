@@ -1,4 +1,10 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Action, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { CreateActionDto } from './dto/create-action.dto';
@@ -173,13 +179,13 @@ export class ActionsService {
   ) {
     const startTime = Date.now();
     const executionId = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     // Create initial execution log
     const executionLog = await this.prisma.actionExecutionLog.create({
       data: {
         orgId,
         userId: userId || null,
-        actionId: '',  // Will be updated once we have the action
+        actionId: '', // Will be updated once we have the action
         actionKey,
         executionId,
         status: 'pending',
@@ -350,7 +356,7 @@ export class ActionsService {
           where: { id: executionLog.id },
           data: {
             status: 'failed',
-            error: { 
+            error: {
               message: errorMessage,
               statusCode: httpResponse.statusCode,
               details: httpResponse.error,
@@ -378,7 +384,7 @@ export class ActionsService {
 
       // Update execution log with error if not already updated
       await this.prisma.actionExecutionLog.updateMany({
-        where: { 
+        where: {
           id: executionLog.id,
           status: { in: ['pending', 'running'] },
         },
@@ -405,16 +411,15 @@ export class ActionsService {
   }
 
   // Action Execution Management Methods
-  
-  async getActionExecutions(
-    orgId: string,
-    actionKey?: string,
-    status?: string,
-    limit = 100,
-  ) {
+
+  async getActionExecutions(orgId: string, actionKey?: string, status?: string, limit = 100) {
     const where: any = { orgId };
-    if (actionKey) where.actionKey = actionKey;
-    if (status) where.status = status;
+    if (actionKey) {
+      where.actionKey = actionKey;
+    }
+    if (status) {
+      where.status = status;
+    }
 
     return this.prisma.actionExecutionLog.findMany({
       where,
@@ -487,9 +492,7 @@ export class ActionsService {
     }
 
     if (execution.status !== 'pending' && execution.status !== 'running') {
-      throw new BadRequestException(
-        `Cannot cancel execution in status ${execution.status}`,
-      );
+      throw new BadRequestException(`Cannot cancel execution in status ${execution.status}`);
     }
 
     await this.prisma.actionExecutionLog.update({

@@ -521,10 +521,10 @@ export class ActionsController {
           id: { type: 'string', example: 'clm123...' },
           executionId: { type: 'string', example: 'exec_1234567890_abc123' },
           actionKey: { type: 'string', example: 'slack_send_message' },
-          status: { 
-            type: 'string', 
+          status: {
+            type: 'string',
             enum: ['pending', 'running', 'completed', 'failed', 'cancelled'],
-            example: 'completed' 
+            example: 'completed',
           },
           inputs: { type: 'object', example: { channel: '#general', text: 'Hello' } },
           outputs: { type: 'object', example: { messageId: 'msg_123' } },
@@ -607,10 +607,10 @@ export class ActionsController {
         id: { type: 'string', example: 'clm123...' },
         executionId: { type: 'string', example: 'exec_1234567890_abc123' },
         actionKey: { type: 'string', example: 'slack_send_message' },
-        status: { 
-          type: 'string', 
+        status: {
+          type: 'string',
           enum: ['pending', 'running', 'completed', 'failed', 'cancelled'],
-          example: 'completed' 
+          example: 'completed',
         },
         inputs: { type: 'object' },
         outputs: { type: 'object', nullable: true },
@@ -717,10 +717,7 @@ export class ActionsController {
     status: 404,
     description: 'Execution not found',
   })
-  async retryExecution(
-    @Param('executionId') executionId: string,
-    @Tenant() tenant: TenantContext,
-  ) {
+  async retryExecution(@Param('executionId') executionId: string, @Tenant() tenant: TenantContext) {
     return this.actionsService.retryActionExecution(executionId, tenant);
   }
 }
