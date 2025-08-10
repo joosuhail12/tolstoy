@@ -13,8 +13,7 @@ on:
       - 'stainless.yml'
 
 env:
-  STAINLESS_ORG: pullse-inc
-  STAINLESS_PROJECT: tolstoy-api
+  STAINLESS_PROJECT: tolstoy
   OAS_PATH: docs/openapi.json
 
 jobs:
@@ -31,14 +30,33 @@ jobs:
         with:
           fetch-depth: 2
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Generate OpenAPI spec
+        run: |
+          npm ci
+          npm run build
+          npm run generate-openapi || echo "OpenAPI generation failed, using existing spec"
+          
+      - name: Validate OpenAPI spec
+        run: |
+          if [ ! -f "${{ env.OAS_PATH }}" ]; then
+            echo "❌ OpenAPI spec not found at ${{ env.OAS_PATH }}"
+            exit 1
+          fi
+          echo "✅ OpenAPI spec found, size: $(wc -c < ${{ env.OAS_PATH }}) bytes"
+          
       - name: Run preview builds
         uses: stainless-api/upload-openapi-spec-action@v1
         with:
           stainless_api_key: ${{ secrets.STAINLESS_TOKEN }}
-          org: ${{ env.STAINLESS_ORG }}
-          project: ${{ env.STAINLESS_PROJECT }}
-          oas_path: ${{ env.OAS_PATH }}
-          target: preview
+          input_path: ${{ env.OAS_PATH }}
+          project_name: ${{ env.STAINLESS_PROJECT }}
+          branch: preview
 
   merge:
     # Run builds when PRs that modify OpenAPI spec are merged to main
@@ -53,14 +71,34 @@ jobs:
         with:
           fetch-depth: 2
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Generate OpenAPI spec
+        run: |
+          npm ci
+          npm run build
+          npm run generate-openapi || echo "OpenAPI generation failed, using existing spec"
+          
+      - name: Validate OpenAPI spec
+        run: |
+          if [ ! -f "${{ env.OAS_PATH }}" ]; then
+            echo "❌ OpenAPI spec not found at ${{ env.OAS_PATH }}"
+            exit 1
+          fi
+          echo "✅ OpenAPI spec found, size: $(wc -c < ${{ env.OAS_PATH }}) bytes"
+          
       - name: Run merge build
         uses: stainless-api/upload-openapi-spec-action@v1
         with:
           stainless_api_key: ${{ secrets.STAINLESS_TOKEN }}
-          org: ${{ env.STAINLESS_ORG }}
-          project: ${{ env.STAINLESS_PROJECT }}
-          oas_path: ${{ env.OAS_PATH }}
-          target: merge
+          input_path: ${{ env.OAS_PATH }}
+          project_name: ${{ env.STAINLESS_PROJECT }}
+          branch: main
+          commit_message: "Merged PR with OpenAPI spec updates"
 
   push:
     # Run builds when changes are pushed directly to main
@@ -74,11 +112,32 @@ jobs:
         with:
           fetch-depth: 2
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          
+      - name: Generate OpenAPI spec
+        run: |
+          npm ci
+          npm run build
+          npm run generate-openapi || echo "OpenAPI generation failed, using existing spec"
+          
+      - name: Validate OpenAPI spec
+        run: |
+          if [ ! -f "${{ env.OAS_PATH }}" ]; then
+            echo "❌ OpenAPI spec not found at ${{ env.OAS_PATH }}"
+            exit 1
+          fi
+          echo "✅ OpenAPI spec found, size: $(wc -c < ${{ env.OAS_PATH }}) bytes"
+          jq empty "${{ env.OAS_PATH }}" && echo "✅ Valid JSON" || (echo "❌ Invalid JSON" && exit 1)
+          
       - name: Run push build
         uses: stainless-api/upload-openapi-spec-action@v1
         with:
           stainless_api_key: ${{ secrets.STAINLESS_TOKEN }}
-          org: ${{ env.STAINLESS_ORG }}
-          project: ${{ env.STAINLESS_PROJECT }}
-          oas_path: ${{ env.OAS_PATH }}
-          target: push
+          input_path: ${{ env.OAS_PATH }}
+          project_name: ${{ env.STAINLESS_PROJECT }}
+          branch: main
+          commit_message: "Update OpenAPI spec from commit ${{ github.sha }}"
