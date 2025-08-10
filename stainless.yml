@@ -3,7 +3,7 @@
 organization:
   # Name of your organization or company, used to determine the name of the client
   # and headings.
-  name: tolstoy
+  name: tolstoy-api
   # Link to your API documentation.
   docs: 'https://github.com/joosuhail12/tolstoy'
   # Contact email for bug reports, questions, and support requests.

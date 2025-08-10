@@ -13,7 +13,7 @@ on:
       - 'stainless.yml'
 
 env:
-  STAINLESS_PROJECT: tolstoy
+  STAINLESS_PROJECT: tolstoy-api
   OAS_PATH: docs/openapi.json
 
 jobs:
