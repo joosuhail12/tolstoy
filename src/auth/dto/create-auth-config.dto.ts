@@ -1,4 +1,4 @@
-import { IsIn, IsNotEmpty, IsString, IsObject, Validate } from 'class-validator';
+import { IsIn, IsNotEmpty, IsObject, IsString, Validate } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { AuthConfigValidator } from './create-auth-config.validator';
 

@@ -542,11 +542,14 @@ export class AuthConfigService {
    * Process and validate auth configuration based on type
    * Adds default values and transforms the config for storage
    */
-  private processAuthConfig(type: string, config: Record<string, unknown>): Record<string, unknown> {
+  private processAuthConfig(
+    type: string,
+    config: Record<string, unknown>,
+  ): Record<string, unknown> {
     if (type === 'apiKey') {
       // For API key auth, ensure we have headerName and headerValue
       const apiKeyConfig = config as { headerName: string; headerValue: string };
-      
+
       if (!apiKeyConfig.headerName || !apiKeyConfig.headerValue) {
         throw new Error('API key configuration requires headerName and headerValue');
       }
