@@ -280,7 +280,7 @@ describe('ActionsController', () => {
       expect(result).toEqual(executionResult);
       expect(actionsService.executeActionById).toHaveBeenCalledWith(
         'org-123',
-        'user-456', 
+        'user-456',
         'action-123',
         { message: 'Hello, World!' },
       );
@@ -316,7 +316,7 @@ describe('ActionsController', () => {
       expect(result).toEqual(executionResult);
       expect(actionsService.executeActionById).toHaveBeenCalledWith(
         'org-123',
-        'user-456', 
+        'user-456',
         'action-123',
         { message: 'This will fail' },
       );
