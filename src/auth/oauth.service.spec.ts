@@ -32,7 +32,9 @@ describe('OAuthService', () => {
     id: 'oauth-config-123',
     orgId: mockOrgId,
     toolId: mockToolId,
+    name: 'default',
     type: 'oauth2',
+    isDefault: true,
     config: {
       clientId: 'test_client_id',
       clientSecret: 'test_client_secret',
@@ -52,6 +54,7 @@ describe('OAuthService', () => {
           provide: AuthConfigService,
           useValue: {
             getDefaultOrgAuthConfig: jest.fn(),
+            getOrgAuthConfig: jest.fn(),
             setUserCredentials: jest.fn(),
           },
         },
@@ -119,7 +122,7 @@ describe('OAuthService', () => {
 
     it('should throw BadRequestException for non-OAuth2 tools', async () => {
       const nonOAuthConfig = { ...mockOAuthConfig, type: 'apiKey' };
-      authConfigService.getOrgAuthConfig.mockResolvedValue(nonOAuthConfig);
+      authConfigService.getDefaultOrgAuthConfig.mockResolvedValue(nonOAuthConfig);
 
       await expect(service.getAuthorizeUrl(mockToolId, mockOrgId, mockUserId)).rejects.toThrow(
         BadRequestException,
@@ -131,7 +134,7 @@ describe('OAuthService', () => {
         ...mockOAuthConfig,
         config: { ...mockOAuthConfig.config, clientId: undefined },
       };
-      authConfigService.getOrgAuthConfig.mockResolvedValue(incompleteConfig);
+      authConfigService.getDefaultOrgAuthConfig.mockResolvedValue(incompleteConfig);
 
       await expect(service.getAuthorizeUrl(mockToolId, mockOrgId, mockUserId)).rejects.toThrow(
         BadRequestException,
@@ -143,7 +146,7 @@ describe('OAuthService', () => {
         ...mockOAuthConfig,
         config: { ...mockOAuthConfig.config, clientSecret: undefined },
       };
-      authConfigService.getOrgAuthConfig.mockResolvedValue(incompleteConfig);
+      authConfigService.getDefaultOrgAuthConfig.mockResolvedValue(incompleteConfig);
 
       await expect(service.getAuthorizeUrl(mockToolId, mockOrgId, mockUserId)).rejects.toThrow(
         BadRequestException,
@@ -155,7 +158,7 @@ describe('OAuthService', () => {
         ...mockOAuthConfig,
         config: { ...mockOAuthConfig.config, redirectUri: undefined },
       };
-      authConfigService.getOrgAuthConfig.mockResolvedValue(incompleteConfig);
+      authConfigService.getDefaultOrgAuthConfig.mockResolvedValue(incompleteConfig);
 
       await expect(service.getAuthorizeUrl(mockToolId, mockOrgId, mockUserId)).rejects.toThrow(
         BadRequestException,
@@ -170,7 +173,7 @@ describe('OAuthService', () => {
           authorizeUrl: 'https://custom-provider.com/oauth/authorize',
         },
       };
-      authConfigService.getOrgAuthConfig.mockResolvedValue(customConfig);
+      authConfigService.getDefaultOrgAuthConfig.mockResolvedValue(customConfig);
       redisCacheService.set.mockResolvedValue(undefined);
 
       const result = await service.getAuthorizeUrl(mockToolId, mockOrgId, mockUserId);
@@ -336,7 +339,7 @@ describe('OAuthService', () => {
           tokenUrl: 'https://custom-provider.com/oauth/token',
         },
       };
-      authConfigService.getOrgAuthConfig.mockResolvedValue(customConfig);
+      authConfigService.getDefaultOrgAuthConfig.mockResolvedValue(customConfig);
       mockedAxios.post.mockResolvedValue({
         status: 200,
         data: mockTokenResponse,
@@ -400,7 +403,7 @@ describe('OAuthService', () => {
     testCases.forEach(({ toolKey, expectedAuthUrl }) => {
       it(`should use correct default authorization URL for ${toolKey}`, async () => {
         const configForTool = { ...mockOAuthConfig };
-        authConfigService.getOrgAuthConfig.mockResolvedValue(configForTool);
+        authConfigService.getDefaultOrgAuthConfig.mockResolvedValue(configForTool);
         redisCacheService.set.mockResolvedValue(undefined);
 
         // Mock Prisma to return the specific tool for this test

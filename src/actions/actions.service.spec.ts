@@ -71,6 +71,7 @@ describe('ActionsService', () => {
       actionExecutionLog: {
         create: jest.fn().mockResolvedValue({ id: 'exec-log-123' }),
         update: jest.fn(),
+        updateMany: jest.fn(),
       },
     };
 
@@ -80,6 +81,7 @@ describe('ActionsService', () => {
 
     const mockAuthConfig = {
       getDefaultOrgAuthConfig: jest.fn(),
+      getOrgAuthConfig: jest.fn(),
       getUserCredentials: jest.fn(),
       refreshUserToken: jest.fn(),
     };
@@ -194,7 +196,7 @@ describe('ActionsService', () => {
       );
 
       // Verify API key auth was applied
-      expect(authConfig.getDefaultOrgAuthConfig).toHaveBeenCalledWith('org-456', 'email-service');
+      expect(authConfig.getDefaultOrgAuthConfig).toHaveBeenCalledWith('org-456', 'tool-789');
 
       // Verify HTTP request through Daytona
       expect(daytonaService.executeHttpRequest).toHaveBeenCalledWith({
@@ -270,7 +272,7 @@ describe('ActionsService', () => {
     });
 
     it('should execute action without authentication when no auth config', async () => {
-      authConfig.getOrgAuthConfig.mockRejectedValue(new NotFoundException('No auth config'));
+      authConfig.getDefaultOrgAuthConfig.mockRejectedValue(new NotFoundException('No auth config'));
 
       const result = await service.executeAction('org-456', 'user-123', 'send-email', validInputs);
 

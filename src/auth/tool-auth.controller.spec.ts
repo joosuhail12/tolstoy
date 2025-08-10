@@ -16,6 +16,7 @@ describe('ToolAuthController', () => {
     const mockAuthConfigService = {
       setOrgAuthConfig: jest.fn(),
       getOrgAuthConfig: jest.fn(),
+      listOrgAuthConfigs: jest.fn(),
       deleteOrgAuthConfig: jest.fn(),
     };
 
@@ -122,7 +123,7 @@ describe('ToolAuthController', () => {
         name: 'github',
         orgId,
       });
-      authConfigService.getOrgAuthConfig.mockResolvedValue(mockConfig);
+      authConfigService.listOrgAuthConfigs.mockResolvedValue([mockConfig]);
 
       await controller.get(orgId, toolId);
 
@@ -147,7 +148,7 @@ describe('ToolAuthController', () => {
       });
       authConfigService.deleteOrgAuthConfig.mockResolvedValue();
 
-      await controller.remove(orgId, toolId);
+      await controller.remove(orgId, toolId, 'production');
 
       expect(metricsService.incrementToolAuthConfig).toHaveBeenCalledWith({
         orgId,

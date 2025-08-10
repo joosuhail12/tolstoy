@@ -54,13 +54,13 @@ describe('WebhooksController', () => {
       controllers: [WebhooksController],
       providers: [
         { provide: WebhooksService, useValue: mockWebhooksService },
-        { provide: 'PinoLogger', useValue: mockLogger },
+        { provide: `PinoLogger:WebhooksController`, useValue: mockLogger },
       ],
     }).compile();
 
     controller = module.get<WebhooksController>(WebhooksController);
     webhooksService = module.get(WebhooksService);
-    logger = module.get('PinoLogger');
+    logger = module.get('PinoLogger:WebhooksController');
   });
 
   afterEach(() => {
@@ -330,7 +330,7 @@ describe('WebhooksController', () => {
   describe('toggle', () => {
     it('should toggle webhook enabled status successfully', async () => {
       const toggleResult = {
-        id: 'webhook-123',
+        ...mockWebhook,
         enabled: false,
         updatedAt: new Date(),
       };

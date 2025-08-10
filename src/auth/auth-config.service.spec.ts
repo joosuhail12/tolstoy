@@ -113,7 +113,7 @@ describe('AuthConfigService', () => {
       const result = await service.getOrgAuthConfig('org-456', 'tool-789', 'production');
 
       expect(result).toEqual(cachedConfig);
-      expect(cacheService.get).toHaveBeenCalledWith('auth:org:org-456:tool:tool-789');
+      expect(cacheService.get).toHaveBeenCalledWith('auth:org:org-456:tool:tool-789:config:production');
       expect(prismaService.toolAuthConfig.findFirst).not.toHaveBeenCalled();
     });
 
@@ -130,19 +130,19 @@ describe('AuthConfigService', () => {
 
       expect(result).toEqual(mockOrgAuthConfig);
       expect(prismaService.toolAuthConfig.findFirst).toHaveBeenCalledWith({
-        where: { orgId: 'org-456', toolId: 'tool-789' },
+        where: { orgId: 'org-456', toolId: 'tool-789', name: 'production' },
         include: { tool: true },
       });
       expect(awsSecretsService.secretExists).toHaveBeenCalledWith(
-        'tolstoy/org-456/tools/tool-789/config',
+        'tolstoy/org-456/tools/tool-789/config/production',
       );
       expect(awsSecretsService.createSecret).toHaveBeenCalledWith(
-        'tolstoy/org-456/tools/tool-789/config',
+        'tolstoy/org-456/tools/tool-789/config/production',
         JSON.stringify(mockOrgAuthConfig.config),
         'Tolstoy auth configuration',
       );
       expect(cacheService.set).toHaveBeenCalledWith(
-        'auth:org:org-456:tool:tool-789',
+        'auth:org:org-456:tool:tool-789:config:production',
         mockOrgAuthConfig.config,
         { ttl: 600 },
       );
@@ -298,21 +298,24 @@ describe('AuthConfigService', () => {
         config: newConfig,
       });
       expect(prismaService.toolAuthConfig.upsert).toHaveBeenCalledWith({
-        where: { orgId_toolId: { orgId: 'org-456', toolId: 'tool-789' } },
+        where: { orgId_toolId_name: { orgId: 'org-456', toolId: 'tool-789', name: 'production' } },
         create: {
           orgId: 'org-456',
           toolId: 'tool-789',
+          name: 'production',
           type: 'apiKey',
-          config: newConfig,
+          config: { ...newConfig, apiKey: 'Bearer new-key' },
+          isDefault: false,
         },
         update: {
           type: 'apiKey',
-          config: newConfig,
+          config: { ...newConfig, apiKey: 'Bearer new-key' },
+          isDefault: false,
           updatedAt: expect.any(Date),
         },
         include: { tool: true },
       });
-      expect(cacheService.del).toHaveBeenCalledWith('auth:org:org-456:tool:tool-789');
+      expect(cacheService.del).toHaveBeenCalledWith('auth:org:org-456:tool:tool-789:config:production');
     });
   });
 
@@ -369,9 +372,9 @@ describe('AuthConfigService', () => {
       await service.deleteOrgAuthConfig('org-456', 'tool-789', 'production');
 
       expect(prismaService.toolAuthConfig.deleteMany).toHaveBeenCalledWith({
-        where: { orgId: 'org-456', toolId: 'tool-789' },
+        where: { orgId: 'org-456', toolId: 'tool-789', name: 'production' },
       });
-      expect(cacheService.del).toHaveBeenCalledWith('auth:org:org-456:tool:tool-789');
+      expect(cacheService.del).toHaveBeenCalledWith('auth:org:org-456:tool:tool-789:config:production');
     });
 
     it('should throw NotFoundException when no config to delete', async () => {
@@ -380,7 +383,7 @@ describe('AuthConfigService', () => {
       await expect(
         service.deleteOrgAuthConfig('org-456', 'tool-789', 'production'),
       ).rejects.toThrow(
-        new NotFoundException('No auth config found for org org-456 and tool tool-789'),
+        new NotFoundException("No auth config 'production' found for org org-456 and tool tool-789"),
       );
     });
   });

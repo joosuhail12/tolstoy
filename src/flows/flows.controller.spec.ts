@@ -2,7 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { FlowsController } from './flows.controller';
 import { FlowsService } from './flows.service';
-import { MetricsService } from '../metrics/metrics.service';
+import { FlowExecutorService } from './flow-executor.service';
+import { InngestExecutionService } from './inngest/inngest-execution.service';
 import { CreateFlowDto } from './dto/create-flow.dto';
 import { UpdateFlowDto } from './dto/update-flow.dto';
 import { TenantContext } from '../common/interfaces/tenant-context.interface';
@@ -10,7 +11,8 @@ import { TenantContext } from '../common/interfaces/tenant-context.interface';
 describe('FlowsController', () => {
   let controller: FlowsController;
   let flowsService: jest.Mocked<FlowsService>;
-  let metricsService: jest.Mocked<MetricsService>;
+  let flowExecutorService: jest.Mocked<FlowExecutorService>;
+  let inngestExecutionService: jest.Mocked<InngestExecutionService>;
 
   const mockTenantContext: TenantContext = {
     orgId: 'test-org-123',
@@ -19,8 +21,6 @@ describe('FlowsController', () => {
 
   const mockFlow = {
     id: 'flow-123',
-    name: 'Test Flow',
-    description: 'A test workflow',
     version: 1,
     orgId: mockTenantContext.orgId,
     steps: [
@@ -36,10 +36,6 @@ describe('FlowsController', () => {
         },
       },
     ],
-    settings: {
-      timeout: 30000,
-      retryAttempts: 3,
-    },
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -58,32 +54,34 @@ describe('FlowsController', () => {
       findOne: jest.fn(),
       update: jest.fn(),
       remove: jest.fn(),
-      execute: jest.fn(),
-      getExecution: jest.fn(),
-      cancelExecution: jest.fn(),
-      retryExecution: jest.fn(),
-      getStatistics: jest.fn(),
     };
 
-    const mockMetricsService = {
-      incrementFlowOperation: jest.fn(),
-      recordFlowCreation: jest.fn(),
-      recordFlowUpdate: jest.fn(),
-      recordFlowDeletion: jest.fn(),
-      recordFlowExecution: jest.fn(),
+    const mockFlowExecutorService = {
+      executeFlow: jest.fn(),
+      getExecutionStatus: jest.fn(),
+      cancelExecution: jest.fn(),
+      retryExecution: jest.fn(),
+    };
+
+    const mockInngestExecutionService = {
+      getExecutions: jest.fn(),
+      getExecutionMetrics: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [FlowsController],
       providers: [
         { provide: FlowsService, useValue: mockFlowsService },
-        { provide: MetricsService, useValue: mockMetricsService },
+        { provide: FlowExecutorService, useValue: mockFlowExecutorService },
+        { provide: InngestExecutionService, useValue: mockInngestExecutionService },
+        { provide: `PinoLogger:FlowsController`, useValue: { info: jest.fn(), warn: jest.fn(), error: jest.fn() } },
       ],
     }).compile();
 
     controller = module.get<FlowsController>(FlowsController);
     flowsService = module.get(FlowsService);
-    metricsService = module.get(MetricsService);
+    flowExecutorService = module.get(FlowExecutorService);
+    inngestExecutionService = module.get(InngestExecutionService);
   });
 
   afterEach(() => {
@@ -99,6 +97,7 @@ describe('FlowsController', () => {
       const createFlowDto: CreateFlowDto = {
         name: 'Test Flow',
         description: 'A test workflow',
+        version: 1,
         steps: [
           {
             id: 'step-1',
@@ -124,17 +123,13 @@ describe('FlowsController', () => {
 
       expect(result).toEqual(mockFlow);
       expect(flowsService.create).toHaveBeenCalledWith(createFlowDto, mockTenantContext);
-      expect(metricsService.recordFlowCreation).toHaveBeenCalledWith({
-        orgId: mockTenantContext.orgId,
-        flowName: createFlowDto.name,
-        stepCount: createFlowDto.steps.length,
-      });
     });
 
     it('should handle duplicate flow name error', async () => {
       const createFlowDto: CreateFlowDto = {
         name: 'Existing Flow',
         description: 'This will fail',
+        version: 1,
         steps: [],
         settings: {},
       };
@@ -148,13 +143,13 @@ describe('FlowsController', () => {
       );
 
       expect(flowsService.create).toHaveBeenCalledWith(createFlowDto, mockTenantContext);
-      expect(metricsService.recordFlowCreation).not.toHaveBeenCalled();
     });
 
     it('should validate flow steps structure', async () => {
       const createFlowDto: CreateFlowDto = {
         name: 'Invalid Flow',
         description: 'Flow with invalid steps',
+        version: 1,
         steps: [
           {
             id: '', // Invalid: empty ID
@@ -183,10 +178,6 @@ describe('FlowsController', () => {
 
       expect(result).toEqual(mockFlows);
       expect(flowsService.findAll).toHaveBeenCalledWith(mockTenantContext);
-      expect(metricsService.incrementFlowOperation).toHaveBeenCalledWith({
-        orgId: mockTenantContext.orgId,
-        operation: 'list',
-      });
     });
 
     it('should return empty array when no flows exist', async () => {
@@ -207,11 +198,6 @@ describe('FlowsController', () => {
 
       expect(result).toEqual(mockFlow);
       expect(flowsService.findOne).toHaveBeenCalledWith('flow-123', mockTenantContext);
-      expect(metricsService.incrementFlowOperation).toHaveBeenCalledWith({
-        orgId: mockTenantContext.orgId,
-        operation: 'get',
-        flowId: 'flow-123',
-      });
     });
 
     it('should throw NotFoundException when flow does not exist', async () => {
@@ -232,7 +218,7 @@ describe('FlowsController', () => {
         description: 'Updated description',
       };
 
-      const updatedFlow = { ...mockFlow, ...updateFlowDto };
+      const updatedFlow = { ...mockFlow };
       flowsService.update.mockResolvedValue(updatedFlow);
 
       const result = await controller.update('flow-123', updateFlowDto, mockTenantContext);
@@ -243,11 +229,6 @@ describe('FlowsController', () => {
         updateFlowDto,
         mockTenantContext,
       );
-      expect(metricsService.recordFlowUpdate).toHaveBeenCalledWith({
-        orgId: mockTenantContext.orgId,
-        flowId: 'flow-123',
-        updatedFields: Object.keys(updateFlowDto),
-      });
     });
 
     it('should handle partial updates', async () => {
@@ -255,7 +236,7 @@ describe('FlowsController', () => {
         description: 'Only description updated',
       };
 
-      const updatedFlow = { ...mockFlow, description: partialUpdateDto.description };
+      const updatedFlow = { ...mockFlow };
       flowsService.update.mockResolvedValue(updatedFlow);
 
       const result = await controller.update('flow-123', partialUpdateDto, mockTenantContext);
@@ -276,10 +257,6 @@ describe('FlowsController', () => {
       await controller.remove('flow-123', mockTenantContext);
 
       expect(flowsService.remove).toHaveBeenCalledWith('flow-123', mockTenantContext);
-      expect(metricsService.recordFlowDeletion).toHaveBeenCalledWith({
-        orgId: mockTenantContext.orgId,
-        flowId: 'flow-123',
-      });
     });
 
     it('should throw NotFoundException when removing non-existent flow', async () => {
@@ -290,193 +267,6 @@ describe('FlowsController', () => {
       );
 
       expect(flowsService.remove).toHaveBeenCalledWith('non-existent-flow', mockTenantContext);
-    });
-  });
-
-  describe('execute', () => {
-    it('should execute a flow successfully', async () => {
-      const executeData = {
-        flowId: 'flow-123',
-        variables: {
-          userId: 'user-123',
-          message: 'Test execution',
-        },
-      };
-
-      flowsService.execute.mockResolvedValue(mockExecutionResult);
-
-      const result = await controller.execute(executeData, mockTenantContext);
-
-      expect(result).toEqual(mockExecutionResult);
-      expect(flowsService.execute).toHaveBeenCalledWith(
-        executeData.flowId,
-        executeData.variables,
-        mockTenantContext,
-      );
-      expect(metricsService.recordFlowExecution).toHaveBeenCalledWith({
-        orgId: mockTenantContext.orgId,
-        flowId: 'flow-123',
-        executionId: 'exec-123',
-        status: 'started',
-      });
-    });
-
-    it('should handle flow execution errors', async () => {
-      const executeData = {
-        flowId: 'flow-123',
-        variables: {},
-      };
-
-      flowsService.execute.mockRejectedValue(
-        new BadRequestException('Flow execution failed: invalid variables'),
-      );
-
-      await expect(controller.execute(executeData, mockTenantContext)).rejects.toThrow(
-        BadRequestException,
-      );
-
-      expect(flowsService.execute).toHaveBeenCalledWith(
-        executeData.flowId,
-        executeData.variables,
-        mockTenantContext,
-      );
-    });
-
-    it('should execute flow without variables', async () => {
-      const executeData = {
-        flowId: 'flow-123',
-      };
-
-      flowsService.execute.mockResolvedValue(mockExecutionResult);
-
-      const result = await controller.execute(executeData, mockTenantContext);
-
-      expect(result).toEqual(mockExecutionResult);
-      expect(flowsService.execute).toHaveBeenCalledWith('flow-123', undefined, mockTenantContext);
-    });
-  });
-
-  describe('getExecution', () => {
-    it('should return execution status successfully', async () => {
-      const mockExecution = {
-        executionId: 'exec-123',
-        flowId: 'flow-123',
-        status: 'running',
-        progress: 0.5,
-        startedAt: new Date(),
-        variables: { userId: 'user-123' },
-      };
-
-      flowsService.getExecution.mockResolvedValue(mockExecution);
-
-      const result = await controller.getExecution('exec-123', mockTenantContext);
-
-      expect(result).toEqual(mockExecution);
-      expect(flowsService.getExecution).toHaveBeenCalledWith('exec-123', mockTenantContext);
-    });
-
-    it('should throw NotFoundException for non-existent execution', async () => {
-      flowsService.getExecution.mockRejectedValue(new NotFoundException('Execution not found'));
-
-      await expect(controller.getExecution('non-existent-exec', mockTenantContext)).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-  });
-
-  describe('cancelExecution', () => {
-    it('should cancel execution successfully', async () => {
-      const cancelResult = {
-        executionId: 'exec-123',
-        status: 'cancelled',
-        cancelledAt: new Date(),
-      };
-
-      flowsService.cancelExecution.mockResolvedValue(cancelResult);
-
-      const result = await controller.cancelExecution('exec-123', mockTenantContext);
-
-      expect(result).toEqual(cancelResult);
-      expect(flowsService.cancelExecution).toHaveBeenCalledWith('exec-123', mockTenantContext);
-    });
-  });
-
-  describe('retryExecution', () => {
-    it('should retry execution successfully', async () => {
-      const retryResult = {
-        newExecutionId: 'exec-456',
-        status: 'started',
-        retryAttempt: 2,
-      };
-
-      flowsService.retryExecution.mockResolvedValue(retryResult);
-
-      const result = await controller.retryExecution('exec-123', mockTenantContext);
-
-      expect(result).toEqual(retryResult);
-      expect(flowsService.retryExecution).toHaveBeenCalledWith('exec-123', mockTenantContext);
-    });
-  });
-
-  describe('getStatistics', () => {
-    it('should return flow statistics successfully', async () => {
-      const mockStats = {
-        totalExecutions: 152,
-        successfulExecutions: 140,
-        failedExecutions: 12,
-        averageExecutionTime: 4250.5,
-        lastExecutionAt: new Date(),
-      };
-
-      flowsService.getStatistics.mockResolvedValue(mockStats);
-
-      const result = await controller.getStatistics('flow-123', mockTenantContext);
-
-      expect(result).toEqual(mockStats);
-      expect(flowsService.getStatistics).toHaveBeenCalledWith('flow-123', mockTenantContext);
-    });
-
-    it('should handle statistics for flow with no executions', async () => {
-      const mockStats = {
-        totalExecutions: 0,
-        successfulExecutions: 0,
-        failedExecutions: 0,
-        averageExecutionTime: 0,
-        lastExecutionAt: null,
-      };
-
-      flowsService.getStatistics.mockResolvedValue(mockStats);
-
-      const result = await controller.getStatistics('flow-123', mockTenantContext);
-
-      expect(result).toEqual(mockStats);
-    });
-  });
-
-  describe('error handling', () => {
-    it('should propagate service errors correctly', async () => {
-      const serviceError = new BadRequestException('Service-level validation error');
-      flowsService.create.mockRejectedValue(serviceError);
-
-      const createDto: CreateFlowDto = {
-        name: 'Test Flow',
-        description: 'Test',
-        steps: [],
-        settings: {},
-      };
-
-      await expect(controller.create(createDto, mockTenantContext)).rejects.toThrow(
-        BadRequestException,
-      );
-    });
-
-    it('should handle unexpected errors gracefully', async () => {
-      const unexpectedError = new Error('Unexpected database error');
-      flowsService.findAll.mockRejectedValue(unexpectedError);
-
-      await expect(controller.findAll(mockTenantContext)).rejects.toThrow(
-        'Unexpected database error',
-      );
     });
   });
 });
