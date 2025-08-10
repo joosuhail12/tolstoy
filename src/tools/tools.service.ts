@@ -1,4 +1,9 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Tool } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { CreateToolDto } from './dto/create-tool.dto';
@@ -10,12 +15,33 @@ export class ToolsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async create(createToolDto: CreateToolDto, tenant: TenantContext): Promise<Tool> {
-    return this.prisma.tool.create({
-      data: {
-        ...createToolDto,
-        orgId: tenant.orgId,
-      },
+    // Verify the organization exists before creating the tool
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: tenant.orgId },
     });
+
+    if (!organization) {
+      throw new BadRequestException(
+        `Organization with ID ${tenant.orgId} not found. Please ensure you have a valid organization before creating tools.`,
+      );
+    }
+
+    try {
+      return await this.prisma.tool.create({
+        data: {
+          ...createToolDto,
+          orgId: tenant.orgId,
+        },
+      });
+    } catch (error) {
+      if (error.code === 'P2003') {
+        // Foreign key constraint error
+        throw new BadRequestException(
+          `Invalid organization reference. Organization ${tenant.orgId} does not exist.`,
+        );
+      }
+      throw error;
+    }
   }
 
   async findAll(tenant: TenantContext): Promise<Tool[]> {
