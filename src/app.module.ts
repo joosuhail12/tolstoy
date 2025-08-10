@@ -30,6 +30,7 @@ import { ToolSecretsModule } from './tool-secrets/tool-secrets.module';
 import { SandboxModule } from './sandbox/sandbox.module';
 import { InngestModule } from './flows/inngest/inngest.module';
 import { AuthModule } from './auth/auth.module';
+import { DatabaseModule } from './database/database.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AuthModule } from './auth/auth.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    DatabaseModule,
     LoggerModule.forRoot({
       pinoHttp: {
         level: process.env.LOG_LEVEL || 'info',

@@ -7,13 +7,14 @@ import { AwsSecretsService } from './aws-secrets.service';
 // Dynamic Prisma client with runtime configuration
 class DynamicPrismaClient extends PrismaClient {
   constructor(databaseUrl?: string) {
+    const isProduction = process.env.NODE_ENV === 'production';
     super({
       datasources: {
         db: {
           url: databaseUrl || process.env.DATABASE_URL,
         },
       },
-      log: ['query', 'info', 'warn', 'error'],
+      log: isProduction ? ['error', 'warn'] : ['error', 'warn', 'info'],
     });
   }
 }
