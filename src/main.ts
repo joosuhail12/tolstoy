@@ -157,28 +157,201 @@ async function bootstrap() {
     process.exit(0);
   }
 
-  // Serve Swagger UI at /api-docs (optional)
+  // Serve basic Swagger UI at /api-docs (optional)
   await SwaggerModule.setup('api-docs', app, document, {
     swaggerOptions: {
       persistAuthorization: true,
     },
   });
 
-  // Add a dedicated CORS-enabled OpenAPI spec endpoint for Stainless
-  app.register(async (fastify: unknown) => {
-    const fastifyInstance = fastify as FastifyInstance;
-    await fastifyInstance.route({
-      method: 'GET',
-      url: '/openapi.json',
-      handler: async (_request: FastifyRequest, reply: FastifyReply) => {
-        reply.header('Access-Control-Allow-Origin', '*');
-        reply.header('Access-Control-Allow-Methods', 'GET');
-        reply.header('Access-Control-Allow-Headers', 'Content-Type');
-        reply.header('Content-Type', 'application/json');
-        return document;
-      },
-    });
+  // Serve enhanced Swagger UI at /docs
+  await SwaggerModule.setup('docs', app, document, {
+    jsonDocumentUrl: '/openapi.json',
+    yamlDocumentUrl: '/openapi.yaml',
+    customSiteTitle: 'Tolstoy API - Advanced Documentation & Playground',
+    customCss: `
+      :root {
+        --primary: #2563eb;
+        --primary-light: #3b82f6;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --error: #ef4444;
+      }
+      
+      .swagger-ui .topbar { display: none; }
+      
+      .swagger-ui .info { 
+        background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+      }
+      
+      .swagger-ui .info .title {
+        color: white;
+        font-size: 2.5rem;
+        margin-bottom: 0.5rem;
+      }
+      
+      .swagger-ui .info .description {
+        color: rgba(255,255,255,0.9);
+        font-size: 1.1rem;
+      }
+      
+      .swagger-ui .scheme-container {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 2rem;
+      }
+      
+      .swagger-ui .auth-wrapper {
+        background: #e3f2fd;
+        border: 1px solid #bbdefb;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+      }
+      
+      .swagger-ui .btn.authorize {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: white;
+      }
+      
+      .swagger-ui .btn.authorize:hover {
+        background: var(--primary-light);
+        border-color: var(--primary-light);
+      }
+    `,
+    customJs: `
+      (function() {
+        // Enhanced authentication and history tracking
+        let requestHistory = JSON.parse(localStorage.getItem('tolstoy-request-history') || '[]');
+        
+        // Add authentication helper
+        function addAuthenticationHelper() {
+          const authContainer = document.querySelector('.auth-wrapper') || document.querySelector('.scheme-container');
+          if (!authContainer) return;
+          
+          const helperHtml = \`
+            <div style="background: #fff3cd; border: 1px solid #ffecb5; border-radius: 6px; padding: 1rem; margin: 1rem 0;">
+              <h4 style="color: #856404; margin: 0 0 0.5rem 0;">🔐 Multi-tenant Authentication</h4>
+              <p style="margin: 0; color: #856404;">
+                This API requires <strong>x-org-id</strong> and <strong>x-user-id</strong> headers for all requests except /health.
+                Use the "Authorize" button above or set them manually in each request.
+              </p>
+              <div style="margin-top: 0.5rem;">
+                <input type="text" id="quick-org-id" placeholder="Organization ID" style="margin-right: 0.5rem; padding: 0.25rem;">
+                <input type="text" id="quick-user-id" placeholder="User ID" style="margin-right: 0.5rem; padding: 0.25rem;">
+                <button onclick="setQuickAuth()" style="background: var(--primary); color: white; border: none; padding: 0.25rem 0.5rem; border-radius: 4px;">Set Auth</button>
+              </div>
+            </div>
+          \`;
+          
+          authContainer.insertAdjacentHTML('afterend', helperHtml);
+        }
+        
+        // Quick auth function
+        window.setQuickAuth = function() {
+          const orgId = document.getElementById('quick-org-id').value;
+          const userId = document.getElementById('quick-user-id').value;
+          
+          if (orgId && userId) {
+            localStorage.setItem('tolstoy-org-id', orgId);
+            localStorage.setItem('tolstoy-user-id', userId);
+            
+            // Update Swagger UI auth
+            const ui = window.ui;
+            if (ui) {
+              ui.preauthorizeApiKey('x-org-id', orgId);
+              ui.preauthorizeApiKey('x-user-id', userId);
+            }
+            
+            alert('Authentication credentials set! They will be included in all requests.');
+          }
+        };
+        
+        // Load saved credentials
+        const savedOrgId = localStorage.getItem('tolstoy-org-id');
+        const savedUserId = localStorage.getItem('tolstoy-user-id');
+        
+        // Wait for SwaggerUI to load
+        setTimeout(() => {
+          addAuthenticationHelper();
+          
+          // Pre-fill saved credentials
+          if (savedOrgId) document.getElementById('quick-org-id').value = savedOrgId;
+          if (savedUserId) document.getElementById('quick-user-id').value = savedUserId;
+          
+          // Pre-authorize if credentials exist
+          if (savedOrgId && savedUserId && window.ui) {
+            window.ui.preauthorizeApiKey('x-org-id', savedOrgId);
+            window.ui.preauthorizeApiKey('x-user-id', savedUserId);
+          }
+        }, 2000);
+        
+        // Add request/response interceptors if possible
+        const originalFetch = window.fetch;
+        window.fetch = function(...args) {
+          const [url, options = {}] = args;
+          
+          // Add auth headers if not present and not health endpoint
+          if (!url.includes('/health') && !url.includes('/openapi.json')) {
+            const orgId = localStorage.getItem('tolstoy-org-id');
+            const userId = localStorage.getItem('tolstoy-user-id');
+            
+            if (orgId || userId) {
+              options.headers = options.headers || {};
+              if (orgId) options.headers['x-org-id'] = orgId;
+              if (userId) options.headers['x-user-id'] = userId;
+            }
+          }
+          
+          // Track request
+          const requestData = {
+            url: url,
+            method: options.method || 'GET',
+            timestamp: new Date().toISOString()
+          };
+          
+          return originalFetch.apply(this, [url, options])
+            .then(response => {
+              // Track response
+              requestHistory.unshift({
+                ...requestData,
+                status: response.status,
+                statusText: response.statusText
+              });
+              requestHistory = requestHistory.slice(0, 50);
+              localStorage.setItem('tolstoy-request-history', JSON.stringify(requestHistory));
+              
+              return response;
+            });
+        };
+      })();
+    `,
+    swaggerOptions: {
+      persistAuthorization: true,
+      requestInterceptor: function(request) {
+        // This will be stringified, so keep it simple
+        const orgId = localStorage.getItem('tolstoy-org-id');
+        const userId = localStorage.getItem('tolstoy-user-id');
+        
+        if (!request.url.includes('/health') && !request.url.includes('/openapi.json')) {
+          request.headers = request.headers || {};
+          if (orgId) request.headers['x-org-id'] = orgId;
+          if (userId) request.headers['x-user-id'] = userId;
+        }
+        
+        return request;
+      }
+    }
   });
+
+  // OpenAPI endpoint is now automatically created by SwaggerModule.setup with the jsonDocumentUrl option
 
   await app.listen(port, '0.0.0.0');
 
