@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { Action, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { CreateActionDto } from './dto/create-action.dto';
@@ -172,6 +172,21 @@ export class ActionsService {
     inputs: Record<string, unknown>,
   ) {
     const startTime = Date.now();
+    const executionId = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Create initial execution log
+    const executionLog = await this.prisma.actionExecutionLog.create({
+      data: {
+        orgId,
+        userId: userId || null,
+        actionId: '',  // Will be updated once we have the action
+        actionKey,
+        executionId,
+        status: 'pending',
+        inputs: inputs as any,
+        retryCount: 0,
+      },
+    });
 
     try {
       // 1. Load Action + Tool
@@ -181,8 +196,26 @@ export class ActionsService {
       });
 
       if (!action) {
+        // Update execution log with failure
+        await this.prisma.actionExecutionLog.update({
+          where: { id: executionLog.id },
+          data: {
+            status: 'failed',
+            error: { message: `Action "${actionKey}" not found` },
+            duration: Date.now() - startTime,
+          },
+        });
         throw new NotFoundException(`Action "${actionKey}" not found`);
       }
+
+      // Update execution log with actionId and running status
+      await this.prisma.actionExecutionLog.update({
+        where: { id: executionLog.id },
+        data: {
+          actionId: action.id,
+          status: 'running',
+        },
+      });
 
       const toolName = action.tool.name;
 
@@ -283,10 +316,20 @@ export class ActionsService {
           duration / 1000,
         );
 
+        // Update execution log with success
+        await this.prisma.actionExecutionLog.update({
+          where: { id: executionLog.id },
+          data: {
+            status: 'completed',
+            outputs: httpResponse.data as any,
+            duration,
+          },
+        });
+
         // 5. Return result
         return {
           success: true,
-          executionId: httpResponse.executionId,
+          executionId,
           duration,
           data: httpResponse.data,
           outputs: {
@@ -302,6 +345,19 @@ export class ActionsService {
         };
       } else {
         const errorMessage = httpResponse.error?.message || `HTTP ${httpResponse.statusCode}`;
+        // Update execution log with failure
+        await this.prisma.actionExecutionLog.update({
+          where: { id: executionLog.id },
+          data: {
+            status: 'failed',
+            error: { 
+              message: errorMessage,
+              statusCode: httpResponse.statusCode,
+              details: httpResponse.error,
+            },
+            duration,
+          },
+        });
         throw new Error(errorMessage);
       }
     } catch (error) {
@@ -320,6 +376,22 @@ export class ActionsService {
         duration / 1000,
       );
 
+      // Update execution log with error if not already updated
+      await this.prisma.actionExecutionLog.updateMany({
+        where: { 
+          id: executionLog.id,
+          status: { in: ['pending', 'running'] },
+        },
+        data: {
+          status: 'failed',
+          error: {
+            message: error.message || 'Unknown error',
+            stack: error.stack,
+          },
+          duration,
+        },
+      });
+
       this.logger.error(`Action execution failed: ${actionKey}`, error);
       throw error;
     }
@@ -330,5 +402,151 @@ export class ActionsService {
       const value = variables[key.trim()];
       return value !== undefined ? String(value) : match;
     });
+  }
+
+  // Action Execution Management Methods
+  
+  async getActionExecutions(
+    orgId: string,
+    actionKey?: string,
+    status?: string,
+    limit = 100,
+  ) {
+    const where: any = { orgId };
+    if (actionKey) where.actionKey = actionKey;
+    if (status) where.status = status;
+
+    return this.prisma.actionExecutionLog.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      include: {
+        action: {
+          select: {
+            name: true,
+            key: true,
+            tool: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        user: {
+          select: {
+            email: true,
+          },
+        },
+      },
+    });
+  }
+
+  async getActionExecutionStatus(executionId: string, tenant: TenantContext) {
+    const execution = await this.prisma.actionExecutionLog.findFirst({
+      where: {
+        executionId,
+        orgId: tenant.orgId,
+      },
+      include: {
+        action: {
+          select: {
+            name: true,
+            key: true,
+            tool: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        user: {
+          select: {
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!execution) {
+      throw new NotFoundException(`Execution ${executionId} not found`);
+    }
+
+    return execution;
+  }
+
+  async cancelActionExecution(executionId: string, tenant: TenantContext) {
+    const execution = await this.prisma.actionExecutionLog.findFirst({
+      where: {
+        executionId,
+        orgId: tenant.orgId,
+      },
+    });
+
+    if (!execution) {
+      throw new NotFoundException(`Execution ${executionId} not found`);
+    }
+
+    if (execution.status !== 'pending' && execution.status !== 'running') {
+      throw new BadRequestException(
+        `Cannot cancel execution in status ${execution.status}`,
+      );
+    }
+
+    await this.prisma.actionExecutionLog.update({
+      where: { id: execution.id },
+      data: {
+        status: 'cancelled',
+        error: { message: 'Cancelled by user' },
+        duration: Date.now() - execution.createdAt.getTime(),
+      },
+    });
+
+    this.logger.log(`Cancelled action execution ${executionId}`);
+  }
+
+  async retryActionExecution(executionId: string, tenant: TenantContext) {
+    const originalExecution = await this.prisma.actionExecutionLog.findFirst({
+      where: {
+        executionId,
+        orgId: tenant.orgId,
+      },
+      include: {
+        action: true,
+      },
+    });
+
+    if (!originalExecution) {
+      throw new NotFoundException(`Execution ${executionId} not found`);
+    }
+
+    if (originalExecution.status !== 'failed' && originalExecution.status !== 'cancelled') {
+      throw new BadRequestException(
+        `Can only retry failed or cancelled executions. Current status: ${originalExecution.status}`,
+      );
+    }
+
+    // Execute the action again with the same inputs
+    const result = await this.executeAction(
+      tenant.orgId,
+      originalExecution.userId || undefined,
+      originalExecution.actionKey,
+      originalExecution.inputs as Record<string, unknown>,
+    );
+
+    // Update the new execution with parent reference
+    if (result.executionId) {
+      await this.prisma.actionExecutionLog.updateMany({
+        where: {
+          executionId: result.executionId,
+          orgId: tenant.orgId,
+        },
+        data: {
+          parentId: originalExecution.executionId,
+          retryCount: originalExecution.retryCount + 1,
+        },
+      });
+    }
+
+    return result;
   }
 }

@@ -1970,6 +1970,432 @@
         ]
       }
     },
+    "/actions/executions": {
+      "get": {
+        "description": "Get a list of all action executions for the organization",
+        "operationId": "ActionsController_listExecutions",
+        "parameters": [
+          {
+            "name": "X-Action-Key",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Status",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved action executions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "example": "clm123..."
+                      },
+                      "executionId": {
+                        "type": "string",
+                        "example": "exec_1234567890_abc123"
+                      },
+                      "actionKey": {
+                        "type": "string",
+                        "example": "slack_send_message"
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "pending",
+                          "running",
+                          "completed",
+                          "failed",
+                          "cancelled"
+                        ],
+                        "example": "completed"
+                      },
+                      "inputs": {
+                        "type": "object",
+                        "example": {
+                          "channel": "#general",
+                          "text": "Hello"
+                        }
+                      },
+                      "outputs": {
+                        "type": "object",
+                        "example": {
+                          "messageId": "msg_123"
+                        }
+                      },
+                      "error": {
+                        "type": "object",
+                        "nullable": true
+                      },
+                      "duration": {
+                        "type": "number",
+                        "example": 1250
+                      },
+                      "retryCount": {
+                        "type": "number",
+                        "example": 0
+                      },
+                      "parentId": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "updatedAt": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "action": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string",
+                            "example": "Send Slack Message"
+                          },
+                          "key": {
+                            "type": "string",
+                            "example": "slack_send_message"
+                          },
+                          "tool": {
+                            "type": "object",
+                            "properties": {
+                              "name": {
+                                "type": "string",
+                                "example": "Slack"
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "user": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "email": {
+                            "type": "string",
+                            "example": "user@example.com"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "List Action Executions",
+        "tags": [
+          "Actions"
+        ]
+      }
+    },
+    "/actions/{key}/executions": {
+      "get": {
+        "description": "Get execution history for a specific action",
+        "operationId": "ActionsController_listActionExecutions",
+        "parameters": [
+          {
+            "name": "key",
+            "required": true,
+            "in": "path",
+            "description": "Action key",
+            "schema": {
+              "example": "slack_send_message",
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Status",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved action executions"
+          }
+        },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "List Executions for Specific Action",
+        "tags": [
+          "Actions"
+        ]
+      }
+    },
+    "/actions/executions/{executionId}": {
+      "get": {
+        "description": "Get detailed status of a specific action execution",
+        "operationId": "ActionsController_getExecutionStatus",
+        "parameters": [
+          {
+            "name": "executionId",
+            "required": true,
+            "in": "path",
+            "description": "Execution ID",
+            "schema": {
+              "example": "exec_1234567890_abc123",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successfully retrieved execution status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "example": "clm123..."
+                    },
+                    "executionId": {
+                      "type": "string",
+                      "example": "exec_1234567890_abc123"
+                    },
+                    "actionKey": {
+                      "type": "string",
+                      "example": "slack_send_message"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "pending",
+                        "running",
+                        "completed",
+                        "failed",
+                        "cancelled"
+                      ],
+                      "example": "completed"
+                    },
+                    "inputs": {
+                      "type": "object"
+                    },
+                    "outputs": {
+                      "type": "object",
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "object",
+                      "nullable": true
+                    },
+                    "duration": {
+                      "type": "number",
+                      "example": 1250
+                    },
+                    "retryCount": {
+                      "type": "number",
+                      "example": 0
+                    },
+                    "parentId": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "action": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "key": {
+                          "type": "string"
+                        },
+                        "tool": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "user": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "email": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Execution not found"
+          }
+        },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Get Execution Status",
+        "tags": [
+          "Actions"
+        ]
+      }
+    },
+    "/actions/executions/{executionId}/cancel": {
+      "post": {
+        "description": "Cancel a pending or running action execution",
+        "operationId": "ActionsController_cancelExecution",
+        "parameters": [
+          {
+            "name": "executionId",
+            "required": true,
+            "in": "path",
+            "description": "Execution ID",
+            "schema": {
+              "example": "exec_1234567890_abc123",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Execution cancelled successfully"
+          },
+          "400": {
+            "description": "Cannot cancel execution in current status"
+          },
+          "404": {
+            "description": "Execution not found"
+          }
+        },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Cancel Execution",
+        "tags": [
+          "Actions"
+        ]
+      }
+    },
+    "/actions/executions/{executionId}/retry": {
+      "post": {
+        "description": "Retry a failed or cancelled action execution",
+        "operationId": "ActionsController_retryExecution",
+        "parameters": [
+          {
+            "name": "executionId",
+            "required": true,
+            "in": "path",
+            "description": "Execution ID",
+            "schema": {
+              "example": "exec_1234567890_abc123",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Retry initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "executionId": {
+                      "type": "string",
+                      "example": "exec_9876543210_xyz789"
+                    },
+                    "duration": {
+                      "type": "number",
+                      "example": 1250
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "outputs": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Can only retry failed or cancelled executions"
+          },
+          "404": {
+            "description": "Execution not found"
+          }
+        },
+        "security": [
+          {
+            "x-user-id": []
+          },
+          {
+            "x-org-id": []
+          }
+        ],
+        "summary": "Retry Execution",
+        "tags": [
+          "Actions"
+        ]
+      }
+    },
     "/flows": {
       "post": {
         "description": "Create a new workflow with steps and configuration",
@@ -4499,7 +4925,7 @@
   },
   "info": {
     "title": "Tolstoy API",
-    "description": "Interactive API reference for Tolstoy workflow automation platform with enhanced Swagger UI and comprehensive endpoint coverage",
+    "description": "Interactive API reference for Tolstoy workflow automation platform",
     "version": "1.1.0",
     "contact": {}
   },

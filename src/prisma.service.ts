@@ -201,6 +201,10 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     return this.prismaClient?.executionLog;
   }
 
+  get actionExecutionLog() {
+    return this.prismaClient?.actionExecutionLog;
+  }
+
   get webhook() {
     return this.prismaClient?.webhook;
   }

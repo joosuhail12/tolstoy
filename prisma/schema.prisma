@@ -24,6 +24,7 @@ model Organization {
   flows               Flow[]
   webhooks            Webhook[]
   executionLogs       ExecutionLog[]
+  actionExecutionLogs ActionExecutionLog[]
   webhookDispatchLogs WebhookDispatchLog[]
   toolAuthConfigs     ToolAuthConfig[]
   userCredentials     UserCredential[]
@@ -38,6 +39,7 @@ model User {
 
   organization  Organization @relation(fields: [orgId], references: [id])
   executionLogs ExecutionLog[]
+  actionExecutionLogs ActionExecutionLog[]
   userCredentials UserCredential[]
 }
 
@@ -74,6 +76,7 @@ model Action {
 
   tool           Tool     @relation(fields: [toolId], references: [id])
   organization   Organization @relation(fields: [orgId], references: [id])
+  executionLogs  ActionExecutionLog[]
 
   @@unique([orgId, key])
   @@index([toolId])
@@ -111,6 +114,33 @@ model ExecutionLog {
 
   @@index([orgId, flowId, executionId])
   @@index([executionId, stepKey])
+}
+
+model ActionExecutionLog {
+  id          String   @id @default(cuid())
+  orgId       String
+  userId      String?  // Optional since actions can be executed without user context
+  actionId    String
+  actionKey   String
+  executionId String   @unique
+  status      String   // 'pending','running','completed','failed','cancelled'
+  inputs      Json
+  outputs     Json?
+  error       Json?
+  duration    Int?     // Duration in milliseconds
+  retryCount  Int      @default(0)
+  parentId    String?  // For tracking retries - points to original execution
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id])
+  user         User?        @relation(fields: [userId], references: [id])
+  action       Action       @relation(fields: [actionId], references: [id])
+
+  @@index([orgId, actionKey])
+  @@index([executionId])
+  @@index([orgId, status])
+  @@index([createdAt])
 }
 
 model Webhook {
