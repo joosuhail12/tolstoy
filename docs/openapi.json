@@ -1404,7 +1404,7 @@
         ]
       }
     },
-    "/actions/{key}/execute": {
+    "/actions/{id}/execute": {
       "post": {
         "description": "Execute a standalone action with provided inputs. This endpoint allows you to run individual actions outside of workflow contexts.",
         "operationId": "ActionsController_execute",
@@ -1428,12 +1428,12 @@
             }
           },
           {
-            "name": "key",
+            "name": "id",
             "required": true,
             "in": "path",
-            "description": "Unique action key identifier",
+            "description": "Action ID",
             "schema": {
-              "example": "slack_send_message",
+              "example": "action_abc123",
               "type": "string"
             }
           }
@@ -1530,7 +1530,7 @@
                     },
                     "message": {
                       "type": "string",
-                      "example": "Action \"invalid_key\" not found"
+                      "example": "Action \"invalid_id\" not found"
                     },
                     "error": {
                       "type": "string",
@@ -1556,7 +1556,7 @@
             "bearer": []
           }
         ],
-        "summary": "Execute a single Action by key",
+        "summary": "Execute a single Action by ID",
         "tags": [
           "Actions"
         ]

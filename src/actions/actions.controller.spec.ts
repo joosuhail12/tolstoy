@@ -32,8 +32,6 @@ describe('ActionsController', () => {
         name: 'message',
         type: 'string',
         required: true,
-        label: 'Message',
-        control: 'text',
       },
     ],
     executeIf: null,
@@ -51,14 +49,11 @@ describe('ActionsController', () => {
       update: jest.fn(),
       remove: jest.fn(),
       executeAction: jest.fn(),
+      executeActionById: jest.fn(),
     };
 
     const mockMetricsService = {
-      incrementActionOperation: jest.fn(),
-      recordActionCreation: jest.fn(),
-      recordActionUpdate: jest.fn(),
-      recordActionDeletion: jest.fn(),
-      // No recordActionExecution method in MetricsService
+      // MetricsService mock - only include methods that actually exist
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -90,16 +85,14 @@ describe('ActionsController', () => {
         method: 'POST',
         endpoint: '/api/test',
         toolId: 'tool-123',
+        headers: {},
         inputSchema: [
           {
             name: 'message',
             type: 'string',
             required: true,
-            label: 'Message',
-            control: 'text',
           },
         ],
-        outputSchema: [],
       };
 
       actionsService.create.mockResolvedValue(mockAction);
@@ -108,12 +101,6 @@ describe('ActionsController', () => {
 
       expect(result).toEqual(mockAction);
       expect(actionsService.create).toHaveBeenCalledWith(createActionDto, mockTenantContext);
-      expect(metricsService.recordActionCreation).toHaveBeenCalledWith({
-        orgId: mockTenantContext.orgId,
-        actionKey: createActionDto.key,
-        toolId: createActionDto.toolId,
-        method: createActionDto.method,
-      });
     });
 
     it('should handle duplicate action key error', async () => {
@@ -123,8 +110,8 @@ describe('ActionsController', () => {
         method: 'GET',
         endpoint: '/api/duplicate',
         toolId: 'tool-123',
+        headers: {},
         inputSchema: [],
-        outputSchema: [],
       };
 
       actionsService.create.mockRejectedValue(
@@ -136,7 +123,6 @@ describe('ActionsController', () => {
       );
 
       expect(actionsService.create).toHaveBeenCalledWith(createActionDto, mockTenantContext);
-      expect(metricsService.recordActionCreation).not.toHaveBeenCalled();
     });
   });
 
@@ -152,10 +138,6 @@ describe('ActionsController', () => {
 
       expect(result).toEqual(mockActions);
       expect(actionsService.findAll).toHaveBeenCalledWith(mockTenantContext);
-      expect(metricsService.incrementActionOperation).toHaveBeenCalledWith({
-        orgId: mockTenantContext.orgId,
-        operation: 'list',
-      });
     });
 
     it('should return empty array when no actions exist', async () => {
@@ -176,11 +158,6 @@ describe('ActionsController', () => {
 
       expect(result).toEqual(mockAction);
       expect(actionsService.findOne).toHaveBeenCalledWith('action-123', mockTenantContext);
-      expect(metricsService.incrementActionOperation).toHaveBeenCalledWith({
-        orgId: mockTenantContext.orgId,
-        operation: 'get',
-        actionId: 'action-123',
-      });
     });
 
     it('should throw NotFoundException when action does not exist', async () => {
@@ -201,8 +178,12 @@ describe('ActionsController', () => {
         endpoint: '/api/updated',
       };
 
-      const updatedAction = { ...mockAction, ...updateActionDto };
-      actionsService.update.mockResolvedValue(updatedAction);
+      const updatedAction = {
+        ...mockAction,
+        name: 'Updated Action Name',
+        endpoint: '/api/updated',
+      };
+      actionsService.update.mockResolvedValue(updatedAction as any);
 
       const result = await controller.update('action-123', updateActionDto, mockTenantContext);
 
@@ -212,11 +193,6 @@ describe('ActionsController', () => {
         updateActionDto,
         mockTenantContext,
       );
-      expect(metricsService.recordActionUpdate).toHaveBeenCalledWith({
-        orgId: mockTenantContext.orgId,
-        actionId: 'action-123',
-        updatedFields: Object.keys(updateActionDto),
-      });
     });
 
     it('should handle partial updates', async () => {
@@ -260,10 +236,6 @@ describe('ActionsController', () => {
       await controller.remove('action-123', mockTenantContext);
 
       expect(actionsService.remove).toHaveBeenCalledWith('action-123', mockTenantContext);
-      expect(metricsService.recordActionDeletion).toHaveBeenCalledWith({
-        orgId: mockTenantContext.orgId,
-        actionId: 'action-123',
-      });
     });
 
     it('should throw NotFoundException when removing non-existent action', async () => {
@@ -280,7 +252,7 @@ describe('ActionsController', () => {
   describe('execute', () => {
     it('should execute an action successfully', async () => {
       const executeDto: ExecuteActionDto = {
-        message: 'Hello, World!',
+        inputs: { message: 'Hello, World!' },
       };
 
       const executionResult = {
@@ -288,29 +260,35 @@ describe('ActionsController', () => {
         executionId: 'exec-123',
         duration: 1250,
         data: { result: 'Action executed successfully' },
+        outputs: {
+          orgId: mockTenantContext.orgId,
+          actionKey: 'test_action',
+          actionId: 'action-123',
+          toolKey: 'test_tool',
+          timestamp: '2024-01-01T00:00:00Z',
+          statusCode: 200,
+          url: 'https://api.test.com/test',
+          executedInSandbox: true,
+          sandboxDuration: 1000,
+        },
       };
 
-      actionsService.executeAction.mockResolvedValue(executionResult);
+      actionsService.executeActionById.mockResolvedValue(executionResult);
 
-      const result = await controller.execute('org-123', 'user-456', 'test_action', executeDto);
+      const result = await controller.execute('org-123', 'user-456', 'action-123', executeDto);
 
       expect(result).toEqual(executionResult);
-      expect(actionsService.executeAction).toHaveBeenCalledWith(
-        'test_action',
-        executeDto,
-        mockTenantContext,
+      expect(actionsService.executeActionById).toHaveBeenCalledWith(
+        'org-123',
+        'user-456', 
+        'action-123',
+        { message: 'Hello, World!' },
       );
-      expect(metricsService.recordActionExecution).toHaveBeenCalledWith({
-        orgId: mockTenantContext.orgId,
-        actionKey: 'test_action',
-        success: true,
-        duration: 1250,
-      });
     });
 
     it('should handle action execution failure', async () => {
       const executeDto: ExecuteActionDto = {
-        message: 'This will fail',
+        inputs: { message: 'This will fail' },
       };
 
       const executionResult = {
@@ -318,47 +296,54 @@ describe('ActionsController', () => {
         executionId: 'exec-456',
         duration: 500,
         data: { error: 'API returned 500' },
+        outputs: {
+          orgId: mockTenantContext.orgId,
+          actionKey: 'test_action',
+          actionId: 'action-123',
+          toolKey: 'test_tool',
+          timestamp: '2024-01-01T00:00:00Z',
+          statusCode: 500,
+          url: 'https://api.test.com/test',
+          executedInSandbox: true,
+          sandboxDuration: 500,
+        },
       };
 
-      actionsService.executeAction.mockResolvedValue(executionResult);
+      actionsService.executeActionById.mockResolvedValue(executionResult);
 
-      const result = await controller.execute('org-123', 'user-456', 'test_action', executeDto);
+      const result = await controller.execute('org-123', 'user-456', 'action-123', executeDto);
 
       expect(result).toEqual(executionResult);
-      expect(actionsService.executeAction).toHaveBeenCalledWith(
-        'test_action',
-        executeDto,
-        mockTenantContext,
+      expect(actionsService.executeActionById).toHaveBeenCalledWith(
+        'org-123',
+        'user-456', 
+        'action-123',
+        { message: 'This will fail' },
       );
-      expect(metricsService.recordActionExecution).toHaveBeenCalledWith({
-        orgId: mockTenantContext.orgId,
-        actionKey: 'test_action',
-        success: false,
-        duration: 500,
-      });
     });
 
     it('should throw NotFoundException when executing non-existent action', async () => {
       const executeDto: ExecuteActionDto = { inputs: { message: 'test' } };
-      actionsService.executeAction.mockRejectedValue(
-        new NotFoundException('Action with key "non_existent_action" not found'),
+      actionsService.executeActionById.mockRejectedValue(
+        new NotFoundException('Action with ID "non_existent_action" not found'),
       );
 
       await expect(
-        controller.execute('non_existent_action', executeDto, mockTenantContext),
+        controller.execute('org-123', 'user-456', 'non_existent_action', executeDto),
       ).rejects.toThrow(NotFoundException);
 
-      expect(actionsService.executeAction).toHaveBeenCalledWith(
+      expect(actionsService.executeActionById).toHaveBeenCalledWith(
+        'org-123',
+        'user-456',
         'non_existent_action',
-        executeDto,
-        mockTenantContext,
+        { message: 'test' },
       );
     });
 
     it('should handle validation errors in execution input', async () => {
       const invalidExecuteDto = {}; // Missing required fields
 
-      actionsService.executeAction.mockRejectedValue(
+      actionsService.executeActionById.mockRejectedValue(
         new BadRequestException('Validation failed: message is required'),
       );
 

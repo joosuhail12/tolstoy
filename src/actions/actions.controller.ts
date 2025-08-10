@@ -239,17 +239,17 @@ export class ActionsController {
     return this.actionsService.remove(id, tenant);
   }
 
-  @Post(':key/execute')
+  @Post(':id/execute')
   @ApiBearerAuth()
   @ApiOperation({
-    summary: 'Execute a single Action by key',
+    summary: 'Execute a single Action by ID',
     description:
       'Execute a standalone action with provided inputs. This endpoint allows you to run individual actions outside of workflow contexts.',
   })
   @ApiParam({
-    name: 'key',
-    description: 'Unique action key identifier',
-    example: 'slack_send_message',
+    name: 'id',
+    description: 'Action ID',
+    example: 'action_abc123',
   })
   @ApiHeader({
     name: 'X-Org-ID',
@@ -308,7 +308,7 @@ export class ActionsController {
       type: 'object',
       properties: {
         statusCode: { type: 'number', example: 404 },
-        message: { type: 'string', example: 'Action "invalid_key" not found' },
+        message: { type: 'string', example: 'Action "invalid_id" not found' },
         error: { type: 'string', example: 'Not Found' },
       },
     },
@@ -324,13 +324,13 @@ export class ActionsController {
   async execute(
     @Headers('X-Org-ID') orgId: string,
     @Headers('X-User-ID') userId: string,
-    @Param('key') actionKey: string,
+    @Param('id') actionId: string,
     @Body(ValidationPipe) dto: ExecuteActionDto,
   ) {
     if (!orgId) {
       throw new BadRequestException('X-Org-ID header required');
     }
-    return this.actionsService.executeAction(orgId, userId, actionKey, dto.inputs);
+    return this.actionsService.executeActionById(orgId, userId, actionId, dto.inputs);
   }
 
   @Get('executions')

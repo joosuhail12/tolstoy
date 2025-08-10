@@ -120,7 +120,7 @@ model ActionExecutionLog {
   id          String   @id @default(cuid())
   orgId       String
   userId      String?  // Optional since actions can be executed without user context
-  actionId    String
+  actionId    String?  // Optional during initial creation, will be set once action is found
   actionKey   String
   executionId String   @unique
   status      String   // 'pending','running','completed','failed','cancelled'
@@ -135,7 +135,7 @@ model ActionExecutionLog {
 
   organization Organization @relation(fields: [orgId], references: [id])
   user         User?        @relation(fields: [userId], references: [id])
-  action       Action       @relation(fields: [actionId], references: [id])
+  action       Action?      @relation(fields: [actionId], references: [id])
 
   @@index([orgId, actionKey])
   @@index([executionId])

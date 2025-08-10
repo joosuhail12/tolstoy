@@ -171,6 +171,207 @@ export class ActionsService {
     }
   }
 
+  async executeActionById(
+    orgId: string,
+    userId: string | undefined,
+    actionId: string,
+    inputs: Record<string, unknown>,
+  ) {
+    const startTime = Date.now();
+    const executionId = `exec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    try {
+      // 1. Load Action + Tool by ID
+      const action = await this.prisma.action.findFirst({
+        where: { id: actionId, orgId },
+        include: { tool: true },
+      });
+
+      if (!action) {
+        throw new NotFoundException(`Action with ID "${actionId}" not found`);
+      }
+
+      // Create execution log with actionId and actionKey
+      const executionLog = await this.prisma.actionExecutionLog.create({
+        data: {
+          orgId,
+          userId: userId || null,
+          actionId: action.id,
+          actionKey: action.key,
+          executionId,
+          status: 'running',
+          inputs: inputs as any,
+          retryCount: 0,
+        },
+      });
+
+      const toolName = action.tool.name;
+      const toolId = action.toolId;
+
+      // Increment counter metric
+      this.metrics.actionExecutionCounter.inc({
+        orgId,
+        toolKey: toolName,
+        actionKey: action.key,
+        status: 'started',
+      });
+
+      // 2. Validate inputs against enhanced schema
+      const validInputs = await this.inputValidator.validateEnhanced(
+        action.inputSchema as unknown as InputParam[],
+        inputs,
+        {
+          orgId,
+          actionKey: action.key,
+          contextType: 'action-execution',
+        },
+      );
+
+      // 3. Resolve auth headers
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        ...((action.headers as Record<string, string>) || {}),
+      };
+
+      try {
+        // Get the default auth configuration for the tool
+        const orgAuth = await this.authConfig.getDefaultOrgAuthConfig(orgId, toolId);
+
+        if (orgAuth?.type === 'apiKey') {
+          const headerName = (orgAuth.config.headerName as string) || 'Authorization';
+          const headerValue =
+            (orgAuth.config.headerValue as string) || (orgAuth.config.apiKey as string);
+          headers[headerName] = headerValue;
+        } else if (orgAuth?.type === 'oauth2') {
+          if (userId) {
+            const cred = await this.authConfig.getUserCredentials(orgId, userId, toolName);
+            if (cred) {
+              const token = await this.authConfig.refreshUserToken(cred);
+              headers['Authorization'] = `Bearer ${token}`;
+            }
+          }
+        }
+      } catch (authError) {
+        this.logger.warn(`Auth config not found for org ${orgId}, tool ${toolName}`, authError);
+        // Continue execution without auth headers
+      }
+
+      // 4. Execute HTTP request
+      this.logger.log(`Executing single action: ${action.key} (ID: ${actionId}) for org: ${orgId}`);
+
+      // Construct URL - handle both absolute and relative endpoints
+      let url = action.endpoint;
+      if (!url.startsWith('http')) {
+        url = action.tool.baseUrl + (url.startsWith('/') ? url : '/' + url);
+      }
+
+      // Replace template variables in URL with validated inputs
+      url = this.replaceTemplateVariables(url, validInputs);
+
+      // Prepare request options
+      const requestOptions: RequestInit = {
+        method: action.method,
+        headers,
+      };
+
+      // Add body for non-GET requests
+      if (action.method !== 'GET') {
+        requestOptions.body = JSON.stringify(validInputs);
+      }
+
+      // Execute HTTP request through Daytona sandbox
+      this.logger.log(`Executing HTTP request via Daytona: ${action.method} ${url}`);
+
+      const httpResponse = await this.daytonaService.executeHttpRequest({
+        url,
+        method: action.method as 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH',
+        headers,
+        body: requestOptions.body as string,
+        timeout: 30000, // 30 second timeout
+      });
+
+      const duration = httpResponse.duration || Date.now() - startTime;
+
+      if (httpResponse.success) {
+        // Update metrics with success
+        this.metrics.actionExecutionCounter.inc({
+          orgId,
+          toolKey: toolName,
+          actionKey: action.key,
+          status: 'success',
+        });
+
+        this.metrics.actionExecutionDuration.observe(
+          { orgId, toolKey: toolName, actionKey: action.key },
+          duration / 1000,
+        );
+
+        // Update execution log with success
+        await this.prisma.actionExecutionLog.update({
+          where: { id: executionLog.id },
+          data: {
+            status: 'completed',
+            outputs: httpResponse.data as any,
+            duration,
+          },
+        });
+
+        // 5. Return result
+        return {
+          success: true,
+          executionId,
+          duration,
+          data: httpResponse.data,
+          outputs: {
+            orgId,
+            actionKey: action.key,
+            actionId,
+            toolKey: toolName,
+            timestamp: new Date().toISOString(),
+            statusCode: httpResponse.statusCode,
+            url,
+            executedInSandbox: true,
+            sandboxDuration: httpResponse.duration,
+          },
+        };
+      } else {
+        const errorMessage = httpResponse.error?.message || `HTTP ${httpResponse.statusCode}`;
+        // Update execution log with failure
+        await this.prisma.actionExecutionLog.update({
+          where: { id: executionLog.id },
+          data: {
+            status: 'failed',
+            error: {
+              message: errorMessage,
+              statusCode: httpResponse.statusCode,
+              details: httpResponse.error,
+            },
+            duration,
+          },
+        });
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      const duration = Date.now() - startTime;
+
+      // Update metrics with error
+      this.metrics.actionExecutionCounter.inc({
+        orgId,
+        toolKey: actionId, // fallback if action not found
+        actionKey: actionId,
+        status: 'error',
+      });
+
+      this.metrics.actionExecutionDuration.observe(
+        { orgId, toolKey: actionId, actionKey: actionId },
+        duration / 1000,
+      );
+
+      this.logger.error(`Action execution failed: ${actionId}`, error);
+      throw error;
+    }
+  }
+
   async executeAction(
     orgId: string,
     userId: string | undefined,
@@ -185,7 +386,7 @@ export class ActionsService {
       data: {
         orgId,
         userId: userId || null,
-        actionId: '', // Will be updated once we have the action
+        actionId: null, // Will be updated once we have the action
         actionKey,
         executionId,
         status: 'pending',
