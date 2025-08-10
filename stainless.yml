@@ -3,11 +3,11 @@
 organization:
   # Name of your organization or company, used to determine the name of the client
   # and headings.
-  name: tolstoy-api
+  name: tolstoy
   # Link to your API documentation.
-  docs: ''
+  docs: 'https://github.com/joosuhail12/tolstoy'
   # Contact email for bug reports, questions, and support requests.
-  contact: ''
+  contact: 'support@tolstoy.getpullse.com'
 
 # `targets` define the output targets and their customization options, such as
 # whether to emit the Node SDK and what it's package name should be.
