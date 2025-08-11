@@ -8,7 +8,16 @@ module.exports = {
       PORT: 3000,
       AWS_REGION: 'us-east-1',
       AWS_SECRET_NAME: 'tolstoy/env',
-      USE_AWS_SECRETS: 'true'
+      USE_AWS_SECRETS: 'true',
+      // Inherit from process environment
+      DATABASE_URL: process.env.DATABASE_URL,
+      DIRECT_URL: process.env.DIRECT_URL,
+      INNGEST_EVENT_KEY: process.env.INNGEST_EVENT_KEY,
+      DAYTONA_API_KEY: process.env.DAYTONA_API_KEY,
+      DAYTONA_BASE_URL: process.env.DAYTONA_BASE_URL,
+      UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+      UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
+      SENTRY_DSN: process.env.SENTRY_DSN
     },
     instances: 1,
     autorestart: true,
@@ -29,7 +38,16 @@ module.exports = {
       PORT: 3000,
       AWS_REGION: 'us-east-1',
       AWS_SECRET_NAME: 'tolstoy/env',
-      USE_AWS_SECRETS: 'true'
+      USE_AWS_SECRETS: 'true',
+      // Inherit from process environment
+      DATABASE_URL: process.env.DATABASE_URL,
+      DIRECT_URL: process.env.DIRECT_URL,
+      INNGEST_EVENT_KEY: process.env.INNGEST_EVENT_KEY,
+      DAYTONA_API_KEY: process.env.DAYTONA_API_KEY,
+      DAYTONA_BASE_URL: process.env.DAYTONA_BASE_URL,
+      UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+      UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
+      SENTRY_DSN: process.env.SENTRY_DSN
     }
   }]
 };
