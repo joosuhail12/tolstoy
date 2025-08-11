@@ -230,12 +230,12 @@ export class HealthService {
 
   private getSystemInfo() {
     const now = new Date();
-    
+
     // Detect deployment platform
     let platform = 'Local';
     let region = 'local';
     let url = 'localhost';
-    
+
     if (process.env.VERCEL) {
       platform = 'Vercel';
       region = process.env.VERCEL_REGION || 'unknown';
@@ -249,7 +249,7 @@ export class HealthService {
       region = 'unknown';
       url = process.env.PRODUCTION_URL || 'production-server';
     }
-    
+
     return {
       timestamp: now.toISOString(),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
