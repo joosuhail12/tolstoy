@@ -1,10 +1,4 @@
-import {
-  IsArray,
-  IsNotEmpty,
-  IsNumber,
-  IsOptional,
-  Min,
-} from 'class-validator';
+import { IsArray, IsNotEmpty, IsNumber, IsOptional, Min } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 interface RetryPolicy {
