@@ -149,15 +149,29 @@ export class AppModule implements NestModule, OnModuleInit {
   configure(consumer: MiddlewareConsumer): void {
     consumer
       .apply(TenantMiddleware)
-      .exclude('organizations/(.*)', '/', '/health', '/status', '/metrics', 'webhooks/event-types')
+      .exclude(
+        'organizations/(.*)',
+        '/',
+        '/health',
+        '/status', 
+        '/detailed',
+        '/metrics',
+        'webhooks/event-types'
+      )
       .forRoutes(
+        'users/*',
         'users',
+        'tools/*', 
         'tools',
-        'actions',
+        'actions/*',
+        'actions', 
+        'flows/*',
         'flows',
+        'execution-logs/*',
         'execution-logs',
+        'webhooks/*',
         'webhooks',
-        'tools/:toolId/secrets',
+        'tools/*/secrets',
       );
   }
 }
