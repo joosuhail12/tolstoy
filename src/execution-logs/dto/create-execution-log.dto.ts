@@ -24,6 +24,14 @@ export interface ExecutionLogError {
 
 export class CreateExecutionLogDto {
   @ApiProperty({
+    description: 'ID of the user executing the workflow',
+    example: 'user_abc123',
+  })
+  @IsString()
+  @IsNotEmpty()
+  userId: string;
+
+  @ApiProperty({
     description: 'ID of the workflow being executed',
     example: 'flow_abc123',
   })

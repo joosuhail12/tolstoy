@@ -98,8 +98,6 @@ describe('FlowsController', () => {
   describe('create', () => {
     it('should create a new flow successfully', async () => {
       const createFlowDto: CreateFlowDto = {
-        name: 'Test Flow',
-        description: 'A test workflow',
         version: 1,
         steps: [
           {
@@ -114,10 +112,6 @@ describe('FlowsController', () => {
             },
           },
         ],
-        settings: {
-          timeout: 30000,
-          retryAttempts: 3,
-        },
       };
 
       flowsService.create.mockResolvedValue(mockFlow);
@@ -130,11 +124,8 @@ describe('FlowsController', () => {
 
     it('should handle duplicate flow name error', async () => {
       const createFlowDto: CreateFlowDto = {
-        name: 'Existing Flow',
-        description: 'This will fail',
         version: 1,
         steps: [],
-        settings: {},
       };
 
       flowsService.create.mockRejectedValue(
@@ -150,8 +141,6 @@ describe('FlowsController', () => {
 
     it('should validate flow steps structure', async () => {
       const createFlowDto: CreateFlowDto = {
-        name: 'Invalid Flow',
-        description: 'Flow with invalid steps',
         version: 1,
         steps: [
           {
@@ -161,7 +150,6 @@ describe('FlowsController', () => {
             config: {},
           },
         ],
-        settings: {},
       };
 
       flowsService.create.mockResolvedValue(mockFlow);
@@ -217,8 +205,7 @@ describe('FlowsController', () => {
   describe('update', () => {
     it('should update a flow successfully', async () => {
       const updateFlowDto: UpdateFlowDto = {
-        name: 'Updated Flow Name',
-        description: 'Updated description',
+        version: 2,
       };
 
       const updatedFlow = { ...mockFlow };
@@ -236,7 +223,7 @@ describe('FlowsController', () => {
 
     it('should handle partial updates', async () => {
       const partialUpdateDto: UpdateFlowDto = {
-        description: 'Only description updated',
+        version: 2,
       };
 
       const updatedFlow = { ...mockFlow };

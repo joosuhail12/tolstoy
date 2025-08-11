@@ -2,9 +2,7 @@ import {
   IsArray,
   IsNotEmpty,
   IsNumber,
-  IsObject,
   IsOptional,
-  IsString,
   Min,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -27,22 +25,6 @@ interface FlowStep {
 }
 
 export class CreateFlowDto {
-  @ApiProperty({
-    description: 'Flow name',
-    example: 'User Onboarding Flow',
-  })
-  @IsString()
-  @IsNotEmpty()
-  name: string;
-
-  @ApiPropertyOptional({
-    description: 'Flow description',
-    example: 'Automated user onboarding process with email and notifications',
-  })
-  @IsString()
-  @IsOptional()
-  description?: string;
-
   @ApiPropertyOptional({
     description: 'Flow version number',
     example: 1,
@@ -76,12 +58,4 @@ export class CreateFlowDto {
   @IsArray()
   @IsNotEmpty()
   steps: FlowStep[];
-
-  @ApiPropertyOptional({
-    description: 'Flow execution settings',
-    example: { timeout: 300000, retries: 2 },
-  })
-  @IsObject()
-  @IsOptional()
-  settings?: Record<string, unknown>;
 }

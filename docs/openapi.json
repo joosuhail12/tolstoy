@@ -4340,34 +4340,10 @@
             "description": "User email address",
             "format": "email",
             "example": "john.doe@example.com"
-          },
-          "name": {
-            "type": "string",
-            "description": "User full name",
-            "example": "John Doe"
-          },
-          "role": {
-            "type": "string",
-            "description": "User role",
-            "enum": [
-              "admin",
-              "member",
-              "viewer"
-            ],
-            "example": "member"
-          },
-          "profile": {
-            "type": "object",
-            "description": "User profile information",
-            "example": {
-              "department": "Engineering",
-              "title": "Software Engineer"
-            }
           }
         },
         "required": [
-          "email",
-          "name"
+          "email"
         ]
       },
       "UpdateUserDto": {
@@ -4579,16 +4555,6 @@
       "CreateFlowDto": {
         "type": "object",
         "properties": {
-          "name": {
-            "type": "string",
-            "description": "Flow name",
-            "example": "User Onboarding Flow"
-          },
-          "description": {
-            "type": "string",
-            "description": "Flow description",
-            "example": "Automated user onboarding process with email and notifications"
-          },
           "version": {
             "type": "number",
             "description": "Flow version number",
@@ -4631,18 +4597,9 @@
                 }
               }
             ]
-          },
-          "settings": {
-            "type": "object",
-            "description": "Flow execution settings",
-            "example": {
-              "timeout": 300000,
-              "retries": 2
-            }
           }
         },
         "required": [
-          "name",
           "steps"
         ]
       },
@@ -4653,6 +4610,11 @@
       "CreateExecutionLogDto": {
         "type": "object",
         "properties": {
+          "userId": {
+            "type": "string",
+            "description": "ID of the user executing the workflow",
+            "example": "user_abc123"
+          },
           "flowId": {
             "type": "string",
             "description": "ID of the workflow being executed",
@@ -4708,6 +4670,7 @@
           }
         },
         "required": [
+          "userId",
           "flowId",
           "executionId",
           "stepKey",

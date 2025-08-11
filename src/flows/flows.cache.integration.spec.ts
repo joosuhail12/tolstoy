@@ -106,8 +106,6 @@ describe('FlowsService - Cache Integration', () => {
 
   describe('create', () => {
     const createFlowDto: CreateFlowDto = {
-      name: 'Test Flow',
-      description: 'Test flow for caching',
       version: 1,
       steps: [
         {
@@ -117,7 +115,6 @@ describe('FlowsService - Cache Integration', () => {
           config: {},
         },
       ],
-      settings: {},
     };
 
     it('should create flow and invalidate flows list cache', async () => {
