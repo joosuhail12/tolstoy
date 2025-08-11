@@ -31,14 +31,22 @@ import { AuthModule } from '../../auth/auth.module';
         try {
           // Fetch Inngest credentials from AWS Secrets Manager
           const inngestConfig = await secretsService.getInngestConfig();
+          
+          console.log('Inngest Config loaded from AWS Secrets:', {
+            hasEventKey: !!inngestConfig.eventKey,
+            hasSigningKey: !!inngestConfig.signingKey,
+            eventKeyLength: inngestConfig.eventKey?.length,
+            signingKeyLength: inngestConfig.signingKey?.length,
+          });
 
           return {
             appId: 'tolstoy-workflow-engine',
-            signingKey: inngestConfig.signingKey, // Use proper signing key
+            signingKey: inngestConfig.signingKey, // This will be INNGEST_API_KEY from AWS
+            eventKey: inngestConfig.eventKey, // This will be INNGEST_EVENT_KEY from AWS
             inngest: {
               id: 'tolstoy',
               name: 'Tolstoy Workflow Engine',
-              eventKey: inngestConfig.eventKey, // Use event key
+              eventKey: inngestConfig.eventKey, // Also keep it here for compatibility
             },
             serve: {
               servePort: process.env.PORT || 3000,
@@ -66,13 +74,21 @@ import { AuthModule } from '../../auth/auth.module';
           console.error('Failed to load Inngest configuration from AWS Secrets:', error);
 
           // Fallback to environment variables if AWS Secrets fail
+          console.log('Using fallback environment variables for Inngest config:', {
+            hasEventKey: !!process.env.INNGEST_EVENT_KEY,
+            hasSigningKey: !!process.env.INNGEST_SIGNING_KEY,
+            eventKeyLength: process.env.INNGEST_EVENT_KEY?.length,
+            signingKeyLength: process.env.INNGEST_SIGNING_KEY?.length,
+          });
+          
           return {
             appId: 'tolstoy-workflow-engine',
-            signingKey: process.env.INNGEST_SIGNING_KEY || process.env.INNGEST_API_KEY || 'dev-key',
+            signingKey: process.env.INNGEST_API_KEY || 'dev-key', // INNGEST_API_KEY is the signing key
+            eventKey: process.env.INNGEST_EVENT_KEY || 'dev-key', // INNGEST_EVENT_KEY is the event key
             inngest: {
               id: 'tolstoy',
               name: 'Tolstoy Workflow Engine',
-              eventKey: process.env.INNGEST_EVENT_KEY || process.env.INNGEST_API_KEY || 'dev-key',
+              eventKey: process.env.INNGEST_EVENT_KEY || 'dev-key',
             },
             serve: {
               servePort: process.env.PORT || 3000,

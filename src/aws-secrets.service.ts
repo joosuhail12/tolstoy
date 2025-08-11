@@ -207,10 +207,10 @@ export class AwsSecretsService {
   }> {
     const secrets = await this.getSecretAsJson(secretId);
     return {
-      apiKey: String(secrets.INNGEST_API_KEY),
+      apiKey: String(secrets.INNGEST_API_KEY), // This is actually the signing key
       webhookSecret: String(secrets.INNGEST_WEBHOOK_SECRET),
-      eventKey: String(secrets.INNGEST_EVENT_KEY),
-      signingKey: String(secrets.INNGEST_SIGNING_KEY),
+      eventKey: String(secrets.INNGEST_EVENT_KEY), // This is the event key
+      signingKey: String(secrets.INNGEST_API_KEY), // Use INNGEST_API_KEY as signing key
     };
   }
 
