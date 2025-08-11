@@ -50,19 +50,20 @@ export class CreateActionDto {
   @IsNotEmpty()
   endpoint: string;
 
-  @ApiProperty({
-    description: 'HTTP headers required for the action',
+  @ApiPropertyOptional({
+    description: 'HTTP headers for the action (optional, defaults to empty object)',
     example: {
       'Content-Type': 'application/json',
       Authorization: 'Bearer {token}',
     },
+    default: {},
   })
   @IsObject()
-  @IsNotEmpty()
-  headers: Record<string, string>;
+  @IsOptional()
+  headers?: Record<string, string>;
 
-  @ApiProperty({
-    description: 'Schema defining input parameters for the action',
+  @ApiPropertyOptional({
+    description: 'Schema defining input parameters for the action (optional, defaults to empty array)',
     type: 'array',
     items: {
       type: 'object',
@@ -87,10 +88,11 @@ export class CreateActionDto {
         description: 'Message content',
       },
     ],
+    default: [],
   })
   @IsArray()
-  @IsNotEmpty()
-  inputSchema: InputSchemaItem[];
+  @IsOptional()
+  inputSchema?: InputSchemaItem[];
 
   @ApiPropertyOptional({
     description: 'Conditional execution rules (optional)',

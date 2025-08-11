@@ -4454,15 +4454,16 @@
           },
           "headers": {
             "type": "object",
-            "description": "HTTP headers required for the action",
+            "description": "HTTP headers for the action (optional, defaults to empty object)",
             "example": {
               "Content-Type": "application/json",
               "Authorization": "Bearer {token}"
-            }
+            },
+            "default": {}
           },
           "inputSchema": {
             "type": "array",
-            "description": "Schema defining input parameters for the action",
+            "description": "Schema defining input parameters for the action (optional, defaults to empty array)",
             "items": {
               "type": "object",
               "properties": {
@@ -4497,7 +4498,8 @@
                 "required": true,
                 "description": "Message content"
               }
-            ]
+            ],
+            "default": []
           },
           "executeIf": {
             "type": "object",
@@ -4517,9 +4519,7 @@
           "key",
           "toolId",
           "method",
-          "endpoint",
-          "headers",
-          "inputSchema"
+          "endpoint"
         ]
       },
       "UpdateActionDto": {

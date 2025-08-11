@@ -44,8 +44,8 @@ export class ActionsService {
       toolId: createActionDto.toolId,
       method: createActionDto.method,
       endpoint: createActionDto.endpoint,
-      headers: createActionDto.headers as unknown as Prisma.InputJsonValue,
-      inputSchema: createActionDto.inputSchema as unknown as Prisma.InputJsonValue,
+      headers: (createActionDto.headers || {}) as unknown as Prisma.InputJsonValue,
+      inputSchema: (createActionDto.inputSchema || []) as unknown as Prisma.InputJsonValue,
       executeIf: createActionDto.executeIf as unknown as Prisma.InputJsonValue,
       orgId: tenant.orgId,
     };

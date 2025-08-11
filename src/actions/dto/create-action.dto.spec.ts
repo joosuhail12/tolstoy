@@ -311,8 +311,8 @@ describe('CreateActionDto', () => {
       expect(errors).toHaveLength(0);
     });
 
-    it('should fail validation when headers is missing', async () => {
-      const invalidData = {
+    it('should pass validation when headers is missing (now optional)', async () => {
+      const validData = {
         name: 'Test Action',
         key: 'test_action',
         method: 'POST',
@@ -321,12 +321,10 @@ describe('CreateActionDto', () => {
         inputSchema: validInputSchema,
       };
 
-      const dto = plainToInstance(CreateActionDto, invalidData);
+      const dto = plainToInstance(CreateActionDto, validData);
       const errors = await validate(dto);
 
-      expect(errors).toHaveLength(1);
-      expect(errors[0].property).toBe('headers');
-      expect(errors[0].constraints).toHaveProperty('isNotEmpty');
+      expect(errors).toHaveLength(0);
     });
 
     it('should fail validation when headers is not an object', async () => {
@@ -407,8 +405,8 @@ describe('CreateActionDto', () => {
       expect(errors[0].constraints).toHaveProperty('isArray');
     });
 
-    it('should fail validation when inputSchema is missing', async () => {
-      const invalidData = {
+    it('should pass validation when inputSchema is missing (now optional)', async () => {
+      const validData = {
         name: 'Test Action',
         key: 'test_action',
         method: 'POST',
@@ -417,12 +415,10 @@ describe('CreateActionDto', () => {
         headers: validHeaders,
       };
 
-      const dto = plainToInstance(CreateActionDto, invalidData);
+      const dto = plainToInstance(CreateActionDto, validData);
       const errors = await validate(dto);
 
-      expect(errors).toHaveLength(1);
-      expect(errors[0].property).toBe('inputSchema');
-      expect(errors[0].constraints).toHaveProperty('isNotEmpty');
+      expect(errors).toHaveLength(0);
     });
   });
 
@@ -431,11 +427,10 @@ describe('CreateActionDto', () => {
       const minimalData = {
         name: 'Test Action',
         key: 'test_action',
-        method: 'POST',
+        method: 'GET',
         endpoint: '/api/test',
         toolId: 'tool-123',
-        inputSchema: [],
-        headers: validHeaders,
+        // headers and inputSchema are now optional and can be omitted
       };
 
       const dto = plainToInstance(CreateActionDto, minimalData);
