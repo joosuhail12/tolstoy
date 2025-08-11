@@ -113,7 +113,9 @@ describe('AuthConfigService', () => {
       const result = await service.getOrgAuthConfig('org-456', 'tool-789', 'production');
 
       expect(result).toEqual(cachedConfig);
-      expect(cacheService.get).toHaveBeenCalledWith('auth:org:org-456:tool:tool-789:config:production');
+      expect(cacheService.get).toHaveBeenCalledWith(
+        'auth:org:org-456:tool:tool-789:config:production',
+      );
       expect(prismaService.toolAuthConfig.findFirst).not.toHaveBeenCalled();
     });
 
@@ -315,7 +317,9 @@ describe('AuthConfigService', () => {
         },
         include: { tool: true },
       });
-      expect(cacheService.del).toHaveBeenCalledWith('auth:org:org-456:tool:tool-789:config:production');
+      expect(cacheService.del).toHaveBeenCalledWith(
+        'auth:org:org-456:tool:tool-789:config:production',
+      );
     });
   });
 
@@ -374,7 +378,9 @@ describe('AuthConfigService', () => {
       expect(prismaService.toolAuthConfig.deleteMany).toHaveBeenCalledWith({
         where: { orgId: 'org-456', toolId: 'tool-789', name: 'production' },
       });
-      expect(cacheService.del).toHaveBeenCalledWith('auth:org:org-456:tool:tool-789:config:production');
+      expect(cacheService.del).toHaveBeenCalledWith(
+        'auth:org:org-456:tool:tool-789:config:production',
+      );
     });
 
     it('should throw NotFoundException when no config to delete', async () => {
@@ -383,7 +389,9 @@ describe('AuthConfigService', () => {
       await expect(
         service.deleteOrgAuthConfig('org-456', 'tool-789', 'production'),
       ).rejects.toThrow(
-        new NotFoundException("No auth config 'production' found for org org-456 and tool tool-789"),
+        new NotFoundException(
+          "No auth config 'production' found for org org-456 and tool tool-789",
+        ),
       );
     });
   });

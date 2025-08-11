@@ -74,7 +74,10 @@ describe('FlowsController', () => {
         { provide: FlowsService, useValue: mockFlowsService },
         { provide: FlowExecutorService, useValue: mockFlowExecutorService },
         { provide: InngestExecutionService, useValue: mockInngestExecutionService },
-        { provide: `PinoLogger:FlowsController`, useValue: { info: jest.fn(), warn: jest.fn(), error: jest.fn() } },
+        {
+          provide: `PinoLogger:FlowsController`,
+          useValue: { info: jest.fn(), warn: jest.fn(), error: jest.fn() },
+        },
       ],
     }).compile();
 

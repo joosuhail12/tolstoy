@@ -63,7 +63,8 @@ export class CreateActionDto {
   headers?: Record<string, string>;
 
   @ApiPropertyOptional({
-    description: 'Schema defining input parameters for the action (optional, defaults to empty array)',
+    description:
+      'Schema defining input parameters for the action (optional, defaults to empty array)',
     type: 'array',
     items: {
       type: 'object',
