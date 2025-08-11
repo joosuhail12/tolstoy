@@ -9,6 +9,7 @@ module.exports = {
       AWS_REGION: 'us-east-1',
       AWS_SECRET_NAME: 'tolstoy/env',
       USE_AWS_SECRETS: 'true',
+      PRODUCTION_URL: 'tolstoy.getpullse.com',
       // Inherit from process environment
       DATABASE_URL: process.env.DATABASE_URL,
       DIRECT_URL: process.env.DIRECT_URL,
@@ -39,6 +40,7 @@ module.exports = {
       AWS_REGION: 'us-east-1',
       AWS_SECRET_NAME: 'tolstoy/env',
       USE_AWS_SECRETS: 'true',
+      PRODUCTION_URL: 'tolstoy.getpullse.com',
       // Inherit from process environment
       DATABASE_URL: process.env.DATABASE_URL,
       DIRECT_URL: process.env.DIRECT_URL,

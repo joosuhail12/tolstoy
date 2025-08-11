@@ -230,14 +230,34 @@ export class HealthService {
 
   private getSystemInfo() {
     const now = new Date();
+    
+    // Detect deployment platform
+    let platform = 'Local';
+    let region = 'local';
+    let url = 'localhost';
+    
+    if (process.env.VERCEL) {
+      platform = 'Vercel';
+      region = process.env.VERCEL_REGION || 'unknown';
+      url = process.env.VERCEL_URL || 'vercel-unknown';
+    } else if (process.env.NODE_ENV === 'production' && process.env.USE_AWS_SECRETS === 'true') {
+      platform = 'AWS EC2';
+      region = process.env.AWS_REGION || 'us-east-1';
+      url = process.env.PRODUCTION_URL || 'tolstoy.getpullse.com';
+    } else if (process.env.NODE_ENV === 'production') {
+      platform = 'Production Server';
+      region = 'unknown';
+      url = process.env.PRODUCTION_URL || 'production-server';
+    }
+    
     return {
       timestamp: now.toISOString(),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       version: process.env.npm_package_version || '1.0.0',
       deployment: {
-        platform: process.env.VERCEL ? 'Vercel' : 'Local',
-        region: process.env.VERCEL_REGION || 'local',
-        url: process.env.VERCEL_URL || 'localhost',
+        platform,
+        region,
+        url,
       },
     };
   }
