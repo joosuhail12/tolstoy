@@ -153,18 +153,18 @@ export class AppModule implements NestModule, OnModuleInit {
         'organizations/(.*)',
         '/',
         '/health',
-        '/status', 
+        '/status',
         '/detailed',
         '/metrics',
-        'webhooks/event-types'
+        'webhooks/event-types',
       )
       .forRoutes(
         'users/*',
         'users',
-        'tools/*', 
+        'tools/*',
         'tools',
         'actions/*',
-        'actions', 
+        'actions',
         'flows/*',
         'flows',
         'execution-logs/*',
