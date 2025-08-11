@@ -31,7 +31,7 @@ import { AuthModule } from '../../auth/auth.module';
         try {
           // Fetch Inngest credentials from AWS Secrets Manager
           const inngestConfig = await secretsService.getInngestConfig();
-          
+
           console.log('Inngest Config loaded from AWS Secrets:', {
             hasEventKey: !!inngestConfig.eventKey,
             hasSigningKey: !!inngestConfig.signingKey,
@@ -80,7 +80,7 @@ import { AuthModule } from '../../auth/auth.module';
             eventKeyLength: process.env.INNGEST_EVENT_KEY?.length,
             signingKeyLength: process.env.INNGEST_SIGNING_KEY?.length,
           });
-          
+
           return {
             appId: 'tolstoy-workflow-engine',
             signingKey: process.env.INNGEST_API_KEY || 'dev-key', // INNGEST_API_KEY is the signing key
