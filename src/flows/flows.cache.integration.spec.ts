@@ -128,7 +128,8 @@ describe('FlowsService - Cache Integration', () => {
 
       expect(mockFlowMethods.create).toHaveBeenCalledWith({
         data: {
-          ...createFlowDto,
+          version: createFlowDto.version,
+          steps: createFlowDto.steps,
           orgId: mockTenant.orgId,
         },
       });
