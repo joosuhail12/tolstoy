@@ -1,0 +1,311 @@
+---
+title: "Get Tool"
+api: "GET /tools/{id}"
+description: "Retrieve detailed information about a specific tool"
+---
+
+## Overview
+
+The Get Tool endpoint returns comprehensive details about a specific tool, including its full configuration, available actions, and authentication requirements.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the tool
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the tool
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the tool
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Detailed description of the tool's capabilities
+</ResponseField>
+
+<ResponseField name="category" type="string">
+  Tool category: `api`, `database`, `messaging`, `storage`, `analytics`, `payment`
+</ResponseField>
+
+<ResponseField name="icon" type="string">
+  URL to the tool's icon
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Connection status: `connected`, `disconnected`, `error`
+</ResponseField>
+
+<ResponseField name="authType" type="string">
+  Authentication type: `oauth2`, `api_key`, `basic`, `custom`
+</ResponseField>
+
+<ResponseField name="authConfig" type="object">
+  Authentication configuration details
+  
+  <Expandable title="Auth Config Object">
+    <ResponseField name="type" type="string">
+      Authentication type
+    </ResponseField>
+    
+    <ResponseField name="fields" type="array">
+      Required authentication fields
+    </ResponseField>
+    
+    <ResponseField name="oauth2Config" type="object">
+      OAuth2 configuration (if applicable)
+      
+      <Expandable title="OAuth2 Config">
+        <ResponseField name="authorizationUrl" type="string">
+          OAuth2 authorization URL
+        </ResponseField>
+        
+        <ResponseField name="tokenUrl" type="string">
+          OAuth2 token URL
+        </ResponseField>
+        
+        <ResponseField name="scopes" type="array">
+          Required OAuth2 scopes
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="actions" type="array">
+  Available actions for this tool
+  
+  <Expandable title="Action Object">
+    <ResponseField name="id" type="string">
+      Action identifier
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Action name
+    </ResponseField>
+    
+    <ResponseField name="description" type="string">
+      What the action does
+    </ResponseField>
+    
+    <ResponseField name="parameters" type="array">
+      Required and optional parameters
+      
+      <Expandable title="Parameter Object">
+        <ResponseField name="name" type="string">
+          Parameter name
+        </ResponseField>
+        
+        <ResponseField name="type" type="string">
+          Parameter type: `string`, `number`, `boolean`, `object`, `array`
+        </ResponseField>
+        
+        <ResponseField name="required" type="boolean">
+          Whether the parameter is required
+        </ResponseField>
+        
+        <ResponseField name="description" type="string">
+          Parameter description
+        </ResponseField>
+        
+        <ResponseField name="default" type="any">
+          Default value if not provided
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="outputSchema" type="object">
+      Expected output format
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="configuration" type="object">
+  Current configuration (sensitive data excluded)
+</ResponseField>
+
+<ResponseField name="rateLimits" type="object">
+  Rate limiting information
+  
+  <Expandable title="Rate Limits">
+    <ResponseField name="requestsPerMinute" type="number">
+      Maximum requests per minute
+    </ResponseField>
+    
+    <ResponseField name="requestsPerHour" type="number">
+      Maximum requests per hour
+    </ResponseField>
+    
+    <ResponseField name="concurrentRequests" type="number">
+      Maximum concurrent requests
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="usage" type="object">
+  Detailed usage statistics
+  
+  <Expandable title="Usage Statistics">
+    <ResponseField name="totalExecutions" type="number">
+      Total number of executions
+    </ResponseField>
+    
+    <ResponseField name="successfulExecutions" type="number">
+      Number of successful executions
+    </ResponseField>
+    
+    <ResponseField name="failedExecutions" type="number">
+      Number of failed executions
+    </ResponseField>
+    
+    <ResponseField name="averageResponseTime" type="number">
+      Average response time in milliseconds
+    </ResponseField>
+    
+    <ResponseField name="lastDayExecutions" type="number">
+      Executions in the last 24 hours
+    </ResponseField>
+    
+    <ResponseField name="lastWeekExecutions" type="number">
+      Executions in the last 7 days
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="lastUsed" type="string">
+  ISO 8601 timestamp of last use
+</ResponseField>
+
+<ResponseField name="connectedAt" type="string">
+  ISO 8601 timestamp when connected
+</ResponseField>
+
+<ResponseField name="connectedBy" type="string">
+  User ID who connected the tool
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "id": "tool_slack_123",
+  "name": "Slack",
+  "description": "Slack is a messaging platform for teams. This integration allows you to send messages, create channels, upload files, and manage your Slack workspace programmatically.",
+  "category": "messaging",
+  "icon": "https://cdn.tolstoy.ai/icons/slack.png",
+  "status": "connected",
+  "authType": "oauth2",
+  "authConfig": {
+    "type": "oauth2",
+    "fields": [],
+    "oauth2Config": {
+      "authorizationUrl": "https://slack.com/oauth/v2/authorize",
+      "tokenUrl": "https://slack.com/api/oauth.v2.access",
+      "scopes": [
+        "chat:write",
+        "channels:read",
+        "channels:write",
+        "files:write",
+        "users:read"
+      ]
+    }
+  },
+  "actions": [
+    {
+      "id": "send_message",
+      "name": "Send Message",
+      "description": "Send a message to a Slack channel or user",
+      "parameters": [
+        {
+          "name": "channel",
+          "type": "string",
+          "required": true,
+          "description": "Channel ID or name (e.g., #general or @username)"
+        },
+        {
+          "name": "text",
+          "type": "string",
+          "required": true,
+          "description": "Message text to send"
+        },
+        {
+          "name": "blocks",
+          "type": "array",
+          "required": false,
+          "description": "Rich message blocks for advanced formatting"
+        },
+        {
+          "name": "thread_ts",
+          "type": "string",
+          "required": false,
+          "description": "Thread timestamp to reply to"
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "ts": { "type": "string" },
+          "channel": { "type": "string" },
+          "message": { "type": "object" }
+        }
+      }
+    },
+    {
+      "id": "create_channel",
+      "name": "Create Channel",
+      "description": "Create a new Slack channel",
+      "parameters": [
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "description": "Channel name (lowercase, no spaces)"
+        },
+        {
+          "name": "is_private",
+          "type": "boolean",
+          "required": false,
+          "description": "Whether the channel should be private",
+          "default": false
+        }
+      ],
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "ok": { "type": "boolean" },
+          "channel": { "type": "object" }
+        }
+      }
+    }
+  ],
+  "configuration": {
+    "workspace": "acme-corp",
+    "workspaceId": "T0123456789",
+    "defaultChannel": "#general",
+    "botUserId": "U0123456789"
+  },
+  "rateLimits": {
+    "requestsPerMinute": 60,
+    "requestsPerHour": 1000,
+    "concurrentRequests": 10
+  },
+  "usage": {
+    "totalExecutions": 1245,
+    "successfulExecutions": 1235,
+    "failedExecutions": 10,
+    "averageResponseTime": 150,
+    "lastDayExecutions": 42,
+    "lastWeekExecutions": 285
+  },
+  "lastUsed": "2024-01-15T10:00:00Z",
+  "connectedAt": "2023-06-01T00:00:00Z",
+  "connectedBy": "user_admin_123"
+}
+```
+</ResponseExample>
+
+<Snippet file="api-footer.mdx" />

@@ -1,0 +1,568 @@
+---
+title: "CLI Authentication"
+description: "Authenticate the Tolstoy CLI with your organization"
+---
+
+# CLI Authentication
+
+The Tolstoy CLI requires authentication to access your organization's workflows and resources. This guide covers all authentication methods and troubleshooting common issues.
+
+## Quick Start
+
+<Steps>
+  <Step title="Login Command">
+    Start the authentication process:
+    ```bash
+    tolstoy auth login
+    ```
+    This will open your default browser for OAuth authentication.
+  </Step>
+  
+  <Step title="Select Organization">
+    If you belong to multiple organizations:
+    ```bash
+    tolstoy org select
+    # or specify directly
+    tolstoy auth login --org-id org_abc123def456
+    ```
+  </Step>
+  
+  <Step title="Verify Authentication">
+    Check your authentication status:
+    ```bash
+    tolstoy auth verify
+    tolstoy org list
+    ```
+  </Step>
+</Steps>
+
+## Authentication Methods
+
+### OAuth (Recommended)
+
+**Interactive Login**:
+```bash
+tolstoy auth login
+```
+
+This method:
+- Opens browser for secure OAuth flow
+- Uses same login as web dashboard
+- Supports SSO (Google, Microsoft, SAML)
+- Automatically handles token refresh
+
+**Direct Organization Login**:
+```bash
+tolstoy auth login --org-id org_abc123def456
+```
+
+### API Token Authentication
+
+**For CI/CD and Automation**:
+```bash
+# Set via environment variable
+export TOLSTOY_TOKEN="your-api-token"
+
+# Or specify in config file
+tolstoy config set token "your-api-token"
+
+# Verify token works
+tolstoy auth verify --token
+```
+
+**Generate API Token**:
+1. Go to Dashboard → Settings → API Keys
+2. Click "Generate New Token"
+3. Copy token immediately (shown only once)
+4. Store securely in your automation system
+
+### Service Account Authentication
+
+**For Production Systems**:
+```bash
+# Create service account
+tolstoy auth create-service-account \
+  --name "CI/CD Pipeline" \
+  --permissions "workflows:execute,actions:read"
+
+# Authenticate with service account
+tolstoy auth login --service-account service_abc123 \
+  --key-file /path/to/service-key.json
+```
+
+## Configuration Management
+
+### Configuration File
+
+The CLI stores configuration in `~/.tolstoy/config.yaml`:
+
+```yaml
+# Authentication settings
+auth:
+  type: "oauth"  # oauth, token, service_account
+  org_id: "org_abc123def456"
+  user_id: "user_xyz789abc"
+  token_file: "~/.tolstoy/token"
+
+# Default settings
+defaults:
+  output: "table"
+  timeout: 30
+  retry_attempts: 3
+
+# API configuration
+api:
+  base_url: "https://tolstoy.getpullse.com"
+  timeout: 30
+```
+
+### Environment Variables
+
+Override configuration with environment variables:
+
+```bash
+# Authentication
+export TOLSTOY_ORG_ID="org_abc123def456"
+export TOLSTOY_USER_ID="user_xyz789abc"  
+export TOLSTOY_TOKEN="your-api-token"
+
+# API settings
+export TOLSTOY_API_URL="https://custom.tolstoy.com"
+export TOLSTOY_TIMEOUT="60"
+
+# Output preferences
+export TOLSTOY_OUTPUT="json"
+export TOLSTOY_NO_COLOR="true"
+```
+
+### Configuration Commands
+
+**View Configuration**:
+```bash
+tolstoy config show
+tolstoy config get auth.org_id
+```
+
+**Update Configuration**:
+```bash
+tolstoy config set defaults.output json
+tolstoy config set api.timeout 60
+```
+
+**Reset Configuration**:
+```bash
+tolstoy config reset
+# or delete specific setting
+tolstoy config unset defaults.output
+```
+
+## Organization Management
+
+### List Organizations
+
+```bash
+tolstoy org list
+
+# Example output:
+┌─────────────────────┬──────────────────────┬─────────────┬────────────┐
+│ ID                  │ Name                 │ Role        │ Status     │
+├─────────────────────┼──────────────────────┼─────────────┼────────────┤
+│ org_abc123def456    │ Acme Corp            │ admin       │ active     │
+│ org_def456ghi789    │ Startup Inc          │ member      │ active     │
+│ org_ghi789jkl012    │ Freelance Projects   │ admin       │ active     │
+└─────────────────────┴──────────────────────┴─────────────┴────────────┘
+```
+
+### Switch Organizations
+
+```bash
+# Interactive selection
+tolstoy org select
+
+# Direct selection
+tolstoy org select org_def456ghi789
+
+# Temporarily override for one command
+tolstoy --org-id org_def456ghi789 actions list
+```
+
+### Organization Info
+
+```bash
+tolstoy org info
+
+# Example output:
+Organization: Acme Corp (org_abc123def456)
+Role: Administrator
+Members: 15 users
+Plan: Professional
+Usage: 1,247 executions this month
+API Limits: 10,000 requests/hour
+```
+
+## Token Management
+
+### Token Storage
+
+Tokens are securely stored based on your operating system:
+
+**macOS**: Keychain (secure)
+```bash
+# View token location
+tolstoy auth info
+# Token stored in: macOS Keychain
+```
+
+**Linux**: Encrypted file
+```bash
+# Token file location
+~/.tolstoy/tokens/org_abc123def456.enc
+```
+
+**Windows**: Windows Credential Store
+```bash
+# Stored in Windows Credential Manager
+# Application: Tolstoy CLI
+```
+
+### Token Refresh
+
+**Automatic Refresh**:
+```bash
+# Tokens are automatically refreshed when they expire
+tolstoy actions list  # Auto-refreshes if needed
+```
+
+**Manual Refresh**:
+```bash
+tolstoy auth refresh
+```
+
+**Force Re-authentication**:
+```bash
+tolstoy auth login --force
+```
+
+## Multi-Environment Setup
+
+### Different Environments
+
+Configure separate authentication for different environments:
+
+```bash
+# Production
+tolstoy auth login --org-id org_prod_123 --profile production
+
+# Staging  
+tolstoy auth login --org-id org_stage_456 --profile staging
+
+# Development
+tolstoy auth login --org-id org_dev_789 --profile development
+```
+
+### Profile Management
+
+**Use Specific Profile**:
+```bash
+# Use production profile
+tolstoy --profile production actions list
+
+# Set default profile
+tolstoy config set defaults.profile production
+```
+
+**Profile Configuration**:
+```yaml
+# ~/.tolstoy/profiles.yaml
+profiles:
+  production:
+    org_id: "org_prod_123"
+    api_url: "https://api.tolstoy.com"
+    timeout: 30
+    
+  staging:
+    org_id: "org_stage_456" 
+    api_url: "https://staging-api.tolstoy.com"
+    timeout: 60
+    
+  development:
+    org_id: "org_dev_789"
+    api_url: "https://dev-api.tolstoy.com"
+    timeout: 120
+```
+
+## CI/CD Integration
+
+### GitHub Actions
+
+```yaml
+name: Deploy Workflows
+on: [push]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Setup Tolstoy CLI
+        run: |
+          npm install -g @tolstoy/cli
+          
+      - name: Authenticate
+        run: |
+          tolstoy auth login --token ${{ secrets.TOLSTOY_TOKEN }}
+          tolstoy org select ${{ secrets.TOLSTOY_ORG_ID }}
+          
+      - name: Deploy
+        run: |
+          tolstoy workflows deploy --from-file ./workflows/
+```
+
+### GitLab CI
+
+```yaml
+deploy:
+  stage: deploy
+  script:
+    - npm install -g @tolstoy/cli
+    - tolstoy auth login --token $TOLSTOY_TOKEN
+    - tolstoy org select $TOLSTOY_ORG_ID
+    - tolstoy workflows deploy --from-file ./workflows/
+  variables:
+    TOLSTOY_TOKEN: $CI_TOLSTOY_TOKEN
+    TOLSTOY_ORG_ID: $CI_TOLSTOY_ORG_ID
+```
+
+### Docker
+
+```dockerfile
+FROM node:18-alpine
+
+# Install Tolstoy CLI
+RUN npm install -g @tolstoy/cli
+
+# Set authentication via environment
+ENV TOLSTOY_TOKEN=${TOLSTOY_TOKEN}
+ENV TOLSTOY_ORG_ID=${TOLSTOY_ORG_ID}
+
+# Verify authentication on startup
+RUN tolstoy auth verify
+
+COPY workflows/ /app/workflows/
+WORKDIR /app
+
+CMD ["tolstoy", "workflows", "deploy", "--from-file", "./workflows/"]
+```
+
+## Security Best Practices
+
+### Token Security
+
+<CardGroup cols={2}>
+  <Card title="Secure Storage" icon="lock">
+    - Use OS credential stores when possible
+    - Never commit tokens to version control
+    - Rotate tokens regularly (every 90 days)
+    - Use service accounts for automation
+  </Card>
+  
+  <Card title="Access Control" icon="shield">
+    - Generate tokens with minimal required permissions
+    - Use separate tokens for different environments
+    - Monitor token usage in audit logs
+    - Revoke unused or compromised tokens
+  </Card>
+</CardGroup>
+
+### Environment Separation
+
+```bash
+# ✅ Good: Separate tokens for each environment
+TOLSTOY_PROD_TOKEN="prod-token-here"
+TOLSTOY_STAGING_TOKEN="staging-token-here"
+
+# ❌ Bad: Same token for all environments
+TOLSTOY_TOKEN="shared-token-here"
+```
+
+### Token Permissions
+
+```bash
+# Create token with limited permissions
+tolstoy auth create-token \
+  --name "CI/CD Pipeline" \
+  --permissions "workflows:deploy,actions:read" \
+  --expires-in "90d"
+```
+
+## Troubleshooting
+
+### Common Authentication Issues
+
+<AccordionGroup>
+  <Accordion title="Token Expired or Invalid">
+    **Error**: `Authentication failed: invalid token`
+    
+    **Solutions**:
+    ```bash
+    # Refresh token
+    tolstoy auth refresh
+    
+    # Re-authenticate
+    tolstoy auth login --force
+    
+    # Verify token
+    tolstoy auth verify
+    
+    # Check token expiration
+    tolstoy auth info
+    ```
+  </Accordion>
+  
+  <Accordion title="Organization Access Denied">
+    **Error**: `Access denied to organization`
+    
+    **Solutions**:
+    ```bash
+    # Check available organizations
+    tolstoy org list
+    
+    # Verify current organization
+    tolstoy org info
+    
+    # Switch to correct organization
+    tolstoy org select correct_org_id
+    
+    # Check user permissions
+    tolstoy auth whoami
+    ```
+  </Accordion>
+  
+  <Accordion title="Browser Authentication Issues">
+    **Error**: `Failed to open browser` or authentication timeout
+    
+    **Solutions**:
+    ```bash
+    # Use device code flow instead
+    tolstoy auth login --device-code
+    
+    # Manual browser specification
+    tolstoy auth login --browser firefox
+    
+    # Use API token instead
+    tolstoy auth login --token your-token
+    
+    # Check system browser settings
+    echo $BROWSER
+    ```
+  </Accordion>
+  
+  <Accordion title="Network/Proxy Issues">
+    **Error**: `Connection timeout` or `Network error`
+    
+    **Solutions**:
+    ```bash
+    # Configure proxy
+    tolstoy config set api.proxy http://proxy:8080
+    
+    # Use custom API URL
+    tolstoy config set api.base_url https://custom.tolstoy.com
+    
+    # Increase timeout
+    tolstoy config set api.timeout 120
+    
+    # Test connectivity
+    tolstoy health check
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Debug Mode
+
+Enable debug logging for authentication issues:
+
+```bash
+# Enable debug mode
+export TOLSTOY_DEBUG=true
+tolstoy auth login
+
+# Or use debug flag
+tolstoy --debug auth login
+
+# Verbose output
+tolstoy -vvv auth verify
+```
+
+### Reset Authentication
+
+**Complete Reset**:
+```bash
+# Clear all authentication data
+tolstoy auth logout --all
+
+# Remove configuration
+rm -rf ~/.tolstoy/
+
+# Fresh start
+tolstoy auth login
+```
+
+**Selective Reset**:
+```bash
+# Logout from current organization
+tolstoy auth logout
+
+# Clear just tokens
+tolstoy auth clear-tokens
+
+# Reset specific profile
+tolstoy auth logout --profile staging
+```
+
+## Advanced Configuration
+
+### Custom API Endpoints
+
+```bash
+# Self-hosted Tolstoy instance
+tolstoy config set api.base_url https://tolstoy.yourcompany.com
+
+# Development API
+tolstoy config set api.base_url https://localhost:3000
+```
+
+### Request Configuration
+
+```bash
+# Increase timeout for slow networks
+tolstoy config set api.timeout 120
+
+# Configure retry behavior
+tolstoy config set api.retry_attempts 5
+tolstoy config set api.retry_delay 2000
+
+# Custom user agent
+tolstoy config set api.user_agent "MyCompany-CI/1.0"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="CLI Configuration" icon="gear" href="/cli/configuration">
+    Configure CLI settings and preferences
+  </Card>
+  <Card title="First Commands" icon="play" href="/cli/commands">
+    Start using CLI commands
+  </Card>
+  <Card title="Organization Setup" icon="building" href="/public/product/organizations/overview">
+    Set up your organization
+  </Card>
+  <Card title="Security Guide" icon="shield" href="/public/product/getting-started/authentication">
+    Learn about security best practices
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="cli-footer.mdx" />

@@ -1,0 +1,378 @@
+---
+title: "Create Execution Log"
+api: "POST /execution-logs"
+description: "Create a log entry for workflow step execution"
+---
+
+## Overview
+
+The Create Execution Log endpoint creates a log entry for workflow step execution. This tracks the execution history, inputs, outputs, and any errors for audit trail and debugging purposes.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Request Body
+
+<ParamField body="flowId" type="string" required>
+  The unique identifier of the workflow flow
+</ParamField>
+
+<ParamField body="executionId" type="string" required>
+  The unique identifier of the workflow execution
+</ParamField>
+
+<ParamField body="stepKey" type="string" required>
+  The key/identifier of the workflow step being logged
+</ParamField>
+
+<ParamField body="inputs" type="object" required>
+  Input data and configuration for the step execution
+  
+  <Expandable title="Step Inputs">
+    <ParamField body="stepName" type="string">
+      Human-readable name of the step
+    </ParamField>
+    
+    <ParamField body="stepType" type="string">
+      Type of step: "action", "condition", "loop", "transform"
+    </ParamField>
+    
+    <ParamField body="config" type="object">
+      Step configuration parameters
+    </ParamField>
+    
+    <ParamField body="variables" type="object">
+      Variable values available to the step
+    </ParamField>
+    
+    <ParamField body="stepOutputs" type="object">
+      Outputs from previous steps
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="outputs" type="object">
+  Output data produced by the step execution (optional for initial log creation)
+</ParamField>
+
+<ParamField body="error" type="object">
+  Error information if step execution failed (optional)
+  
+  <Expandable title="Error Object">
+    <ParamField body="message" type="string">
+      Error message
+    </ParamField>
+    
+    <ParamField body="code" type="string">
+      Error code identifier
+    </ParamField>
+    
+    <ParamField body="stack" type="string">
+      Stack trace (if available)
+    </ParamField>
+    
+    <ParamField body="details" type="object">
+      Additional error context
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="status" type="string" required>
+  Current execution status: "pending", "running", "completed", "failed", "skipped"
+</ParamField>
+
+<ParamField body="duration" type="number">
+  Execution duration in milliseconds (optional)
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Additional metadata for the execution log
+</ParamField>
+
+## Response
+
+**Status Code:** `201 Created`
+
+<ResponseField name="id" type="string">
+  Unique identifier for the execution log entry
+</ResponseField>
+
+<ResponseField name="flowId" type="string">
+  The workflow flow ID
+</ResponseField>
+
+<ResponseField name="executionId" type="string">
+  The workflow execution ID
+</ResponseField>
+
+<ResponseField name="stepKey" type="string">
+  The workflow step key
+</ResponseField>
+
+<ResponseField name="inputs" type="object">
+  Input data and configuration for the step
+</ResponseField>
+
+<ResponseField name="outputs" type="object">
+  Output data produced by the step (null if not yet completed)
+</ResponseField>
+
+<ResponseField name="error" type="object">
+  Error information if execution failed (null if successful)
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current execution status
+</ResponseField>
+
+<ResponseField name="duration" type="number">
+  Execution duration in milliseconds (null if not completed)
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Additional metadata for the execution log
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO timestamp when the log entry was created
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO timestamp when the log entry was last updated
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid execution log data
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Field-specific validation errors
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - Log entry already exists for this step execution
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "https://api.tolstoy.com/v1/execution-logs" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "flowId": "flow_abc123",
+    "executionId": "exec_xyz789",
+    "stepKey": "send_notification",
+    "inputs": {
+      "stepName": "Send Slack Notification",
+      "stepType": "action",
+      "config": {
+        "actionKey": "slack_send_message",
+        "parameters": {
+          "channel": "#general",
+          "message": "Workflow completed successfully"
+        }
+      },
+      "variables": {
+        "userId": "user_123",
+        "timestamp": "2024-01-15T10:30:00Z"
+      },
+      "stepOutputs": {
+        "previousStepResult": "success"
+      }
+    },
+    "status": "pending"
+  }'
+```
+
+```javascript JavaScript
+const logEntry = await fetch('/api/v1/execution-logs', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    flowId: 'flow_abc123',
+    executionId: 'exec_xyz789',
+    stepKey: 'send_notification',
+    inputs: {
+      stepName: 'Send Slack Notification',
+      stepType: 'action',
+      config: {
+        actionKey: 'slack_send_message',
+        parameters: {
+          channel: '#general',
+          message: 'Workflow completed successfully'
+        }
+      },
+      variables: {
+        userId: 'user_123',
+        timestamp: '2024-01-15T10:30:00Z'
+      },
+      stepOutputs: {
+        previousStepResult: 'success'
+      }
+    },
+    status: 'pending'
+  })
+});
+
+const logData = await logEntry.json();
+console.log('Execution log created:', logData.id);
+```
+
+```python Python
+import requests
+
+log_data = {
+    "flowId": "flow_abc123",
+    "executionId": "exec_xyz789",
+    "stepKey": "send_notification",
+    "inputs": {
+        "stepName": "Send Slack Notification",
+        "stepType": "action",
+        "config": {
+            "actionKey": "slack_send_message",
+            "parameters": {
+                "channel": "#general",
+                "message": "Workflow completed successfully"
+            }
+        },
+        "variables": {
+            "userId": "user_123",
+            "timestamp": "2024-01-15T10:30:00Z"
+        },
+        "stepOutputs": {
+            "previousStepResult": "success"
+        }
+    },
+    "status": "pending"
+}
+
+response = requests.post(
+    "https://api.tolstoy.com/v1/execution-logs",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json=log_data
+)
+
+if response.status_code == 201:
+    log_entry = response.json()
+    print(f"Execution log created: {log_entry['id']}")
+else:
+    print(f"Error: {response.json()}")
+```
+
+</CodeGroup>
+
+## Step Types and Logging
+
+Different step types require different logging approaches:
+
+### Action Steps
+```json
+{
+  "stepType": "action",
+  "config": {
+    "actionKey": "slack_send_message",
+    "parameters": {...}
+  },
+  "inputs": {...},
+  "outputs": {
+    "messageId": "msg_456",
+    "success": true
+  }
+}
+```
+
+### Condition Steps
+```json
+{
+  "stepType": "condition",
+  "config": {
+    "condition": "user.role == 'admin'"
+  },
+  "outputs": {
+    "result": true,
+    "evaluatedCondition": "user.role == 'admin'"
+  }
+}
+```
+
+### Transform Steps
+```json
+{
+  "stepType": "transform",
+  "config": {
+    "transformations": [...]
+  },
+  "outputs": {
+    "transformedData": {...}
+  }
+}
+```
+
+## Status Lifecycle
+
+Execution logs typically follow this status progression:
+1. `pending` - Step is queued for execution
+2. `running` - Step is currently executing
+3. `completed` - Step completed successfully
+4. `failed` - Step failed with error
+5. `skipped` - Step was skipped due to conditions
+
+## Use Cases
+
+### Audit Trail
+- Track all step executions for compliance
+- Provide detailed execution history
+- Debug workflow issues
+
+### Performance Monitoring
+- Monitor step execution times
+- Identify bottlenecks in workflows
+- Track resource usage patterns
+
+### Error Tracking
+- Capture and analyze execution failures
+- Provide context for debugging
+- Track error patterns over time
+
+## Related Endpoints
+
+- [List Execution Logs](/api/endpoints/execution-logs/list-logs) - Retrieve execution logs
+- [Get Execution Log](/api/endpoints/execution-logs/get-log) - Get specific log entry
+- [Update Execution Log](/api/endpoints/execution-logs/update-execution-log) - Update log entry
+- [Delete Execution Log](/api/endpoints/execution-logs/delete-execution-log) - Remove log entry

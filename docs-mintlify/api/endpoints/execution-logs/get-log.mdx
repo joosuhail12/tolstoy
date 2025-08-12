@@ -1,0 +1,176 @@
+---
+title: "Get Execution Log"
+api: "GET /execution-logs/{id}"
+description: "Retrieve detailed information about a specific execution log"
+---
+
+## Overview
+
+The Get Execution Log endpoint returns comprehensive details about a specific execution log, including full output, error traces, and step-by-step execution details.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the execution log
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the execution log
+</ResponseField>
+
+<ResponseField name="type" type="string">
+  Type of execution: `action` or `flow`
+</ResponseField>
+
+<ResponseField name="executionId" type="string">
+  ID of the associated execution
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Execution status: `success`, `failure`, `running`, `cancelled`
+</ResponseField>
+
+<ResponseField name="startTime" type="string">
+  ISO 8601 timestamp when execution started
+</ResponseField>
+
+<ResponseField name="endTime" type="string">
+  ISO 8601 timestamp when execution completed
+</ResponseField>
+
+<ResponseField name="duration" type="number">
+  Execution duration in milliseconds
+</ResponseField>
+
+<ResponseField name="input" type="object">
+  Input parameters provided to the execution
+</ResponseField>
+
+<ResponseField name="output" type="object">
+  Output data from the execution
+</ResponseField>
+
+<ResponseField name="steps" type="array">
+  Detailed step-by-step execution trace
+  
+  <Expandable title="Step Object">
+    <ResponseField name="stepId" type="string">
+      Unique identifier for the step
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Name of the step
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Step execution status
+    </ResponseField>
+    
+    <ResponseField name="startTime" type="string">
+      When the step started
+    </ResponseField>
+    
+    <ResponseField name="endTime" type="string">
+      When the step completed
+    </ResponseField>
+    
+    <ResponseField name="output" type="any">
+      Step output data
+    </ResponseField>
+    
+    <ResponseField name="error" type="object">
+      Error details if step failed
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="error" type="object">
+  Error details if execution failed
+  
+  <Expandable title="Error Object">
+    <ResponseField name="message" type="string">
+      Error message
+    </ResponseField>
+    
+    <ResponseField name="code" type="string">
+      Error code
+    </ResponseField>
+    
+    <ResponseField name="stack" type="string">
+      Stack trace (if available)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Additional metadata about the execution
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "id": "log_abc123",
+  "type": "flow",
+  "executionId": "exec_xyz789",
+  "status": "success",
+  "startTime": "2024-01-15T10:30:00Z",
+  "endTime": "2024-01-15T10:30:45Z",
+  "duration": 45000,
+  "input": {
+    "userId": "user_123",
+    "action": "processOrder",
+    "orderId": "order_456"
+  },
+  "output": {
+    "success": true,
+    "processedItems": 5,
+    "totalAmount": 150.00
+  },
+  "steps": [
+    {
+      "stepId": "step_1",
+      "name": "Validate Order",
+      "status": "success",
+      "startTime": "2024-01-15T10:30:00Z",
+      "endTime": "2024-01-15T10:30:05Z",
+      "output": {
+        "valid": true
+      },
+      "error": null
+    },
+    {
+      "stepId": "step_2",
+      "name": "Process Payment",
+      "status": "success",
+      "startTime": "2024-01-15T10:30:05Z",
+      "endTime": "2024-01-15T10:30:20Z",
+      "output": {
+        "transactionId": "txn_789"
+      },
+      "error": null
+    },
+    {
+      "stepId": "step_3",
+      "name": "Update Inventory",
+      "status": "success",
+      "startTime": "2024-01-15T10:30:20Z",
+      "endTime": "2024-01-15T10:30:45Z",
+      "output": {
+        "updated": true
+      },
+      "error": null
+    }
+  ],
+  "error": null,
+  "metadata": {
+    "source": "api",
+    "triggeredBy": "user_789",
+    "environment": "production"
+  }
+}
+```
+</ResponseExample>
+
+<Snippet file="api-footer.mdx" />

@@ -1,0 +1,399 @@
+---
+title: "Test Webhook"
+api: "POST /webhooks/{id}/test"
+description: "Send a test event to a webhook endpoint to verify connectivity and configuration"
+---
+
+## Overview
+
+The Test Webhook endpoint allows you to send a test event to a configured webhook endpoint to verify that it's properly configured and accessible. This is useful for debugging webhook issues and confirming setup.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the webhook to test
+</ParamField>
+
+## Request Body
+
+<ParamField body="eventType" type="string">
+  Type of test event to send (defaults to "webhook.test")
+</ParamField>
+
+<ParamField body="testData" type="object">
+  Custom test data to include in the webhook payload
+</ParamField>
+
+<ParamField body="timeout" type="number">
+  Request timeout in seconds (1-30, defaults to 10)
+</ParamField>
+
+<ParamField body="followRedirects" type="boolean">
+  Whether to follow HTTP redirects (defaults to true)
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="success" type="boolean">
+  Whether the test webhook was delivered successfully
+</ResponseField>
+
+<ResponseField name="webhookId" type="string">
+  The ID of the webhook that was tested
+</ResponseField>
+
+<ResponseField name="testId" type="string">
+  Unique identifier for this test execution
+</ResponseField>
+
+<ResponseField name="deliveryAttempt" type="object">
+  Details about the delivery attempt
+  
+  <Expandable title="Delivery Attempt">
+    <ResponseField name="url" type="string">
+      The webhook URL that was called
+    </ResponseField>
+    
+    <ResponseField name="method" type="string">
+      HTTP method used (typically POST)
+    </ResponseField>
+    
+    <ResponseField name="statusCode" type="number">
+      HTTP status code returned by the webhook endpoint
+    </ResponseField>
+    
+    <ResponseField name="responseTime" type="number">
+      Response time in milliseconds
+    </ResponseField>
+    
+    <ResponseField name="responseHeaders" type="object">
+      Headers returned by the webhook endpoint
+    </ResponseField>
+    
+    <ResponseField name="responseBody" type="string">
+      Response body (truncated to first 1KB)
+    </ResponseField>
+    
+    <ResponseField name="sentAt" type="string">
+      ISO timestamp when the request was sent
+    </ResponseField>
+    
+    <ResponseField name="receivedAt" type="string">
+      ISO timestamp when the response was received
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="testPayload" type="object">
+  The exact payload that was sent to the webhook
+  
+  <Expandable title="Test Payload Structure">
+    <ResponseField name="event" type="string">
+      Event type (e.g., "webhook.test")
+    </ResponseField>
+    
+    <ResponseField name="timestamp" type="string">
+      ISO timestamp of the test event
+    </ResponseField>
+    
+    <ResponseField name="webhookId" type="string">
+      ID of the webhook being tested
+    </ResponseField>
+    
+    <ResponseField name="testId" type="string">
+      Unique test execution ID
+    </ResponseField>
+    
+    <ResponseField name="data" type="object">
+      Test data included in the payload
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid parameters or webhook configuration
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Additional error context
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="404" type="object">
+  Not Found - Webhook does not exist
+</ResponseField>
+
+<ResponseField name="422" type="object">
+  Unprocessable Entity - Webhook delivery failed
+  
+  <Expandable title="Delivery Failure">
+    <ResponseField name="error" type="string">
+      "WEBHOOK_DELIVERY_FAILED"
+    </ResponseField>
+    
+    <ResponseField name="deliveryAttempt" type="object">
+      Details about the failed delivery attempt
+    </ResponseField>
+    
+    <ResponseField name="failureReason" type="string">
+      Reason for delivery failure
+    </ResponseField>
+    
+    <ResponseField name="suggestions" type="array">
+      Suggested fixes for common issues
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL Basic Test
+curl -X POST "https://api.tolstoy.com/v1/webhooks/webhook_abc123/test" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+```bash cURL Custom Test
+curl -X POST "https://api.tolstoy.com/v1/webhooks/webhook_abc123/test" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "eventType": "workflow.completed",
+    "testData": {
+      "workflowId": "workflow_test123",
+      "status": "completed",
+      "duration": 45.2
+    },
+    "timeout": 15
+  }'
+```
+
+```javascript JavaScript
+// Basic webhook test
+const basicTest = await fetch('/api/v1/webhooks/webhook_abc123/test', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({})
+});
+
+const basicResult = await basicTest.json();
+if (basicResult.success) {
+  console.log(`Webhook test successful! Response time: ${basicResult.deliveryAttempt.responseTime}ms`);
+} else {
+  console.error('Webhook test failed:', basicResult.failureReason);
+}
+
+// Custom test with specific event type
+const customTest = await fetch('/api/v1/webhooks/webhook_abc123/test', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    eventType: 'workflow.completed',
+    testData: {
+      workflowId: 'workflow_test123',
+      status: 'completed',
+      duration: 45.2
+    },
+    timeout: 15
+  })
+});
+```
+
+```python Python
+import requests
+
+# Basic webhook test
+basic_response = requests.post(
+    "https://api.tolstoy.com/v1/webhooks/webhook_abc123/test",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json={}
+)
+
+if basic_response.status_code == 200:
+    result = basic_response.json()
+    if result['success']:
+        response_time = result['deliveryAttempt']['responseTime']
+        print(f"Webhook test successful! Response time: {response_time}ms")
+    else:
+        print(f"Webhook test failed: {result.get('failureReason', 'Unknown error')}")
+
+# Custom test with specific event type
+custom_response = requests.post(
+    "https://api.tolstoy.com/v1/webhooks/webhook_abc123/test",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json={
+        "eventType": "workflow.completed",
+        "testData": {
+            "workflowId": "workflow_test123",
+            "status": "completed",
+            "duration": 45.2
+        },
+        "timeout": 15
+    }
+)
+```
+
+</CodeGroup>
+
+## Test Event Types
+
+You can specify different event types for testing:
+
+- `webhook.test` (default) - Generic test event
+- `workflow.started` - Simulates workflow start
+- `workflow.completed` - Simulates workflow completion
+- `workflow.failed` - Simulates workflow failure
+- `execution.step_completed` - Simulates step completion
+- `tool.connected` - Simulates tool connection
+- `organization.updated` - Simulates organization change
+
+## Response Analysis
+
+### Success Indicators
+- `success: true` - Webhook endpoint is reachable and responding
+- Status codes 200-299 - Generally considered successful
+- Response time < 5000ms - Good performance
+
+### Warning Signs
+- Status codes 300-399 - Redirects (may indicate configuration issues)
+- Response time > 5000ms - Slow response (may cause timeouts in production)
+- Non-standard response format - May indicate endpoint issues
+
+### Failure Indicators
+- `success: false` - Webhook delivery failed
+- Status codes 400-599 - Client or server errors
+- Network timeouts - Unreachable endpoint
+- SSL/TLS errors - Certificate or security issues
+
+## Common Test Failures
+
+<CodeGroup>
+
+```json Connection Timeout
+{
+  "success": false,
+  "error": "WEBHOOK_DELIVERY_FAILED",
+  "failureReason": "Connection timeout after 10 seconds",
+  "suggestions": [
+    "Check if the webhook URL is accessible",
+    "Verify firewall settings allow incoming connections",
+    "Consider increasing timeout value"
+  ]
+}
+```
+
+```json SSL Certificate Error
+{
+  "success": false,
+  "error": "WEBHOOK_DELIVERY_FAILED",
+  "failureReason": "SSL certificate verification failed",
+  "suggestions": [
+    "Ensure SSL certificate is valid and not expired",
+    "Check certificate chain completeness",
+    "Verify hostname matches certificate"
+  ]
+}
+```
+
+```json HTTP Error Response
+{
+  "success": false,
+  "deliveryAttempt": {
+    "statusCode": 404,
+    "responseBody": "Not Found",
+    "responseTime": 150
+  },
+  "failureReason": "HTTP 404: Endpoint not found",
+  "suggestions": [
+    "Verify the webhook URL path is correct",
+    "Check if the endpoint handler is deployed",
+    "Ensure the HTTP method (POST) is supported"
+  ]
+}
+```
+
+</CodeGroup>
+
+## Security Headers
+
+Test webhook requests include security headers:
+- `X-Tolstoy-Signature` - HMAC signature for request verification
+- `X-Tolstoy-Timestamp` - Request timestamp
+- `X-Tolstoy-Test` - Header indicating this is a test request
+- `User-Agent` - Identifies requests from Tolstoy
+
+## Rate Limiting
+
+Webhook testing is rate limited:
+- **5 tests per minute** per webhook
+- **20 tests per hour** per organization
+- **100 tests per day** per organization
+
+Exceeding these limits returns a `429 Too Many Requests` error.
+
+## Best Practices
+
+1. **Test after setup** - Always test webhooks after initial configuration
+2. **Test after changes** - Retest when modifying webhook settings or endpoint
+3. **Monitor response times** - Ensure endpoints respond quickly
+4. **Validate signatures** - Verify your endpoint validates Tolstoy signatures
+5. **Handle retries** - Ensure idempotent handling of webhook events
+
+## Related Endpoints
+
+- [Create Webhook](/api/endpoints/webhooks/create-webhook) - Set up new webhook
+- [Update Webhook](/api/endpoints/webhooks/update-webhook) - Modify webhook configuration
+- [List Webhooks](/api/endpoints/webhooks/list-webhooks) - View all webhooks
+- [Toggle Webhook](/api/endpoints/webhooks/toggle-webhook) - Enable/disable webhook

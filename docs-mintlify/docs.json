@@ -1,0 +1,377 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Tolstoy Documentation",
+  "description": "Comprehensive documentation for the Tolstoy workflow automation platform",
+  "logo": {
+    "dark": "/images/logo-dark.svg",
+    "light": "/images/logo-light.svg",
+    "href": "https://tolstoy.getpullse.com"
+  },
+  "favicon": "/favicon.ico",
+  "colors": {
+    "primary": "#3B82F6",
+    "light": "#EFF6FF",
+    "dark": "#1E3A8A"
+  },
+  "topbarLinks": [
+    {
+      "name": "Support",
+      "url": "mailto:support@tolstoy.com"
+    }
+  ],
+  "topbarCtaButton": {
+    "name": "Dashboard",
+    "url": "https://tolstoy.getpullse.com"
+  },
+  "navigation": {
+    "dropdowns": [
+      {
+        "dropdown": "Product",
+        "icon": "rocket",
+        "description": "User guides and feature documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "public/product/index",
+              "public/product/getting-started/installation",
+              "public/product/getting-started/first-workflow",
+              "public/product/getting-started/authentication",
+              "public/product/getting-started/basic-concepts"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "public/product/organizations/overview",
+              "public/product/users/overview", 
+              "public/product/tools/overview",
+              "public/product/tools/auth-types/overview",
+              "public/product/actions/overview",
+              "public/product/actions/http-methods/overview",
+              "public/product/flows/overview",
+              "public/product/flows/flow-steps/overview",
+              "public/product/flows/patterns",
+              "public/product/webhooks/overview",
+              "public/product/execution-logs/overview",
+              "public/product/integrations/overview"
+            ]
+          },
+          {
+            "group": "Use Cases",
+            "pages": [
+              "public/product/use-cases/payment-automation",
+              "public/product/use-cases/data-synchronization",
+              "public/product/use-cases/notification-systems",
+              "public/product/use-cases/ci-cd-automation",
+              "public/product/use-cases/customer-onboarding",
+              "public/product/use-cases/ecommerce-automation",
+              "public/product/use-cases/fintech-automation",
+              "public/product/use-cases/healthcare-automation"
+            ]
+          },
+          {
+            "group": "Optimization & Scaling",
+            "pages": [
+              "public/product/optimization/performance",
+              "public/product/optimization/scaling",
+              "public/product/troubleshooting/overview"
+            ]
+          },
+          {
+            "group": "Tutorials",
+            "pages": [
+              "public/product/tutorials/getting-started",
+              "public/product/tutorials/advanced-patterns",
+              "public/product/tutorials/production-setup"
+            ]
+          },
+          {
+            "group": "Enterprise",
+            "pages": [
+              "public/product/enterprise/rate-limiting",
+              "public/product/enterprise/advanced-auth"
+            ]
+          }
+        ]
+      },
+      {
+        "dropdown": "API Reference", 
+        "icon": "code",
+        "description": "Complete REST API documentation",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api/index"
+            ]
+          },
+          {
+            "group": "Actions",
+            "pages": [
+              "api/endpoints/actions/create-action",
+              "api/endpoints/actions/list-actions", 
+              "api/endpoints/actions/get-action",
+              "api/endpoints/actions/execute-action",
+              "api/endpoints/actions/update-action",
+              "api/endpoints/actions/delete-action"
+            ]
+          },
+          {
+            "group": "Tools",
+            "pages": [
+              "api/endpoints/tools/create-tool",
+              "api/endpoints/tools/list-tools",
+              "api/endpoints/tools/get-tool",
+              "api/endpoints/tools/update-tool",
+              "api/endpoints/tools/delete-tool"
+            ]
+          },
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/endpoints/auth/oauth-login",
+              "api/endpoints/auth/oauth-callback"
+            ]
+          },
+          {
+            "group": "Tool Authentication",
+            "pages": [
+              "api/endpoints/tools/auth/create-tool-auth"
+            ]
+          },
+          {
+            "group": "Tool Secrets",
+            "pages": [
+              "api/endpoints/tools/secrets/create-tool-secret"
+            ]
+          },
+          {
+            "group": "Flows",
+            "pages": [
+              "api/endpoints/flows/create-flow",
+              "api/endpoints/flows/list-flows",
+              "api/endpoints/flows/get-flow",
+              "api/endpoints/flows/execute-flow",
+              "api/endpoints/flows/update-flow",
+              "api/endpoints/flows/delete-flow"
+            ]
+          },
+          {
+            "group": "Execution Logs",
+            "pages": [
+              "api/endpoints/execution-logs/create-execution-log",
+              "api/endpoints/execution-logs/list-logs",
+              "api/endpoints/execution-logs/get-log",
+              "api/endpoints/execution-logs/update-execution-log",
+              "api/endpoints/execution-logs/delete-execution-log"
+            ]
+          },
+          {
+            "group": "Execution Management",
+            "pages": [
+              "api/endpoints/executions/cancel-execution",
+              "api/endpoints/executions/retry-execution"
+            ]
+          },
+          {
+            "group": "Organizations",
+            "pages": [
+              "api/endpoints/organizations/list-organizations",
+              "api/endpoints/organizations/get-organization",
+              "api/endpoints/organizations/create-organization",
+              "api/endpoints/organizations/update-organization",
+              "api/endpoints/organizations/delete-organization"
+            ]
+          },
+          {
+            "group": "Users",
+            "pages": [
+              "api/endpoints/users/create-user",
+              "api/endpoints/users/list-users",
+              "api/endpoints/users/get-current-user",
+              "api/endpoints/users/update-user",
+              "api/endpoints/users/delete-user"
+            ]
+          },
+          {
+            "group": "Webhooks",
+            "pages": [
+              "api/endpoints/webhooks/create-webhook",
+              "api/endpoints/webhooks/list-webhooks",
+              "api/endpoints/webhooks/test-webhook",
+              "api/endpoints/webhooks/toggle-webhook"
+            ]
+          },
+          {
+            "group": "Health",
+            "pages": [
+              "api/endpoints/health/health-check"
+            ]
+          }
+        ]
+      },
+      {
+        "dropdown": "CLI",
+        "icon": "terminal",
+        "description": "Command line interface documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "cli/index",
+              "cli/installation",
+              "cli/configuration",
+              "cli/authentication"
+            ]
+          },
+          {
+            "group": "Commands",
+            "pages": [
+              "cli/commands/init/init",
+              "cli/commands/auth/login",
+              "cli/commands/organizations/list",
+              "cli/commands/tools/create",
+              "cli/commands/actions/create",
+              "cli/commands/flows/execute"
+            ]
+          }
+        ]
+      },
+      {
+        "dropdown": "SDKs", 
+        "icon": "puzzle",
+        "description": "SDK documentation for multiple languages",
+        "groups": [
+          {
+            "group": "TypeScript SDK",
+            "pages": [
+              "sdk/typescript/index",
+              "sdk/typescript/installation",
+              "sdk/typescript/quickstart",
+              "sdk/typescript/examples"
+            ]
+          },
+          {
+            "group": "Python SDK",
+            "pages": [
+              "sdk/python/index",
+              "sdk/python/installation",
+              "sdk/python/quickstart",
+              "sdk/python/examples"
+            ]
+          },
+          {
+            "group": "Go SDK",
+            "pages": [
+              "sdk/go/index",
+              "sdk/go/installation",
+              "sdk/go/quickstart",
+              "sdk/go/examples"
+            ]
+          }
+        ]
+      },
+      {
+        "dropdown": "Internal Docs",
+        "icon": "lock",
+        "description": "Internal team documentation and architecture guides",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "internal/architecture/overview",
+              "internal/architecture/system-design",
+              "internal/architecture/workflow-engine",
+              "internal/architecture/data-layer",
+              "internal/architecture/monitoring-observability",
+              "internal/architecture/security/overview"
+            ]
+          },
+          {
+            "group": "Operations",
+            "pages": [
+              "internal/operations/runbooks/incident-response",
+              "internal/operations/runbooks/database-operations",
+              "internal/operations/migration"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "internal/development/guidelines/coding-standards",
+              "internal/development/testing/testing-strategy",
+              "internal/development/debugging/troubleshooting-guide"
+            ]
+          },
+          {
+            "group": "Infrastructure",
+            "pages": [
+              "internal/infrastructure/aws/architecture",
+              "internal/infrastructure/deployment/production-deployment",
+              "internal/infrastructure/scaling/auto-scaling",
+              "internal/infrastructure/monitoring/observability"
+            ]
+          },
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "internal/advanced/security/security-hardening",
+              "internal/advanced/performance/performance-optimization",
+              "internal/advanced/adrs/architecture-decisions"
+            ]
+          },
+          {
+            "group": "Integrations",
+            "pages": [
+              "internal/integrations/external-services/service-integration-guide",
+              "internal/integrations/aws-services/aws-integration-guide",
+              "internal/integrations/database/database-connection-guide",
+              "internal/integrations/cicd/pipeline-integration-guide"
+            ]
+          }
+        ]
+      }
+    ],
+    "anchors": [
+      {
+        "anchor": "GitHub",
+        "icon": "github",
+        "href": "https://github.com/joosuhail12/tolstoy"
+      },
+      {
+        "anchor": "Discord",
+        "icon": "discord",
+        "href": "https://discord.gg/tolstoy"
+      }
+    ]
+  },
+  "api": {
+    "playground": {
+      "display": "interactive"
+    },
+    "examples": {
+      "languages": ["curl", "javascript", "python"],
+      "defaults": "required"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/joosuhail12/tolstoy",
+      "discord": "https://discord.gg/tolstoy",
+      "twitter": "https://twitter.com/tolstoy"
+    }
+  },
+  "integrations": {
+    "ga4": {
+      "measurementId": "G-XXXXXXXXXX"
+    }
+  },
+  "redirects": [
+    {
+      "source": "/docs/*",
+      "destination": "/*"
+    }
+  ]
+}

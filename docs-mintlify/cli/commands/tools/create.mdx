@@ -1,0 +1,520 @@
+---
+title: "tolstoy tools create"
+description: "Create and configure new tool integrations for external APIs and services"
+---
+
+# tolstoy tools create
+
+Create new tool integrations to connect external APIs, databases, and services with your Tolstoy workflows.
+
+## Usage
+
+```bash
+tolstoy tools create [OPTIONS] <TOOL_NAME>
+```
+
+## Description
+
+The `tolstoy tools create` command helps you create and configure tool integrations that can be used in your workflow actions. Tools define how to connect to external services and specify available operations.
+
+## Basic Usage
+
+```bash
+# Create a new REST API tool
+tolstoy tools create "Stripe API" \
+  --type rest-api \
+  --base-url "https://api.stripe.com/v1" \
+  --auth bearer
+
+# Create database connection
+tolstoy tools create "Customer DB" \
+  --type database \
+  --connection "postgresql://user:pass@localhost/customers"
+
+# Interactive tool creation
+tolstoy tools create --interactive
+```
+
+## Arguments
+
+<ParamField path="TOOL_NAME" type="string" required>
+  Name of the tool to create
+  
+  ```bash
+  tolstoy tools create "My API Tool"
+  ```
+</ParamField>
+
+## Options
+
+<ParamField path="--type, -t" type="string" required>
+  Type of tool to create
+  
+  **Options**: `rest-api`, `graphql`, `database`, `webhook`, `custom`
+  
+  ```bash
+  tolstoy tools create "GitHub API" --type rest-api
+  ```
+</ParamField>
+
+<ParamField path="--base-url, -u" type="string">
+  Base URL for API endpoints
+  
+  ```bash
+  tolstoy tools create "Stripe" --base-url "https://api.stripe.com/v1"
+  ```
+</ParamField>
+
+<ParamField path="--auth, -a" type="string">
+  Authentication method
+  
+  **Options**: `none`, `api-key`, `bearer`, `basic`, `oauth2`
+  
+  ```bash
+  tolstoy tools create "API" --auth bearer
+  ```
+</ParamField>
+
+<ParamField path="--description, -d" type="string">
+  Description of the tool's purpose
+  
+  ```bash
+  tolstoy tools create "CRM" --description "Customer relationship management system"
+  ```
+</ParamField>
+
+<ParamField path="--config, -c" type="string">
+  Path to tool configuration file
+  
+  ```bash
+  tolstoy tools create "API" --config ./api-config.yaml
+  ```
+</ParamField>
+
+<ParamField path="--interactive, -i" type="boolean">
+  Use interactive mode for tool creation
+  
+  ```bash
+  tolstoy tools create --interactive
+  ```
+</ParamField>
+
+<ParamField path="--from-openapi" type="string">
+  Create tool from OpenAPI specification
+  
+  ```bash
+  tolstoy tools create "Petstore" --from-openapi "https://petstore.swagger.io/v2/swagger.json"
+  ```
+</ParamField>
+
+<ParamField path="--headers" type="string">
+  Default headers (key=value format, comma-separated)
+  
+  ```bash
+  tolstoy tools create "API" --headers "Content-Type=application/json,Accept=application/json"
+  ```
+</ParamField>
+
+## Tool Types
+
+### REST API Tools
+
+```bash
+# Basic REST API tool
+tolstoy tools create "GitHub API" \
+  --type rest-api \
+  --base-url "https://api.github.com" \
+  --auth bearer \
+  --description "GitHub REST API v4"
+
+# With custom headers
+tolstoy tools create "Custom API" \
+  --type rest-api \
+  --base-url "https://api.example.com/v1" \
+  --auth api-key \
+  --headers "Accept=application/vnd.api+json,X-API-Version=2023-12-01"
+```
+
+### GraphQL Tools
+
+```bash
+# GraphQL API tool
+tolstoy tools create "Shopify GraphQL" \
+  --type graphql \
+  --base-url "https://shop.myshopify.com/admin/api/2023-10/graphql.json" \
+  --auth bearer \
+  --headers "X-Shopify-Access-Token=your-token"
+```
+
+### Database Tools
+
+```bash
+# PostgreSQL connection
+tolstoy tools create "Customer Database" \
+  --type database \
+  --connection "postgresql://user:password@localhost:5432/customers" \
+  --description "Customer data warehouse"
+
+# MongoDB connection
+tolstoy tools create "Product Catalog" \
+  --type database \
+  --connection "mongodb://localhost:27017/products" \
+  --description "Product catalog and inventory"
+```
+
+### Webhook Tools
+
+```bash
+# Webhook endpoint tool
+tolstoy tools create "Payment Webhooks" \
+  --type webhook \
+  --base-url "https://hooks.tolstoy.com/webhook" \
+  --auth signature \
+  --description "Stripe payment event webhooks"
+```
+
+## Configuration File Format
+
+### REST API Configuration
+
+```yaml
+# api-config.yaml
+type: rest-api
+base_url: "https://api.stripe.com/v1"
+authentication:
+  type: bearer
+  token_header: "Authorization"
+  token_prefix: "Bearer"
+headers:
+  Content-Type: "application/json"
+  Accept: "application/json"
+endpoints:
+  - name: "create_payment"
+    method: POST
+    path: "/payment_intents"
+    description: "Create a new payment intent"
+  - name: "get_payment"
+    method: GET
+    path: "/payment_intents/{id}"
+    description: "Retrieve payment intent details"
+```
+
+### Database Configuration
+
+```yaml
+# db-config.yaml
+type: database
+engine: postgresql
+connection:
+  host: localhost
+  port: 5432
+  database: customers
+  username: app_user
+  password_env: DB_PASSWORD
+  ssl_mode: require
+queries:
+  - name: "get_customer"
+    sql: "SELECT * FROM customers WHERE id = $1"
+    description: "Get customer by ID"
+  - name: "update_customer"
+    sql: "UPDATE customers SET email = $1 WHERE id = $2"
+    description: "Update customer email"
+```
+
+## Interactive Mode
+
+```bash
+tolstoy tools create --interactive
+```
+
+**Interactive Flow**:
+1. **Tool Name**: Enter a descriptive name
+2. **Tool Type**: Select from available types
+3. **Base URL**: Provide the API base URL
+4. **Authentication**: Choose auth method and configure
+5. **Headers**: Add any default headers
+6. **Test Connection**: Verify the configuration
+7. **Save**: Create the tool
+
+```
+? Tool name: Stripe API
+? Tool type: rest-api
+? Base URL: https://api.stripe.com/v1
+? Authentication method: bearer
+? Default headers (key=value, comma-separated): Content-Type=application/json
+? Test connection now? Yes
+✓ Connection test successful
+✓ Tool 'Stripe API' created successfully (tool_stripe_123)
+```
+
+## OpenAPI Integration
+
+### From OpenAPI URL
+
+```bash
+# Create tool from OpenAPI spec
+tolstoy tools create "Petstore API" \
+  --from-openapi "https://petstore.swagger.io/v2/swagger.json"
+
+# With custom authentication
+tolstoy tools create "Internal API" \
+  --from-openapi "https://api.company.com/openapi.json" \
+  --auth bearer
+```
+
+### From Local OpenAPI File
+
+```bash
+# Use local OpenAPI file
+tolstoy tools create "Custom API" \
+  --from-openapi "./api-spec.yaml" \
+  --description "Internal customer API"
+```
+
+**Generated Actions**: When using OpenAPI specs, Tolstoy automatically creates actions for each endpoint defined in the specification.
+
+## Authentication Configuration
+
+### API Key Authentication
+
+```bash
+tolstoy tools create "API" \
+  --auth api-key \
+  --headers "X-API-Key=your-api-key"
+
+# Or use environment variable
+tolstoy tools create "API" \
+  --auth api-key \
+  --auth-env "API_KEY"
+```
+
+### Bearer Token Authentication
+
+```bash
+tolstoy tools create "GitHub" \
+  --auth bearer \
+  --auth-env "GITHUB_TOKEN"
+```
+
+### Basic Authentication
+
+```bash
+tolstoy tools create "Legacy API" \
+  --auth basic \
+  --auth-user "username" \
+  --auth-pass-env "API_PASSWORD"
+```
+
+### OAuth 2.0 Authentication
+
+```bash
+tolstoy tools create "Google API" \
+  --auth oauth2 \
+  --oauth-client-id "your-client-id" \
+  --oauth-client-secret-env "GOOGLE_CLIENT_SECRET" \
+  --oauth-scope "https://www.googleapis.com/auth/userinfo.email"
+```
+
+## Examples
+
+### E-commerce Integration
+
+```bash
+# Shopify API tool
+tolstoy tools create "Shopify Store" \
+  --type rest-api \
+  --base-url "https://your-shop.myshopify.com/admin/api/2023-10" \
+  --auth api-key \
+  --headers "X-Shopify-Access-Token=your-access-token" \
+  --description "Shopify store management API"
+```
+
+### Payment Processing
+
+```bash
+# Stripe payments tool
+tolstoy tools create "Stripe Payments" \
+  --type rest-api \
+  --base-url "https://api.stripe.com/v1" \
+  --auth bearer \
+  --auth-env "STRIPE_SECRET_KEY" \
+  --description "Stripe payment processing"
+```
+
+### Database Integration
+
+```bash
+# Customer database
+tolstoy tools create "Customer DB" \
+  --type database \
+  --connection "postgresql://localhost:5432/customers" \
+  --auth-env "DATABASE_URL" \
+  --description "Customer database for CRM operations"
+```
+
+### Notification Services
+
+```bash
+# Slack integration
+tolstoy tools create "Slack Notifications" \
+  --type rest-api \
+  --base-url "https://slack.com/api" \
+  --auth bearer \
+  --auth-env "SLACK_BOT_TOKEN" \
+  --description "Slack workspace integration"
+```
+
+## Advanced Configuration
+
+### Custom HTTP Settings
+
+```yaml
+# advanced-config.yaml
+type: rest-api
+base_url: "https://api.example.com"
+http_settings:
+  timeout: 30
+  retries: 3
+  retry_delay: 2
+  user_agent: "Tolstoy-CLI/1.0"
+  follow_redirects: true
+  verify_ssl: true
+authentication:
+  type: custom
+  headers:
+    Authorization: "Custom {{.token}}"
+    X-API-Version: "2023-12-01"
+rate_limiting:
+  requests_per_minute: 100
+  burst_size: 10
+```
+
+### Environment-Specific Tools
+
+```bash
+# Development environment
+tolstoy tools create "API-Dev" \
+  --type rest-api \
+  --base-url "https://dev-api.company.com" \
+  --auth bearer \
+  --profile development
+
+# Production environment
+tolstoy tools create "API-Prod" \
+  --type rest-api \
+  --base-url "https://api.company.com" \
+  --auth bearer \
+  --profile production
+```
+
+## Validation and Testing
+
+### Connection Testing
+
+```bash
+# Test tool connection after creation
+tolstoy tools test tool_stripe_123
+
+# Test with custom endpoint
+tolstoy tools test tool_stripe_123 --endpoint "/customers" --method GET
+```
+
+### Validation
+
+```bash
+# Validate tool configuration
+tolstoy tools validate tool_stripe_123
+
+# Validate before creation (dry run)
+tolstoy tools create "Test API" \
+  --type rest-api \
+  --base-url "https://api.test.com" \
+  --dry-run
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Connection Failed">
+    **Error**: `failed to connect to API endpoint`
+    
+    **Solutions**:
+    ```bash
+    # Test connectivity manually
+    curl -I https://api.example.com
+    
+    # Check authentication
+    tolstoy tools test your-tool --debug
+    
+    # Verify base URL
+    tolstoy tools show your-tool
+    ```
+  </Accordion>
+  
+  <Accordion title="Authentication Error">
+    **Error**: `authentication failed` or `401 Unauthorized`
+    
+    **Solutions**:
+    ```bash
+    # Verify auth configuration
+    tolstoy tools show your-tool --show-auth
+    
+    # Update authentication
+    tolstoy tools update your-tool --auth-env "NEW_TOKEN"
+    
+    # Test with valid credentials
+    export API_TOKEN="valid-token"
+    tolstoy tools test your-tool
+    ```
+  </Accordion>
+  
+  <Accordion title="OpenAPI Import Failed">
+    **Error**: `failed to parse OpenAPI specification`
+    
+    **Solutions**:
+    ```bash
+    # Validate OpenAPI spec
+    curl https://api.example.com/openapi.json | jq .
+    
+    # Try local file instead
+    wget https://api.example.com/openapi.json
+    tolstoy tools create "API" --from-openapi ./openapi.json
+    
+    # Check spec version compatibility
+    tolstoy tools create "API" --from-openapi ./spec.yaml --openapi-version 3.0
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="tools list" icon="list">
+    ```bash
+    tolstoy tools list
+    ```
+    List all created tools
+  </Card>
+  <Card title="tools show" icon="eye">
+    ```bash
+    tolstoy tools show tool_123
+    ```
+    View tool details and configuration
+  </Card>
+  <Card title="tools test" icon="flask">
+    ```bash
+    tolstoy tools test tool_123
+    ```
+    Test tool connectivity and authentication
+  </Card>
+  <Card title="actions create" icon="plus">
+    ```bash
+    tolstoy actions create
+    ```
+    Create actions that use this tool
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="cli-footer.mdx" />

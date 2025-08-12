@@ -1,0 +1,810 @@
+---
+title: "TypeScript SDK"
+description: "Official TypeScript/JavaScript SDK for Tolstoy workflow automation platform"
+---
+
+# Tolstoy TypeScript SDK
+
+The official TypeScript/JavaScript SDK for integrating Tolstoy workflow automation into your applications. Build, execute, and manage workflows programmatically with full type safety.
+
+## Overview
+
+The Tolstoy TypeScript SDK provides:
+
+- **Full TypeScript Support**: Complete type definitions and IntelliSense
+- **Workflow Management**: Create, execute, and monitor workflows
+- **Tool Integration**: Connect external APIs and services
+- **Real-time Updates**: Stream execution progress and results
+- **Error Handling**: Comprehensive error management and retry logic
+- **Node.js & Browser**: Works in both server and client environments
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/sdk/typescript/quickstart">
+    Get up and running with the SDK in minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/sdk/typescript/installation">
+    Install the SDK in your project
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/index">
+    Complete API documentation
+  </Card>
+  <Card title="Examples" icon="lightbulb" href="#examples">
+    Code examples and use cases
+  </Card>
+</CardGroup>
+
+## Key Features
+
+### Workflow Execution
+
+```typescript
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const client = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  organizationId: 'org_123456'
+});
+
+// Execute a workflow
+const execution = await client.flows.execute('flow_payment_processing', {
+  customer_id: 'cust_789',
+  amount: 10000, // $100.00 in cents
+  currency: 'usd'
+});
+
+console.log(`Execution started: ${execution.id}`);
+```
+
+### Real-time Monitoring
+
+```typescript
+// Stream execution progress
+client.executions.stream(execution.id)
+  .on('step_started', (step) => {
+    console.log(`Step started: ${step.name}`);
+  })
+  .on('step_completed', (step) => {
+    console.log(`Step completed: ${step.name} (${step.duration}ms)`);
+  })
+  .on('completed', (result) => {
+    console.log('Execution completed:', result);
+  })
+  .on('error', (error) => {
+    console.error('Execution failed:', error);
+  });
+```
+
+### Tool Management
+
+```typescript
+// Create a new API integration
+const tool = await client.tools.create({
+  name: 'Stripe API',
+  type: 'rest-api',
+  baseUrl: 'https://api.stripe.com/v1',
+  authentication: {
+    type: 'bearer',
+    token: process.env.STRIPE_SECRET_KEY
+  }
+});
+
+// Create actions for the tool
+const action = await client.actions.create({
+  name: 'Create Payment Intent',
+  toolId: tool.id,
+  method: 'POST',
+  endpoint: '/payment_intents',
+  inputSchema: {
+    amount: { type: 'number', required: true },
+    currency: { type: 'string', default: 'usd' },
+    payment_method: { type: 'string', required: true }
+  }
+});
+```
+
+## Environment Support
+
+<Tabs>
+  <Tab title="Node.js">
+    **Server-side applications**
+    
+    ```typescript
+    // Node.js with ES modules
+    import { TolstoyClient } from '@tolstoy/sdk';
+    
+    // Node.js with CommonJS
+    const { TolstoyClient } = require('@tolstoy/sdk');
+    
+    const client = new TolstoyClient({
+      apiKey: process.env.TOLSTOY_API_KEY,
+      organizationId: process.env.TOLSTOY_ORG_ID
+    });
+    ```
+    
+    **Supported Versions**: Node.js 16+
+  </Tab>
+  
+  <Tab title="Browser">
+    **Client-side applications**
+    
+    ```typescript
+    // Modern browsers with ES modules
+    import { TolstoyClient } from '@tolstoy/sdk';
+    
+    const client = new TolstoyClient({
+      apiKey: 'your-public-api-key', // Use public keys only
+      organizationId: 'org_123456'
+    });
+    
+    // Execute workflows from the browser
+    const result = await client.flows.execute('flow_customer_signup', {
+      email: 'user@example.com',
+      name: 'John Doe'
+    });
+    ```
+    
+    **Note**: Never expose secret API keys in browser code
+  </Tab>
+  
+  <Tab title="Deno">
+    **Deno runtime support**
+    
+    ```typescript
+    import { TolstoyClient } from 'https://esm.sh/@tolstoy/sdk';
+    
+    const client = new TolstoyClient({
+      apiKey: Deno.env.get('TOLSTOY_API_KEY'),
+      organizationId: Deno.env.get('TOLSTOY_ORG_ID')
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Authentication
+
+### API Key Authentication
+
+```typescript
+// Using environment variables (recommended)
+const client = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  organizationId: process.env.TOLSTOY_ORG_ID
+});
+
+// Direct API key (not recommended for production)
+const client = new TolstoyClient({
+  apiKey: 'tok_your_api_key_here',
+  organizationId: 'org_123456'
+});
+```
+
+### OAuth 2.0 Authentication
+
+```typescript
+// OAuth flow for user applications
+const client = new TolstoyClient({
+  oauth: {
+    clientId: process.env.TOLSTOY_CLIENT_ID,
+    clientSecret: process.env.TOLSTOY_CLIENT_SECRET,
+    redirectUri: 'https://yourapp.com/auth/callback'
+  }
+});
+
+// Handle OAuth callback
+const tokens = await client.oauth.exchangeCode(authCode);
+client.setAccessToken(tokens.access_token);
+```
+
+## Client Configuration
+
+```typescript
+const client = new TolstoyClient({
+  // Authentication (required)
+  apiKey: 'your-api-key',
+  organizationId: 'org_123456',
+  
+  // Optional configuration
+  baseUrl: 'https://api.tolstoy.getpullse.com', // Custom API endpoint
+  timeout: 30000,  // Request timeout in milliseconds
+  retries: 3,      // Number of retry attempts
+  retryDelay: 1000, // Base delay between retries (ms)
+  
+  // Logging
+  logger: {
+    level: 'info', // 'debug', 'info', 'warn', 'error'
+    stream: process.stdout
+  },
+  
+  // HTTP client options
+  httpClient: {
+    headers: {
+      'User-Agent': 'MyApp/1.0.0',
+      'X-Custom-Header': 'value'
+    },
+    proxy: 'http://proxy.company.com:8080'
+  }
+});
+```
+
+## Core APIs
+
+### Flows
+
+```typescript
+// List all flows
+const flows = await client.flows.list();
+
+// Get flow details
+const flow = await client.flows.get('flow_123');
+
+// Execute flow
+const execution = await client.flows.execute('flow_123', {
+  input: 'data'
+});
+
+// Execute with options
+const execution = await client.flows.execute('flow_123', inputData, {
+  wait: true,          // Wait for completion
+  timeout: 300000,     // 5 minutes
+  priority: 'high',    // Execution priority
+  tags: ['manual', 'v2'] // Tags for tracking
+});
+```
+
+### Executions
+
+```typescript
+// Get execution details
+const execution = await client.executions.get('exec_456');
+
+// List executions
+const executions = await client.executions.list({
+  flowId: 'flow_123',
+  status: 'completed',
+  limit: 50
+});
+
+// Cancel running execution
+await client.executions.cancel('exec_456');
+
+// Retry failed execution
+const newExecution = await client.executions.retry('exec_456');
+```
+
+### Tools
+
+```typescript
+// Create REST API tool
+const tool = await client.tools.create({
+  name: 'GitHub API',
+  type: 'rest-api',
+  baseUrl: 'https://api.github.com',
+  authentication: {
+    type: 'bearer',
+    token: process.env.GITHUB_TOKEN
+  }
+});
+
+// Update tool configuration
+await client.tools.update(tool.id, {
+  baseUrl: 'https://api.github.com/v4'
+});
+
+// Test tool connectivity
+const testResult = await client.tools.test(tool.id);
+```
+
+### Actions
+
+```typescript
+// Create action
+const action = await client.actions.create({
+  name: 'Get Repository',
+  toolId: tool.id,
+  method: 'GET',
+  endpoint: '/repos/{owner}/{repo}',
+  inputSchema: {
+    owner: { type: 'string', required: true },
+    repo: { type: 'string', required: true }
+  }
+});
+
+// Execute action directly
+const result = await client.actions.execute(action.id, {
+  owner: 'octocat',
+  repo: 'Hello-World'
+});
+```
+
+## Error Handling
+
+### Standard Error Types
+
+```typescript
+import { 
+  TolstoyError, 
+  AuthenticationError, 
+  ValidationError, 
+  ExecutionError, 
+  RateLimitError 
+} from '@tolstoy/sdk';
+
+try {
+  const execution = await client.flows.execute('flow_123', invalidInput);
+} catch (error) {
+  if (error instanceof AuthenticationError) {
+    console.error('Authentication failed:', error.message);
+    // Refresh token or re-authenticate
+  } else if (error instanceof ValidationError) {
+    console.error('Input validation failed:', error.details);
+    // Fix input data
+  } else if (error instanceof RateLimitError) {
+    console.error('Rate limit exceeded, retry after:', error.retryAfter);
+    // Implement backoff strategy
+  } else if (error instanceof ExecutionError) {
+    console.error('Execution failed:', error.message);
+    console.error('Failed step:', error.step);
+    console.error('Error details:', error.details);
+  } else {
+    console.error('Unexpected error:', error);
+  }
+}
+```
+
+### Retry Logic
+
+```typescript
+// Automatic retries with exponential backoff
+const client = new TolstoyClient({
+  apiKey: 'your-key',
+  organizationId: 'org_123',
+  retries: 3,
+  retryDelay: 1000,
+  retryMultiplier: 2 // 1s, 2s, 4s delays
+});
+
+// Custom retry logic
+const executeWithRetry = async (flowId: string, input: any, maxRetries = 3) => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await client.flows.execute(flowId, input);
+    } catch (error) {
+      if (attempt === maxRetries) throw error;
+      
+      if (error instanceof RateLimitError) {
+        await new Promise(resolve => 
+          setTimeout(resolve, error.retryAfter * 1000)
+        );
+      } else {
+        await new Promise(resolve => 
+          setTimeout(resolve, Math.pow(2, attempt) * 1000)
+        );
+      }
+    }
+  }
+};
+```
+
+## TypeScript Types
+
+### Core Types
+
+```typescript
+interface Flow {
+  id: string;
+  name: string;
+  description?: string;
+  status: 'active' | 'paused' | 'archived';
+  steps: FlowStep[];
+  inputSchema?: JsonSchema;
+  outputSchema?: JsonSchema;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Execution {
+  id: string;
+  flowId: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+  input: Record<string, any>;
+  output?: Record<string, any>;
+  error?: ExecutionError;
+  startedAt?: string;
+  completedAt?: string;
+  duration?: number;
+  steps: ExecutionStep[];
+}
+
+interface Tool {
+  id: string;
+  name: string;
+  type: 'rest-api' | 'graphql' | 'database' | 'webhook' | 'custom';
+  baseUrl?: string;
+  authentication?: ToolAuthentication;
+  headers?: Record<string, string>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Action {
+  id: string;
+  name: string;
+  toolId: string;
+  method?: string;
+  endpoint?: string;
+  inputSchema?: JsonSchema;
+  outputSchema?: JsonSchema;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### Generic Types
+
+```typescript
+// Generic execution with typed input/output
+interface TypedExecution<TInput = any, TOutput = any> extends Execution {
+  input: TInput;
+  output?: TOutput;
+}
+
+// Usage with specific types
+interface PaymentInput {
+  customerId: string;
+  amount: number;
+  currency: string;
+  paymentMethod: string;
+}
+
+interface PaymentOutput {
+  paymentIntentId: string;
+  status: 'succeeded' | 'processing' | 'failed';
+  chargeId?: string;
+}
+
+const execution: TypedExecution<PaymentInput, PaymentOutput> = 
+  await client.flows.execute('flow_payment', {
+    customerId: 'cust_123',
+    amount: 5000,
+    currency: 'usd',
+    paymentMethod: 'pm_card_visa'
+  });
+```
+
+## Examples
+
+### E-commerce Order Processing
+
+```typescript
+import { TolstoyClient } from '@tolstoy/sdk';
+
+interface OrderData {
+  orderId: string;
+  customerId: string;
+  items: Array<{
+    productId: string;
+    quantity: number;
+    price: number;
+  }>;
+  shippingAddress: {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
+  paymentMethod: string;
+}
+
+const client = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY!,
+  organizationId: process.env.TOLSTOY_ORG_ID!
+});
+
+async function processOrder(orderData: OrderData) {
+  try {
+    // Execute order processing workflow
+    const execution = await client.flows.execute(
+      'flow_order_processing',
+      orderData,
+      { wait: true, timeout: 300000 }
+    );
+    
+    if (execution.status === 'completed') {
+      console.log('Order processed successfully:', {
+        orderId: orderData.orderId,
+        executionId: execution.id,
+        result: execution.output
+      });
+      
+      // Send confirmation email
+      await client.flows.execute('flow_send_confirmation', {
+        customerId: orderData.customerId,
+        orderId: orderData.orderId,
+        template: 'order_confirmation'
+      });
+      
+      return execution.output;
+    } else {
+      throw new Error(`Order processing failed: ${execution.error?.message}`);
+    }
+  } catch (error) {
+    console.error('Failed to process order:', error);
+    
+    // Execute failure handling workflow
+    await client.flows.execute('flow_order_failure', {
+      orderId: orderData.orderId,
+      error: error.message
+    });
+    
+    throw error;
+  }
+}
+
+// Usage
+processOrder({
+  orderId: 'ord_123456',
+  customerId: 'cust_789',
+  items: [
+    { productId: 'prod_001', quantity: 2, price: 29.99 },
+    { productId: 'prod_002', quantity: 1, price: 15.00 }
+  ],
+  shippingAddress: {
+    street: '123 Main St',
+    city: 'Anytown',
+    state: 'NY',
+    zipCode: '12345'
+  },
+  paymentMethod: 'pm_card_visa'
+});
+```
+
+### Data Synchronization
+
+```typescript
+interface SyncConfig {
+  source: 'crm' | 'database' | 'api';
+  target: 'warehouse' | 'analytics' | 'backup';
+  syncType: 'full' | 'incremental';
+  batchSize?: number;
+}
+
+async function synchronizeData(config: SyncConfig) {
+  const execution = await client.flows.execute('flow_data_sync', config);
+  
+  // Monitor progress
+  const stream = client.executions.stream(execution.id);
+  
+  stream.on('step_completed', (step) => {
+    if (step.name === 'extract_data') {
+      console.log(`Extracted ${step.output.recordCount} records`);
+    } else if (step.name === 'transform_data') {
+      console.log(`Transformed ${step.output.processedCount} records`);
+    } else if (step.name === 'load_data') {
+      console.log(`Loaded ${step.output.insertedCount} records`);
+    }
+  });
+  
+  stream.on('completed', (result) => {
+    console.log('Sync completed:', {
+      recordsSynced: result.totalRecords,
+      duration: result.duration,
+      errors: result.errorCount
+    });
+  });
+  
+  stream.on('error', (error) => {
+    console.error('Sync failed:', error);
+  });
+  
+  return execution;
+}
+```
+
+### Notification System
+
+```typescript
+interface NotificationPayload {
+  recipients: string[];
+  message: {
+    title: string;
+    body: string;
+    priority: 'low' | 'normal' | 'high' | 'urgent';
+  };
+  channels: Array<'email' | 'sms' | 'push' | 'slack'>;
+  templateId?: string;
+  templateData?: Record<string, any>;
+}
+
+class NotificationService {
+  constructor(private client: TolstoyClient) {}
+  
+  async sendNotification(payload: NotificationPayload) {
+    // Route to appropriate notification flow based on channels
+    const flowId = this.getNotificationFlow(payload.channels);
+    
+    const execution = await this.client.flows.execute(flowId, payload);
+    
+    // Return delivery tracking information
+    return {
+      notificationId: execution.id,
+      status: 'sent',
+      estimatedDelivery: new Date(Date.now() + 60000) // 1 minute
+    };
+  }
+  
+  private getNotificationFlow(channels: string[]): string {
+    if (channels.includes('email') && channels.includes('sms')) {
+      return 'flow_multi_channel_notification';
+    } else if (channels.includes('email')) {
+      return 'flow_email_notification';
+    } else if (channels.includes('sms')) {
+      return 'flow_sms_notification';
+    } else if (channels.includes('push')) {
+      return 'flow_push_notification';
+    } else {
+      return 'flow_default_notification';
+    }
+  }
+  
+  async getDeliveryStatus(notificationId: string) {
+    const execution = await this.client.executions.get(notificationId);
+    
+    return {
+      id: notificationId,
+      status: execution.status,
+      deliveredAt: execution.completedAt,
+      deliveryDetails: execution.output
+    };
+  }
+}
+
+// Usage
+const notificationService = new NotificationService(client);
+
+await notificationService.sendNotification({
+  recipients: ['user@example.com', '+1234567890'],
+  message: {
+    title: 'Order Shipped',
+    body: 'Your order #12345 has been shipped and is on its way!',
+    priority: 'normal'
+  },
+  channels: ['email', 'sms'],
+  templateId: 'order_shipped',
+  templateData: {
+    orderId: '12345',
+    trackingNumber: 'TN123456789',
+    estimatedDelivery: '2023-12-15'
+  }
+});
+```
+
+## Best Practices
+
+### Environment Configuration
+
+```typescript
+// config/tolstoy.ts
+interface TolstoyConfig {
+  apiKey: string;
+  organizationId: string;
+  baseUrl?: string;
+  environment: 'development' | 'staging' | 'production';
+}
+
+export const getTolstoyConfig = (): TolstoyConfig => {
+  const config = {
+    apiKey: process.env.TOLSTOY_API_KEY!,
+    organizationId: process.env.TOLSTOY_ORG_ID!,
+    environment: (process.env.NODE_ENV as any) || 'development'
+  };
+  
+  if (!config.apiKey || !config.organizationId) {
+    throw new Error('Missing required Tolstoy configuration');
+  }
+  
+  return config;
+};
+
+// Create client with environment-specific settings
+export const createTolstoyClient = () => {
+  const config = getTolstoyConfig();
+  
+  return new TolstoyClient({
+    ...config,
+    timeout: config.environment === 'production' ? 30000 : 10000,
+    retries: config.environment === 'production' ? 3 : 1,
+    logger: {
+      level: config.environment === 'development' ? 'debug' : 'info'
+    }
+  });
+};
+```
+
+### Error Handling Strategy
+
+```typescript
+// utils/tolstoy-wrapper.ts
+import { TolstoyError, ExecutionError, RateLimitError } from '@tolstoy/sdk';
+
+export async function executeFlowSafely<T>(
+  client: TolstoyClient,
+  flowId: string,
+  input: any,
+  options: {
+    maxRetries?: number;
+    onRetry?: (attempt: number, error: Error) => void;
+    onSuccess?: (result: T) => void;
+    onFailure?: (error: Error) => void;
+  } = {}
+): Promise<T> {
+  const { maxRetries = 3, onRetry, onSuccess, onFailure } = options;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const execution = await client.flows.execute(flowId, input, {
+        wait: true,
+        timeout: 300000
+      });
+      
+      if (execution.status === 'completed') {
+        onSuccess?.(execution.output);
+        return execution.output;
+      } else {
+        throw new ExecutionError('Execution failed', {
+          executionId: execution.id,
+          status: execution.status,
+          error: execution.error
+        });
+      }
+    } catch (error) {
+      const isLastAttempt = attempt === maxRetries;
+      
+      if (error instanceof RateLimitError) {
+        if (isLastAttempt) {
+          onFailure?.(error);
+          throw error;
+        }
+        
+        const delay = error.retryAfter * 1000;
+        onRetry?.(attempt, error);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else if (error instanceof TolstoyError && error.retriable) {
+        if (isLastAttempt) {
+          onFailure?.(error);
+          throw error;
+        }
+        
+        const delay = Math.pow(2, attempt) * 1000; // Exponential backoff
+        onRetry?.(attempt, error);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        onFailure?.(error);
+        throw error;
+      }
+    }
+  }
+  
+  throw new Error('Maximum retries exceeded');
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/sdk/typescript/installation">
+    Install and set up the TypeScript SDK
+  </Card>
+  <Card title="Quick Start" icon="rocket" href="/sdk/typescript/quickstart">
+    Build your first workflow integration
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/index">
+    Complete API documentation
+  </Card>
+  <Card title="Examples" icon="lightbulb" href="/examples">
+    More code examples and tutorials
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="sdk-footer.mdx" />

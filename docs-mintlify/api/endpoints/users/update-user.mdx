@@ -1,0 +1,124 @@
+---
+title: "Update User Profile"
+api: "PUT /users/me"
+description: "Update the current user's profile information and preferences"
+---
+
+## Overview
+
+The Update User Profile endpoint allows users to update their profile information, preferences, and settings.
+
+## Request Body
+
+<ParamField body="name" type="string">
+  User's full name
+</ParamField>
+
+<ParamField body="avatar" type="string">
+  URL to the user's avatar image
+</ParamField>
+
+<ParamField body="preferences" type="object">
+  User preferences and settings
+  
+  <Expandable title="Preferences Object">
+    <ParamField body="theme" type="string">
+      UI theme: `light`, `dark`, `system`
+    </ParamField>
+    
+    <ParamField body="timezone" type="string">
+      User's timezone (e.g., "America/New_York")
+    </ParamField>
+    
+    <ParamField body="language" type="string">
+      Preferred language code (e.g., "en", "es", "fr")
+    </ParamField>
+    
+    <ParamField body="notifications" type="object">
+      Notification preferences
+      
+      <Expandable title="Notification Settings">
+        <ParamField body="email" type="boolean">
+          Receive email notifications
+        </ParamField>
+        
+        <ParamField body="inApp" type="boolean">
+          Receive in-app notifications
+        </ParamField>
+        
+        <ParamField body="webhook" type="boolean">
+          Receive webhook notifications
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<RequestExample>
+```json
+{
+  "name": "John M. Doe",
+  "avatar": "https://cdn.example.com/avatars/new_avatar.jpg",
+  "preferences": {
+    "theme": "dark",
+    "timezone": "Europe/London",
+    "language": "en",
+    "notifications": {
+      "email": true,
+      "inApp": false,
+      "webhook": true
+    }
+  }
+}
+```
+</RequestExample>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the user
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address (cannot be changed via this endpoint)
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Updated user's full name
+</ResponseField>
+
+<ResponseField name="avatar" type="string">
+  Updated URL to the user's avatar image
+</ResponseField>
+
+<ResponseField name="preferences" type="object">
+  Updated user preferences
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO 8601 timestamp when the profile was updated
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "id": "user_123",
+  "email": "john.doe@example.com",
+  "name": "John M. Doe",
+  "avatar": "https://cdn.example.com/avatars/new_avatar.jpg",
+  "preferences": {
+    "theme": "dark",
+    "timezone": "Europe/London",
+    "language": "en",
+    "notifications": {
+      "email": true,
+      "inApp": false,
+      "webhook": true
+    }
+  },
+  "updatedAt": "2024-01-15T11:45:00Z"
+}
+```
+</ResponseExample>
+
+<Snippet file="api-footer.mdx" />

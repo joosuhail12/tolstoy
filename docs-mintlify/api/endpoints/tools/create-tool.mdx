@@ -1,0 +1,251 @@
+---
+title: "Create Tool"
+api: "POST /tools"
+description: "Create a new tool integration for connecting to external APIs"
+---
+
+## Overview
+
+The Create Tool endpoint allows you to register a new external API integration that can be used to create actions and build workflows.
+
+## Request Body
+
+<ParamField body="name" type="string" required>
+  Name of the tool (must be unique within organization)
+</ParamField>
+
+<ParamField body="description" type="string">
+  Description of the tool's purpose and capabilities
+</ParamField>
+
+<ParamField body="baseUrl" type="string" required>
+  Base URL for the external API
+</ParamField>
+
+<ParamField body="category" type="string" required>
+  Tool category: `api`, `database`, `messaging`, `storage`, `analytics`, `payment`
+</ParamField>
+
+<ParamField body="authType" type="string" required>
+  Authentication type: `none`, `api_key`, `bearer_token`, `oauth2`, `basic_auth`, `custom`
+</ParamField>
+
+<ParamField body="authConfig" type="object">
+  Authentication configuration based on authType
+  
+  <Expandable title="Auth Config by Type">
+    ### API Key Authentication
+    <ParamField body="keyLocation" type="string" required>
+      Where to send the key: `header`, `query`, `body`
+    </ParamField>
+    
+    <ParamField body="keyName" type="string" required>
+      Parameter name for the key (e.g., "X-API-Key")
+    </ParamField>
+    
+    <ParamField body="keyPrefix" type="string">
+      Optional prefix for the key value
+    </ParamField>
+    
+    ### Bearer Token Authentication
+    <ParamField body="tokenPrefix" type="string" default="Bearer">
+      Prefix for the authorization header
+    </ParamField>
+    
+    ### OAuth2 Authentication
+    <ParamField body="grantType" type="string" required>
+      OAuth2 grant type: `authorization_code`, `client_credentials`
+    </ParamField>
+    
+    <ParamField body="authUrl" type="string" required>
+      OAuth2 authorization URL
+    </ParamField>
+    
+    <ParamField body="tokenUrl" type="string" required>
+      OAuth2 token URL
+    </ParamField>
+    
+    <ParamField body="scopes" type="array">
+      Required OAuth2 scopes
+    </ParamField>
+    
+    ### Basic Authentication
+    <ParamField body="usernameField" type="string" default="username">
+      Field name for username
+    </ParamField>
+    
+    <ParamField body="passwordField" type="string" default="password">
+      Field name for password
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="headers" type="object">
+  Default headers to include with all requests
+</ParamField>
+
+<ParamField body="rateLimits" type="object">
+  Rate limiting configuration
+  
+  <Expandable title="Rate Limits">
+    <ParamField body="requestsPerMinute" type="number">
+      Maximum requests per minute
+    </ParamField>
+    
+    <ParamField body="requestsPerHour" type="number">
+      Maximum requests per hour
+    </ParamField>
+    
+    <ParamField body="concurrentRequests" type="number">
+      Maximum concurrent requests
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="timeout" type="number" default="30000">
+  Default timeout in milliseconds for API calls
+</ParamField>
+
+<ParamField body="retryPolicy" type="object">
+  Retry configuration for failed requests
+  
+  <Expandable title="Retry Policy">
+    <ParamField body="maxRetries" type="number" default="3">
+      Maximum number of retry attempts
+    </ParamField>
+    
+    <ParamField body="backoffMultiplier" type="number" default="2">
+      Exponential backoff multiplier
+    </ParamField>
+    
+    <ParamField body="initialDelay" type="number" default="1000">
+      Initial retry delay in milliseconds
+    </ParamField>
+    
+    <ParamField body="maxDelay" type="number" default="30000">
+      Maximum retry delay in milliseconds
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="icon" type="string">
+  URL to the tool's icon image
+</ParamField>
+
+<ParamField body="documentation" type="string">
+  URL to the tool's API documentation
+</ParamField>
+
+<RequestExample>
+```json
+{
+  "name": "Stripe Payment API",
+  "description": "Process payments and manage subscriptions with Stripe",
+  "baseUrl": "https://api.stripe.com/v1",
+  "category": "payment",
+  "authType": "bearer_token",
+  "authConfig": {
+    "tokenPrefix": "Bearer"
+  },
+  "headers": {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Stripe-Version": "2023-10-16"
+  },
+  "rateLimits": {
+    "requestsPerMinute": 100,
+    "requestsPerHour": 5000,
+    "concurrentRequests": 25
+  },
+  "timeout": 30000,
+  "retryPolicy": {
+    "maxRetries": 3,
+    "backoffMultiplier": 2,
+    "initialDelay": 1000,
+    "maxDelay": 10000
+  },
+  "icon": "https://cdn.tolstoy.ai/icons/stripe.png",
+  "documentation": "https://stripe.com/docs/api"
+}
+```
+</RequestExample>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the created tool
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the tool
+</ResponseField>
+
+<ResponseField name="baseUrl" type="string">
+  Base URL for the API
+</ResponseField>
+
+<ResponseField name="category" type="string">
+  Tool category
+</ResponseField>
+
+<ResponseField name="authType" type="string">
+  Authentication type
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Initial status: `disconnected` (requires connection before use)
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp when created
+</ResponseField>
+
+<ResponseField name="createdBy" type="string">
+  User ID who created the tool
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "id": "tool_stripe_new123",
+  "name": "Stripe Payment API",
+  "baseUrl": "https://api.stripe.com/v1",
+  "category": "payment",
+  "authType": "bearer_token",
+  "status": "disconnected",
+  "createdAt": "2024-01-15T14:00:00Z",
+  "createdBy": "user_admin_123"
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+### 400 Bad Request
+Invalid tool configuration.
+
+```json
+{
+  "error": {
+    "code": "INVALID_CONFIGURATION",
+    "message": "Invalid authentication configuration for bearer_token",
+    "details": {
+      "field": "authConfig.tokenPrefix",
+      "issue": "Token prefix is required"
+    }
+  }
+}
+```
+
+### 409 Conflict
+Tool with the same name already exists.
+
+```json
+{
+  "error": {
+    "code": "DUPLICATE_TOOL",
+    "message": "A tool with the name 'Stripe Payment API' already exists"
+  }
+}
+```
+
+<Snippet file="api-footer.mdx" />

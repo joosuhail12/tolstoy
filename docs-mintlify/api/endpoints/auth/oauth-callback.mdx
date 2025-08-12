@@ -1,0 +1,187 @@
+---
+title: "OAuth Callback"
+api: "GET /auth/callback"
+description: "Handle OAuth2 callback and complete tool authentication flow"
+---
+
+## Overview
+
+The OAuth Callback endpoint handles the OAuth2 callback from external tool providers after user authorization. This endpoint exchanges the authorization code for access tokens and stores the authenticated credentials securely.
+
+## Query Parameters
+
+<ParamField query="code" type="string" required>
+  The authorization code returned by the OAuth provider
+</ParamField>
+
+<ParamField query="state" type="string" required>
+  The state parameter to validate the OAuth flow integrity
+</ParamField>
+
+<ParamField query="error" type="string">
+  Error code if the OAuth flow failed
+</ParamField>
+
+<ParamField query="error_description" type="string">
+  Human-readable error description if the flow failed
+</ParamField>
+
+## Success Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="success" type="boolean">
+  Always `true` for successful authentication
+</ResponseField>
+
+<ResponseField name="toolId" type="string">
+  The ID of the successfully authenticated tool
+</ResponseField>
+
+<ResponseField name="toolName" type="string">
+  The display name of the authenticated tool
+</ResponseField>
+
+<ResponseField name="authId" type="string">
+  Unique identifier for this authentication configuration
+</ResponseField>
+
+<ResponseField name="scopes" type="array">
+  Array of granted OAuth scopes
+</ResponseField>
+
+<ResponseField name="expiresAt" type="string">
+  ISO timestamp when the access token expires (if applicable)
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO timestamp when the authentication was completed
+</ResponseField>
+
+<ResponseField name="redirectUrl" type="string">
+  URL to redirect the user to after successful authentication
+</ResponseField>
+
+## Error Response
+
+**Status Code:** `400 Bad Request`
+
+<ResponseField name="success" type="boolean">
+  Always `false` for failed authentication
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error type identifier
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable error description
+</ResponseField>
+
+<ResponseField name="details" type="object">
+  Additional error context including OAuth provider errors
+</ResponseField>
+
+## Error Types
+
+<ResponseField name="INVALID_STATE" type="string">
+  The state parameter doesn't match the initiated OAuth flow
+</ResponseField>
+
+<ResponseField name="AUTHORIZATION_DENIED" type="string">
+  User denied authorization on the OAuth provider
+</ResponseField>
+
+<ResponseField name="TOKEN_EXCHANGE_FAILED" type="string">
+  Failed to exchange authorization code for access token
+</ResponseField>
+
+<ResponseField name="TOOL_NOT_FOUND" type="string">
+  The tool ID in the state parameter is invalid
+</ResponseField>
+
+<ResponseField name="EXPIRED_STATE" type="string">
+  The OAuth flow has expired (typically after 10 minutes)
+</ResponseField>
+
+## Usage Example
+
+This endpoint is typically called automatically by OAuth providers as part of the redirect flow. However, you can handle the response programmatically:
+
+<CodeGroup>
+
+```javascript JavaScript
+// Handle the callback response in your application
+window.addEventListener('message', (event) => {
+  if (event.data.type === 'OAUTH_COMPLETE') {
+    const { success, toolId, authId } = event.data;
+    
+    if (success) {
+      console.log(`Tool ${toolId} authenticated with ID: ${authId}`);
+      // Proceed with tool usage
+    } else {
+      console.error('OAuth failed:', event.data.error);
+    }
+  }
+});
+```
+
+```python Python
+# Handle OAuth callback in a web framework (e.g., Flask)
+from urllib.parse import parse_qs
+from your_oauth_handler import process_callback
+
+@app.route('/handle-oauth-result')
+def handle_oauth_result():
+    # This would be called after OAuth redirect
+    code = request.args.get('code')
+    state = request.args.get('state')
+    
+    if code and state:
+        # The Tolstoy API handles the actual callback
+        return redirect(f'/dashboard?auth_success=true')
+    else:
+        error = request.args.get('error', 'Unknown error')
+        return redirect(f'/dashboard?auth_error={error}')
+```
+
+</CodeGroup>
+
+## OAuth Flow Sequence
+
+1. User initiates OAuth flow via [OAuth Login](/api/endpoints/auth/oauth-login) endpoint
+2. User is redirected to OAuth provider (GitHub, Google, etc.)
+3. User authorizes the application on the provider's website
+4. Provider redirects back to this callback endpoint with authorization code
+5. This endpoint exchanges the code for access and refresh tokens
+6. Tokens are securely stored and encrypted in the database
+7. User is redirected back to your application
+
+## Security Features
+
+- **State Validation**: Prevents CSRF attacks by validating state parameters
+- **Token Encryption**: All OAuth tokens are encrypted before storage
+- **Secure Storage**: Credentials are stored in secure, isolated storage per organization
+- **Automatic Refresh**: Access tokens are automatically refreshed when expired
+- **Audit Logging**: All OAuth events are logged for security monitoring
+
+## Webhook Integration
+
+After successful OAuth authentication, relevant webhooks are automatically triggered:
+
+- `tool.connected` - Fired when tool authentication is successful
+- `tool.connection_failed` - Fired when authentication fails
+
+## Redirect Behavior
+
+After processing the OAuth callback:
+- **Success**: User is redirected to the original application or a success page
+- **Error**: User is redirected to an error page with appropriate error information
+
+The redirect URL can be customized during the initial OAuth login flow.
+
+## Related Endpoints
+
+- [OAuth Login](/api/endpoints/auth/oauth-login) - Initiate OAuth flow
+- [Tool Authentication Management](/api/endpoints/tools/auth/create-tool-auth) - Manage tool authentication configurations
+- [Tool Secrets](/api/endpoints/tools/secrets/create-tool-secret) - Manage stored credentials

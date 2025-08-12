@@ -1,0 +1,449 @@
+---
+title: "Configuration"
+description: "Configure the Tolstoy CLI for your development environment"
+---
+
+# CLI Configuration
+
+Configure the Tolstoy CLI to work with your development environment, manage profiles, and customize settings for optimal workflow automation.
+
+## Configuration File
+
+The Tolstoy CLI uses a configuration file located at `~/.tolstoy/config.yaml` to store settings and preferences.
+
+### Default Configuration Structure
+
+```yaml
+# Tolstoy CLI Configuration
+profiles:
+  default:
+    api_url: "https://api.tolstoy.getpullse.com"
+    organization_id: ""
+    auth_token: ""
+    output_format: "json"
+    debug: false
+    timeout: 30
+
+current_profile: "default"
+
+# Global settings
+settings:
+  auto_update: true
+  telemetry_enabled: true
+  editor: "code"
+  pager: "less"
+```
+
+## Managing Profiles
+
+Profiles allow you to work with multiple Tolstoy organizations or environments.
+
+### Create a New Profile
+
+<CodeGroup>
+```bash Create Profile
+tolstoy config profile create production \
+  --org-id "org_prod_123" \
+  --api-url "https://api.tolstoy.getpullse.com"
+```
+
+```bash Create Development Profile  
+tolstoy config profile create staging \
+  --org-id "org_staging_456" \
+  --api-url "https://staging-api.tolstoy.getpullse.com"
+```
+</CodeGroup>
+
+### Switch Between Profiles
+
+```bash
+# List all profiles
+tolstoy config profile list
+
+# Switch to a different profile
+tolstoy config profile use production
+
+# View current profile
+tolstoy config profile current
+```
+
+### Profile Configuration
+
+```bash
+# Set organization for current profile
+tolstoy config set organization_id "org_123456"
+
+# Set API URL for current profile  
+tolstoy config set api_url "https://api.tolstoy.getpullse.com"
+
+# Set output format (json, yaml, table)
+tolstoy config set output_format "table"
+
+# Enable debug logging
+tolstoy config set debug true
+```
+
+## Configuration Commands
+
+<AccordionGroup>
+  <Accordion title="View Configuration">
+    **Display current configuration settings**
+    
+    ```bash
+    # View all configuration
+    tolstoy config show
+    
+    # View specific setting
+    tolstoy config get api_url
+    
+    # View profile configuration
+    tolstoy config profile show production
+    ```
+  </Accordion>
+  
+  <Accordion title="Update Configuration">
+    **Modify configuration settings**
+    
+    ```bash
+    # Set configuration value
+    tolstoy config set <key> <value>
+    
+    # Examples
+    tolstoy config set timeout 60
+    tolstoy config set editor "vim"
+    tolstoy config set output_format "yaml"
+    ```
+  </Accordion>
+  
+  <Accordion title="Reset Configuration">
+    **Reset to default settings**
+    
+    ```bash
+    # Reset current profile to defaults
+    tolstoy config reset
+    
+    # Reset specific setting
+    tolstoy config unset debug
+    
+    # Delete a profile
+    tolstoy config profile delete staging
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Environment Variables
+
+Override configuration settings using environment variables:
+
+```bash
+# API Configuration
+export TOLSTOY_API_URL="https://api.tolstoy.getpullse.com"
+export TOLSTOY_ORG_ID="org_123456"
+export TOLSTOY_AUTH_TOKEN="tok_abcdef123456"
+
+# CLI Behavior
+export TOLSTOY_OUTPUT_FORMAT="json"
+export TOLSTOY_DEBUG="true"
+export TOLSTOY_TIMEOUT="30"
+
+# Development
+export TOLSTOY_PROFILE="development"
+export TOLSTOY_CONFIG_FILE="./custom-config.yaml"
+```
+
+## Configuration Reference
+
+### Core Settings
+
+<ParamField path="api_url" type="string" required>
+  Base URL for the Tolstoy API
+  
+  **Default**: `https://api.tolstoy.getpullse.com`
+</ParamField>
+
+<ParamField path="organization_id" type="string" required>
+  Your Tolstoy organization identifier
+</ParamField>
+
+<ParamField path="auth_token" type="string" required>
+  Authentication token for API access
+</ParamField>
+
+<ParamField path="output_format" type="string">
+  Default output format for commands
+  
+  **Options**: `json`, `yaml`, `table`  
+  **Default**: `json`
+</ParamField>
+
+<ParamField path="debug" type="boolean">
+  Enable debug logging
+  
+  **Default**: `false`
+</ParamField>
+
+<ParamField path="timeout" type="number">
+  Request timeout in seconds
+  
+  **Default**: `30`
+</ParamField>
+
+### Editor Configuration
+
+```bash
+# Set preferred editor for editing flows and actions
+tolstoy config set editor "code"        # VS Code
+tolstoy config set editor "vim"         # Vim
+tolstoy config set editor "nano"        # Nano
+tolstoy config set editor "sublime"     # Sublime Text
+```
+
+### Output Formatting
+
+<Tabs>
+  <Tab title="JSON Output">
+    ```bash
+    tolstoy config set output_format "json"
+    ```
+    
+    ```json
+    {
+      "id": "flow_123",
+      "name": "Payment Processing",
+      "status": "active",
+      "steps": 5
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Table Output">
+    ```bash
+    tolstoy config set output_format "table"
+    ```
+    
+    ```
+    ┌──────────┬───────────────────┬────────┬───────┐
+    │ ID       │ Name              │ Status │ Steps │
+    ├──────────┼───────────────────┼────────┼───────┤
+    │ flow_123 │ Payment Processing│ active │ 5     │
+    └──────────┴───────────────────┴────────┴───────┘
+    ```
+  </Tab>
+  
+  <Tab title="YAML Output">
+    ```bash
+    tolstoy config set output_format "yaml"
+    ```
+    
+    ```yaml
+    id: flow_123
+    name: Payment Processing
+    status: active
+    steps: 5
+    ```
+  </Tab>
+</Tabs>
+
+## Configuration File Locations
+
+### Default Locations
+
+<CodeGroup>
+```bash macOS/Linux
+~/.tolstoy/config.yaml
+~/.tolstoy/profiles/
+~/.tolstoy/cache/
+```
+
+```cmd Windows
+%USERPROFILE%\.tolstoy\config.yaml
+%USERPROFILE%\.tolstoy\profiles\
+%USERPROFILE%\.tolstoy\cache\
+```
+</CodeGroup>
+
+### Custom Configuration File
+
+```bash
+# Use custom configuration file
+export TOLSTOY_CONFIG_FILE="/path/to/custom-config.yaml"
+
+# Or specify with flag
+tolstoy --config /path/to/custom-config.yaml flows list
+```
+
+## Advanced Configuration
+
+### Proxy Settings
+
+```yaml
+# Add to config.yaml
+network:
+  proxy:
+    http: "http://proxy.company.com:8080"
+    https: "https://proxy.company.com:8080"
+    no_proxy: "localhost,127.0.0.1,.local"
+
+tls:
+  insecure_skip_verify: false
+  cert_file: "/path/to/client.crt"
+  key_file: "/path/to/client.key"
+```
+
+### Logging Configuration
+
+```yaml
+logging:
+  level: "info"  # debug, info, warn, error
+  file: "~/.tolstoy/tolstoy.log"
+  max_size: 10   # MB
+  max_backups: 3
+  compress: true
+```
+
+### Auto-completion
+
+Enable shell auto-completion:
+
+<CodeGroup>
+```bash Bash
+echo 'eval "$(tolstoy completion bash)"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+```bash Zsh
+echo 'eval "$(tolstoy completion zsh)"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+```bash Fish
+tolstoy completion fish | source
+```
+</CodeGroup>
+
+## Troubleshooting
+
+### Common Configuration Issues
+
+<AccordionGroup>
+  <Accordion title="Invalid Organization ID">
+    **Error**: `organization not found or access denied`
+    
+    **Solutions**:
+    ```bash
+    # Verify organization ID
+    tolstoy organizations list
+    
+    # Update configuration
+    tolstoy config set organization_id "correct_org_id"
+    ```
+  </Accordion>
+  
+  <Accordion title="Authentication Token Expired">
+    **Error**: `authentication token expired`
+    
+    **Solutions**:
+    ```bash
+    # Re-authenticate
+    tolstoy auth login
+    
+    # Or manually set new token
+    tolstoy config set auth_token "new_token_here"
+    ```
+  </Accordion>
+  
+  <Accordion title="Network Connectivity">
+    **Error**: `connection timeout` or `network unreachable`
+    
+    **Solutions**:
+    ```bash
+    # Test connectivity
+    curl -I https://api.tolstoy.getpullse.com
+    
+    # Increase timeout
+    tolstoy config set timeout 60
+    
+    # Configure proxy if needed
+    tolstoy config set proxy "http://proxy.company.com:8080"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Validate Configuration
+
+```bash
+# Test current configuration
+tolstoy config validate
+
+# Test specific profile
+tolstoy config validate --profile production
+
+# Test with verbose output
+tolstoy config validate --debug
+```
+
+## Examples
+
+### Team Development Setup
+
+```yaml
+# config.yaml for team development
+profiles:
+  development:
+    api_url: "https://dev-api.tolstoy.getpullse.com"
+    organization_id: "org_dev_123"
+    debug: true
+    timeout: 60
+  
+  staging:
+    api_url: "https://staging-api.tolstoy.getpullse.com" 
+    organization_id: "org_staging_456"
+    debug: false
+    timeout: 30
+  
+  production:
+    api_url: "https://api.tolstoy.getpullse.com"
+    organization_id: "org_prod_789"
+    debug: false
+    timeout: 30
+
+settings:
+  editor: "code"
+  output_format: "table"
+  auto_update: true
+```
+
+### CI/CD Configuration
+
+```bash
+# CI/CD environment setup
+export TOLSTOY_API_URL="https://api.tolstoy.getpullse.com"
+export TOLSTOY_ORG_ID="${TOLSTOY_ORG_ID}"
+export TOLSTOY_AUTH_TOKEN="${TOLSTOY_AUTH_TOKEN}"
+export TOLSTOY_OUTPUT_FORMAT="json"
+export TOLSTOY_DEBUG="false"
+
+# Validate configuration in CI
+tolstoy config validate || exit 1
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/cli/authentication">
+    Set up authentication and login to Tolstoy
+  </Card>
+  <Card title="CLI Commands" icon="terminal" href="/cli/commands/init/init">
+    Learn about available CLI commands
+  </Card>
+  <Card title="Organizations" icon="building" href="/cli/commands/organizations/list">
+    Manage organizations and teams
+  </Card>
+  <Card title="Tools Integration" icon="wrench" href="/cli/commands/tools/create">
+    Connect external tools and APIs
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="cli-footer.mdx" />

@@ -1,0 +1,385 @@
+---
+title: "Toggle Webhook"
+api: "PATCH /webhooks/{id}/toggle"
+description: "Enable or disable a webhook endpoint"
+---
+
+## Overview
+
+The Toggle Webhook endpoint allows you to enable or disable a webhook without deleting it. This is useful for temporarily stopping webhook deliveries during maintenance or debugging without losing the webhook configuration.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the webhook to toggle
+</ParamField>
+
+## Request Body
+
+<ParamField body="enabled" type="boolean" required>
+  Whether to enable (true) or disable (false) the webhook
+</ParamField>
+
+<ParamField body="reason" type="string">
+  Optional reason for enabling/disabling the webhook
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="id" type="string">
+  The webhook ID that was toggled
+</ResponseField>
+
+<ResponseField name="enabled" type="boolean">
+  Current enabled status of the webhook
+</ResponseField>
+
+<ResponseField name="previousStatus" type="boolean">
+  Previous enabled status before the toggle
+</ResponseField>
+
+<ResponseField name="toggledAt" type="string">
+  ISO timestamp when the webhook was toggled
+</ResponseField>
+
+<ResponseField name="toggledBy" type="string">
+  User ID who toggled the webhook
+</ResponseField>
+
+<ResponseField name="reason" type="string">
+  Reason provided for the toggle (if any)
+</ResponseField>
+
+<ResponseField name="webhook" type="object">
+  Updated webhook configuration
+  
+  <Expandable title="Webhook Object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the webhook
+    </ResponseField>
+    
+    <ResponseField name="url" type="string">
+      The webhook endpoint URL
+    </ResponseField>
+    
+    <ResponseField name="events" type="array">
+      Array of event types this webhook subscribes to
+    </ResponseField>
+    
+    <ResponseField name="enabled" type="boolean">
+      Whether the webhook is currently enabled
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      ISO timestamp when webhook was created
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      ISO timestamp when webhook was last updated
+    </ResponseField>
+    
+    <ResponseField name="stats" type="object">
+      Delivery statistics for this webhook
+      
+      <Expandable title="Webhook Statistics">
+        <ResponseField name="totalDeliveries" type="number">
+          Total number of delivery attempts
+        </ResponseField>
+        
+        <ResponseField name="successfulDeliveries" type="number">
+          Number of successful deliveries
+        </ResponseField>
+        
+        <ResponseField name="failedDeliveries" type="number">
+          Number of failed deliveries
+        </ResponseField>
+        
+        <ResponseField name="lastDeliveryAt" type="string">
+          ISO timestamp of last delivery attempt
+        </ResponseField>
+        
+        <ResponseField name="lastSuccessAt" type="string">
+          ISO timestamp of last successful delivery
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid request parameters
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="404" type="object">
+  Not Found - Webhook does not exist
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - Webhook is already in the requested state
+  
+  <Expandable title="State Conflict">
+    <ResponseField name="error" type="string">
+      "WEBHOOK_ALREADY_IN_STATE"
+    </ResponseField>
+    <ResponseField name="currentState" type="boolean">
+      Current enabled state of the webhook
+    </ResponseField>
+    <ResponseField name="requestedState" type="boolean">
+      The state that was requested
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      "Webhook is already enabled/disabled"
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL Enable
+curl -X PATCH "https://api.tolstoy.com/v1/webhooks/webhook_abc123/toggle" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "enabled": true,
+    "reason": "Re-enabling after maintenance window"
+  }'
+```
+
+```bash cURL Disable
+curl -X PATCH "https://api.tolstoy.com/v1/webhooks/webhook_abc123/toggle" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "enabled": false,
+    "reason": "Temporarily disabling for debugging"
+  }'
+```
+
+```javascript JavaScript
+// Enable a webhook
+const enableResponse = await fetch('/api/v1/webhooks/webhook_abc123/toggle', {
+  method: 'PATCH',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    enabled: true,
+    reason: 'Re-enabling after maintenance window'
+  })
+});
+
+if (enableResponse.ok) {
+  const result = await enableResponse.json();
+  console.log(`Webhook ${result.id} is now ${result.enabled ? 'enabled' : 'disabled'}`);
+}
+
+// Disable a webhook
+const disableResponse = await fetch('/api/v1/webhooks/webhook_abc123/toggle', {
+  method: 'PATCH',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    enabled: false,
+    reason: 'Temporarily disabling for debugging'
+  })
+});
+```
+
+```python Python
+import requests
+
+# Enable a webhook
+enable_response = requests.patch(
+    "https://api.tolstoy.com/v1/webhooks/webhook_abc123/toggle",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json={
+        "enabled": True,
+        "reason": "Re-enabling after maintenance window"
+    }
+)
+
+if enable_response.status_code == 200:
+    result = enable_response.json()
+    status = "enabled" if result['enabled'] else "disabled"
+    print(f"Webhook {result['id']} is now {status}")
+
+# Disable a webhook
+disable_response = requests.patch(
+    "https://api.tolstoy.com/v1/webhooks/webhook_abc123/toggle",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json={
+        "enabled": False,
+        "reason": "Temporarily disabling for debugging"
+    }
+)
+```
+
+</CodeGroup>
+
+## Enable vs Disable Behavior
+
+### When Enabling a Webhook
+- Webhook starts receiving events immediately
+- Queued events (if any) are delivered
+- Delivery statistics reset failure counters
+- Webhook appears in active webhook lists
+
+### When Disabling a Webhook
+- Webhook stops receiving new events
+- In-flight deliveries are allowed to complete
+- Failed events are not retried
+- Webhook statistics are preserved
+
+## Use Cases
+
+### Maintenance Windows
+```javascript
+// Disable webhook before maintenance
+await toggleWebhook(webhookId, false, 'Maintenance window - disabling webhook');
+
+// Perform maintenance...
+
+// Re-enable webhook after maintenance
+await toggleWebhook(webhookId, true, 'Maintenance complete - re-enabling webhook');
+```
+
+### Debugging and Testing
+```javascript
+// Disable production webhook for debugging
+await toggleWebhook(prodWebhookId, false, 'Debugging webhook delivery issues');
+
+// Test with development webhook
+await testWebhook(devWebhookId);
+
+// Re-enable when ready
+await toggleWebhook(prodWebhookId, true, 'Debugging complete');
+```
+
+### Circuit Breaker Pattern
+```javascript
+// Disable webhook after too many failures
+if (webhookStats.failedDeliveries > 10) {
+  await toggleWebhook(webhookId, false, 'Circuit breaker: too many failures');
+}
+
+// Re-enable after cooling off period
+setTimeout(async () => {
+  await toggleWebhook(webhookId, true, 'Circuit breaker: attempting recovery');
+}, 300000); // 5 minutes
+```
+
+## Event Handling
+
+When webhooks are toggled, the following events are triggered:
+
+### Webhook Enabled
+```json
+{
+  "event": "webhook.enabled",
+  "timestamp": "2024-01-15T14:30:00Z",
+  "data": {
+    "webhookId": "webhook_abc123",
+    "enabledBy": "user_789012",
+    "reason": "Re-enabling after maintenance window"
+  }
+}
+```
+
+### Webhook Disabled
+```json
+{
+  "event": "webhook.disabled",
+  "timestamp": "2024-01-15T14:30:00Z",
+  "data": {
+    "webhookId": "webhook_abc123",
+    "disabledBy": "user_789012",
+    "reason": "Temporarily disabling for debugging"
+  }
+}
+```
+
+## Batch Operations
+
+You can use this endpoint in batch operations to manage multiple webhooks:
+
+```javascript
+// Disable all webhooks for maintenance
+const webhooks = await listWebhooks();
+const disablePromises = webhooks.map(webhook => 
+  toggleWebhook(webhook.id, false, 'Scheduled maintenance')
+);
+await Promise.all(disablePromises);
+
+// Re-enable all webhooks after maintenance
+const enablePromises = webhooks.map(webhook => 
+  toggleWebhook(webhook.id, true, 'Maintenance complete')
+);
+await Promise.all(enablePromises);
+```
+
+## Audit Trail
+
+All webhook toggles are logged in the audit trail:
+- User who performed the toggle
+- Timestamp of the operation
+- Previous and new states
+- Reason provided (if any)
+- IP address and user agent
+
+## Related Endpoints
+
+- [Create Webhook](/api/endpoints/webhooks/create-webhook) - Set up new webhook
+- [Update Webhook](/api/endpoints/webhooks/update-webhook) - Modify webhook configuration
+- [Test Webhook](/api/endpoints/webhooks/test-webhook) - Test webhook delivery
+- [List Webhooks](/api/endpoints/webhooks/list-webhooks) - View all webhooks
+- [Delete Webhook](/api/endpoints/webhooks/delete-webhook) - Remove webhook

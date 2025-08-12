@@ -1,0 +1,544 @@
+---
+title: "Delete Action"
+api: "DELETE /actions/{id}"
+description: "Delete an action from your organization with safety checks for active workflows"
+---
+
+## Overview
+
+Permanently removes an action from your organization. This is a destructive operation that should be used with caution. The API includes several safety mechanisms:
+
+- **Workflow Protection**: Prevents deletion if the action is used in active workflows
+- **Soft Delete Option**: Marks action as deleted while preserving execution history
+- **Force Delete**: Completely removes action and all associated data
+- **Cascade Options**: Handles dependent workflows and executions
+
+<Danger>
+  **Irreversible Operation**: Once an action is force-deleted, it cannot be recovered. All execution history, configuration data, and associated logs are permanently removed.
+</Danger>
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID - determines which organization context to operate in
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID - used for audit logging and permission checks
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the action to delete
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="force" type="boolean" default="false">
+  Force deletion even if action is used in workflows
+</ParamField>
+
+<ParamField query="soft" type="boolean" default="true">
+  Perform soft delete (mark as deleted) instead of permanent removal
+</ParamField>
+
+<ParamField query="cascade" type="string" default="none">
+  How to handle dependent workflows
+  
+  **Options:**
+  - `none`: Fail if workflows exist (default, safest)
+  - `disable`: Disable workflows using this action
+  - `delete`: Delete workflows that only use this action
+  - `replace`: Replace with a specified alternative action
+</ParamField>
+
+<ParamField query="replacementActionId" type="string">
+  ID of action to replace this one with (required if cascade=replace)
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  ID of the deleted action
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the deleted action
+</ResponseField>
+
+<ResponseField name="deletionType" type="string">
+  Type of deletion performed: `soft` or `hard`
+</ResponseField>
+
+<ResponseField name="affectedWorkflows" type="array">
+  List of workflows that were affected by this deletion
+  
+  <Expandable title="Affected Workflow Object">
+    <ResponseField name="id" type="string">
+      Workflow ID
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Workflow name
+    </ResponseField>
+    <ResponseField name="action" type="string">
+      Action taken: `disabled`, `deleted`, `updated`
+    </ResponseField>
+    <ResponseField name="replacementActionId" type="string">
+      ID of replacement action (if applicable)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="executionStats" type="object">
+  Summary of execution data that was affected
+  
+  <Expandable title="Execution Stats">
+    <ResponseField name="totalExecutions" type="number">
+      Total number of executions
+    </ResponseField>
+    <ResponseField name="executionsDeleted" type="number">
+      Number of executions permanently deleted
+    </ResponseField>
+    <ResponseField name="executionsArchived" type="number">
+      Number of executions archived (soft delete)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="deletedAt" type="string">
+  ISO 8601 timestamp of deletion
+</ResponseField>
+
+<ResponseField name="deletedBy" type="object">
+  User who performed the deletion
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+```bash cURL - Soft Delete (Safe)
+curl -X DELETE "https://tolstoy.getpullse.com/actions/act_def456ghi789?soft=true" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc"
+```
+
+```bash cURL - Force Delete with Workflow Disabling
+curl -X DELETE "https://tolstoy.getpullse.com/actions/act_def456ghi789?force=true&cascade=disable" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc"
+```
+
+```bash cURL - Replace Action in Workflows
+curl -X DELETE "https://tolstoy.getpullse.com/actions/act_def456ghi789?cascade=replace&replacementActionId=act_new123" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc"
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+// Safe soft delete
+const result = await tolstoy.actions.delete('act_def456ghi789', {
+  soft: true
+});
+
+console.log(`Action ${result.name} soft deleted`);
+console.log(`${result.affectedWorkflows.length} workflows affected`);
+
+// Force delete with replacement
+const forceResult = await tolstoy.actions.delete('act_old123', {
+  force: true,
+  cascade: 'replace',
+  replacementActionId: 'act_new456'
+});
+
+console.log(`Replaced action in ${forceResult.affectedWorkflows.length} workflows`);
+```
+
+```python Python SDK
+from tolstoy import TolstoyClient
+
+client = TolstoyClient(
+    org_id='org_abc123def456',
+    user_id='user_xyz789abc'
+)
+
+# Safe soft delete
+result = client.actions.delete(
+    action_id='act_def456ghi789',
+    soft=True
+)
+
+print(f"Action {result.name} soft deleted")
+print(f"{len(result.affected_workflows)} workflows affected")
+
+# Force delete with replacement
+force_result = client.actions.delete(
+    action_id='act_old123',
+    force=True,
+    cascade='replace',
+    replacement_action_id='act_new456'
+)
+
+print(f"Replaced action in {len(force_result.affected_workflows)} workflows")
+```
+</CodeGroup>
+
+## Success Responses
+
+<ResponseExample>
+```json 200 OK - Soft Delete
+{
+  "id": "act_def456ghi789",
+  "name": "Create Stripe Customer",
+  "deletionType": "soft",
+  "affectedWorkflows": [
+    {
+      "id": "flow_abc123",
+      "name": "Customer Onboarding", 
+      "action": "disabled",
+      "replacementActionId": null
+    },
+    {
+      "id": "flow_def456",
+      "name": "Payment Processing",
+      "action": "disabled", 
+      "replacementActionId": null
+    }
+  ],
+  "executionStats": {
+    "totalExecutions": 1247,
+    "executionsDeleted": 0,
+    "executionsArchived": 1247
+  },
+  "deletedAt": "2024-01-15T10:30:00.000Z",
+  "deletedBy": {
+    "id": "user_xyz789abc",
+    "name": "John Smith",
+    "email": "john@company.com"
+  }
+}
+```
+
+```json 200 OK - Hard Delete with Replacement
+{
+  "id": "act_old456ghi789",
+  "name": "Legacy Customer Creation",
+  "deletionType": "hard",
+  "affectedWorkflows": [
+    {
+      "id": "flow_abc123",
+      "name": "Customer Onboarding",
+      "action": "updated",
+      "replacementActionId": "act_new789"
+    },
+    {
+      "id": "flow_def456", 
+      "name": "Payment Processing",
+      "action": "updated",
+      "replacementActionId": "act_new789"
+    }
+  ],
+  "executionStats": {
+    "totalExecutions": 892,
+    "executionsDeleted": 892,
+    "executionsArchived": 0
+  },
+  "deletedAt": "2024-01-15T10:30:00.000Z",
+  "deletedBy": {
+    "id": "user_xyz789abc",
+    "name": "John Smith", 
+    "email": "john@company.com"
+  }
+}
+```
+</ResponseExample>
+
+## Deletion Types
+
+<Tabs>
+  <Tab title="Soft Delete (Recommended)">
+    **Safe deletion that preserves data:**
+    ```bash
+    DELETE /actions/act_123?soft=true
+    ```
+    
+    **What happens:**
+    - Action marked as deleted (hidden from UI)
+    - Execution history preserved
+    - Workflows using action are disabled
+    - Can be restored by administrators
+    - No data loss
+    
+    **Use when:** You want to remove an action but preserve audit trails and allow for recovery.
+  </Tab>
+  
+  <Tab title="Hard Delete">
+    **Permanent removal of all data:**
+    ```bash
+    DELETE /actions/act_123?soft=false&force=true
+    ```
+    
+    **What happens:**
+    - Action completely removed from database
+    - All execution history deleted
+    - Workflows must be updated or deleted
+    - Cannot be recovered
+    - Frees up storage space
+    
+    **Use when:** You're certain the action and its data should be permanently removed.
+  </Tab>
+</Tabs>
+
+## Cascade Options
+
+<Tabs>
+  <Tab title="None (Default)">
+    **Fail if workflows exist:**
+    ```bash
+    DELETE /actions/act_123?cascade=none
+    ```
+    
+    **Behavior:**
+    - Returns 409 Conflict if any workflows use this action
+    - Forces manual workflow cleanup before deletion
+    - Safest option to prevent accidental workflow breakage
+  </Tab>
+  
+  <Tab title="Disable Workflows">
+    **Disable affected workflows:**
+    ```bash
+    DELETE /actions/act_123?cascade=disable
+    ```
+    
+    **Behavior:**
+    - Workflows using this action are disabled
+    - Workflows remain intact but won't execute
+    - Can be re-enabled after fixing action dependencies
+  </Tab>
+  
+  <Tab title="Delete Workflows">
+    **Remove workflows that only use this action:**
+    ```bash
+    DELETE /actions/act_123?cascade=delete
+    ```
+    
+    **Behavior:**
+    - Workflows that ONLY use this action are deleted
+    - Workflows with multiple actions are disabled
+    - Use with extreme caution
+  </Tab>
+  
+  <Tab title="Replace Action">
+    **Replace with another action:**
+    ```bash
+    DELETE /actions/act_123?cascade=replace&replacementActionId=act_456
+    ```
+    
+    **Behavior:**
+    - All workflow references updated to use replacement action
+    - Replacement action must have compatible input schema
+    - Seamless transition with no workflow downtime
+  </Tab>
+</Tabs>
+
+## Pre-Delete Validation
+
+Before deletion, the API performs several safety checks:
+
+<AccordionGroup>
+  <Accordion title="Active Workflow Check">
+    ```json Error Response
+    {
+      "error": "ConflictError",
+      "message": "Cannot delete action used in active workflows",
+      "details": {
+        "activeWorkflows": [
+          {
+            "id": "flow_abc123",
+            "name": "Customer Onboarding",
+            "status": "active"
+          }
+        ],
+        "suggestion": "Use cascade=disable or replace with another action"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Permission Check">
+    ```json Error Response
+    {
+      "error": "PermissionError",
+      "message": "Insufficient permissions to delete action",
+      "details": {
+        "required": "actions:delete",
+        "current": "actions:update"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Replacement Compatibility">
+    ```json Error Response
+    {
+      "error": "ValidationError",
+      "message": "Replacement action incompatible with workflows",
+      "details": {
+        "incompatibilities": [
+          {
+            "workflowId": "flow_abc123",
+            "issue": "Missing required parameter 'email' in replacement action"
+          }
+        ]
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Error Responses
+
+<ResponseExample>
+```json 409 Conflict - Workflows Exist
+{
+  "error": "ConflictError",
+  "message": "Cannot delete action used in active workflows",
+  "details": {
+    "activeWorkflows": [
+      {
+        "id": "flow_abc123",
+        "name": "Customer Onboarding",
+        "status": "active",
+        "lastExecuted": "2024-01-15T09:30:00.000Z"
+      },
+      {
+        "id": "flow_def456", 
+        "name": "Payment Processing",
+        "status": "active",
+        "lastExecuted": "2024-01-15T10:15:00.000Z"
+      }
+    ],
+    "totalWorkflows": 2,
+    "suggestion": "Use cascade parameter to handle workflows or delete them manually first"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 400 Bad Request - Invalid Replacement
+{
+  "error": "ValidationError",
+  "message": "Replacement action is not compatible",
+  "details": {
+    "replacementActionId": "act_incompatible123",
+    "incompatibilities": [
+      "Missing required parameter 'customerId'",
+      "Parameter 'amount' has different type (string vs number)",
+      "Different HTTP method (GET vs POST)"
+    ]
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 404 Not Found
+{
+  "error": "NotFoundError",
+  "message": "Action not found or already deleted",
+  "details": {
+    "actionId": "act_invalid123"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+</ResponseExample>
+
+## Recovery Options
+
+<AccordionGroup>
+  <Accordion title="Restore Soft-Deleted Actions">
+    Soft-deleted actions can be restored by administrators:
+    ```bash
+    POST /actions/act_123/restore
+    ```
+    
+    This will re-enable the action and any workflows that were disabled.
+  </Accordion>
+  
+  <Accordion title="Backup Before Deletion">
+    Export action configuration before deletion:
+    ```bash
+    GET /actions/act_123/export
+    ```
+    
+    Use the exported data to recreate the action if needed.
+  </Accordion>
+  
+  <Accordion title="Audit Trail">
+    All deletions are logged in the organization audit log:
+    ```bash
+    GET /organizations/{orgId}/audit-log?action=action.deleted
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Safe Deletion Workflow">
+    1. **Check Dependencies**: List workflows using the action
+    2. **Plan Migration**: Identify replacement actions or update workflows
+    3. **Soft Delete First**: Use soft delete to test impact
+    4. **Monitor**: Check for any issues in dependent systems
+    5. **Hard Delete**: Only after confirming no issues
+  </Accordion>
+  
+  <Accordion title="Team Communication">
+    - Notify team before deleting shared actions
+    - Document reasons for deletion
+    - Provide migration instructions if needed
+    - Consider deprecation period before deletion
+  </Accordion>
+  
+  <Accordion title="Testing Deletions">
+    - Test in development environment first
+    - Use soft delete in production initially
+    - Monitor workflow execution after deletion
+    - Have rollback plan ready
+  </Accordion>
+  
+  <Accordion title="Cleanup Strategy">
+    - Regular audit of unused actions
+    - Archive old actions instead of deleting
+    - Batch delete multiple unused actions
+    - Clean up associated resources (logs, metrics)
+  </Accordion>
+</AccordionGroup>
+
+## Related Operations
+
+<CardGroup cols={2}>
+  <Card title="List Actions" icon="list" href="/api/endpoints/actions/list-actions">
+    Find actions to clean up
+  </Card>
+  <Card title="Get Action" icon="eye" href="/api/endpoints/actions/get-action">
+    Check action usage before deletion
+  </Card>
+  <Card title="Restore Action" icon="refresh" href="/api/endpoints/actions/restore-action">
+    Recover soft-deleted actions
+  </Card>
+  <Card title="Audit Log" icon="scroll" href="/api/endpoints/organizations/audit-log">
+    View deletion audit trail
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="api-footer.mdx" />

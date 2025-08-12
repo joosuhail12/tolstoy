@@ -1,0 +1,334 @@
+---
+title: "Create Tool Authentication"
+api: "POST /tools/{toolId}/auth"
+description: "Create or update authentication configuration for a tool"
+---
+
+## Overview
+
+The Create Tool Authentication endpoint allows you to configure how a tool authenticates with external services. This supports both API key and OAuth2 authentication methods.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="toolId" type="string" required>
+  The unique identifier of the tool to configure authentication for
+</ParamField>
+
+## Request Body
+
+The request body varies based on the authentication type:
+
+### API Key Authentication
+
+<ParamField body="type" type="string" required>
+  Must be "api_key"
+</ParamField>
+
+<ParamField body="config" type="object" required>
+  API key authentication configuration
+  
+  <Expandable title="API Key Config">
+    <ParamField body="keyName" type="string" required>
+      The name of the API key header or parameter (e.g., "X-API-Key", "Authorization")
+    </ParamField>
+    
+    <ParamField body="keyLocation" type="string" required>
+      Where to place the API key: "header", "query", or "body"
+    </ParamField>
+    
+    <ParamField body="keyPrefix" type="string">
+      Optional prefix for the API key (e.g., "Bearer ", "Token ")
+    </ParamField>
+    
+    <ParamField body="testEndpoint" type="string">
+      Optional endpoint to test the API key validity
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### OAuth2 Authentication
+
+<ParamField body="type" type="string" required>
+  Must be "oauth2"
+</ParamField>
+
+<ParamField body="config" type="object" required>
+  OAuth2 authentication configuration
+  
+  <Expandable title="OAuth2 Config">
+    <ParamField body="clientId" type="string" required>
+      OAuth2 client ID from the provider
+    </ParamField>
+    
+    <ParamField body="clientSecret" type="string" required>
+      OAuth2 client secret from the provider
+    </ParamField>
+    
+    <ParamField body="authUrl" type="string" required>
+      OAuth2 authorization URL
+    </ParamField>
+    
+    <ParamField body="tokenUrl" type="string" required>
+      OAuth2 token exchange URL
+    </ParamField>
+    
+    <ParamField body="scopes" type="array" required>
+      Array of OAuth2 scopes to request
+    </ParamField>
+    
+    <ParamField body="redirectUri" type="string">
+      Custom redirect URI (defaults to Tolstoy's callback URL)
+    </ParamField>
+    
+    <ParamField body="refreshUrl" type="string">
+      URL for refreshing access tokens (if different from tokenUrl)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+**Status Code:** `201 Created`
+
+<ResponseField name="id" type="string">
+  Unique identifier for this authentication configuration
+</ResponseField>
+
+<ResponseField name="toolId" type="string">
+  The tool ID this authentication is configured for
+</ResponseField>
+
+<ResponseField name="type" type="string">
+  Authentication type: "api_key" or "oauth2"
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Authentication status: "configured", "active", or "error"
+</ResponseField>
+
+<ResponseField name="config" type="object">
+  Sanitized configuration (sensitive fields are masked)
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO timestamp when the authentication was created
+</ResponseField>
+
+<ResponseField name="createdBy" type="string">
+  User ID who created this authentication configuration
+</ResponseField>
+
+<ResponseField name="testResult" type="object">
+  Results from authentication testing (if applicable)
+  
+  <Expandable title="Test Result">
+    <ResponseField name="success" type="boolean">
+      Whether the authentication test passed
+    </ResponseField>
+    
+    <ResponseField name="message" type="string">
+      Test result message
+    </ResponseField>
+    
+    <ResponseField name="testedAt" type="string">
+      ISO timestamp when the test was performed
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid configuration or missing required fields
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Field-specific validation errors
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - Authentication already exists for this tool
+  
+  <Expandable title="Conflict Resolution">
+    <ResponseField name="error" type="string">
+      "AUTH_ALREADY_EXISTS"
+    </ResponseField>
+    <ResponseField name="existingAuthId" type="string">
+      ID of the existing authentication configuration
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      "Authentication already configured for this tool. Use PUT to update."
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL API Key
+curl -X POST "https://api.tolstoy.com/v1/tools/github-tool-123/auth" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "api_key",
+    "config": {
+      "keyName": "Authorization",
+      "keyLocation": "header",
+      "keyPrefix": "token ",
+      "testEndpoint": "https://api.github.com/user"
+    }
+  }'
+```
+
+```bash cURL OAuth2
+curl -X POST "https://api.tolstoy.com/v1/tools/slack-tool-456/auth" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "type": "oauth2",
+    "config": {
+      "clientId": "your-slack-client-id",
+      "clientSecret": "your-slack-client-secret",
+      "authUrl": "https://slack.com/oauth/v2/authorize",
+      "tokenUrl": "https://slack.com/api/oauth.v2.access",
+      "scopes": ["chat:write", "channels:read"]
+    }
+  }'
+```
+
+```javascript JavaScript
+// API Key authentication
+const apiKeyAuth = await fetch('/api/v1/tools/github-tool-123/auth', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    type: 'api_key',
+    config: {
+      keyName: 'Authorization',
+      keyLocation: 'header',
+      keyPrefix: 'token ',
+      testEndpoint: 'https://api.github.com/user'
+    }
+  })
+});
+
+// OAuth2 authentication
+const oauthAuth = await fetch('/api/v1/tools/slack-tool-456/auth', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    type: 'oauth2',
+    config: {
+      clientId: 'your-slack-client-id',
+      clientSecret: 'your-slack-client-secret',
+      authUrl: 'https://slack.com/oauth/v2/authorize',
+      tokenUrl: 'https://slack.com/api/oauth.v2.access',
+      scopes: ['chat:write', 'channels:read']
+    }
+  })
+});
+```
+
+```python Python
+import requests
+
+# API Key authentication
+api_key_auth = requests.post(
+    "https://api.tolstoy.com/v1/tools/github-tool-123/auth",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json={
+        "type": "api_key",
+        "config": {
+            "keyName": "Authorization",
+            "keyLocation": "header",
+            "keyPrefix": "token ",
+            "testEndpoint": "https://api.github.com/user"
+        }
+    }
+)
+
+# OAuth2 authentication
+oauth_auth = requests.post(
+    "https://api.tolstoy.com/v1/tools/slack-tool-456/auth",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json={
+        "type": "oauth2",
+        "config": {
+            "clientId": "your-slack-client-id",
+            "clientSecret": "your-slack-client-secret",
+            "authUrl": "https://slack.com/oauth/v2/authorize",
+            "tokenUrl": "https://slack.com/api/oauth.v2.access",
+            "scopes": ["chat:write", "channels:read"]
+        }
+    }
+)
+```
+
+</CodeGroup>
+
+## Configuration Testing
+
+When creating authentication configurations, Tolstoy automatically tests the configuration if a `testEndpoint` is provided. This ensures the authentication works before saving.
+
+For OAuth2 configurations, you can test the OAuth flow using the [OAuth Login](/api/endpoints/auth/oauth-login) endpoint after creating the configuration.
+
+## Security Features
+
+- **Credential Encryption**: All sensitive configuration data is encrypted before storage
+- **Access Control**: Authentication configurations are scoped to organizations
+- **Audit Logging**: All authentication configuration changes are logged
+- **Automatic Testing**: Configurations are validated when created
+
+## Related Endpoints
+
+- [List Tool Authentication](/api/endpoints/tools/auth/list-tool-auth) - List all authentication configurations
+- [Update Tool Authentication](/api/endpoints/tools/auth/update-tool-auth) - Update authentication configuration
+- [Delete Tool Authentication](/api/endpoints/tools/auth/delete-tool-auth) - Remove authentication configuration
+- [OAuth Login](/api/endpoints/auth/oauth-login) - Initiate OAuth flow

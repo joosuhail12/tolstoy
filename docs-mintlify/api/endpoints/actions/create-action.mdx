@@ -1,0 +1,666 @@
+---
+title: "Create Action"
+api: "POST /actions"
+description: "Create a new action within your organization for use in workflows"
+---
+
+## Overview
+
+Creates a new action that represents a reusable API operation. Actions are the building blocks of workflows and can be executed individually or as part of complex flows.
+
+Actions encapsulate:
+- HTTP method and endpoint configuration
+- Input parameter schemas and validation  
+- Authentication headers and secrets
+- Conditional execution logic
+- Error handling and retry policies
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID - determines which organization this action belongs to
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID - used for audit logging and permission checks
+</ParamField>
+
+## Request Body
+
+<ParamField body="name" type="string" required>
+  Human-readable name for the action (e.g., "Create Stripe Customer")
+</ParamField>
+
+<ParamField body="key" type="string">
+  Unique identifier for the action. If not provided, automatically generated from name.
+  Must be unique within the organization.
+</ParamField>
+
+<ParamField body="toolId" type="string" required>
+  ID of the tool this action belongs to. The tool defines the base URL and authentication method.
+</ParamField>
+
+<ParamField body="method" type="string" required>
+  HTTP method for the API call
+  
+  **Options:** `GET`, `POST`, `PUT`, `PATCH`, `DELETE`
+</ParamField>
+
+<ParamField body="endpoint" type="string" required>
+  API endpoint path (relative to tool's base URL)
+  
+  **Examples:**
+  - `/customers`
+  - `/users/{id}`
+  - `/orders/{orderId}/items`
+</ParamField>
+
+<ParamField body="headers" type="object">
+  HTTP headers to include with the request. These headers are merged with tool-level authentication headers.
+  
+  <Expandable title="Common Headers">
+    ```json
+    {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+      "User-Agent": "Tolstoy/1.0"
+    }
+    ```
+  </Expandable>
+</ParamField>
+
+<ParamField body="inputSchema" type="array">
+  Array defining the input parameters this action accepts
+  
+  <Expandable title="Input Schema Structure">
+    <ParamField body="name" type="string" required>
+      Parameter name (used as variable name in workflows)
+    </ParamField>
+    <ParamField body="type" type="string" required>
+      Parameter data type: `string`, `number`, `boolean`, `object`, `array`
+    </ParamField>
+    <ParamField body="required" type="boolean" default="false">
+      Whether this parameter is required for execution
+    </ParamField>
+    <ParamField body="description" type="string">
+      Human-readable description of the parameter
+    </ParamField>
+    <ParamField body="default" type="any">
+      Default value if parameter is not provided
+    </ParamField>
+    <ParamField body="validation" type="object">
+      Additional validation rules (min/max length, regex patterns, etc.)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="executeIf" type="string">
+  JSON Logic expression to conditionally execute this action based on workflow context
+  
+  **Example:** `{"==": [{"var": "status"}, "active"]}`
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the created action
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  The display name of the action
+</ResponseField>
+
+<ResponseField name="key" type="string">
+  The unique key used to reference this action
+</ResponseField>
+
+<ResponseField name="toolId" type="string">
+  ID of the associated tool
+</ResponseField>
+
+<ResponseField name="method" type="string">
+  HTTP method (GET, POST, etc.)
+</ResponseField>
+
+<ResponseField name="endpoint" type="string">
+  The API endpoint path
+</ResponseField>
+
+<ResponseField name="headers" type="object">
+  Configured HTTP headers
+</ResponseField>
+
+<ResponseField name="inputSchema" type="array">
+  Input parameter schema array
+</ResponseField>
+
+<ResponseField name="executeIf" type="string">
+  Conditional execution logic (if configured)
+</ResponseField>
+
+<ResponseField name="version" type="number">
+  Action version number (starts at 1)
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp of creation
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO 8601 timestamp of last update
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://tolstoy.getpullse.com/actions \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc" \
+  -d '{
+    "name": "Create Stripe Customer",
+    "key": "stripe-create-customer",
+    "toolId": "tool_stripe_api",
+    "method": "POST",
+    "endpoint": "/customers",
+    "headers": {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    "inputSchema": [
+      {
+        "name": "email",
+        "type": "string",
+        "required": true,
+        "description": "Customer email address",
+        "validation": {
+          "format": "email"
+        }
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "required": true,
+        "description": "Customer full name",
+        "validation": {
+          "minLength": 1,
+          "maxLength": 100
+        }
+      },
+      {
+        "name": "phone",
+        "type": "string",
+        "required": false,
+        "description": "Customer phone number"
+      },
+      {
+        "name": "metadata",
+        "type": "object", 
+        "required": false,
+        "description": "Additional metadata for the customer"
+      }
+    ]
+  }'
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const action = await tolstoy.actions.create({
+  name: 'Create Stripe Customer',
+  key: 'stripe-create-customer',
+  toolId: 'tool_stripe_api',
+  method: 'POST',
+  endpoint: '/customers',
+  headers: {
+    'Content-Type': 'application/x-www-form-urlencoded'
+  },
+  inputSchema: [
+    {
+      name: 'email',
+      type: 'string',
+      required: true,
+      description: 'Customer email address',
+      validation: { format: 'email' }
+    },
+    {
+      name: 'name', 
+      type: 'string',
+      required: true,
+      description: 'Customer full name',
+      validation: { minLength: 1, maxLength: 100 }
+    },
+    {
+      name: 'phone',
+      type: 'string',
+      required: false,
+      description: 'Customer phone number'
+    },
+    {
+      name: 'metadata',
+      type: 'object',
+      required: false,
+      description: 'Additional metadata for the customer'
+    }
+  ]
+});
+
+console.log('Action created:', action.id);
+```
+
+```python Python SDK
+from tolstoy import TolstoyClient
+
+client = TolstoyClient(
+    org_id='org_abc123def456',
+    user_id='user_xyz789abc'
+)
+
+action = client.actions.create(
+    name='Create Stripe Customer',
+    key='stripe-create-customer', 
+    tool_id='tool_stripe_api',
+    method='POST',
+    endpoint='/customers',
+    headers={
+        'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    input_schema=[
+        {
+            'name': 'email',
+            'type': 'string',
+            'required': True,
+            'description': 'Customer email address',
+            'validation': {'format': 'email'}
+        },
+        {
+            'name': 'name',
+            'type': 'string', 
+            'required': True,
+            'description': 'Customer full name',
+            'validation': {'min_length': 1, 'max_length': 100}
+        },
+        {
+            'name': 'phone',
+            'type': 'string',
+            'required': False,
+            'description': 'Customer phone number'
+        },
+        {
+            'name': 'metadata',
+            'type': 'object',
+            'required': False,
+            'description': 'Additional metadata for the customer'
+        }
+    ]
+)
+
+print(f'Action created: {action.id}')
+```
+
+```go Go SDK
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+func main() {
+    client, err := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:         "your-api-key",
+        OrganizationID: "org_abc123def456",
+        UserID:         "user_xyz789abc",
+    })
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer client.Close()
+
+    ctx := context.Background()
+    
+    action, err := client.Actions.Create(ctx, &tolstoy.CreateActionRequest{
+        Name:     "Create Stripe Customer",
+        Key:      "stripe-create-customer",
+        ToolID:   "tool_stripe_api",
+        Method:   "POST",
+        Endpoint: "/customers",
+        Headers: map[string]string{
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        InputSchema: []tolstoy.InputField{
+            {
+                Name:        "email",
+                Type:        "string",
+                Required:    true,
+                Description: "Customer email address",
+                Validation: map[string]interface{}{
+                    "format": "email",
+                },
+            },
+            {
+                Name:        "name",
+                Type:        "string",
+                Required:    true,
+                Description: "Customer full name",
+                Validation: map[string]interface{}{
+                    "minLength": 1,
+                    "maxLength": 100,
+                },
+            },
+            {
+                Name:        "phone",
+                Type:        "string",
+                Required:    false,
+                Description: "Customer phone number",
+            },
+            {
+                Name:        "metadata",
+                Type:        "object",
+                Required:    false,
+                Description: "Additional metadata for the customer",
+            },
+        },
+    })
+    if err != nil {
+        log.Fatalf("Failed to create action: %v", err)
+    }
+
+    fmt.Printf("Action created: %s\n", action.ID)
+}
+```
+</CodeGroup>
+
+## Success Response
+
+<ResponseExample>
+```json 201 Created
+{
+  "id": "act_def456ghi789",
+  "name": "Create Stripe Customer",
+  "key": "stripe-create-customer",
+  "orgId": "org_abc123def456",
+  "toolId": "tool_stripe_api",
+  "method": "POST", 
+  "endpoint": "/customers",
+  "headers": {
+    "Content-Type": "application/x-www-form-urlencoded"
+  },
+  "inputSchema": [
+    {
+      "name": "email",
+      "type": "string",
+      "required": true,
+      "description": "Customer email address",
+      "validation": {
+        "format": "email"
+      }
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "required": true, 
+      "description": "Customer full name",
+      "validation": {
+        "minLength": 1,
+        "maxLength": 100
+      }
+    },
+    {
+      "name": "phone",
+      "type": "string",
+      "required": false,
+      "description": "Customer phone number"
+    },
+    {
+      "name": "metadata",
+      "type": "object",
+      "required": false,
+      "description": "Additional metadata for the customer"
+    }
+  ],
+  "executeIf": null,
+  "version": 1,
+  "createdAt": "2024-01-15T10:30:00.000Z",
+  "updatedAt": "2024-01-15T10:30:00.000Z"
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseExample>
+```json 400 Bad Request - Invalid Input Schema
+{
+  "error": "ValidationError",
+  "message": "Invalid input schema format",
+  "details": {
+    "field": "inputSchema[0].type",
+    "issue": "Invalid type 'text', must be one of: string, number, boolean, object, array"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 409 Conflict - Duplicate Key
+{
+  "error": "ConflictError", 
+  "message": "Action with key 'stripe-create-customer' already exists",
+  "details": {
+    "existingActionId": "act_existing123",
+    "conflictingKey": "stripe-create-customer"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 404 Not Found - Invalid Tool
+{
+  "error": "NotFoundError",
+  "message": "Tool with ID 'tool_invalid' not found or access denied",
+  "details": {
+    "toolId": "tool_invalid",
+    "orgId": "org_abc123def456"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 403 Forbidden - Insufficient Permissions
+{
+  "error": "PermissionError",
+  "message": "Insufficient permissions to create actions",
+  "details": {
+    "required": "actions:create",
+    "current": "actions:read"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+</ResponseExample>
+
+## Input Schema Validation
+
+The `inputSchema` array supports rich validation rules:
+
+<Tabs>
+  <Tab title="String Validation">
+    ```json
+    {
+      "name": "email",
+      "type": "string",
+      "required": true,
+      "validation": {
+        "format": "email",           // Built-in formats: email, url, uuid
+        "minLength": 5,
+        "maxLength": 100,
+        "pattern": "^[a-zA-Z0-9]*$" // Regex pattern
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Number Validation">
+    ```json
+    {
+      "name": "amount",
+      "type": "number",
+      "required": true,
+      "validation": {
+        "minimum": 0,
+        "maximum": 1000000,
+        "multipleOf": 0.01          // For currency amounts
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Array Validation">
+    ```json
+    {
+      "name": "tags",
+      "type": "array", 
+      "required": false,
+      "validation": {
+        "minItems": 1,
+        "maxItems": 10,
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "maxLength": 50
+        }
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Object Validation">
+    ```json
+    {
+      "name": "address",
+      "type": "object",
+      "required": false,
+      "validation": {
+        "properties": {
+          "street": {"type": "string", "required": true},
+          "city": {"type": "string", "required": true},
+          "zipCode": {"type": "string", "pattern": "^\\d{5}$"}
+        },
+        "additionalProperties": false
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Conditional Execution
+
+Use JSON Logic to conditionally execute actions based on workflow context:
+
+<Tabs>
+  <Tab title="Simple Condition">
+    Execute only if status equals "active":
+    ```json
+    {
+      "executeIf": {
+        "==": [{"var": "status"}, "active"]
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Multiple Conditions">
+    Execute if amount > 100 AND status is "pending":
+    ```json
+    {
+      "executeIf": {
+        "and": [
+          {">": [{"var": "amount"}, 100]},
+          {"==": [{"var": "status"}, "pending"]}
+        ]
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Complex Logic">
+    Execute if (VIP customer OR amount > 1000) AND not weekend:
+    ```json
+    {
+      "executeIf": {
+        "and": [
+          {
+            "or": [
+              {"==": [{"var": "customer.vip"}, true]},
+              {">": [{"var": "amount"}, 1000]}
+            ]
+          },
+          {"!": {"in": [{"var": "dayOfWeek"}, ["Saturday", "Sunday"]]}}
+        ]
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Naming Conventions">
+    - Use descriptive names that clearly indicate what the action does
+    - Include the service name for external APIs (e.g., "Stripe Create Customer")
+    - Use consistent naming patterns across related actions
+    - Avoid abbreviations unless they're widely understood
+  </Accordion>
+  
+  <Accordion title="Input Schema Design">
+    - Mark parameters as required only when truly necessary
+    - Provide clear descriptions for all parameters
+    - Use validation rules to prevent common errors
+    - Group related parameters using object types
+    - Set sensible defaults for optional parameters
+  </Accordion>
+  
+  <Accordion title="Error Handling">
+    - Design actions to be idempotent when possible
+    - Use appropriate HTTP methods (GET for reading, POST for creation)
+    - Handle authentication errors gracefully
+    - Consider retry logic for transient failures
+  </Accordion>
+  
+  <Accordion title="Security">
+    - Never include sensitive data in action names or descriptions
+    - Use tool-level authentication instead of hardcoded credentials
+    - Validate all input parameters to prevent injection attacks
+    - Log execution details without exposing sensitive information
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Execute Action" icon="play" href="/api/endpoints/actions/execute-action">
+    Test your newly created action
+  </Card>
+  <Card title="List Actions" icon="list" href="/api/endpoints/actions/list-actions">
+    View all actions in your organization
+  </Card>
+  <Card title="Update Action" icon="edit" href="/api/endpoints/actions/update-action">
+    Modify action configuration
+  </Card>
+  <Card title="Create Flow" icon="flow" href="/api/endpoints/flows/create-flow">
+    Use actions in workflows
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="api-footer.mdx" />

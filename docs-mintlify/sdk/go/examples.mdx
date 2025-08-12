@@ -1,0 +1,1480 @@
+---
+title: "Go SDK Examples"
+description: "Real-world examples and advanced patterns using the Tolstoy Go SDK"
+---
+
+# Go SDK Examples
+
+This guide provides comprehensive examples and patterns for using the Tolstoy Go SDK in production environments, demonstrating Go's concurrency features and best practices.
+
+## Basic Patterns
+
+### Client Configuration and Setup
+
+<Tabs>
+  <Tab title="Environment Configuration">
+    ```go
+    package main
+
+    import (
+        "context"
+        "log"
+        "os"
+        "time"
+
+        "github.com/joho/godotenv"
+        "github.com/tolstoy/go-sdk/tolstoy"
+    )
+
+    func main() {
+        // Load environment variables
+        if err := godotenv.Load(); err != nil {
+            log.Printf("Warning: .env file not loaded: %v", err)
+        }
+
+        // Initialize client with environment variables
+        client, err := tolstoy.NewClientFromEnv()
+        if err != nil {
+            log.Fatalf("Failed to create client: %v", err)
+        }
+        defer client.Close()
+
+        // Test connection
+        ctx := context.Background()
+        user, err := client.Users.GetCurrent(ctx)
+        if err != nil {
+            log.Fatalf("Connection test failed: %v", err)
+        }
+        
+        log.Printf("✅ Connected as: %s", user.Email)
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Advanced Configuration">
+    ```go
+    package main
+
+    import (
+        "context"
+        "crypto/tls"
+        "net/http"
+        "time"
+
+        "github.com/tolstoy/go-sdk/tolstoy"
+    )
+
+    func createAdvancedClient() (*tolstoy.Client, error) {
+        // Custom HTTP transport
+        transport := &http.Transport{
+            MaxIdleConns:       100,
+            MaxIdleConnsPerHost: 10,
+            IdleConnTimeout:    90 * time.Second,
+            TLSClientConfig: &tls.Config{
+                MinVersion: tls.VersionTLS12,
+            },
+        }
+
+        // Custom HTTP client
+        httpClient := &http.Client{
+            Transport: transport,
+            Timeout:   60 * time.Second,
+        }
+
+        // Advanced client configuration
+        config := &tolstoy.Config{
+            APIKey:         os.Getenv("TOLSTOY_API_KEY"),
+            OrganizationID: os.Getenv("TOLSTOY_ORGANIZATION_ID"),
+            BaseURL:        "https://api.tolstoy.com",
+            Timeout:        45 * time.Second,
+            MaxRetries:     5,
+            RetryDelay:     2 * time.Second,
+            Debug:          true,
+            UserAgent:      "MyApp/2.1.0",
+            HTTPClient:     httpClient,
+        }
+
+        return tolstoy.NewClient(config)
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Production Configuration">
+    ```go
+    package config
+
+    import (
+        "fmt"
+        "os"
+        "strconv"
+        "time"
+
+        "github.com/tolstoy/go-sdk/tolstoy"
+    )
+
+    type AppConfig struct {
+        TolstoyAPIKey    string
+        TolstoyOrgID     string
+        TolstoyTimeout   time.Duration
+        TolstoyRetries   int
+        Environment      string
+    }
+
+    func LoadConfig() (*AppConfig, error) {
+        timeout, err := strconv.Atoi(getEnvOrDefault("TOLSTOY_TIMEOUT_SECONDS", "30"))
+        if err != nil {
+            return nil, fmt.Errorf("invalid timeout: %w", err)
+        }
+
+        retries, err := strconv.Atoi(getEnvOrDefault("TOLSTOY_MAX_RETRIES", "3"))
+        if err != nil {
+            return nil, fmt.Errorf("invalid retries: %w", err)
+        }
+
+        return &AppConfig{
+            TolstoyAPIKey:  os.Getenv("TOLSTOY_API_KEY"),
+            TolstoyOrgID:   os.Getenv("TOLSTOY_ORGANIZATION_ID"),
+            TolstoyTimeout: time.Duration(timeout) * time.Second,
+            TolstoyRetries: retries,
+            Environment:    getEnvOrDefault("ENVIRONMENT", "development"),
+        }, nil
+    }
+
+    func (c *AppConfig) CreateTolstoyClient() (*tolstoy.Client, error) {
+        return tolstoy.NewClient(&tolstoy.Config{
+            APIKey:         c.TolstoyAPIKey,
+            OrganizationID: c.TolstoyOrgID,
+            Timeout:        c.TolstoyTimeout,
+            MaxRetries:     c.TolstoyRetries,
+            Debug:          c.Environment == "development",
+        })
+    }
+
+    func getEnvOrDefault(key, defaultValue string) string {
+        if value := os.Getenv(key); value != "" {
+            return value
+        }
+        return defaultValue
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### Error Handling and Resilience
+
+```go
+package main
+
+import (
+    "context"
+    "errors"
+    "fmt"
+    "log"
+    "math/rand"
+    "time"
+
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+type ResilientService struct {
+    client *tolstoy.Client
+    logger *log.Logger
+}
+
+func NewResilientService(client *tolstoy.Client) *ResilientService {
+    return &ResilientService{
+        client: client,
+        logger: log.New(os.Stdout, "[RESILIENT] ", log.LstdFlags),
+    }
+}
+
+// ExecuteWithRetry executes an action with exponential backoff retry logic
+func (rs *ResilientService) ExecuteWithRetry(
+    ctx context.Context,
+    actionID string,
+    input map[string]interface{},
+    options RetryOptions,
+) (*tolstoy.ExecutionResult, error) {
+    var lastErr error
+    
+    for attempt := 0; attempt < options.MaxAttempts; attempt++ {
+        if attempt > 0 {
+            // Exponential backoff with jitter
+            delay := time.Duration(float64(options.BaseDelay) * 
+                     math.Pow(options.BackoffMultiplier, float64(attempt-1)))
+            jitter := time.Duration(rand.Float64() * float64(delay) * 0.1)
+            
+            select {
+            case <-time.After(delay + jitter):
+            case <-ctx.Done():
+                return nil, ctx.Err()
+            }
+        }
+
+        rs.logger.Printf("Executing action %s (attempt %d/%d)", 
+                        actionID, attempt+1, options.MaxAttempts)
+
+        result, err := rs.client.Actions.Execute(ctx, actionID, input)
+        if err != nil {
+            lastErr = err
+            
+            var apiErr *tolstoy.APIError
+            if errors.As(err, &apiErr) {
+                switch apiErr.Code {
+                case tolstoy.ErrorCodeRateLimit:
+                    // Honor rate limit retry-after
+                    if apiErr.RetryAfter > 0 {
+                        rs.logger.Printf("Rate limited, waiting %v", apiErr.RetryAfter)
+                        select {
+                        case <-time.After(apiErr.RetryAfter):
+                            continue
+                        case <-ctx.Done():
+                            return nil, ctx.Err()
+                        }
+                    }
+                    
+                case tolstoy.ErrorCodeAuth, tolstoy.ErrorCodeNotFound, tolstoy.ErrorCodeValidation:
+                    // Don't retry these errors
+                    return nil, fmt.Errorf("non-retryable error: %w", err)
+                    
+                case tolstoy.ErrorCodeServerError:
+                    // Server errors are retryable
+                    rs.logger.Printf("Server error (retryable): %v", err)
+                    continue
+                    
+                default:
+                    // Check if error is retryable
+                    if !options.ShouldRetry(err) {
+                        return nil, fmt.Errorf("non-retryable error: %w", err)
+                    }
+                }
+            }
+            
+            continue
+        }
+
+        // Wait for execution completion with timeout
+        execution, err := rs.client.Executions.WaitForCompletion(
+            ctx, result.ID, options.ExecutionTimeout,
+        )
+        if err != nil {
+            lastErr = err
+            continue
+        }
+
+        return execution, nil
+    }
+
+    return nil, fmt.Errorf("max retry attempts (%d) exceeded: %w", 
+                          options.MaxAttempts, lastErr)
+}
+
+type RetryOptions struct {
+    MaxAttempts        int
+    BaseDelay          time.Duration
+    BackoffMultiplier  float64
+    ExecutionTimeout   time.Duration
+    ShouldRetry        func(error) bool
+}
+
+func DefaultRetryOptions() RetryOptions {
+    return RetryOptions{
+        MaxAttempts:       3,
+        BaseDelay:         1 * time.Second,
+        BackoffMultiplier: 2.0,
+        ExecutionTimeout:  60 * time.Second,
+        ShouldRetry: func(err error) bool {
+            // Default retry logic
+            var apiErr *tolstoy.APIError
+            if errors.As(err, &apiErr) {
+                return apiErr.Code == tolstoy.ErrorCodeServerError ||
+                       apiErr.Code == tolstoy.ErrorCodeRateLimit
+            }
+            return true // Retry unknown errors
+        },
+    }
+}
+
+// Usage example
+func main() {
+    client, err := tolstoy.NewClientFromEnv()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Close()
+
+    service := NewResilientService(client)
+    ctx := context.Background()
+
+    result, err := service.ExecuteWithRetry(
+        ctx,
+        "action_123",
+        map[string]interface{}{
+            "user_id": "12345",
+            "action": "send_welcome_email",
+        },
+        DefaultRetryOptions(),
+    )
+
+    if err != nil {
+        log.Printf("❌ Action failed after retries: %v", err)
+        return
+    }
+
+    log.Printf("✅ Action completed: %s", result.Status)
+}
+```
+
+## Advanced Workflow Patterns
+
+### E-commerce Order Processing System
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "sync"
+    "time"
+
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+type OrderItem struct {
+    ProductID string  `json:"product_id"`
+    Quantity  int     `json:"quantity"`
+    Price     float64 `json:"price"`
+}
+
+type Order struct {
+    OrderID      string            `json:"order_id"`
+    CustomerID   string            `json:"customer_id"`
+    CustomerEmail string           `json:"customer_email"`
+    Items        []OrderItem       `json:"items"`
+    TotalAmount  float64           `json:"total_amount"`
+    ShippingAddr map[string]string `json:"shipping_address"`
+    CreatedAt    time.Time         `json:"created_at"`
+}
+
+type OrderProcessor struct {
+    client *tolstoy.Client
+    logger *log.Logger
+    
+    // Action IDs
+    inventoryCheckActionID    string
+    inventoryUpdateActionID   string
+    paymentProcessActionID    string
+    emailNotificationActionID string
+    slackNotificationActionID string
+    analyticsTrackActionID    string
+}
+
+func NewOrderProcessor(client *tolstoy.Client) *OrderProcessor {
+    return &OrderProcessor{
+        client: client,
+        logger: log.New(os.Stdout, "[ORDER-PROCESSOR] ", log.LstdFlags),
+        
+        // These would be configured based on your actual action IDs
+        inventoryCheckActionID:    "inventory_check_action",
+        inventoryUpdateActionID:   "inventory_update_action",
+        paymentProcessActionID:    "stripe_payment_action",
+        emailNotificationActionID: "sendgrid_email_action",
+        slackNotificationActionID: "slack_notification_action",
+        analyticsTrackActionID:    "analytics_tracking_action",
+    }
+}
+
+type OrderProcessingResult struct {
+    OrderID        string                 `json:"order_id"`
+    PaymentID      string                 `json:"payment_id,omitempty"`
+    Status         string                 `json:"status"`
+    ProcessingTime time.Duration          `json:"processing_time"`
+    Steps          []ProcessingStep       `json:"steps"`
+    Error          error                  `json:"error,omitempty"`
+}
+
+type ProcessingStep struct {
+    Name      string        `json:"name"`
+    Status    string        `json:"status"`
+    Duration  time.Duration `json:"duration"`
+    Error     error         `json:"error,omitempty"`
+}
+
+func (op *OrderProcessor) ProcessOrder(ctx context.Context, order *Order) *OrderProcessingResult {
+    startTime := time.Now()
+    result := &OrderProcessingResult{
+        OrderID: order.OrderID,
+        Status:  "processing",
+        Steps:   make([]ProcessingStep, 0),
+    }
+
+    op.logger.Printf("🛒 Processing order: %s", order.OrderID)
+
+    // Step 1: Validate inventory
+    if err := op.executeStep(ctx, result, "inventory_validation", func() error {
+        return op.validateInventory(ctx, order)
+    }); err != nil {
+        result.Status = "failed"
+        result.Error = err
+        return result
+    }
+
+    // Step 2: Process payment
+    var paymentID string
+    if err := op.executeStep(ctx, result, "payment_processing", func() error {
+        var err error
+        paymentID, err = op.processPayment(ctx, order)
+        return err
+    }); err != nil {
+        result.Status = "failed"
+        result.Error = err
+        return result
+    }
+    result.PaymentID = paymentID
+
+    // Step 3: Update inventory (parallel for each item)
+    if err := op.executeStep(ctx, result, "inventory_update", func() error {
+        return op.updateInventoryParallel(ctx, order.Items)
+    }); err != nil {
+        result.Status = "failed"
+        result.Error = err
+        // Note: Payment already processed, would need compensating transaction
+        op.logger.Printf("⚠️  Payment processed but inventory update failed for order %s", order.OrderID)
+        return result
+    }
+
+    // Step 4: Send notifications (parallel)
+    if err := op.executeStep(ctx, result, "notifications", func() error {
+        return op.sendNotificationsParallel(ctx, order, paymentID)
+    }); err != nil {
+        // Non-critical step - log but don't fail the order
+        op.logger.Printf("⚠️  Notifications failed for order %s: %v", order.OrderID, err)
+    }
+
+    result.Status = "completed"
+    result.ProcessingTime = time.Since(startTime)
+    
+    op.logger.Printf("✅ Order processed successfully: %s (took %v)", 
+                    order.OrderID, result.ProcessingTime)
+    
+    return result
+}
+
+func (op *OrderProcessor) executeStep(
+    ctx context.Context, 
+    result *OrderProcessingResult, 
+    stepName string, 
+    stepFunc func() error,
+) error {
+    stepStart := time.Now()
+    op.logger.Printf("🔄 Executing step: %s", stepName)
+    
+    step := ProcessingStep{
+        Name:   stepName,
+        Status: "running",
+    }
+    
+    err := stepFunc()
+    step.Duration = time.Since(stepStart)
+    
+    if err != nil {
+        step.Status = "failed"
+        step.Error = err
+        op.logger.Printf("❌ Step failed: %s - %v", stepName, err)
+    } else {
+        step.Status = "completed"
+        op.logger.Printf("✅ Step completed: %s (took %v)", stepName, step.Duration)
+    }
+    
+    result.Steps = append(result.Steps, step)
+    return err
+}
+
+func (op *OrderProcessor) validateInventory(ctx context.Context, order *Order) error {
+    // Check inventory for all items concurrently
+    type inventoryResult struct {
+        ProductID string
+        Available bool
+        Error     error
+    }
+    
+    resultChan := make(chan inventoryResult, len(order.Items))
+    
+    for _, item := range order.Items {
+        go func(item OrderItem) {
+            result, err := op.client.Actions.Execute(ctx, op.inventoryCheckActionID, map[string]interface{}{
+                "product_id":        item.ProductID,
+                "required_quantity": item.Quantity,
+            })
+            
+            if err != nil {
+                resultChan <- inventoryResult{ProductID: item.ProductID, Error: err}
+                return
+            }
+            
+            execution, err := op.client.Executions.WaitForCompletion(ctx, result.ID, 30*time.Second)
+            if err != nil {
+                resultChan <- inventoryResult{ProductID: item.ProductID, Error: err}
+                return
+            }
+            
+            available, ok := execution.Output["available"].(bool)
+            if !ok {
+                available = false
+            }
+            
+            resultChan <- inventoryResult{
+                ProductID: item.ProductID,
+                Available: available,
+            }
+        }(item)
+    }
+    
+    // Collect results
+    unavailableItems := make([]string, 0)
+    for i := 0; i < len(order.Items); i++ {
+        result := <-resultChan
+        if result.Error != nil {
+            return fmt.Errorf("inventory check failed for %s: %w", result.ProductID, result.Error)
+        }
+        if !result.Available {
+            unavailableItems = append(unavailableItems, result.ProductID)
+        }
+    }
+    
+    if len(unavailableItems) > 0 {
+        return fmt.Errorf("insufficient inventory for products: %v", unavailableItems)
+    }
+    
+    return nil
+}
+
+func (op *OrderProcessor) processPayment(ctx context.Context, order *Order) (string, error) {
+    result, err := op.client.Actions.Execute(ctx, op.paymentProcessActionID, map[string]interface{}{
+        "amount":         int(order.TotalAmount * 100), // Convert to cents
+        "currency":       "usd",
+        "customer_email": order.CustomerEmail,
+        "order_id":       order.OrderID,
+        "description":    fmt.Sprintf("Order %s", order.OrderID),
+        "metadata": map[string]interface{}{
+            "order_id":    order.OrderID,
+            "customer_id": order.CustomerID,
+            "items_count": len(order.Items),
+        },
+    })
+    
+    if err != nil {
+        return "", fmt.Errorf("payment initiation failed: %w", err)
+    }
+    
+    execution, err := op.client.Executions.WaitForCompletion(ctx, result.ID, 60*time.Second)
+    if err != nil {
+        return "", fmt.Errorf("payment processing timeout: %w", err)
+    }
+    
+    if execution.Status != "success" {
+        return "", fmt.Errorf("payment failed: %v", execution.Error)
+    }
+    
+    paymentIntentID, ok := execution.Output["payment_intent_id"].(string)
+    if !ok {
+        return "", fmt.Errorf("invalid payment response format")
+    }
+    
+    return paymentIntentID, nil
+}
+
+func (op *OrderProcessor) updateInventoryParallel(ctx context.Context, items []OrderItem) error {
+    errChan := make(chan error, len(items))
+    var wg sync.WaitGroup
+    
+    for _, item := range items {
+        wg.Add(1)
+        go func(item OrderItem) {
+            defer wg.Done()
+            
+            result, err := op.client.Actions.Execute(ctx, op.inventoryUpdateActionID, map[string]interface{}{
+                "product_id":     item.ProductID,
+                "quantity_delta": -item.Quantity, // Reduce inventory
+                "reason":         "order_fulfillment",
+                "order_id":       order.OrderID,
+            })
+            
+            if err != nil {
+                errChan <- fmt.Errorf("inventory update failed for %s: %w", item.ProductID, err)
+                return
+            }
+            
+            execution, err := op.client.Executions.WaitForCompletion(ctx, result.ID, 30*time.Second)
+            if err != nil || execution.Status != "success" {
+                errChan <- fmt.Errorf("inventory update execution failed for %s: %v", item.ProductID, err)
+                return
+            }
+            
+            errChan <- nil
+        }(item)
+    }
+    
+    wg.Wait()
+    close(errChan)
+    
+    // Check for any errors
+    for err := range errChan {
+        if err != nil {
+            return err
+        }
+    }
+    
+    return nil
+}
+
+func (op *OrderProcessor) sendNotificationsParallel(ctx context.Context, order *Order, paymentID string) error {
+    var wg sync.WaitGroup
+    errChan := make(chan error, 3) // 3 notification types
+    
+    // Send customer confirmation email
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        
+        emailData := map[string]interface{}{
+            "to":           order.CustomerEmail,
+            "template":     "order_confirmation",
+            "order_id":     order.OrderID,
+            "payment_id":   paymentID,
+            "items":        order.Items,
+            "total_amount": order.TotalAmount,
+            "shipping_address": order.ShippingAddr,
+        }
+        
+        result, err := op.client.Actions.Execute(ctx, op.emailNotificationActionID, emailData)
+        if err != nil {
+            errChan <- fmt.Errorf("email notification failed: %w", err)
+            return
+        }
+        
+        _, err = op.client.Executions.WaitForCompletion(ctx, result.ID, 30*time.Second)
+        if err != nil {
+            errChan <- fmt.Errorf("email notification execution failed: %w", err)
+        } else {
+            errChan <- nil
+        }
+    }()
+    
+    // Send Slack notification to fulfillment team
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        
+        slackData := map[string]interface{}{
+            "channel": "#fulfillment",
+            "text":    fmt.Sprintf("📦 New order to fulfill: %s", order.OrderID),
+            "blocks": []map[string]interface{}{
+                {
+                    "type": "section",
+                    "text": map[string]interface{}{
+                        "type": "mrkdwn",
+                        "text": fmt.Sprintf("*Order ID:* %s\n*Customer:* %s\n*Items:* %d\n*Total:* $%.2f", 
+                               order.OrderID, order.CustomerEmail, len(order.Items), order.TotalAmount),
+                    },
+                },
+                {
+                    "type": "actions",
+                    "elements": []map[string]interface{}{
+                        {
+                            "type": "button",
+                            "text": map[string]string{"type": "plain_text", "text": "View Order"},
+                            "url":  fmt.Sprintf("https://admin.example.com/orders/%s", order.OrderID),
+                        },
+                    },
+                },
+            },
+        }
+        
+        result, err := op.client.Actions.Execute(ctx, op.slackNotificationActionID, slackData)
+        if err != nil {
+            errChan <- fmt.Errorf("slack notification failed: %w", err)
+            return
+        }
+        
+        _, err = op.client.Executions.WaitForCompletion(ctx, result.ID, 30*time.Second)
+        if err != nil {
+            errChan <- fmt.Errorf("slack notification execution failed: %w", err)
+        } else {
+            errChan <- nil
+        }
+    }()
+    
+    // Track analytics
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        
+        analyticsData := map[string]interface{}{
+            "event": "order_processed",
+            "properties": map[string]interface{}{
+                "order_id":       order.OrderID,
+                "customer_id":    order.CustomerID,
+                "order_value":    order.TotalAmount,
+                "items_count":    len(order.Items),
+                "payment_method": "stripe",
+                "timestamp":      time.Now().Unix(),
+            },
+        }
+        
+        result, err := op.client.Actions.Execute(ctx, op.analyticsTrackActionID, analyticsData)
+        if err != nil {
+            errChan <- fmt.Errorf("analytics tracking failed: %w", err)
+            return
+        }
+        
+        _, err = op.client.Executions.WaitForCompletion(ctx, result.ID, 30*time.Second)
+        if err != nil {
+            errChan <- fmt.Errorf("analytics tracking execution failed: %w", err)
+        } else {
+            errChan <- nil
+        }
+    }()
+    
+    wg.Wait()
+    close(errChan)
+    
+    // Collect any errors (notifications are non-critical)
+    var errors []error
+    for err := range errChan {
+        if err != nil {
+            errors = append(errors, err)
+        }
+    }
+    
+    if len(errors) > 0 {
+        return fmt.Errorf("notification errors: %v", errors)
+    }
+    
+    return nil
+}
+
+// Usage example
+func main() {
+    client, err := tolstoy.NewClientFromEnv()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Close()
+    
+    processor := NewOrderProcessor(client)
+    ctx := context.Background()
+    
+    sampleOrder := &Order{
+        OrderID:       "ORD-12345",
+        CustomerID:    "CUST-567",
+        CustomerEmail: "customer@example.com",
+        Items: []OrderItem{
+            {ProductID: "PROD-1", Quantity: 2, Price: 29.99},
+            {ProductID: "PROD-2", Quantity: 1, Price: 49.99},
+        },
+        TotalAmount: 109.97,
+        ShippingAddr: map[string]string{
+            "street": "123 Main St",
+            "city":   "Anytown",
+            "state":  "CA",
+            "zip":    "90210",
+        },
+        CreatedAt: time.Now(),
+    }
+    
+    result := processor.ProcessOrder(ctx, sampleOrder)
+    
+    if result.Status == "completed" {
+        log.Printf("✅ Order processed successfully: %s", result.OrderID)
+    } else {
+        log.Printf("❌ Order processing failed: %s - %v", result.OrderID, result.Error)
+    }
+    
+    log.Printf("📊 Processing took: %v", result.ProcessingTime)
+    log.Printf("📝 Steps completed: %d", len(result.Steps))
+}
+```
+
+### Concurrent Batch Processing
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "sync"
+    "time"
+
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+type BatchProcessor struct {
+    client      *tolstoy.Client
+    workerCount int
+    logger      *log.Logger
+}
+
+type BatchItem struct {
+    ID   string
+    Data map[string]interface{}
+}
+
+type BatchResult struct {
+    Item     BatchItem
+    Result   *tolstoy.ExecutionResult
+    Error    error
+    Duration time.Duration
+}
+
+type BatchSummary struct {
+    TotalItems     int
+    SuccessCount   int
+    FailureCount   int
+    TotalDuration  time.Duration
+    AverageDuration time.Duration
+    Failures       []BatchResult
+}
+
+func NewBatchProcessor(client *tolstoy.Client, workerCount int) *BatchProcessor {
+    return &BatchProcessor{
+        client:      client,
+        workerCount: workerCount,
+        logger:      log.New(os.Stdout, "[BATCH] ", log.LstdFlags),
+    }
+}
+
+func (bp *BatchProcessor) ProcessBatch(
+    ctx context.Context,
+    items []BatchItem,
+    actionID string,
+    batchSize int,
+) (*BatchSummary, error) {
+    startTime := time.Now()
+    
+    bp.logger.Printf("🚀 Starting batch processing: %d items with %d workers", 
+                     len(items), bp.workerCount)
+    
+    // Create channels
+    itemChan := make(chan BatchItem, batchSize)
+    resultChan := make(chan BatchResult, len(items))
+    
+    // Start workers
+    var wg sync.WaitGroup
+    for i := 0; i < bp.workerCount; i++ {
+        wg.Add(1)
+        go bp.worker(ctx, &wg, i, itemChan, resultChan, actionID)
+    }
+    
+    // Send items to workers
+    go func() {
+        defer close(itemChan)
+        for _, item := range items {
+            select {
+            case itemChan <- item:
+            case <-ctx.Done():
+                return
+            }
+        }
+    }()
+    
+    // Wait for all workers to complete
+    go func() {
+        wg.Wait()
+        close(resultChan)
+    }()
+    
+    // Collect results
+    summary := &BatchSummary{
+        TotalItems: len(items),
+        Failures:   make([]BatchResult, 0),
+    }
+    
+    var totalDuration time.Duration
+    
+    for result := range resultChan {
+        totalDuration += result.Duration
+        
+        if result.Error != nil {
+            summary.FailureCount++
+            summary.Failures = append(summary.Failures, result)
+            bp.logger.Printf("❌ Item failed: %s - %v", result.Item.ID, result.Error)
+        } else {
+            summary.SuccessCount++
+            bp.logger.Printf("✅ Item completed: %s (took %v)", 
+                           result.Item.ID, result.Duration)
+        }
+    }
+    
+    summary.TotalDuration = time.Since(startTime)
+    if summary.TotalItems > 0 {
+        summary.AverageDuration = totalDuration / time.Duration(summary.TotalItems)
+    }
+    
+    bp.logger.Printf("📊 Batch completed: %d/%d successful (%.1f%%) in %v",
+                     summary.SuccessCount, summary.TotalItems,
+                     float64(summary.SuccessCount)/float64(summary.TotalItems)*100,
+                     summary.TotalDuration)
+    
+    return summary, nil
+}
+
+func (bp *BatchProcessor) worker(
+    ctx context.Context,
+    wg *sync.WaitGroup,
+    workerID int,
+    itemChan <-chan BatchItem,
+    resultChan chan<- BatchResult,
+    actionID string,
+) {
+    defer wg.Done()
+    
+    bp.logger.Printf("🔧 Worker %d started", workerID)
+    
+    for {
+        select {
+        case item, ok := <-itemChan:
+            if !ok {
+                bp.logger.Printf("🔧 Worker %d finished", workerID)
+                return
+            }
+            
+            result := bp.processItem(ctx, item, actionID)
+            
+            select {
+            case resultChan <- result:
+            case <-ctx.Done():
+                return
+            }
+            
+        case <-ctx.Done():
+            bp.logger.Printf("🔧 Worker %d cancelled", workerID)
+            return
+        }
+    }
+}
+
+func (bp *BatchProcessor) processItem(
+    ctx context.Context,
+    item BatchItem,
+    actionID string,
+) BatchResult {
+    startTime := time.Now()
+    
+    result := BatchResult{
+        Item: item,
+    }
+    
+    // Execute action
+    execution, err := bp.client.Actions.Execute(ctx, actionID, item.Data)
+    if err != nil {
+        result.Error = err
+        result.Duration = time.Since(startTime)
+        return result
+    }
+    
+    // Wait for completion
+    completedExecution, err := bp.client.Executions.WaitForCompletion(
+        ctx, execution.ID, 60*time.Second,
+    )
+    if err != nil {
+        result.Error = err
+        result.Duration = time.Since(startTime)
+        return result
+    }
+    
+    result.Result = completedExecution
+    result.Duration = time.Since(startTime)
+    
+    if completedExecution.Status != "success" {
+        result.Error = fmt.Errorf("execution failed: %v", completedExecution.Error)
+    }
+    
+    return result
+}
+
+// Usage example for user synchronization
+func main() {
+    client, err := tolstoy.NewClientFromEnv()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Close()
+    
+    processor := NewBatchProcessor(client, 10) // 10 concurrent workers
+    ctx := context.Background()
+    
+    // Create batch of user sync items
+    users := make([]BatchItem, 100)
+    for i := 0; i < 100; i++ {
+        users[i] = BatchItem{
+            ID: fmt.Sprintf("user_%d", i),
+            Data: map[string]interface{}{
+                "user_id": fmt.Sprintf("user_%d", i),
+                "email":   fmt.Sprintf("user%d@example.com", i),
+                "action":  "sync_to_crm",
+            },
+        }
+    }
+    
+    summary, err := processor.ProcessBatch(
+        ctx,
+        users,
+        "sync_user_to_hubspot", // Action ID
+        50, // Batch size
+    )
+    
+    if err != nil {
+        log.Printf("❌ Batch processing failed: %v", err)
+        return
+    }
+    
+    // Print summary
+    fmt.Printf(`
+📊 Batch Processing Summary:
+   Total Items: %d
+   Successful: %d
+   Failed: %d
+   Success Rate: %.1f%%
+   Total Time: %v
+   Average Time per Item: %v
+`, 
+        summary.TotalItems,
+        summary.SuccessCount,
+        summary.FailureCount,
+        float64(summary.SuccessCount)/float64(summary.TotalItems)*100,
+        summary.TotalDuration,
+        summary.AverageDuration,
+    )
+    
+    // Show first few failures for debugging
+    if len(summary.Failures) > 0 {
+        fmt.Println("\n❌ Sample Failures:")
+        for i, failure := range summary.Failures {
+            if i >= 5 { // Show only first 5
+                fmt.Printf("   ... and %d more\n", len(summary.Failures)-5)
+                break
+            }
+            fmt.Printf("   %s: %v\n", failure.Item.ID, failure.Error)
+        }
+    }
+}
+```
+
+### Real-time Event Processing
+
+```go
+package main
+
+import (
+    "context"
+    "encoding/json"
+    "fmt"
+    "log"
+    "sync"
+    "time"
+
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+type Event struct {
+    ID        string                 `json:"id"`
+    Type      string                 `json:"type"`
+    Timestamp time.Time              `json:"timestamp"`
+    UserID    string                 `json:"user_id,omitempty"`
+    Data      map[string]interface{} `json:"data"`
+}
+
+type EventHandler interface {
+    Handle(ctx context.Context, event Event) error
+    CanHandle(eventType string) bool
+}
+
+type EventProcessor struct {
+    client   *tolstoy.Client
+    handlers map[string]EventHandler
+    logger   *log.Logger
+    
+    // Metrics
+    processedCount int64
+    failedCount    int64
+    mutex          sync.RWMutex
+}
+
+func NewEventProcessor(client *tolstoy.Client) *EventProcessor {
+    return &EventProcessor{
+        client:   client,
+        handlers: make(map[string]EventHandler),
+        logger:   log.New(os.Stdout, "[EVENT-PROCESSOR] ", log.LstdFlags),
+    }
+}
+
+func (ep *EventProcessor) RegisterHandler(eventType string, handler EventHandler) {
+    ep.handlers[eventType] = handler
+    ep.logger.Printf("📝 Registered handler for event type: %s", eventType)
+}
+
+func (ep *EventProcessor) ProcessEvent(ctx context.Context, event Event) error {
+    ep.logger.Printf("🔄 Processing event: %s (type: %s)", event.ID, event.Type)
+    
+    handler, exists := ep.handlers[event.Type]
+    if !exists {
+        ep.logger.Printf("❓ No handler found for event type: %s", event.Type)
+        return fmt.Errorf("no handler for event type: %s", event.Type)
+    }
+    
+    if !handler.CanHandle(event.Type) {
+        return fmt.Errorf("handler cannot process event type: %s", event.Type)
+    }
+    
+    startTime := time.Now()
+    err := handler.Handle(ctx, event)
+    duration := time.Since(startTime)
+    
+    ep.mutex.Lock()
+    if err != nil {
+        ep.failedCount++
+        ep.logger.Printf("❌ Event processing failed: %s - %v (took %v)", 
+                        event.ID, err, duration)
+    } else {
+        ep.processedCount++
+        ep.logger.Printf("✅ Event processed successfully: %s (took %v)", 
+                        event.ID, duration)
+    }
+    ep.mutex.Unlock()
+    
+    return err
+}
+
+func (ep *EventProcessor) GetStats() (processed, failed int64) {
+    ep.mutex.RLock()
+    defer ep.mutex.RUnlock()
+    return ep.processedCount, ep.failedCount
+}
+
+// User signup event handler
+type UserSignupHandler struct {
+    client                *tolstoy.Client
+    welcomeEmailActionID  string
+    crmSyncActionID      string
+    analyticsActionID    string
+}
+
+func NewUserSignupHandler(client *tolstoy.Client) *UserSignupHandler {
+    return &UserSignupHandler{
+        client:               client,
+        welcomeEmailActionID: "send_welcome_email",
+        crmSyncActionID:      "sync_user_to_crm",
+        analyticsActionID:    "track_signup_event",
+    }
+}
+
+func (h *UserSignupHandler) CanHandle(eventType string) bool {
+    return eventType == "user.signup"
+}
+
+func (h *UserSignupHandler) Handle(ctx context.Context, event Event) error {
+    // Extract user data from event
+    email, ok := event.Data["email"].(string)
+    if !ok {
+        return fmt.Errorf("missing email in user signup event")
+    }
+    
+    name, _ := event.Data["name"].(string)
+    source, _ := event.Data["source"].(string)
+    
+    // Process signup in parallel
+    errChan := make(chan error, 3)
+    var wg sync.WaitGroup
+    
+    // Send welcome email
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        
+        result, err := h.client.Actions.Execute(ctx, h.welcomeEmailActionID, map[string]interface{}{
+            "email":    email,
+            "name":     name,
+            "user_id":  event.UserID,
+        })
+        
+        if err != nil {
+            errChan <- fmt.Errorf("welcome email failed: %w", err)
+            return
+        }
+        
+        execution, err := h.client.Executions.WaitForCompletion(ctx, result.ID, 30*time.Second)
+        if err != nil || execution.Status != "success" {
+            errChan <- fmt.Errorf("welcome email execution failed: %v", err)
+        } else {
+            errChan <- nil
+        }
+    }()
+    
+    // Sync to CRM
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        
+        result, err := h.client.Actions.Execute(ctx, h.crmSyncActionID, map[string]interface{}{
+            "email":     email,
+            "name":      name,
+            "user_id":   event.UserID,
+            "source":    source,
+            "signup_at": event.Timestamp.Unix(),
+        })
+        
+        if err != nil {
+            errChan <- fmt.Errorf("CRM sync failed: %w", err)
+            return
+        }
+        
+        execution, err := h.client.Executions.WaitForCompletion(ctx, result.ID, 30*time.Second)
+        if err != nil || execution.Status != "success" {
+            errChan <- fmt.Errorf("CRM sync execution failed: %v", err)
+        } else {
+            errChan <- nil
+        }
+    }()
+    
+    // Track analytics
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        
+        result, err := h.client.Actions.Execute(ctx, h.analyticsActionID, map[string]interface{}{
+            "event":      "user_signup",
+            "user_id":    event.UserID,
+            "properties": map[string]interface{}{
+                "email":      email,
+                "name":       name,
+                "source":     source,
+                "signup_at":  event.Timestamp.Unix(),
+                "event_id":   event.ID,
+            },
+        })
+        
+        if err != nil {
+            errChan <- fmt.Errorf("analytics tracking failed: %w", err)
+            return
+        }
+        
+        execution, err := h.client.Executions.WaitForCompletion(ctx, result.ID, 30*time.Second)
+        if err != nil || execution.Status != "success" {
+            errChan <- fmt.Errorf("analytics tracking execution failed: %v", err)
+        } else {
+            errChan <- nil
+        }
+    }()
+    
+    // Wait for all operations and collect errors
+    wg.Wait()
+    close(errChan)
+    
+    var errors []error
+    for err := range errChan {
+        if err != nil {
+            errors = append(errors, err)
+        }
+    }
+    
+    if len(errors) > 0 {
+        return fmt.Errorf("signup processing errors: %v", errors)
+    }
+    
+    return nil
+}
+
+// Order completed event handler
+type OrderCompletedHandler struct {
+    client                    *tolstoy.Client
+    confirmationEmailActionID string
+    shippingNotifyActionID   string
+    loyaltyPointsActionID    string
+}
+
+func NewOrderCompletedHandler(client *tolstoy.Client) *OrderCompletedHandler {
+    return &OrderCompletedHandler{
+        client:                    client,
+        confirmationEmailActionID: "send_order_confirmation",
+        shippingNotifyActionID:    "notify_shipping_team",
+        loyaltyPointsActionID:     "add_loyalty_points",
+    }
+}
+
+func (h *OrderCompletedHandler) CanHandle(eventType string) bool {
+    return eventType == "order.completed"
+}
+
+func (h *OrderCompletedHandler) Handle(ctx context.Context, event Event) error {
+    // Extract order data
+    orderID, ok := event.Data["order_id"].(string)
+    if !ok {
+        return fmt.Errorf("missing order_id in order completed event")
+    }
+    
+    customerEmail, _ := event.Data["customer_email"].(string)
+    totalAmount, _ := event.Data["total_amount"].(float64)
+    
+    // Process order completion
+    var wg sync.WaitGroup
+    errChan := make(chan error, 3)
+    
+    // Send confirmation email
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        
+        result, err := h.client.Actions.Execute(ctx, h.confirmationEmailActionID, map[string]interface{}{
+            "order_id":       orderID,
+            "customer_email": customerEmail,
+            "total_amount":   totalAmount,
+            "order_data":     event.Data,
+        })
+        
+        if err != nil {
+            errChan <- fmt.Errorf("confirmation email failed: %w", err)
+            return
+        }
+        
+        _, err = h.client.Executions.WaitForCompletion(ctx, result.ID, 30*time.Second)
+        errChan <- err
+    }()
+    
+    // Notify shipping team
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        
+        result, err := h.client.Actions.Execute(ctx, h.shippingNotifyActionID, map[string]interface{}{
+            "order_id":    orderID,
+            "customer_id": event.UserID,
+            "priority":    "normal",
+            "order_data":  event.Data,
+        })
+        
+        if err != nil {
+            errChan <- fmt.Errorf("shipping notification failed: %w", err)
+            return
+        }
+        
+        _, err = h.client.Executions.WaitForCompletion(ctx, result.ID, 30*time.Second)
+        errChan <- err
+    }()
+    
+    // Add loyalty points
+    if event.UserID != "" {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            
+            points := int(totalAmount * 1.0) // 1 point per dollar
+            
+            result, err := h.client.Actions.Execute(ctx, h.loyaltyPointsActionID, map[string]interface{}{
+                "user_id":    event.UserID,
+                "points":     points,
+                "reason":     "order_completed",
+                "order_id":   orderID,
+                "amount":     totalAmount,
+            })
+            
+            if err != nil {
+                errChan <- fmt.Errorf("loyalty points failed: %w", err)
+                return
+            }
+            
+            _, err = h.client.Executions.WaitForCompletion(ctx, result.ID, 30*time.Second)
+            errChan <- err
+        }()
+    }
+    
+    wg.Wait()
+    close(errChan)
+    
+    // Check for errors
+    for err := range errChan {
+        if err != nil {
+            return err
+        }
+    }
+    
+    return nil
+}
+
+// Simulated event stream processor
+func simulateEventStream(ctx context.Context, processor *EventProcessor) {
+    events := []Event{
+        {
+            ID:        "evt_001",
+            Type:      "user.signup",
+            Timestamp: time.Now(),
+            UserID:    "user_123",
+            Data: map[string]interface{}{
+                "email":  "john@example.com",
+                "name":   "John Doe",
+                "source": "website",
+            },
+        },
+        {
+            ID:        "evt_002",
+            Type:      "order.completed",
+            Timestamp: time.Now(),
+            UserID:    "user_123",
+            Data: map[string]interface{}{
+                "order_id":       "ord_456",
+                "customer_email": "john@example.com",
+                "total_amount":   99.99,
+                "items": []map[string]interface{}{
+                    {"product_id": "prod_1", "quantity": 2, "price": 49.99},
+                },
+            },
+        },
+    }
+    
+    for _, event := range events {
+        select {
+        case <-ctx.Done():
+            return
+        default:
+            if err := processor.ProcessEvent(ctx, event); err != nil {
+                log.Printf("❌ Failed to process event %s: %v", event.ID, err)
+            }
+            
+            // Simulate delay between events
+            time.Sleep(2 * time.Second)
+        }
+    }
+}
+
+// Usage example
+func main() {
+    client, err := tolstoy.NewClientFromEnv()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer client.Close()
+    
+    // Create event processor
+    processor := NewEventProcessor(client)
+    
+    // Register event handlers
+    processor.RegisterHandler("user.signup", NewUserSignupHandler(client))
+    processor.RegisterHandler("order.completed", NewOrderCompletedHandler(client))
+    
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+    
+    // Simulate processing events
+    simulateEventStream(ctx, processor)
+    
+    // Show final stats
+    processed, failed := processor.GetStats()
+    fmt.Printf("\n📊 Final Stats: %d processed, %d failed\n", processed, failed)
+}
+```
+
+These comprehensive Go SDK examples demonstrate production-ready patterns including error handling, concurrency, batch processing, and real-time event handling. Each example showcases Go's strengths in building robust, concurrent applications with the Tolstoy platform.

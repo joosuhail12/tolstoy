@@ -1,0 +1,162 @@
+---
+title: "List Flows"
+api: "GET /flows"
+description: "Retrieve a paginated list of all flows in your organization"
+---
+
+## Overview
+
+The List Flows endpoint returns a paginated list of all flows in your organization, with filtering and sorting options.
+
+## Query Parameters
+
+<ParamField query="page" type="number" default="1">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="limit" type="number" default="20">
+  Number of items per page (max: 100)
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by status: `active`, `inactive`, `draft`
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search flows by name or description
+</ParamField>
+
+<ParamField query="triggerType" type="string">
+  Filter by trigger type: `manual`, `webhook`, `schedule`, `event`
+</ParamField>
+
+<ParamField query="sortBy" type="string" default="createdAt">
+  Sort field: `name`, `createdAt`, `updatedAt`, `executionCount`
+</ParamField>
+
+<ParamField query="sortOrder" type="string" default="desc">
+  Sort order: `asc` or `desc`
+</ParamField>
+
+## Response
+
+<ResponseField name="flows" type="array">
+  Array of flow objects
+  
+  <Expandable title="Flow Object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the flow
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Name of the flow
+    </ResponseField>
+    
+    <ResponseField name="description" type="string">
+      Brief description of the flow
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Current status: `active`, `inactive`, `draft`
+    </ResponseField>
+    
+    <ResponseField name="triggerType" type="string">
+      Type of trigger for the flow
+    </ResponseField>
+    
+    <ResponseField name="stepCount" type="number">
+      Number of steps in the flow
+    </ResponseField>
+    
+    <ResponseField name="lastExecutedAt" type="string">
+      ISO 8601 timestamp of last execution
+    </ResponseField>
+    
+    <ResponseField name="executionCount" type="number">
+      Total number of executions
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      ISO 8601 timestamp when created
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      ISO 8601 timestamp when last updated
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination metadata
+  
+  <Expandable title="Pagination Object">
+    <ResponseField name="page" type="number">
+      Current page number
+    </ResponseField>
+    
+    <ResponseField name="limit" type="number">
+      Items per page
+    </ResponseField>
+    
+    <ResponseField name="total" type="number">
+      Total number of items
+    </ResponseField>
+    
+    <ResponseField name="totalPages" type="number">
+      Total number of pages
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "flows": [
+    {
+      "id": "flow_abc123",
+      "name": "Customer Onboarding Flow",
+      "description": "Automated workflow for new customer onboarding",
+      "status": "active",
+      "triggerType": "webhook",
+      "stepCount": 5,
+      "lastExecutedAt": "2024-01-15T09:00:00Z",
+      "executionCount": 156,
+      "createdAt": "2024-01-01T00:00:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z"
+    },
+    {
+      "id": "flow_def456",
+      "name": "Daily Report Generation",
+      "description": "Generate and distribute daily reports",
+      "status": "active",
+      "triggerType": "schedule",
+      "stepCount": 3,
+      "lastExecutedAt": "2024-01-15T00:00:00Z",
+      "executionCount": 30,
+      "createdAt": "2023-12-15T00:00:00Z",
+      "updatedAt": "2024-01-10T14:20:00Z"
+    },
+    {
+      "id": "flow_ghi789",
+      "name": "Error Alert Handler",
+      "description": "Process and route error alerts",
+      "status": "active",
+      "triggerType": "event",
+      "stepCount": 4,
+      "lastExecutedAt": "2024-01-14T22:45:00Z",
+      "executionCount": 89,
+      "createdAt": "2023-11-20T00:00:00Z",
+      "updatedAt": "2024-01-05T09:15:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 45,
+    "totalPages": 3
+  }
+}
+```
+</ResponseExample>
+
+<Snippet file="api-footer.mdx" />

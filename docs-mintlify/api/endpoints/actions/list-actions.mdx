@@ -1,0 +1,460 @@
+---
+title: "List Actions"
+api: "GET /actions"
+description: "Retrieve all actions within your organization with filtering and pagination support"
+---
+
+## Overview
+
+Lists all actions in your organization. Actions are displayed in reverse chronological order (newest first) by default. Use query parameters to filter, sort, and paginate results.
+
+This endpoint is essential for:
+- Browsing available actions for workflow building
+- Monitoring action inventory and usage
+- Searching for specific actions by name or functionality
+- Auditing action configurations and versions
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID - determines which organization's actions to retrieve
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID - used for permission checks and audit logging
+</ParamField>
+
+## Query Parameters
+
+### Pagination
+
+<ParamField query="page" type="integer" default="1">
+  Page number for pagination (1-based)
+</ParamField>
+
+<ParamField query="limit" type="integer" default="20">
+  Number of actions per page (maximum 100)
+</ParamField>
+
+### Filtering
+
+<ParamField query="search" type="string">
+  Search term to filter actions by name or key
+</ParamField>
+
+<ParamField query="toolId" type="string">
+  Filter actions by specific tool ID
+</ParamField>
+
+<ParamField query="method" type="string">
+  Filter by HTTP method
+  
+  **Options:** `GET`, `POST`, `PUT`, `PATCH`, `DELETE`
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by action status
+  
+  **Options:** `active`, `inactive`, `draft`
+</ParamField>
+
+<ParamField query="createdAfter" type="string">
+  ISO 8601 timestamp - only return actions created after this date
+</ParamField>
+
+<ParamField query="createdBefore" type="string">
+  ISO 8601 timestamp - only return actions created before this date
+</ParamField>
+
+### Sorting
+
+<ParamField query="sort" type="string" default="createdAt">
+  Field to sort by
+  
+  **Options:** `name`, `key`, `createdAt`, `updatedAt`, `version`
+</ParamField>
+
+<ParamField query="order" type="string" default="desc">
+  Sort direction
+  
+  **Options:** `asc`, `desc`
+</ParamField>
+
+## Response
+
+<ResponseField name="data" type="array">
+  Array of action objects
+  
+  <Expandable title="Action Object Schema">
+    <ResponseField name="id" type="string">
+      Unique identifier for the action
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Human-readable name of the action
+    </ResponseField>
+    <ResponseField name="key" type="string">
+      Unique key used to reference this action
+    </ResponseField>
+    <ResponseField name="toolId" type="string">
+      ID of the associated tool
+    </ResponseField>
+    <ResponseField name="toolName" type="string">
+      Name of the associated tool
+    </ResponseField>
+    <ResponseField name="method" type="string">
+      HTTP method (GET, POST, PUT, PATCH, DELETE)
+    </ResponseField>
+    <ResponseField name="endpoint" type="string">
+      API endpoint path
+    </ResponseField>
+    <ResponseField name="status" type="string">
+      Action status: `active`, `inactive`, or `draft`
+    </ResponseField>
+    <ResponseField name="version" type="number">
+      Current version number
+    </ResponseField>
+    <ResponseField name="executionCount" type="number">
+      Total number of times this action has been executed
+    </ResponseField>
+    <ResponseField name="lastExecutedAt" type="string">
+      ISO 8601 timestamp of last execution (null if never executed)
+    </ResponseField>
+    <ResponseField name="createdAt" type="string">
+      ISO 8601 timestamp of creation
+    </ResponseField>
+    <ResponseField name="updatedAt" type="string">
+      ISO 8601 timestamp of last update
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination information
+  
+  <Expandable title="Pagination Schema">
+    <ResponseField name="page" type="number">
+      Current page number
+    </ResponseField>
+    <ResponseField name="limit" type="number">
+      Items per page
+    </ResponseField>
+    <ResponseField name="total" type="number">
+      Total number of actions
+    </ResponseField>
+    <ResponseField name="pages" type="number">
+      Total number of pages
+    </ResponseField>
+    <ResponseField name="hasNext" type="boolean">
+      Whether there are more pages
+    </ResponseField>
+    <ResponseField name="hasPrev" type="boolean">
+      Whether there are previous pages
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET "https://tolstoy.getpullse.com/actions?search=stripe&limit=10" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc"
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const response = await tolstoy.actions.list({
+  search: 'stripe',
+  limit: 10,
+  sort: 'name',
+  order: 'asc'
+});
+
+console.log(`Found ${response.data.length} actions`);
+response.data.forEach(action => {
+  console.log(`- ${action.name} (${action.method} ${action.endpoint})`);
+});
+```
+
+```python Python SDK
+from tolstoy import TolstoyClient
+
+client = TolstoyClient(
+    org_id='org_abc123def456',
+    user_id='user_xyz789abc'
+)
+
+response = client.actions.list(
+    search='stripe',
+    limit=10,
+    sort='name',
+    order='asc'
+)
+
+print(f"Found {len(response.data)} actions")
+for action in response.data:
+    print(f"- {action.name} ({action.method} {action.endpoint})")
+```
+
+```go Go SDK
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+func main() {
+    client, err := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:         "your-api-key",
+        OrganizationID: "org_abc123def456",
+        UserID:         "user_xyz789abc",
+    })
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer client.Close()
+
+    ctx := context.Background()
+    
+    response, err := client.Actions.List(ctx, &tolstoy.ListActionsRequest{
+        Search: "stripe",
+        Limit:  10,
+        Sort:   "name",
+        Order:  "asc",
+    })
+    if err != nil {
+        log.Fatalf("Failed to list actions: %v", err)
+    }
+
+    fmt.Printf("Found %d actions\n", len(response.Data))
+    for _, action := range response.Data {
+        fmt.Printf("- %s (%s %s)\n", action.Name, action.Method, action.Endpoint)
+    }
+}
+```
+</CodeGroup>
+
+## Success Response
+
+<ResponseExample>
+```json 200 OK
+{
+  "data": [
+    {
+      "id": "act_def456ghi789",
+      "name": "Create Stripe Customer",
+      "key": "stripe-create-customer",
+      "toolId": "tool_stripe_api",
+      "toolName": "Stripe API",
+      "method": "POST",
+      "endpoint": "/customers",
+      "status": "active",
+      "version": 2,
+      "executionCount": 147,
+      "lastExecutedAt": "2024-01-15T09:45:00.000Z",
+      "createdAt": "2024-01-10T10:30:00.000Z",
+      "updatedAt": "2024-01-12T14:20:00.000Z"
+    },
+    {
+      "id": "act_abc123def456",
+      "name": "Get Stripe Customer",
+      "key": "stripe-get-customer",
+      "toolId": "tool_stripe_api",
+      "toolName": "Stripe API",
+      "method": "GET",
+      "endpoint": "/customers/{id}",
+      "status": "active",
+      "version": 1,
+      "executionCount": 89,
+      "lastExecutedAt": "2024-01-14T16:22:00.000Z",
+      "createdAt": "2024-01-10T11:15:00.000Z",
+      "updatedAt": "2024-01-10T11:15:00.000Z"
+    },
+    {
+      "id": "act_ghi789jkl012",
+      "name": "Update Stripe Subscription",
+      "key": "stripe-update-subscription", 
+      "toolId": "tool_stripe_api",
+      "toolName": "Stripe API",
+      "method": "PATCH",
+      "endpoint": "/subscriptions/{id}",
+      "status": "active",
+      "version": 1,
+      "executionCount": 23,
+      "lastExecutedAt": "2024-01-13T12:30:00.000Z",
+      "createdAt": "2024-01-09T15:45:00.000Z",
+      "updatedAt": "2024-01-09T15:45:00.000Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 3,
+    "pages": 1,
+    "hasNext": false,
+    "hasPrev": false
+  }
+}
+```
+</ResponseExample>
+
+## Filtering Examples
+
+### Search by Name or Key
+
+```bash
+GET /actions?search=customer
+```
+
+Returns all actions with "customer" in their name or key.
+
+### Filter by Tool
+
+```bash
+GET /actions?toolId=tool_stripe_api&sort=executionCount&order=desc
+```
+
+Returns all Stripe actions sorted by execution count (most used first).
+
+### Filter by HTTP Method
+
+```bash
+GET /actions?method=POST&status=active
+```
+
+Returns all active POST actions.
+
+### Date Range Filtering
+
+```bash
+GET /actions?createdAfter=2024-01-01T00:00:00Z&createdBefore=2024-01-31T23:59:59Z
+```
+
+Returns actions created in January 2024.
+
+## Advanced Filtering
+
+<Tabs>
+  <Tab title="Popular Actions">
+    Find your most-used actions:
+    ```bash
+    GET /actions?sort=executionCount&order=desc&limit=5
+    ```
+  </Tab>
+  
+  <Tab title="Recently Updated">
+    See recently modified actions:
+    ```bash
+    GET /actions?sort=updatedAt&order=desc&limit=10
+    ```
+  </Tab>
+  
+  <Tab title="Draft Actions">
+    Find actions in development:
+    ```bash
+    GET /actions?status=draft&sort=createdAt&order=desc
+    ```
+  </Tab>
+  
+  <Tab title="Unused Actions">
+    Find actions that haven't been executed:
+    ```bash
+    GET /actions?executionCount=0&sort=createdAt&order=asc
+    ```
+  </Tab>
+</Tabs>
+
+## Error Responses
+
+<ResponseExample>
+```json 400 Bad Request - Invalid Parameters
+{
+  "error": "ValidationError",
+  "message": "Invalid query parameters",
+  "details": {
+    "field": "limit",
+    "issue": "Limit must be between 1 and 100"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 403 Forbidden - Insufficient Permissions
+{
+  "error": "PermissionError",
+  "message": "Insufficient permissions to list actions",
+  "details": {
+    "required": "actions:read",
+    "current": "none"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+</ResponseExample>
+
+## Performance Tips
+
+<AccordionGroup>
+  <Accordion title="Pagination Best Practices">
+    - Use reasonable page sizes (10-50 items)
+    - Cache results when possible to avoid repeated requests
+    - Consider using `hasNext` and `hasPrev` for navigation UI
+    - For large datasets, use filtering to narrow results
+  </Accordion>
+  
+  <Accordion title="Efficient Filtering">
+    - Use specific filters (toolId, method) instead of broad searches
+    - Combine filters to reduce result sets (e.g., `toolId` + `status`)
+    - Use date range filtering for time-based queries
+    - Consider caching frequently accessed filter combinations
+  </Accordion>
+  
+  <Accordion title="Sorting Strategy">
+    - Default sort (createdAt desc) is most efficient
+    - Sorting by `executionCount` helps identify popular actions
+    - Use `name` sort for user-facing displays
+    - Avoid frequent sort changes to leverage caching
+  </Accordion>
+</AccordionGroup>
+
+## Response Headers
+
+```bash
+X-Total-Count: 147
+X-Page: 1
+X-Per-Page: 20
+X-Total-Pages: 8
+Link: </actions?page=2&limit=20>; rel="next"
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Create Action" icon="plus" href="/api/endpoints/actions/create-action">
+    Add a new action to your organization
+  </Card>
+  <Card title="Execute Action" icon="play" href="/api/endpoints/actions/execute-action">
+    Run an action and see results
+  </Card>
+  <Card title="Get Action Details" icon="eye" href="/api/endpoints/actions/get-action">
+    View full action configuration
+  </Card>
+  <Card title="Update Action" icon="edit" href="/api/endpoints/actions/update-action">
+    Modify existing action settings
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="api-footer.mdx" />

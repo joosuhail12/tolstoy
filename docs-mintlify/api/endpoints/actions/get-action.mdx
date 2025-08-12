@@ -1,0 +1,505 @@
+---
+title: "Get Action"
+api: "GET /actions/{id}"
+description: "Retrieve detailed information about a specific action including its configuration and metadata"
+---
+
+## Overview
+
+Retrieves complete details for a specific action, including its configuration, input schema, execution statistics, and version history. This endpoint is essential for:
+
+- Inspecting action configurations before execution
+- Understanding input requirements and validation rules
+- Reviewing execution statistics and performance metrics
+- Debugging action setup and parameters
+- Building dynamic UI for action selection and execution
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID - determines which organization context to search in
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID - used for permission checks and audit logging
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the action to retrieve. Can be either the action ID or the action key.
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the action
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Human-readable name of the action
+</ResponseField>
+
+<ResponseField name="key" type="string">
+  Unique key used to reference this action in workflows
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Optional description of what this action does
+</ResponseField>
+
+<ResponseField name="orgId" type="string">
+  Organization ID this action belongs to
+</ResponseField>
+
+<ResponseField name="toolId" type="string">
+  ID of the associated tool that provides the base URL and authentication
+</ResponseField>
+
+<ResponseField name="tool" type="object">
+  Embedded tool information
+  
+  <Expandable title="Tool Object">
+    <ResponseField name="id" type="string">
+      Tool ID
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Tool display name
+    </ResponseField>
+    <ResponseField name="baseUrl" type="string">
+      Base URL for API calls
+    </ResponseField>
+    <ResponseField name="authType" type="string">
+      Authentication method: `none`, `api_key`, `bearer_token`, `oauth2`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="method" type="string">
+  HTTP method for the API call (GET, POST, PUT, PATCH, DELETE)
+</ResponseField>
+
+<ResponseField name="endpoint" type="string">
+  API endpoint path (relative to tool's base URL)
+</ResponseField>
+
+<ResponseField name="headers" type="object">
+  Custom HTTP headers to include with requests
+</ResponseField>
+
+<ResponseField name="inputSchema" type="array">
+  Array defining the input parameters this action accepts
+  
+  <Expandable title="Input Schema Item">
+    <ResponseField name="name" type="string">
+      Parameter name
+    </ResponseField>
+    <ResponseField name="type" type="string">
+      Parameter data type: `string`, `number`, `boolean`, `object`, `array`
+    </ResponseField>
+    <ResponseField name="required" type="boolean">
+      Whether this parameter is required
+    </ResponseField>
+    <ResponseField name="description" type="string">
+      Human-readable parameter description
+    </ResponseField>
+    <ResponseField name="default" type="any">
+      Default value if parameter is not provided
+    </ResponseField>
+    <ResponseField name="validation" type="object">
+      Additional validation rules
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="executeIf" type="string">
+  JSON Logic expression for conditional execution (null if always execute)
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Action status: `active`, `inactive`, or `draft`
+</ResponseField>
+
+<ResponseField name="version" type="number">
+  Current version number of the action
+</ResponseField>
+
+<ResponseField name="stats" type="object">
+  Execution statistics
+  
+  <Expandable title="Statistics Object">
+    <ResponseField name="totalExecutions" type="number">
+      Total number of executions
+    </ResponseField>
+    <ResponseField name="successfulExecutions" type="number">
+      Number of successful executions
+    </ResponseField>
+    <ResponseField name="failedExecutions" type="number">
+      Number of failed executions
+    </ResponseField>
+    <ResponseField name="avgDurationMs" type="number">
+      Average execution duration in milliseconds
+    </ResponseField>
+    <ResponseField name="lastExecutedAt" type="string">
+      ISO 8601 timestamp of last execution (null if never executed)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="createdBy" type="object">
+  User who created the action
+  
+  <Expandable title="User Object">
+    <ResponseField name="id" type="string">
+      User ID
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      User display name
+    </ResponseField>
+    <ResponseField name="email" type="string">
+      User email address
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp of creation
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO 8601 timestamp of last modification
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET https://tolstoy.getpullse.com/actions/act_def456ghi789 \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc"
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const action = await tolstoy.actions.get('act_def456ghi789');
+
+console.log(`Action: ${action.name}`);
+console.log(`Method: ${action.method} ${action.endpoint}`);
+console.log(`Executions: ${action.stats.totalExecutions}`);
+console.log(`Success Rate: ${
+  (action.stats.successfulExecutions / action.stats.totalExecutions * 100).toFixed(1)
+}%`);
+```
+
+```python Python SDK
+from tolstoy import TolstoyClient
+
+client = TolstoyClient(
+    org_id='org_abc123def456',
+    user_id='user_xyz789abc'
+)
+
+action = client.actions.get('act_def456ghi789')
+
+print(f"Action: {action.name}")
+print(f"Method: {action.method} {action.endpoint}")
+print(f"Executions: {action.stats.total_executions}")
+success_rate = (action.stats.successful_executions / action.stats.total_executions * 100)
+print(f"Success Rate: {success_rate:.1f}%")
+```
+</CodeGroup>
+
+## Success Response
+
+<ResponseExample>
+```json 200 OK
+{
+  "id": "act_def456ghi789",
+  "name": "Create Stripe Customer",
+  "key": "stripe-create-customer",
+  "description": "Creates a new customer in Stripe with email, name, and optional metadata",
+  "orgId": "org_abc123def456",
+  "toolId": "tool_stripe_api",
+  "tool": {
+    "id": "tool_stripe_api",
+    "name": "Stripe API",
+    "baseUrl": "https://api.stripe.com/v1",
+    "authType": "api_key"
+  },
+  "method": "POST",
+  "endpoint": "/customers",
+  "headers": {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "User-Agent": "Tolstoy/1.0"
+  },
+  "inputSchema": [
+    {
+      "name": "email",
+      "type": "string",
+      "required": true,
+      "description": "Customer email address",
+      "validation": {
+        "format": "email"
+      }
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "required": true,
+      "description": "Customer full name",
+      "validation": {
+        "minLength": 1,
+        "maxLength": 100
+      }
+    },
+    {
+      "name": "phone",
+      "type": "string",
+      "required": false,
+      "description": "Customer phone number"
+    },
+    {
+      "name": "metadata",
+      "type": "object",
+      "required": false,
+      "description": "Additional metadata for the customer",
+      "default": {}
+    }
+  ],
+  "executeIf": null,
+  "status": "active",
+  "version": 2,
+  "stats": {
+    "totalExecutions": 147,
+    "successfulExecutions": 142,
+    "failedExecutions": 5,
+    "avgDurationMs": 1247,
+    "lastExecutedAt": "2024-01-15T09:45:00.000Z"
+  },
+  "createdBy": {
+    "id": "user_xyz789abc",
+    "name": "John Smith",
+    "email": "john@company.com"
+  },
+  "createdAt": "2024-01-10T10:30:00.000Z",
+  "updatedAt": "2024-01-12T14:20:00.000Z"
+}
+```
+</ResponseExample>
+
+## Alternative Access Methods
+
+### Get by Action Key
+
+You can also retrieve an action using its unique key instead of ID:
+
+```bash
+GET /actions/stripe-create-customer
+```
+
+This is useful when you know the action key but not the ID.
+
+### Response Format
+
+Both ID and key lookups return identical response formats.
+
+## Error Responses
+
+<ResponseExample>
+```json 404 Not Found
+{
+  "error": "NotFoundError",
+  "message": "Action not found or access denied",
+  "details": {
+    "actionId": "act_invalid123",
+    "orgId": "org_abc123def456"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 403 Forbidden
+{
+  "error": "PermissionError",
+  "message": "Insufficient permissions to view action",
+  "details": {
+    "required": "actions:read",
+    "current": "none"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+</ResponseExample>
+
+## Understanding Input Schema
+
+The input schema defines what parameters the action accepts:
+
+<Tabs>
+  <Tab title="String Parameters">
+    ```json
+    {
+      "name": "email",
+      "type": "string",
+      "required": true,
+      "description": "Customer email address",
+      "validation": {
+        "format": "email",
+        "maxLength": 255
+      }
+    }
+    ```
+    
+    String parameters can include format validation (email, url, uuid) and length constraints.
+  </Tab>
+  
+  <Tab title="Number Parameters">
+    ```json
+    {
+      "name": "amount",
+      "type": "number",
+      "required": true,
+      "description": "Transaction amount in cents",
+      "validation": {
+        "minimum": 50,
+        "maximum": 1000000,
+        "multipleOf": 1
+      }
+    }
+    ```
+    
+    Number parameters support minimum/maximum values and multiple constraints.
+  </Tab>
+  
+  <Tab title="Object Parameters">
+    ```json
+    {
+      "name": "address",
+      "type": "object",
+      "required": false,
+      "description": "Customer billing address",
+      "validation": {
+        "properties": {
+          "street": {"type": "string", "required": true},
+          "city": {"type": "string", "required": true},
+          "zipCode": {"type": "string", "pattern": "^\\d{5}$"}
+        }
+      }
+    }
+    ```
+    
+    Object parameters can define nested schemas for complex data structures.
+  </Tab>
+  
+  <Tab title="Array Parameters">
+    ```json
+    {
+      "name": "tags",
+      "type": "array",
+      "required": false,
+      "description": "Customer tags",
+      "validation": {
+        "minItems": 1,
+        "maxItems": 10,
+        "items": {
+          "type": "string",
+          "maxLength": 50
+        }
+      }
+    }
+    ```
+    
+    Array parameters can specify item types and quantity constraints.
+  </Tab>
+</Tabs>
+
+## Execution Statistics
+
+The `stats` object provides insights into action performance:
+
+<AccordionGroup>
+  <Accordion title="Success Rate">
+    Calculate the success rate:
+    ```javascript
+    const successRate = (stats.successfulExecutions / stats.totalExecutions) * 100;
+    console.log(`Success rate: ${successRate.toFixed(1)}%`);
+    ```
+  </Accordion>
+  
+  <Accordion title="Performance Metrics">
+    Monitor execution performance:
+    ```javascript
+    if (stats.avgDurationMs > 5000) {
+      console.warn('Action is running slower than expected');
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Usage Tracking">
+    Track action popularity:
+    ```javascript
+    const executionsToday = await getExecutionsSince(new Date().setHours(0,0,0,0));
+    console.log(`Executed ${executionsToday} times today`);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Version Information
+
+Actions support versioning for configuration changes:
+
+- **Version Number**: Increments with each configuration change
+- **Backward Compatibility**: Existing workflows continue using the version they were created with
+- **Schema Evolution**: Input schemas can be extended without breaking existing workflows
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Schema Validation">
+    - Always validate the input schema before building execution requests
+    - Check `required` fields to ensure all necessary parameters are provided
+    - Use `validation` rules to implement client-side validation
+    - Handle `default` values appropriately in your UI
+  </Accordion>
+  
+  <Accordion title="Performance Monitoring">
+    - Monitor `avgDurationMs` for performance degradation
+    - Track success rates to identify problematic actions
+    - Use `lastExecutedAt` to identify unused actions
+    - Set up alerts for actions with high failure rates
+  </Accordion>
+  
+  <Accordion title="Access Control">
+    - Implement role-based access to sensitive actions
+    - Log access to actions with sensitive data
+    - Use the `createdBy` field for audit trails
+    - Consider action visibility based on user permissions
+  </Accordion>
+</AccordionGroup>
+
+## Related Operations
+
+<CardGroup cols={2}>
+  <Card title="Execute Action" icon="play" href="/api/endpoints/actions/execute-action">
+    Execute this action with parameters
+  </Card>
+  <Card title="Update Action" icon="edit" href="/api/endpoints/actions/update-action">
+    Modify action configuration
+  </Card>
+  <Card title="List Actions" icon="list" href="/api/endpoints/actions/list-actions">
+    Browse all organization actions
+  </Card>
+  <Card title="Execution History" icon="history" href="/api/endpoints/execution-logs/list-logs">
+    View detailed execution logs
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="api-footer.mdx" />

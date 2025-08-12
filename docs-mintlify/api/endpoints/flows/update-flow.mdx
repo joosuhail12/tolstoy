@@ -1,0 +1,225 @@
+---
+title: "Update Flow"
+api: "PUT /flows/{id}"
+description: "Update an existing flow's configuration and steps"
+---
+
+## Overview
+
+The Update Flow endpoint allows you to modify an existing flow's configuration, including its steps, triggers, and settings.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the flow to update
+</ParamField>
+
+## Request Body
+
+<ParamField body="name" type="string">
+  Name of the flow
+</ParamField>
+
+<ParamField body="description" type="string">
+  Description of what the flow does
+</ParamField>
+
+<ParamField body="status" type="string">
+  Flow status: `active`, `inactive`, `draft`
+</ParamField>
+
+<ParamField body="trigger" type="object">
+  Flow trigger configuration
+  
+  <Expandable title="Trigger Object">
+    <ParamField body="type" type="string">
+      Trigger type: `manual`, `webhook`, `schedule`, `event`
+    </ParamField>
+    
+    <ParamField body="config" type="object">
+      Trigger-specific configuration
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="steps" type="array">
+  Array of flow steps
+  
+  <Expandable title="Step Object">
+    <ParamField body="id" type="string">
+      Step identifier (required for existing steps)
+    </ParamField>
+    
+    <ParamField body="name" type="string" required>
+      Step name
+    </ParamField>
+    
+    <ParamField body="type" type="string" required>
+      Step type: `action`, `condition`, `loop`, `parallel`
+    </ParamField>
+    
+    <ParamField body="actionId" type="string">
+      ID of the action to execute (required for action steps)
+    </ParamField>
+    
+    <ParamField body="config" type="object">
+      Step configuration
+    </ParamField>
+    
+    <ParamField body="dependencies" type="array">
+      IDs of steps that must complete before this step
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="variables" type="object">
+  Flow variables and their default values
+</ParamField>
+
+<ParamField body="settings" type="object">
+  Flow execution settings
+  
+  <Expandable title="Settings Object">
+    <ParamField body="timeout" type="number">
+      Maximum execution time in seconds
+    </ParamField>
+    
+    <ParamField body="retryPolicy" type="object">
+      Retry configuration for failed executions
+    </ParamField>
+    
+    <ParamField body="notifications" type="object">
+      Notification settings for flow events
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<RequestExample>
+```json
+{
+  "name": "Updated Customer Onboarding",
+  "description": "Enhanced automated workflow with additional validation",
+  "status": "active",
+  "trigger": {
+    "type": "webhook",
+    "config": {
+      "url": "https://api.example.com/webhook/onboarding-v2",
+      "method": "POST",
+      "headers": {
+        "Authorization": "Bearer {{webhook_token}}"
+      }
+    }
+  },
+  "steps": [
+    {
+      "id": "step_1",
+      "name": "Validate Customer Data",
+      "type": "action",
+      "actionId": "action_validate_123",
+      "config": {
+        "inputMapping": {
+          "email": "{{trigger.email}}",
+          "name": "{{trigger.name}}",
+          "phone": "{{trigger.phone}}"
+        }
+      },
+      "dependencies": []
+    },
+    {
+      "name": "Check Duplicate Account",
+      "type": "action",
+      "actionId": "action_check_duplicate",
+      "config": {
+        "email": "{{trigger.email}}"
+      },
+      "dependencies": ["step_1"]
+    },
+    {
+      "id": "step_2",
+      "name": "Create Account",
+      "type": "action",
+      "actionId": "action_create_456",
+      "config": {
+        "inputMapping": {
+          "validatedData": "{{step_1.output}}"
+        }
+      },
+      "dependencies": ["step_1"]
+    },
+    {
+      "id": "step_3",
+      "name": "Send Welcome Email",
+      "type": "action",
+      "actionId": "action_email_789",
+      "config": {
+        "template": "welcome_v2",
+        "recipient": "{{step_2.output.email}}"
+      },
+      "dependencies": ["step_2"]
+    }
+  ],
+  "variables": {
+    "environment": "production",
+    "region": "us-east-1",
+    "emailTemplate": "welcome_v2"
+  },
+  "settings": {
+    "timeout": 600,
+    "retryPolicy": {
+      "maxRetries": 5,
+      "backoffMultiplier": 2
+    },
+    "notifications": {
+      "onSuccess": ["admin@example.com", "team@example.com"],
+      "onFailure": ["alerts@example.com", "oncall@example.com"]
+    }
+  }
+}
+```
+</RequestExample>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the flow
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Updated name of the flow
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Updated description
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  New version number after update
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Updated status
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO 8601 timestamp when the flow was updated
+</ResponseField>
+
+<ResponseField name="updatedBy" type="string">
+  User ID who performed the update
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "id": "flow_abc123",
+  "name": "Updated Customer Onboarding",
+  "description": "Enhanced automated workflow with additional validation",
+  "version": "1.3.0",
+  "status": "active",
+  "updatedAt": "2024-01-15T11:00:00Z",
+  "updatedBy": "user_admin_123"
+}
+```
+</ResponseExample>
+
+<Snippet file="api-footer.mdx" />

@@ -1,0 +1,433 @@
+---
+title: "Update Execution Log"
+api: "PUT /execution-logs/{id}"
+description: "Update execution log entry with outputs, status, or error information"
+---
+
+## Overview
+
+The Update Execution Log endpoint updates an existing execution log entry. This is typically used to add outputs or update status after step completion, or to record errors when step execution fails.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the execution log to update
+</ParamField>
+
+## Request Body
+
+<ParamField body="outputs" type="object">
+  Output data produced by the step execution
+  
+  <Expandable title="Output Examples">
+    <ParamField body="messageId" type="string">
+      ID of sent message (for notification steps)
+    </ParamField>
+    
+    <ParamField body="success" type="boolean">
+      Whether the step completed successfully
+    </ParamField>
+    
+    <ParamField body="responseCode" type="number">
+      HTTP response code (for API calls)
+    </ParamField>
+    
+    <ParamField body="data" type="object">
+      Any structured data returned by the step
+    </ParamField>
+    
+    <ParamField body="timestamp" type="string">
+      ISO timestamp when step completed
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="error" type="object">
+  Error information if step execution failed
+  
+  <Expandable title="Error Object">
+    <ParamField body="message" type="string">
+      Error message
+    </ParamField>
+    
+    <ParamField body="code" type="string">
+      Error code identifier
+    </ParamField>
+    
+    <ParamField body="stack" type="string">
+      Stack trace (if available)
+    </ParamField>
+    
+    <ParamField body="details" type="object">
+      Additional error context
+    </ParamField>
+    
+    <ParamField body="retryable" type="boolean">
+      Whether this error can be retried
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="status" type="string">
+  Updated execution status: "pending", "running", "completed", "failed", "skipped"
+</ParamField>
+
+<ParamField body="duration" type="number">
+  Execution duration in milliseconds
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Additional metadata to add or update
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="id" type="string">
+  Unique identifier for the execution log entry
+</ResponseField>
+
+<ResponseField name="flowId" type="string">
+  The workflow flow ID
+</ResponseField>
+
+<ResponseField name="executionId" type="string">
+  The workflow execution ID
+</ResponseField>
+
+<ResponseField name="stepKey" type="string">
+  The workflow step key
+</ResponseField>
+
+<ResponseField name="inputs" type="object">
+  Input data and configuration for the step
+</ResponseField>
+
+<ResponseField name="outputs" type="object">
+  Updated output data produced by the step
+</ResponseField>
+
+<ResponseField name="error" type="object">
+  Updated error information (null if successful)
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Updated execution status
+</ResponseField>
+
+<ResponseField name="duration" type="number">
+  Updated execution duration in milliseconds
+</ResponseField>
+
+<ResponseField name="metadata" type="object">
+  Updated metadata for the execution log
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO timestamp when the log entry was created
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO timestamp when the log entry was last updated
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid execution log data
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Field-specific validation errors
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="404" type="object">
+  Not Found - Execution log does not exist
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - Log entry is in a state that cannot be updated
+  
+  <Expandable title="State Conflict">
+    <ResponseField name="error" type="string">
+      "LOG_UPDATE_CONFLICT"
+    </ResponseField>
+    <ResponseField name="currentStatus" type="string">
+      Current log entry status
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Explanation of why update is not allowed
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL Success Update
+curl -X PUT "https://api.tolstoy.com/v1/execution-logs/log_def456" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "outputs": {
+      "messageId": "msg_456",
+      "timestamp": "2024-01-15T10:30:05Z",
+      "success": true,
+      "responseCode": 200,
+      "channelId": "C1234567890"
+    },
+    "status": "completed",
+    "duration": 1250
+  }'
+```
+
+```bash cURL Error Update
+curl -X PUT "https://api.tolstoy.com/v1/execution-logs/log_def456" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "error": {
+      "message": "Failed to send message to Slack channel",
+      "code": "SLACK_API_ERROR",
+      "details": {
+        "slackError": "channel_not_found",
+        "statusCode": 404
+      },
+      "retryable": true
+    },
+    "status": "failed",
+    "duration": 2100
+  }'
+```
+
+```javascript JavaScript
+// Update log with successful completion
+const successUpdate = await fetch('/api/v1/execution-logs/log_def456', {
+  method: 'PUT',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    outputs: {
+      messageId: 'msg_456',
+      timestamp: '2024-01-15T10:30:05Z',
+      success: true,
+      responseCode: 200,
+      channelId: 'C1234567890'
+    },
+    status: 'completed',
+    duration: 1250
+  })
+});
+
+// Update log with error information
+const errorUpdate = await fetch('/api/v1/execution-logs/log_def456', {
+  method: 'PUT',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    error: {
+      message: 'Failed to send message to Slack channel',
+      code: 'SLACK_API_ERROR',
+      details: {
+        slackError: 'channel_not_found',
+        statusCode: 404
+      },
+      retryable: true
+    },
+    status: 'failed',
+    duration: 2100
+  })
+});
+
+if (errorUpdate.ok) {
+  const updatedLog = await errorUpdate.json();
+  console.log('Log updated with error:', updatedLog.id);
+}
+```
+
+```python Python
+import requests
+
+# Update log with successful completion
+success_data = {
+    "outputs": {
+        "messageId": "msg_456",
+        "timestamp": "2024-01-15T10:30:05Z",
+        "success": True,
+        "responseCode": 200,
+        "channelId": "C1234567890"
+    },
+    "status": "completed",
+    "duration": 1250
+}
+
+success_response = requests.put(
+    "https://api.tolstoy.com/v1/execution-logs/log_def456",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json=success_data
+)
+
+# Update log with error information
+error_data = {
+    "error": {
+        "message": "Failed to send message to Slack channel",
+        "code": "SLACK_API_ERROR",
+        "details": {
+            "slackError": "channel_not_found",
+            "statusCode": 404
+        },
+        "retryable": True
+    },
+    "status": "failed",
+    "duration": 2100
+}
+
+error_response = requests.put(
+    "https://api.tolstoy.com/v1/execution-logs/log_def456",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json=error_data
+)
+
+if error_response.status_code == 200:
+    updated_log = error_response.json()
+    print(f"Log updated with error: {updated_log['id']}")
+```
+
+</CodeGroup>
+
+## Common Update Patterns
+
+### Step Completion
+```json
+{
+  "outputs": {
+    "result": "success",
+    "data": {...},
+    "timestamp": "2024-01-15T10:30:05Z"
+  },
+  "status": "completed",
+  "duration": 1250
+}
+```
+
+### Step Failure
+```json
+{
+  "error": {
+    "message": "API timeout after 30 seconds",
+    "code": "TIMEOUT_ERROR",
+    "retryable": true
+  },
+  "status": "failed",
+  "duration": 30000
+}
+```
+
+### Progressive Updates
+```json
+{
+  "outputs": {
+    "progress": 50,
+    "currentStep": "processing_data",
+    "itemsProcessed": 25
+  },
+  "status": "running",
+  "metadata": {
+    "lastUpdateAt": "2024-01-15T10:30:05Z"
+  }
+}
+```
+
+## Update Validation
+
+When updating execution logs, the following validations apply:
+
+### Status Transitions
+- `pending` → `running`, `completed`, `failed`, `skipped`
+- `running` → `completed`, `failed`
+- `completed` → Cannot be changed
+- `failed` → Cannot be changed without explicit override
+
+### Required Fields
+- When status is `completed`: `outputs` should be provided
+- When status is `failed`: `error` should be provided
+- When status is `running`: `duration` is optional
+
+### Data Consistency
+- Cannot remove existing outputs (only add/modify)
+- Cannot change immutable fields (`flowId`, `executionId`, `stepKey`)
+- Error information replaces previous error data
+
+## Concurrency Handling
+
+Multiple updates to the same log entry are handled using:
+- **Optimistic locking**: Uses `updatedAt` timestamp for conflict detection
+- **Last-write-wins**: Later updates override earlier ones
+- **Atomic operations**: All fields update together or not at all
+
+## Use Cases
+
+### Real-time Status Updates
+Update log entries as steps progress through execution
+
+### Error Recording
+Capture detailed error information when steps fail
+
+### Output Collection
+Store results and data produced by completed steps
+
+### Performance Tracking
+Record execution durations and performance metrics
+
+## Related Endpoints
+
+- [Create Execution Log](/api/endpoints/execution-logs/create-execution-log) - Create new log entry
+- [Get Execution Log](/api/endpoints/execution-logs/get-log) - Retrieve specific log
+- [List Execution Logs](/api/endpoints/execution-logs/list-logs) - View all logs
+- [Delete Execution Log](/api/endpoints/execution-logs/delete-execution-log) - Remove log entry

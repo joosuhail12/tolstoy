@@ -1,0 +1,220 @@
+---
+title: "Cancel Execution"
+api: "POST /executions/{id}/cancel"
+description: "Cancel a running workflow execution"
+---
+
+## Overview
+
+The Cancel Execution endpoint allows you to stop a currently running workflow execution. This is useful for long-running workflows that need to be interrupted or when resource constraints require stopping executions.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the execution to cancel
+</ParamField>
+
+## Request Body
+
+<ParamField body="reason" type="string">
+  Optional reason for canceling the execution
+</ParamField>
+
+<ParamField body="force" type="boolean">
+  Whether to force cancel the execution immediately (defaults to false)
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="id" type="string">
+  The execution ID that was canceled
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  New execution status: "canceling" or "canceled"
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Confirmation message about the cancellation
+</ResponseField>
+
+<ResponseField name="canceledAt" type="string">
+  ISO timestamp when the cancellation was initiated
+</ResponseField>
+
+<ResponseField name="canceledBy" type="string">
+  User ID who canceled the execution
+</ResponseField>
+
+<ResponseField name="reason" type="string">
+  Reason provided for cancellation (if any)
+</ResponseField>
+
+<ResponseField name="estimatedStopTime" type="string">
+  Estimated time when execution will fully stop (for graceful cancellation)
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid execution ID or execution cannot be canceled
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="404" type="object">
+  Not Found - Execution does not exist
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - Execution is not in a cancellable state
+  
+  <Expandable title="State Conflict">
+    <ResponseField name="error" type="string">
+      "INVALID_EXECUTION_STATE"
+    </ResponseField>
+    <ResponseField name="currentStatus" type="string">
+      Current execution status
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Explanation of why cancellation is not possible
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "https://api.tolstoy.com/v1/executions/exec_abc123/cancel" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reason": "User requested cancellation due to resource constraints",
+    "force": false
+  }'
+```
+
+```javascript JavaScript
+const cancelResponse = await fetch('/api/v1/executions/exec_abc123/cancel', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    reason: 'User requested cancellation due to resource constraints',
+    force: false
+  })
+});
+
+if (cancelResponse.ok) {
+  const result = await cancelResponse.json();
+  console.log(`Execution ${result.id} is now ${result.status}`);
+} else {
+  const error = await cancelResponse.json();
+  console.error('Cancellation failed:', error.message);
+}
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://api.tolstoy.com/v1/executions/exec_abc123/cancel",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json={
+        "reason": "User requested cancellation due to resource constraints",
+        "force": False
+    }
+)
+
+if response.status_code == 200:
+    result = response.json()
+    print(f"Execution {result['id']} is now {result['status']}")
+else:
+    error = response.json()
+    print(f"Cancellation failed: {error['message']}")
+```
+
+</CodeGroup>
+
+## Cancellation Behavior
+
+### Graceful Cancellation (force: false)
+- Allows current step to complete
+- Triggers cleanup procedures
+- May take 30-60 seconds to fully stop
+- Preferred method for most use cases
+
+### Force Cancellation (force: true)
+- Immediately terminates execution
+- May leave resources in inconsistent state
+- Use only when graceful cancellation fails
+- Requires additional cleanup permissions
+
+## Execution States
+
+Executions can only be canceled when in these states:
+- `running` - Currently executing
+- `pending` - Waiting to start
+- `paused` - Temporarily paused
+
+Cannot cancel executions in these states:
+- `completed` - Already finished successfully
+- `failed` - Already finished with error
+- `canceled` - Already canceled
+- `canceling` - Already in process of being canceled
+
+## Cleanup and Resources
+
+When an execution is canceled:
+- Any allocated resources are released
+- Temporary files and data are cleaned up
+- Connected tools are notified of cancellation
+- Webhook events are triggered
+
+## Webhook Events
+
+The cancellation triggers webhook events:
+- `execution.canceling` - When cancellation is initiated
+- `execution.canceled` - When cancellation completes
+
+## Related Endpoints
+
+- [Get Execution Status](/api/endpoints/executions/get-execution) - Check execution details
+- [List Executions](/api/endpoints/executions/list-executions) - View all executions
+- [Retry Execution](/api/endpoints/executions/retry-execution) - Restart failed execution

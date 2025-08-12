@@ -1,0 +1,622 @@
+---
+title: "Go SDK"
+description: "Official Go SDK for the Tolstoy workflow automation platform"
+---
+
+# Tolstoy Go SDK
+
+The official Go SDK for Tolstoy provides a high-performance, type-safe interface to the Tolstoy API. Build robust workflow automations with Go's concurrency and performance benefits.
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Type Safety" icon="shield-alt">
+    Full Go type safety with comprehensive struct definitions
+  </Card>
+  <Card title="High Performance" icon="rocket">
+    Built for speed with efficient HTTP client and connection pooling
+  </Card>
+  <Card title="Goroutine Support" icon="layers">
+    Concurrent operations with Go's powerful goroutine model
+  </Card>
+  <Card title="Context Support" icon="clock">
+    Full context.Context support for cancellation and timeouts
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+    
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+func main() {
+    // Initialize client
+    client, err := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:         os.Getenv("TOLSTOY_API_KEY"),
+        OrganizationID: os.Getenv("TOLSTOY_ORGANIZATION_ID"),
+    })
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer client.Close()
+
+    ctx := context.Background()
+
+    // Create a tool
+    tool, err := client.Tools.Create(ctx, &tolstoy.CreateToolRequest{
+        Name:     "My API Tool",
+        BaseURL:  "https://api.example.com",
+        AuthType: tolstoy.AuthTypeBearer,
+    })
+    if err != nil {
+        log.Fatalf("Failed to create tool: %v", err)
+    }
+
+    // Create an action
+    action, err := client.Actions.Create(ctx, &tolstoy.CreateActionRequest{
+        Name:     "Fetch User Data",
+        ToolID:   tool.ID,
+        Method:   "GET",
+        Endpoint: "/users/{user_id}",
+    })
+    if err != nil {
+        log.Fatalf("Failed to create action: %v", err)
+    }
+
+    // Execute the action
+    result, err := client.Actions.Execute(ctx, action.ID, map[string]interface{}{
+        "user_id": "12345",
+    })
+    if err != nil {
+        log.Fatalf("Failed to execute action: %v", err)
+    }
+
+    fmt.Printf("Action result: %+v\n", result.Output)
+}
+```
+
+## Installation
+
+Add the SDK to your Go module:
+
+```bash
+go mod init your-project
+go get github.com/tolstoy/go-sdk
+```
+
+## Key Concepts
+
+### Client Initialization
+
+```go
+package main
+
+import (
+    "context"
+    "time"
+    
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+func main() {
+    // Basic initialization
+    client, err := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:         "your-api-key",
+        OrganizationID: "your-org-id",
+    })
+    
+    // Advanced configuration
+    client, err = tolstoy.NewClient(&tolstoy.Config{
+        APIKey:         "your-api-key",
+        OrganizationID: "your-org-id",
+        BaseURL:        "https://api.tolstoy.com", // Optional: custom endpoint
+        Timeout:        30 * time.Second,          // Request timeout
+        MaxRetries:     3,                         // Maximum retry attempts
+        RetryDelay:     2 * time.Second,          // Base retry delay
+        Debug:          true,                      // Enable debug logging
+        UserAgent:      "MyApp/1.0",             // Custom user agent
+    })
+    
+    if err != nil {
+        panic(err)
+    }
+    defer client.Close() // Always close the client
+}
+```
+
+### Resource Management
+
+The SDK provides service interfaces for each API resource:
+
+```go
+// Tools management
+tools := client.Tools
+toolsList, err := tools.List(ctx, &tolstoy.ListToolsRequest{
+    Status: tolstoy.StatusConnected,
+    Limit:  50,
+})
+
+tool, err := tools.Create(ctx, &tolstoy.CreateToolRequest{...})
+tool, err = tools.Get(ctx, toolID)
+
+// Actions management
+actions := client.Actions
+actionsList, err := actions.List(ctx, &tolstoy.ListActionsRequest{})
+action, err := actions.Create(ctx, &tolstoy.CreateActionRequest{...})
+result, err := actions.Execute(ctx, actionID, inputData)
+
+// Flows management
+flows := client.Flows
+flow, err := flows.Create(ctx, &tolstoy.CreateFlowRequest{...})
+execution, err := flows.Execute(ctx, flowID, inputData)
+```
+
+### Error Handling
+
+The SDK provides structured error handling:
+
+```go
+import (
+    "errors"
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+result, err := client.Actions.Execute(ctx, actionID, inputData)
+if err != nil {
+    var apiErr *tolstoy.APIError
+    if errors.As(err, &apiErr) {
+        switch apiErr.Code {
+        case tolstoy.ErrorCodeNotFound:
+            fmt.Printf("Action not found: %s\n", apiErr.Message)
+        case tolstoy.ErrorCodeRateLimit:
+            fmt.Printf("Rate limit exceeded. Retry after: %v\n", apiErr.RetryAfter)
+        case tolstoy.ErrorCodeValidation:
+            fmt.Printf("Validation failed: %v\n", apiErr.Errors)
+        case tolstoy.ErrorCodeAuth:
+            fmt.Printf("Authentication failed: %s\n", apiErr.Message)
+        default:
+            fmt.Printf("API error: %s\n", apiErr.Message)
+        }
+        return
+    }
+    
+    // Handle other errors
+    fmt.Printf("Request failed: %v\n", err)
+    return
+}
+```
+
+### Context Support
+
+All SDK methods support Go's context pattern:
+
+```go
+import (
+    "context"
+    "time"
+)
+
+// Context with timeout
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
+result, err := client.Actions.Execute(ctx, actionID, inputData)
+
+// Context with cancellation
+ctx, cancel = context.WithCancel(context.Background())
+
+// Cancel operation from another goroutine
+go func() {
+    time.Sleep(10 * time.Second)
+    cancel()
+}()
+
+result, err = client.Actions.Execute(ctx, actionID, inputData)
+if errors.Is(err, context.Canceled) {
+    fmt.Println("Operation was cancelled")
+}
+```
+
+### Type Safety
+
+The SDK provides comprehensive type definitions:
+
+```go
+type Tool struct {
+    ID          string            `json:"id"`
+    Name        string            `json:"name"`
+    BaseURL     string            `json:"base_url"`
+    Category    string            `json:"category"`
+    AuthType    AuthType          `json:"auth_type"`
+    AuthConfig  map[string]string `json:"auth_config"`
+    Status      Status            `json:"status"`
+    CreatedAt   time.Time         `json:"created_at"`
+    UpdatedAt   time.Time         `json:"updated_at"`
+}
+
+type Action struct {
+    ID             string                 `json:"id"`
+    Name           string                 `json:"name"`
+    ToolID         string                 `json:"tool_id"`
+    Method         string                 `json:"method"`
+    Endpoint       string                 `json:"endpoint"`
+    InputSchema    []InputField           `json:"input_schema"`
+    RequestTemplate *RequestTemplate      `json:"request_template"`
+    ResponseProcessing *ResponseProcessing `json:"response_processing"`
+    CreatedAt      time.Time              `json:"created_at"`
+    UpdatedAt      time.Time              `json:"updated_at"`
+}
+
+type ExecutionResult struct {
+    ID        string                 `json:"id"`
+    Status    ExecutionStatus        `json:"status"`
+    Output    map[string]interface{} `json:"output"`
+    Error     *ExecutionError        `json:"error,omitempty"`
+    StartedAt time.Time              `json:"started_at"`
+    EndedAt   *time.Time             `json:"ended_at,omitempty"`
+    Duration  *time.Duration         `json:"duration,omitempty"`
+}
+```
+
+## Environment Configuration
+
+The SDK supports configuration via environment variables:
+
+```bash
+export TOLSTOY_API_KEY="your-api-key"
+export TOLSTOY_ORGANIZATION_ID="your-org-id"
+export TOLSTOY_BASE_URL="https://api.tolstoy.com"  # Optional
+export TOLSTOY_DEBUG="true"                        # Optional
+```
+
+```go
+// Client will automatically use environment variables
+client, err := tolstoy.NewClientFromEnv()
+if err != nil {
+    log.Fatalf("Failed to create client: %v", err)
+}
+```
+
+## Framework Integration
+
+### HTTP Server Integration
+
+```go
+package main
+
+import (
+    "context"
+    "encoding/json"
+    "net/http"
+    "os"
+    
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+type Server struct {
+    client *tolstoy.Client
+}
+
+func NewServer() *Server {
+    client, err := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:         os.Getenv("TOLSTOY_API_KEY"),
+        OrganizationID: os.Getenv("TOLSTOY_ORGANIZATION_ID"),
+    })
+    if err != nil {
+        panic(err)
+    }
+    
+    return &Server{client: client}
+}
+
+func (s *Server) executeWorkflow(w http.ResponseWriter, r *http.Request) {
+    var payload map[string]interface{}
+    if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+        http.Error(w, "Invalid JSON", http.StatusBadRequest)
+        return
+    }
+    
+    result, err := s.client.Flows.Execute(r.Context(), "flow_123", payload)
+    if err != nil {
+        http.Error(w, err.Error(), http.StatusInternalServerError)
+        return
+    }
+    
+    w.Header().Set("Content-Type", "application/json")
+    json.NewEncoder(w).Encode(map[string]string{
+        "execution_id": result.ID,
+    })
+}
+
+func main() {
+    server := NewServer()
+    defer server.client.Close()
+    
+    http.HandleFunc("/execute-workflow", server.executeWorkflow)
+    http.ListenAndServe(":8080", nil)
+}
+```
+
+### Gin Framework Integration
+
+```go
+package main
+
+import (
+    "net/http"
+    "os"
+    
+    "github.com/gin-gonic/gin"
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+func main() {
+    // Initialize Tolstoy client
+    client, err := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:         os.Getenv("TOLSTOY_API_KEY"),
+        OrganizationID: os.Getenv("TOLSTOY_ORGANIZATION_ID"),
+    })
+    if err != nil {
+        panic(err)
+    }
+    defer client.Close()
+    
+    // Set up Gin router
+    r := gin.Default()
+    
+    // Middleware to inject client
+    r.Use(func(c *gin.Context) {
+        c.Set("tolstoy", client)
+        c.Next()
+    })
+    
+    r.POST("/execute-workflow", func(c *gin.Context) {
+        var payload map[string]interface{}
+        if err := c.ShouldBindJSON(&payload); err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
+            return
+        }
+        
+        client := c.MustGet("tolstoy").(*tolstoy.Client)
+        
+        result, err := client.Flows.Execute(c.Request.Context(), "flow_123", payload)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
+        
+        c.JSON(http.StatusOK, gin.H{
+            "execution_id": result.ID,
+        })
+    })
+    
+    r.Run(":8080")
+}
+```
+
+## Concurrency Patterns
+
+### Goroutine Pool
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "sync"
+    
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+type WorkerPool struct {
+    client    *tolstoy.Client
+    workChan  chan WorkItem
+    wg        sync.WaitGroup
+    workers   int
+}
+
+type WorkItem struct {
+    ActionID string
+    Input    map[string]interface{}
+    ResultChan chan WorkResult
+}
+
+type WorkResult struct {
+    Result *tolstoy.ExecutionResult
+    Error  error
+}
+
+func NewWorkerPool(client *tolstoy.Client, workers int, queueSize int) *WorkerPool {
+    return &WorkerPool{
+        client:   client,
+        workChan: make(chan WorkItem, queueSize),
+        workers:  workers,
+    }
+}
+
+func (wp *WorkerPool) Start(ctx context.Context) {
+    for i := 0; i < wp.workers; i++ {
+        wp.wg.Add(1)
+        go wp.worker(ctx)
+    }
+}
+
+func (wp *WorkerPool) worker(ctx context.Context) {
+    defer wp.wg.Done()
+    
+    for {
+        select {
+        case <-ctx.Done():
+            return
+        case item := <-wp.workChan:
+            result, err := wp.client.Actions.Execute(ctx, item.ActionID, item.Input)
+            
+            select {
+            case item.ResultChan <- WorkResult{Result: result, Error: err}:
+            case <-ctx.Done():
+                return
+            }
+        }
+    }
+}
+
+func (wp *WorkerPool) Execute(actionID string, input map[string]interface{}) <-chan WorkResult {
+    resultChan := make(chan WorkResult, 1)
+    
+    wp.workChan <- WorkItem{
+        ActionID:   actionID,
+        Input:      input,
+        ResultChan: resultChan,
+    }
+    
+    return resultChan
+}
+
+func (wp *WorkerPool) Stop() {
+    close(wp.workChan)
+    wp.wg.Wait()
+}
+
+// Usage
+func main() {
+    client, err := tolstoy.NewClientFromEnv()
+    if err != nil {
+        panic(err)
+    }
+    defer client.Close()
+    
+    // Create worker pool with 10 workers
+    pool := NewWorkerPool(client, 10, 100)
+    
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()
+    
+    // Start workers
+    pool.Start(ctx)
+    defer pool.Stop()
+    
+    // Execute multiple actions concurrently
+    var results []<-chan WorkResult
+    
+    for i := 0; i < 50; i++ {
+        resultChan := pool.Execute("action_123", map[string]interface{}{
+            "id": fmt.Sprintf("item_%d", i),
+        })
+        results = append(results, resultChan)
+    }
+    
+    // Collect results
+    for i, resultChan := range results {
+        result := <-resultChan
+        if result.Error != nil {
+            fmt.Printf("Item %d failed: %v\n", i, result.Error)
+        } else {
+            fmt.Printf("Item %d completed: %s\n", i, result.Result.Status)
+        }
+    }
+}
+```
+
+## Configuration Options
+
+The SDK supports extensive configuration options:
+
+```go
+type Config struct {
+    // Required
+    APIKey         string
+    OrganizationID string
+    
+    // Optional
+    BaseURL        string        // Default: https://api.tolstoy.com
+    Timeout        time.Duration // Default: 30 seconds
+    MaxRetries     int           // Default: 3
+    RetryDelay     time.Duration // Default: 1 second
+    Debug          bool          // Default: false
+    UserAgent      string        // Default: tolstoy-go-sdk/v1.0.0
+    
+    // HTTP Client configuration
+    MaxIdleConns       int           // Default: 100
+    MaxIdleConnsPerHost int          // Default: 10
+    IdleConnTimeout    time.Duration // Default: 90 seconds
+    
+    // Custom HTTP client
+    HTTPClient *http.Client
+}
+
+// Example with all options
+client, err := tolstoy.NewClient(&tolstoy.Config{
+    APIKey:         "your-api-key",
+    OrganizationID: "your-org-id",
+    BaseURL:        "https://api.tolstoy.com",
+    Timeout:        60 * time.Second,
+    MaxRetries:     5,
+    RetryDelay:     3 * time.Second,
+    Debug:          true,
+    UserAgent:      "MyApp/2.0",
+    MaxIdleConns:   200,
+    MaxIdleConnsPerHost: 20,
+    IdleConnTimeout: 120 * time.Second,
+})
+```
+
+## Logging and Debugging
+
+The SDK supports structured logging:
+
+```go
+import (
+    "log/slog"
+    "os"
+    
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+func main() {
+    // Configure structured logging
+    logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+        Level: slog.LevelDebug,
+    }))
+    
+    client, err := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:         "your-api-key",
+        OrganizationID: "your-org-id",
+        Debug:          true,
+        Logger:         logger, // Inject custom logger
+    })
+    if err != nil {
+        panic(err)
+    }
+    defer client.Close()
+    
+    // All requests will be logged with structured data
+    result, err := client.Actions.Execute(ctx, actionID, inputData)
+}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/sdk/go/installation">
+    Get started with installation and setup
+  </Card>
+  <Card title="Quick Start Tutorial" icon="play" href="/sdk/go/quickstart">
+    Build your first workflow with Go
+  </Card>
+  <Card title="Examples & Patterns" icon="code" href="/sdk/go/examples">
+    Real-world examples and Go patterns
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/index">
+    Complete API documentation
+  </Card>
+</CardGroup>

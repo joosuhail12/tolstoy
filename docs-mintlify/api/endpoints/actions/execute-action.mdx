@@ -1,0 +1,642 @@
+---
+title: "Execute Action"
+api: "POST /actions/{id}/execute"
+description: "Execute a specific action with input parameters and receive the API response"
+---
+
+## Overview
+
+Executes an action by making the configured API call with provided input parameters. This endpoint is the core of workflow automation - it takes your action configuration and input data, makes the external API call, and returns the results.
+
+Key features:
+- **Real-time Execution**: Immediate API call execution with live results
+- **Input Validation**: Automatic validation against the action's input schema
+- **Error Handling**: Comprehensive error reporting and retry logic
+- **Conditional Logic**: Respects `executeIf` conditions defined in the action
+- **Audit Trail**: Complete logging of execution details and outcomes
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID - determines which organization context the execution runs in
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID - used for audit logging and permission checks
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the action to execute
+</ParamField>
+
+## Request Body
+
+<ParamField body="input" type="object" required>
+  Input parameters for the action execution. Must conform to the action's input schema.
+  
+  <Expandable title="Input Validation">
+    - All required parameters must be provided
+    - Parameter types must match the schema definitions
+    - Values are validated against any configured validation rules
+    - Missing optional parameters use their default values
+  </Expandable>
+</ParamField>
+
+<ParamField body="context" type="object">
+  Additional context variables for conditional execution and variable substitution
+  
+  <Expandable title="Context Usage">
+    ```json Example Context
+    {
+      "userId": "user_123",
+      "environment": "production", 
+      "timestamp": "2024-01-15T10:30:00Z",
+      "metadata": {
+        "source": "webhook",
+        "triggerId": "trigger_abc"
+      }
+    }
+    ```
+  </Expandable>
+</ParamField>
+
+<ParamField body="options" type="object">
+  Execution options to customize behavior
+  
+  <Expandable title="Available Options">
+    <ParamField body="timeout" type="number" default="30">
+      Timeout in seconds for the API call (max 300)
+    </ParamField>
+    <ParamField body="retries" type="number" default="3">
+      Number of retry attempts for failed requests (max 5)
+    </ParamField>
+    <ParamField body="skipCondition" type="boolean" default="false">
+      Skip `executeIf` condition check and force execution
+    </ParamField>
+    <ParamField body="dryRun" type="boolean" default="false">
+      Validate inputs and show what would be executed without making the API call
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for this execution instance
+</ResponseField>
+
+<ResponseField name="actionId" type="string">
+  ID of the executed action
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Execution status: `success`, `error`, `skipped`, `timeout`
+</ResponseField>
+
+<ResponseField name="executed" type="boolean">
+  Whether the action was actually executed (false if skipped due to conditions)
+</ResponseField>
+
+<ResponseField name="duration" type="number">
+  Execution time in milliseconds
+</ResponseField>
+
+<ResponseField name="request" type="object">
+  Details of the API request made
+  
+  <Expandable title="Request Schema">
+    <ResponseField name="method" type="string">
+      HTTP method used
+    </ResponseField>
+    <ResponseField name="url" type="string">
+      Complete URL called
+    </ResponseField>
+    <ResponseField name="headers" type="object">
+      Headers sent with the request
+    </ResponseField>
+    <ResponseField name="body" type="any">
+      Request body (if applicable)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="response" type="object">
+  Response from the external API
+  
+  <Expandable title="Response Schema">
+    <ResponseField name="statusCode" type="number">
+      HTTP status code returned
+    </ResponseField>
+    <ResponseField name="headers" type="object">
+      Response headers
+    </ResponseField>
+    <ResponseField name="body" type="any">
+      Response body/data
+    </ResponseField>
+    <ResponseField name="size" type="number">
+      Response size in bytes
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="error" type="object">
+  Error details (if execution failed)
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="code" type="string">
+      Error code (e.g., "TIMEOUT", "VALIDATION_ERROR", "API_ERROR")
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error message
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Additional error context
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="executedAt" type="string">
+  ISO 8601 timestamp of execution
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST https://tolstoy.getpullse.com/actions/act_def456ghi789/execute \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc" \
+  -d '{
+    "input": {
+      "email": "john@example.com",
+      "name": "John Doe",
+      "phone": "+1234567890"
+    },
+    "context": {
+      "source": "api",
+      "userId": "user_123"
+    }
+  }'
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const execution = await tolstoy.actions.execute('act_def456ghi789', {
+  input: {
+    email: 'john@example.com',
+    name: 'John Doe',
+    phone: '+1234567890'
+  },
+  context: {
+    source: 'api',
+    userId: 'user_123'
+  },
+  options: {
+    timeout: 60,
+    retries: 2
+  }
+});
+
+if (execution.status === 'success') {
+  console.log('Customer created:', execution.response.body);
+} else {
+  console.error('Execution failed:', execution.error);
+}
+```
+
+```python Python SDK
+from tolstoy import TolstoyClient
+
+client = TolstoyClient(
+    org_id='org_abc123def456',
+    user_id='user_xyz789abc'
+)
+
+execution = client.actions.execute(
+    action_id='act_def456ghi789',
+    input={
+        'email': 'john@example.com',
+        'name': 'John Doe',
+        'phone': '+1234567890'
+    },
+    context={
+        'source': 'api',
+        'user_id': 'user_123'
+    },
+    options={
+        'timeout': 60,
+        'retries': 2
+    }
+)
+
+if execution.status == 'success':
+    print('Customer created:', execution.response.body)
+else:
+    print('Execution failed:', execution.error)
+```
+
+```go Go SDK
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+func main() {
+    client, err := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:         "your-api-key",
+        OrganizationID: "org_abc123def456",
+        UserID:         "user_xyz789abc",
+    })
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer client.Close()
+
+    ctx := context.Background()
+    
+    execution, err := client.Actions.Execute(ctx, "act_def456ghi789", &tolstoy.ExecuteActionRequest{
+        Input: map[string]interface{}{
+            "email": "john@example.com",
+            "name":  "John Doe",
+            "phone": "+1234567890",
+        },
+        Context: map[string]interface{}{
+            "source":  "api",
+            "user_id": "user_123",
+        },
+        Options: &tolstoy.ExecuteOptions{
+            Timeout: 60,
+            Retries: 2,
+        },
+    })
+    if err != nil {
+        log.Fatalf("Failed to execute action: %v", err)
+    }
+
+    if execution.Status == "success" {
+        fmt.Printf("Customer created: %+v\n", execution.Response.Body)
+    } else {
+        fmt.Printf("Execution failed: %+v\n", execution.Error)
+    }
+}
+```
+</CodeGroup>
+
+## Success Response
+
+<ResponseExample>
+```json 200 OK - Successful Execution
+{
+  "id": "exec_mno345pqr678",
+  "actionId": "act_def456ghi789", 
+  "status": "success",
+  "executed": true,
+  "duration": 1247,
+  "request": {
+    "method": "POST",
+    "url": "https://api.stripe.com/v1/customers",
+    "headers": {
+      "Authorization": "Bearer sk_test_...",
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": "Tolstoy/1.0"
+    },
+    "body": {
+      "email": "john@example.com",
+      "name": "John Doe",
+      "phone": "+1234567890"
+    }
+  },
+  "response": {
+    "statusCode": 200,
+    "headers": {
+      "content-type": "application/json",
+      "stripe-version": "2022-11-15"
+    },
+    "body": {
+      "id": "cus_NffrFeUfNV2Hib",
+      "object": "customer",
+      "email": "john@example.com",
+      "name": "John Doe",
+      "phone": "+1234567890",
+      "created": 1642251600,
+      "default_source": null,
+      "description": null,
+      "livemode": false
+    },
+    "size": 324
+  },
+  "executedAt": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 200 OK - Skipped Due to Condition
+{
+  "id": "exec_stu901vwx234",
+  "actionId": "act_def456ghi789",
+  "status": "skipped", 
+  "executed": false,
+  "duration": 5,
+  "skipReason": "executeIf condition not met: status != 'active'",
+  "executedAt": "2024-01-15T10:30:00.000Z"
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+<ResponseExample>
+```json 400 Bad Request - Validation Error
+{
+  "error": "ValidationError",
+  "message": "Input validation failed",
+  "details": {
+    "field": "email",
+    "issue": "Invalid email format",
+    "value": "invalid-email"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 404 Not Found - Action Not Found
+{
+  "error": "NotFoundError",
+  "message": "Action not found or access denied",
+  "details": {
+    "actionId": "act_invalid123"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 422 Unprocessable Entity - API Error
+{
+  "id": "exec_error123",
+  "actionId": "act_def456ghi789",
+  "status": "error",
+  "executed": true,
+  "duration": 2341,
+  "request": {
+    "method": "POST",
+    "url": "https://api.stripe.com/v1/customers"
+  },
+  "response": {
+    "statusCode": 402,
+    "body": {
+      "error": {
+        "type": "card_error",
+        "code": "card_declined",
+        "message": "Your card was declined."
+      }
+    }
+  },
+  "error": {
+    "code": "API_ERROR",
+    "message": "External API returned an error",
+    "details": {
+      "statusCode": 402,
+      "apiError": "card_declined"
+    }
+  },
+  "executedAt": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 408 Request Timeout
+{
+  "id": "exec_timeout789",
+  "actionId": "act_def456ghi789", 
+  "status": "timeout",
+  "executed": true,
+  "duration": 30000,
+  "error": {
+    "code": "TIMEOUT",
+    "message": "Request timed out after 30 seconds",
+    "details": {
+      "timeoutMs": 30000
+    }
+  },
+  "executedAt": "2024-01-15T10:30:00.000Z"
+}
+```
+</ResponseExample>
+
+## Execution Modes
+
+<Tabs>
+  <Tab title="Normal Execution">
+    Standard execution with full validation and API calls:
+    ```json
+    {
+      "input": {
+        "email": "user@example.com"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Dry Run Mode">
+    Validate inputs without making actual API calls:
+    ```json
+    {
+      "input": {
+        "email": "user@example.com"
+      },
+      "options": {
+        "dryRun": true
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Skip Conditions">
+    Force execution regardless of `executeIf` conditions:
+    ```json
+    {
+      "input": {
+        "email": "user@example.com"
+      },
+      "options": {
+        "skipCondition": true
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Custom Timeout">
+    Execute with extended timeout for slow APIs:
+    ```json
+    {
+      "input": {
+        "email": "user@example.com"
+      },
+      "options": {
+        "timeout": 120,
+        "retries": 1
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Input Validation
+
+The API validates all input parameters against the action's schema:
+
+<AccordionGroup>
+  <Accordion title="Required Parameters">
+    ```json Error Response
+    {
+      "error": "ValidationError",
+      "message": "Missing required parameter",
+      "details": {
+        "field": "email",
+        "issue": "Required parameter not provided"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Type Validation">
+    ```json Error Response
+    {
+      "error": "ValidationError", 
+      "message": "Invalid parameter type",
+      "details": {
+        "field": "amount",
+        "issue": "Expected number, got string",
+        "value": "invalid"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Format Validation">
+    ```json Error Response
+    {
+      "error": "ValidationError",
+      "message": "Invalid parameter format",
+      "details": {
+        "field": "email",
+        "issue": "Invalid email format",
+        "pattern": "^[^@]+@[^@]+\\.[^@]+$"
+      }
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Range Validation">
+    ```json Error Response
+    {
+      "error": "ValidationError",
+      "message": "Parameter value out of range",
+      "details": {
+        "field": "amount",
+        "issue": "Value 1500 exceeds maximum of 1000",
+        "min": 0,
+        "max": 1000
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Conditional Execution
+
+Actions with `executeIf` conditions are evaluated before execution:
+
+<Tabs>
+  <Tab title="Condition Met">
+    ```json
+    {
+      "input": {
+        "amount": 150
+      },
+      "context": {
+        "status": "active"
+      }
+    }
+    ```
+    
+    Action executes normally if condition passes.
+  </Tab>
+  
+  <Tab title="Condition Failed">
+    ```json Response
+    {
+      "status": "skipped",
+      "executed": false,
+      "skipReason": "executeIf condition not met: status != 'active'"
+    }
+    ```
+    
+    Action is skipped with detailed reason.
+  </Tab>
+</Tabs>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Error Handling">
+    - Always check the `status` field before processing results
+    - Handle timeout errors with appropriate retry logic
+    - Log execution IDs for debugging and audit trails
+    - Implement exponential backoff for transient failures
+  </Accordion>
+  
+  <Accordion title="Input Preparation">
+    - Validate inputs client-side before sending requests
+    - Use appropriate data types (numbers vs strings)
+    - Provide context variables for conditional logic
+    - Set reasonable timeouts based on API characteristics
+  </Accordion>
+  
+  <Accordion title="Performance">
+    - Use dry run mode for testing without API calls
+    - Batch multiple action executions when possible
+    - Monitor execution duration for performance optimization
+    - Consider caching results for idempotent operations
+  </Accordion>
+  
+  <Accordion title="Security">
+    - Never log sensitive input parameters
+    - Use context variables instead of hardcoded values
+    - Implement proper access controls for action execution
+    - Monitor for unusual execution patterns
+  </Accordion>
+</AccordionGroup>
+
+## Related Operations
+
+<CardGroup cols={2}>
+  <Card title="List Actions" icon="list" href="/api/endpoints/actions/list-actions">
+    Browse available actions to execute
+  </Card>
+  <Card title="Get Action" icon="eye" href="/api/endpoints/actions/get-action">
+    View action configuration and schema
+  </Card>
+  <Card title="Execution Logs" icon="scroll" href="/api/endpoints/execution-logs/list-logs">
+    View detailed execution history
+  </Card>
+  <Card title="Create Flow" icon="workflow" href="/api/endpoints/flows/create-flow">
+    Use actions in complex workflows
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="api-footer.mdx" />

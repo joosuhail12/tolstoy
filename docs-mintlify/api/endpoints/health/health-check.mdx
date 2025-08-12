@@ -1,0 +1,171 @@
+---
+title: "Health Check"
+api: "GET /health"
+description: "Check the health status of the Tolstoy API"
+---
+
+## Overview
+
+The Health Check endpoint provides information about the current health and status of the Tolstoy API service. This endpoint is useful for monitoring and ensuring the API is operational.
+
+## Response
+
+<ResponseField name="status" type="string">
+  Overall health status: `healthy`, `degraded`, or `unhealthy`
+</ResponseField>
+
+<ResponseField name="timestamp" type="string">
+  ISO 8601 timestamp of the health check
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  Current API version
+</ResponseField>
+
+<ResponseField name="uptime" type="number">
+  Service uptime in seconds
+</ResponseField>
+
+<ResponseField name="services" type="object">
+  Health status of individual services
+  
+  <Expandable title="Services Object">
+    <ResponseField name="database" type="object">
+      Database connection status
+      
+      <Expandable title="Database Status">
+        <ResponseField name="status" type="string">
+          Status: `connected`, `disconnected`, `error`
+        </ResponseField>
+        
+        <ResponseField name="latency" type="number">
+          Database response time in milliseconds
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="redis" type="object">
+      Redis cache status
+      
+      <Expandable title="Redis Status">
+        <ResponseField name="status" type="string">
+          Status: `connected`, `disconnected`, `error`
+        </ResponseField>
+        
+        <ResponseField name="latency" type="number">
+          Redis response time in milliseconds
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="queue" type="object">
+      Job queue status
+      
+      <Expandable title="Queue Status">
+        <ResponseField name="status" type="string">
+          Status: `operational`, `degraded`, `offline`
+        </ResponseField>
+        
+        <ResponseField name="pendingJobs" type="number">
+          Number of jobs waiting to be processed
+        </ResponseField>
+        
+        <ResponseField name="processingJobs" type="number">
+          Number of jobs currently being processed
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="storage" type="object">
+      Storage service status
+      
+      <Expandable title="Storage Status">
+        <ResponseField name="status" type="string">
+          Status: `available`, `limited`, `unavailable`
+        </ResponseField>
+        
+        <ResponseField name="available" type="boolean">
+          Whether storage is accessible
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="metrics" type="object">
+  Current system metrics
+  
+  <Expandable title="Metrics Object">
+    <ResponseField name="requestRate" type="number">
+      Requests per second (last minute average)
+    </ResponseField>
+    
+    <ResponseField name="errorRate" type="number">
+      Error rate percentage (last minute)
+    </ResponseField>
+    
+    <ResponseField name="averageResponseTime" type="number">
+      Average response time in milliseconds (last minute)
+    </ResponseField>
+    
+    <ResponseField name="activeConnections" type="number">
+      Current number of active connections
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "status": "healthy",
+  "timestamp": "2024-01-15T12:00:00Z",
+  "version": "2.5.0",
+  "uptime": 864000,
+  "services": {
+    "database": {
+      "status": "connected",
+      "latency": 5
+    },
+    "redis": {
+      "status": "connected",
+      "latency": 2
+    },
+    "queue": {
+      "status": "operational",
+      "pendingJobs": 42,
+      "processingJobs": 8
+    },
+    "storage": {
+      "status": "available",
+      "available": true
+    }
+  },
+  "metrics": {
+    "requestRate": 145.6,
+    "errorRate": 0.02,
+    "averageResponseTime": 125,
+    "activeConnections": 234
+  }
+}
+```
+</ResponseExample>
+
+## Status Codes
+
+- **200 OK**: Service is healthy or degraded but operational
+- **503 Service Unavailable**: Service is unhealthy or critical components are down
+
+## Monitoring Integration
+
+This endpoint is designed to be compatible with common monitoring tools and services:
+
+- **Uptime monitors**: Use the endpoint to check if the service is responding
+- **Health checks**: Parse the `status` field to determine overall health
+- **Metrics collection**: Extract the `metrics` object for performance monitoring
+- **Service dependencies**: Monitor individual service statuses in the `services` object
+
+<Note>
+  This endpoint does not require authentication, making it suitable for external monitoring services.
+</Note>
+
+<Snippet file="api-footer.mdx" />

@@ -1,0 +1,405 @@
+---
+title: "Delete User"
+api: "DELETE /users/{id}"
+description: "Remove a user from the organization"
+---
+
+## Overview
+
+The Delete User endpoint removes a user from your organization. This action revokes their access to all workflows, tools, and organization resources. Use this endpoint carefully as it cannot be easily undone.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the user to delete
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="transferOwnership" type="string">
+  User ID to transfer ownership to (required if deleting an owner)
+</ParamField>
+
+<ParamField query="reassignWorkflows" type="string">
+  User ID to reassign owned workflows to (optional)
+</ParamField>
+
+<ParamField query="reason" type="string">
+  Reason for user deletion (for audit logs)
+</ParamField>
+
+## Response
+
+**Status Code:** `204 No Content`
+
+The endpoint returns an empty response body with a 204 status code when the deletion is successful.
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid parameters or missing required fields
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Additional context about the error
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="403" type="object">
+  Forbidden - Insufficient permissions to delete users
+  
+  <Expandable title="Permission Error">
+    <ResponseField name="error" type="string">
+      "INSUFFICIENT_PERMISSIONS"
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      "User does not have permission to delete users"
+    </ResponseField>
+    <ResponseField name="requiredRole" type="string">
+      Minimum role required for user deletion
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="404" type="object">
+  Not Found - User does not exist
+  
+  <Expandable title="User Not Found">
+    <ResponseField name="error" type="string">
+      "USER_NOT_FOUND"
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      "User with the specified ID was not found"
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - Cannot delete user due to dependencies or constraints
+  
+  <Expandable title="Deletion Conflicts">
+    <ResponseField name="error" type="string">
+      "CANNOT_DELETE_OWNER", "ACTIVE_WORKFLOWS", or "LAST_ADMIN"
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Reason why deletion is not allowed
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Additional information about blocking conditions
+      
+      <Expandable title="Conflict Details">
+        <ResponseField name="ownedWorkflows" type="number">
+          Number of workflows owned by user
+        </ResponseField>
+        <ResponseField name="activeExecutions" type="number">
+          Number of currently running executions
+        </ResponseField>
+        <ResponseField name="isLastAdmin" type="boolean">
+          Whether user is the last admin in organization
+        </ResponseField>
+        <ResponseField name="alternatives" type="array">
+          Suggested actions to resolve conflicts
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL Basic Deletion
+curl -X DELETE "https://api.tolstoy.com/v1/users/user_abc123" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```bash cURL Delete with Workflow Reassignment
+curl -X DELETE "https://api.tolstoy.com/v1/users/user_abc123?reassignWorkflows=user_def456&reason=Employee%20termination" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```bash cURL Delete Owner with Transfer
+curl -X DELETE "https://api.tolstoy.com/v1/users/user_owner123?transferOwnership=user_admin456&reason=Ownership%20transfer" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```javascript JavaScript
+// Basic user deletion
+const deleteResponse = await fetch('/api/v1/users/user_abc123', {
+  method: 'DELETE',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+if (deleteResponse.status === 204) {
+  console.log('User deleted successfully');
+} else if (deleteResponse.status === 409) {
+  const error = await deleteResponse.json();
+  console.error('Cannot delete user:', error.message);
+  console.log('Alternatives:', error.details.alternatives);
+} else {
+  console.error('Deletion failed:', deleteResponse.status);
+}
+
+// Delete user with workflow reassignment
+const deleteWithReassignment = await fetch('/api/v1/users/user_abc123?reassignWorkflows=user_def456&reason=Employee%20termination', {
+  method: 'DELETE',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+```
+
+```python Python
+import requests
+
+# Basic user deletion
+response = requests.delete(
+    "https://api.tolstoy.com/v1/users/user_abc123",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    }
+)
+
+if response.status_code == 204:
+    print("User deleted successfully")
+elif response.status_code == 409:
+    error = response.json()
+    print(f"Cannot delete user: {error['message']}")
+    if 'alternatives' in error['details']:
+        print("Suggested actions:", error['details']['alternatives'])
+else:
+    print(f"Deletion failed: {response.status_code}")
+
+# Delete user with workflow reassignment
+delete_with_reassignment = requests.delete(
+    "https://api.tolstoy.com/v1/users/user_abc123",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    },
+    params={
+        "reassignWorkflows": "user_def456",
+        "reason": "Employee termination"
+    }
+)
+```
+
+</CodeGroup>
+
+## Deletion Rules and Restrictions
+
+### Role-Based Restrictions
+
+#### Cannot Delete Owner Without Transfer
+```json
+{
+  "error": "CANNOT_DELETE_OWNER",
+  "message": "Cannot delete organization owner without transferring ownership",
+  "details": {
+    "alternatives": [
+      "Transfer ownership to another admin first",
+      "Promote another user to admin, then transfer ownership"
+    ]
+  }
+}
+```
+
+#### Cannot Delete Last Admin
+```json
+{
+  "error": "LAST_ADMIN",
+  "message": "Cannot delete the last admin in the organization",
+  "details": {
+    "isLastAdmin": true,
+    "alternatives": [
+      "Promote another user to admin first",
+      "Contact support for assistance"
+    ]
+  }
+}
+```
+
+### Workflow and Execution Dependencies
+
+#### Active Workflows
+```json
+{
+  "error": "ACTIVE_WORKFLOWS",
+  "message": "User has active workflows that must be reassigned",
+  "details": {
+    "ownedWorkflows": 5,
+    "activeExecutions": 2,
+    "alternatives": [
+      "Reassign workflows using reassignWorkflows parameter",
+      "Wait for active executions to complete",
+      "Cancel active executions first"
+    ]
+  }
+}
+```
+
+## Pre-Deletion Checklist
+
+Before deleting a user, consider:
+
+1. **Workflow Ownership**: Who will own their workflows?
+2. **Active Executions**: Are any workflows currently running?
+3. **API Keys**: Revoke any API keys they created
+4. **Tool Connections**: Transfer or remove tool authentications
+5. **Role Requirements**: Ensure minimum role requirements are met
+
+## Workflow Reassignment
+
+When reassigning workflows, the system:
+- Transfers ownership to specified user
+- Updates all workflow permissions
+- Maintains execution history
+- Preserves workflow configurations
+
+```javascript
+// Check workflows before deletion
+const userWorkflows = await fetch(`/api/v1/workflows?ownerId=${userId}`);
+const workflows = await userWorkflows.json();
+
+if (workflows.count > 0) {
+  console.log(`User owns ${workflows.count} workflows`);
+  // Proceed with reassignment parameter
+}
+```
+
+## Ownership Transfer Process
+
+When transferring ownership from an owner:
+
+1. **Validation**: Ensures target user is an admin
+2. **Transfer**: Moves all owner permissions
+3. **Role Update**: Updates user roles
+4. **Audit Log**: Records ownership change
+5. **Notification**: Notifies relevant users
+
+```javascript
+// Transfer ownership before deleting owner
+const transferResponse = await fetch('/api/v1/users/owner_123?transferOwnership=admin_456', {
+  method: 'DELETE'
+});
+```
+
+## Batch User Deletion
+
+For bulk operations, delete users sequentially:
+
+```javascript
+const usersToDelete = ['user_1', 'user_2', 'user_3'];
+const reassignTo = 'user_admin';
+
+for (const userId of usersToDelete) {
+  try {
+    const response = await fetch(`/api/v1/users/${userId}?reassignWorkflows=${reassignTo}`, {
+      method: 'DELETE',
+      headers: { /* headers */ }
+    });
+    
+    if (response.status === 204) {
+      console.log(`Deleted user: ${userId}`);
+    } else {
+      const error = await response.json();
+      console.error(`Failed to delete ${userId}: ${error.message}`);
+    }
+  } catch (err) {
+    console.error(`Error deleting ${userId}:`, err);
+  }
+}
+```
+
+## Audit and Compliance
+
+User deletions are logged with:
+- **Who**: User who performed the deletion
+- **When**: Timestamp of deletion
+- **Why**: Reason (if provided)
+- **What**: User details and reassignments
+- **How**: Method and parameters used
+
+## Recovery and Restoration
+
+Once deleted:
+- User account is permanently removed
+- Access is immediately revoked
+- Workflows are transferred (if specified)
+- Audit trail is preserved
+- Recovery requires creating new user account
+
+## Alternative Actions
+
+Instead of deletion, consider:
+
+### Suspension
+```javascript
+// Suspend user instead of deleting
+await fetch(`/api/v1/users/${userId}`, {
+  method: 'PUT',
+  body: JSON.stringify({ status: 'suspended' })
+});
+```
+
+### Role Demotion
+```javascript
+// Demote to viewer role
+await fetch(`/api/v1/users/${userId}`, {
+  method: 'PUT', 
+  body: JSON.stringify({ role: 'viewer' })
+});
+```
+
+### Deactivation
+```javascript
+// Deactivate account temporarily
+await fetch(`/api/v1/users/${userId}`, {
+  method: 'PUT',
+  body: JSON.stringify({ status: 'inactive' })
+});
+```
+
+## Related Endpoints
+
+- [Create User](/api/endpoints/users/create-user) - Add new user to organization
+- [List Users](/api/endpoints/users/list-users) - View all organization users  
+- [Get User](/api/endpoints/users/get-current-user) - Retrieve user details
+- [Update User](/api/endpoints/users/update-user) - Modify user information

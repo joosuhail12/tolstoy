@@ -1,0 +1,467 @@
+---
+title: "CLI Installation"
+description: "Install and set up the Tolstoy CLI on your system"
+---
+
+# Installing the Tolstoy CLI
+
+The Tolstoy CLI is available through multiple installation methods to fit your development environment and preferences.
+
+## Installation Methods
+
+<Tabs>
+  <Tab title="npm (Recommended)">
+    Install globally using npm:
+    ```bash
+    npm install -g @tolstoy/cli
+    
+    # Verify installation
+    tolstoy --version
+    ```
+    
+    **Requirements:**
+    - Node.js 16.0 or higher
+    - npm 7.0 or higher
+  </Tab>
+  
+  <Tab title="Yarn">
+    Install globally using Yarn:
+    ```bash
+    yarn global add @tolstoy/cli
+    
+    # Verify installation
+    tolstoy --version
+    ```
+    
+    **Requirements:**
+    - Node.js 16.0 or higher  
+    - Yarn 1.22 or higher
+  </Tab>
+  
+  <Tab title="Homebrew (macOS)">
+    Install using Homebrew:
+    ```bash
+    brew tap tolstoy-platform/cli
+    brew install tolstoy-cli
+    
+    # Verify installation
+    tolstoy --version
+    ```
+    
+    **Requirements:**
+    - macOS 10.15 or higher
+    - Homebrew 3.0 or higher
+  </Tab>
+  
+  <Tab title="Direct Download">
+    Download pre-built binaries:
+    ```bash
+    # Linux x64
+    curl -L https://github.com/tolstoy-platform/cli/releases/latest/download/tolstoy-linux-x64.tar.gz | tar xz
+    sudo mv tolstoy /usr/local/bin/
+    
+    # macOS (Intel)
+    curl -L https://github.com/tolstoy-platform/cli/releases/latest/download/tolstoy-macos-x64.tar.gz | tar xz
+    sudo mv tolstoy /usr/local/bin/
+    
+    # macOS (Apple Silicon)  
+    curl -L https://github.com/tolstoy-platform/cli/releases/latest/download/tolstoy-macos-arm64.tar.gz | tar xz
+    sudo mv tolstoy /usr/local/bin/
+    
+    # Windows
+    # Download tolstoy-windows-x64.zip and extract to PATH
+    ```
+  </Tab>
+</Tabs>
+
+## System Requirements
+
+<AccordionGroup>
+  <Accordion title="Minimum Requirements">
+    - **Operating System**: Windows 10, macOS 10.15, or Linux (Ubuntu 18.04+)
+    - **Memory**: 512 MB RAM
+    - **Storage**: 100 MB free space
+    - **Network**: Internet connection for API access
+  </Accordion>
+  
+  <Accordion title="Recommended Requirements">
+    - **Operating System**: Latest stable versions
+    - **Memory**: 1 GB RAM or higher
+    - **Storage**: 500 MB free space
+    - **Node.js**: 18.0 or higher (for npm installation)
+  </Accordion>
+</AccordionGroup>
+
+## Platform-Specific Installation
+
+### Windows
+
+<Steps>
+  <Step title="Install Node.js">
+    Download and install Node.js from [nodejs.org](https://nodejs.org/)
+    
+    Or use Chocolatey:
+    ```powershell
+    choco install nodejs
+    ```
+  </Step>
+  
+  <Step title="Install CLI">
+    ```powershell
+    npm install -g @tolstoy/cli
+    ```
+  </Step>
+  
+  <Step title="Verify Installation">
+    ```powershell
+    tolstoy --version
+    ```
+    
+    If command not found, add `%APPDATA%\npm` to your PATH.
+  </Step>
+</Steps>
+
+### macOS
+
+<Steps>
+  <Step title="Install via Homebrew (Recommended)">
+    ```bash
+    # Install Homebrew if not already installed
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    
+    # Install Tolstoy CLI
+    brew tap tolstoy-platform/cli
+    brew install tolstoy-cli
+    ```
+  </Step>
+  
+  <Step title="Alternative: Install via npm">
+    ```bash
+    # Install Node.js via Homebrew
+    brew install node
+    
+    # Install CLI
+    npm install -g @tolstoy/cli
+    ```
+  </Step>
+  
+  <Step title="Verify Installation">
+    ```bash
+    tolstoy --version
+    which tolstoy
+    ```
+  </Step>
+</Steps>
+
+### Linux
+
+<Tabs>
+  <Tab title="Ubuntu/Debian">
+    ```bash
+    # Update package list
+    sudo apt update
+    
+    # Install Node.js and npm
+    sudo apt install nodejs npm
+    
+    # Install CLI
+    npm install -g @tolstoy/cli
+    
+    # Add npm global bin to PATH if needed
+    echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.bashrc
+    source ~/.bashrc
+    ```
+  </Tab>
+  
+  <Tab title="CentOS/RHEL">
+    ```bash
+    # Install Node.js
+    sudo dnf install nodejs npm
+    
+    # Install CLI
+    npm install -g @tolstoy/cli
+    
+    # Verify installation
+    tolstoy --version
+    ```
+  </Tab>
+  
+  <Tab title="Arch Linux">
+    ```bash
+    # Install Node.js
+    sudo pacman -S nodejs npm
+    
+    # Install CLI
+    npm install -g @tolstoy/cli
+    
+    # Verify installation  
+    tolstoy --version
+    ```
+  </Tab>
+</Tabs>
+
+## Docker Installation
+
+Run the CLI in a Docker container:
+
+<CodeGroup>
+```dockerfile Dockerfile
+FROM node:18-alpine
+
+# Install CLI globally
+RUN npm install -g @tolstoy/cli
+
+# Set working directory
+WORKDIR /workspace
+
+# Default command
+CMD ["tolstoy", "--help"]
+```
+
+```bash Docker Commands
+# Build image
+docker build -t tolstoy-cli .
+
+# Run CLI commands
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  -e TOLSTOY_TOKEN=$TOLSTOY_TOKEN \
+  tolstoy-cli tolstoy --version
+
+# Interactive shell
+docker run -it --rm \
+  -v $(pwd):/workspace \
+  tolstoy-cli /bin/sh
+```
+
+```yaml Docker Compose
+version: '3.8'
+services:
+  tolstoy-cli:
+    build: .
+    environment:
+      - TOLSTOY_TOKEN=${TOLSTOY_TOKEN}
+      - TOLSTOY_ORG_ID=${TOLSTOY_ORG_ID}
+    volumes:
+      - .:/workspace
+    working_dir: /workspace
+```
+</CodeGroup>
+
+## Verification
+
+After installation, verify everything is working:
+
+<Steps>
+  <Step title="Check Version">
+    ```bash
+    tolstoy --version
+    # Expected output: tolstoy/1.2.3 darwin-x64 node-v18.17.0
+    ```
+  </Step>
+  
+  <Step title="Check Help">
+    ```bash
+    tolstoy --help
+    # Should display command overview and options
+    ```
+  </Step>
+  
+  <Step title="Test Connectivity">
+    ```bash
+    tolstoy health check
+    # Should show API connectivity status
+    ```
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Command Not Found">
+    **Symptoms:** `tolstoy: command not found` or `'tolstoy' is not recognized`
+    
+    **Solutions:**
+    ```bash
+    # Check if installed globally
+    npm list -g @tolstoy/cli
+    
+    # Find npm global bin directory
+    npm config get prefix
+    
+    # Add to PATH (Linux/macOS)
+    export PATH="$(npm config get prefix)/bin:$PATH"
+    echo 'export PATH="$(npm config get prefix)/bin:$PATH"' >> ~/.bashrc
+    
+    # Windows: Add to PATH environment variable
+    # %APPDATA%\npm (for user installation)
+    # or check: npm config get prefix
+    ```
+  </Accordion>
+  
+  <Accordion title="Permission Errors">
+    **Symptoms:** `EACCES: permission denied` during installation
+    
+    **Solutions:**
+    ```bash
+    # Option 1: Use sudo (not recommended)
+    sudo npm install -g @tolstoy/cli
+    
+    # Option 2: Configure npm for global installs without sudo
+    mkdir ~/.npm-global
+    npm config set prefix '~/.npm-global'
+    export PATH=~/.npm-global/bin:$PATH
+    echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+    
+    # Then install normally
+    npm install -g @tolstoy/cli
+    ```
+  </Accordion>
+  
+  <Accordion title="Network/Proxy Issues">
+    **Symptoms:** Installation fails with network errors
+    
+    **Solutions:**
+    ```bash
+    # Configure npm proxy
+    npm config set proxy http://proxy.company.com:8080
+    npm config set https-proxy http://proxy.company.com:8080
+    
+    # Use different registry
+    npm config set registry https://registry.npmjs.org/
+    
+    # Clear npm cache
+    npm cache clean --force
+    
+    # Verify network connectivity
+    curl -I https://registry.npmjs.org
+    ```
+  </Accordion>
+  
+  <Accordion title="Version Conflicts">
+    **Symptoms:** Unexpected behavior or version mismatches
+    
+    **Solutions:**
+    ```bash
+    # Uninstall and reinstall
+    npm uninstall -g @tolstoy/cli
+    npm install -g @tolstoy/cli
+    
+    # Check for multiple installations
+    which tolstoy
+    npm list -g @tolstoy/cli
+    
+    # Clear npm cache
+    npm cache clean --force
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Updating the CLI
+
+Keep your CLI up to date with the latest features and bug fixes:
+
+<Tabs>
+  <Tab title="npm/Yarn">
+    ```bash
+    # Update via npm
+    npm update -g @tolstoy/cli
+    
+    # Or reinstall to get latest
+    npm install -g @tolstoy/cli@latest
+    
+    # Update via Yarn
+    yarn global upgrade @tolstoy/cli
+    ```
+  </Tab>
+  
+  <Tab title="Homebrew">
+    ```bash
+    # Update Homebrew
+    brew update
+    
+    # Upgrade Tolstoy CLI
+    brew upgrade tolstoy-cli
+    
+    # Or reinstall
+    brew reinstall tolstoy-cli
+    ```
+  </Tab>
+  
+  <Tab title="Direct Download">
+    Download the latest binary and replace the existing installation:
+    ```bash
+    # Backup current version
+    cp $(which tolstoy) ~/tolstoy.backup
+    
+    # Download latest
+    curl -L https://github.com/tolstoy-platform/cli/releases/latest/download/tolstoy-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m).tar.gz | tar xz
+    
+    # Replace existing
+    sudo mv tolstoy $(which tolstoy)
+    ```
+  </Tab>
+</Tabs>
+
+## Uninstallation
+
+Remove the CLI if no longer needed:
+
+<Tabs>
+  <Tab title="npm/Yarn">
+    ```bash
+    # Uninstall via npm
+    npm uninstall -g @tolstoy/cli
+    
+    # Uninstall via Yarn
+    yarn global remove @tolstoy/cli
+    
+    # Remove configuration files
+    rm -rf ~/.tolstoy
+    ```
+  </Tab>
+  
+  <Tab title="Homebrew">
+    ```bash
+    # Uninstall via Homebrew
+    brew uninstall tolstoy-cli
+    
+    # Remove tap
+    brew untap tolstoy-platform/cli
+    
+    # Remove configuration
+    rm -rf ~/.tolstoy
+    ```
+  </Tab>
+  
+  <Tab title="Direct Installation">
+    ```bash
+    # Remove binary
+    sudo rm $(which tolstoy)
+    
+    # Remove configuration
+    rm -rf ~/.tolstoy
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/cli/authentication">
+    Set up authentication to access your organization
+  </Card>
+  <Card title="Configuration" icon="gear" href="/cli/configuration">
+    Configure the CLI for your environment
+  </Card>
+  <Card title="CLI Overview" icon="rocket" href="/cli/index">
+    Get started with your first CLI commands
+  </Card>
+  <Card title="Commands Reference" icon="book" href="/cli/commands/init/init">
+    Explore all available CLI commands
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="cli-footer.mdx" />

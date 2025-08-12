@@ -1,0 +1,447 @@
+---
+title: "Create Organization"
+api: "POST /organizations"
+description: "Create a new organization in the Tolstoy platform"
+---
+
+## Overview
+
+The Create Organization endpoint allows you to create a new organization with specified settings, billing configuration, and initial user assignments. This is typically used during onboarding or when expanding to multi-organization setups.
+
+## Authentication
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Request Body
+
+<ParamField body="name" type="string" required>
+  The organization's display name
+</ParamField>
+
+<ParamField body="slug" type="string" required>
+  Unique URL-safe identifier for the organization (used in URLs and API calls)
+</ParamField>
+
+<ParamField body="description" type="string">
+  Optional description of the organization
+</ParamField>
+
+<ParamField body="settings" type="object">
+  Organization-specific settings and preferences
+  
+  <Expandable title="Settings Configuration">
+    <ParamField body="timezone" type="string">
+      Organization's default timezone (IANA timezone identifier)
+    </ParamField>
+    
+    <ParamField body="dateFormat" type="string">
+      Preferred date format: "MM/DD/YYYY", "DD/MM/YYYY", or "YYYY-MM-DD"
+    </ParamField>
+    
+    <ParamField body="timeFormat" type="string">
+      Preferred time format: "12h" or "24h"
+    </ParamField>
+    
+    <ParamField body="weekStartDay" type="number">
+      Day of week that starts the week (0 = Sunday, 1 = Monday, etc.)
+    </ParamField>
+    
+    <ParamField body="allowPublicWorkflows" type="boolean">
+      Whether workflows can be made publicly accessible
+    </ParamField>
+    
+    <ParamField body="defaultExecutionTimeout" type="number">
+      Default workflow execution timeout in seconds
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="billing" type="object">
+  Billing and subscription configuration
+  
+  <Expandable title="Billing Configuration">
+    <ParamField body="plan" type="string">
+      Subscription plan: "free", "starter", "professional", or "enterprise"
+    </ParamField>
+    
+    <ParamField body="billingEmail" type="string">
+      Email address for billing notifications
+    </ParamField>
+    
+    <ParamField body="companyName" type="string">
+      Legal company name for billing
+    </ParamField>
+    
+    <ParamField body="taxId" type="string">
+      Company tax identification number
+    </ParamField>
+    
+    <ParamField body="address" type="object">
+      Billing address information
+      
+      <Expandable title="Address Details">
+        <ParamField body="street" type="string">
+          Street address
+        </ParamField>
+        <ParamField body="city" type="string">
+          City name
+        </ParamField>
+        <ParamField body="state" type="string">
+          State or province
+        </ParamField>
+        <ParamField body="postalCode" type="string">
+          Postal or ZIP code
+        </ParamField>
+        <ParamField body="country" type="string">
+          Country code (ISO 3166-1 alpha-2)
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="initialUsers" type="array">
+  Array of users to add to the organization upon creation
+  
+  <Expandable title="Initial User Configuration">
+    <ParamField body="email" type="string" required>
+      User's email address
+    </ParamField>
+    
+    <ParamField body="name" type="string">
+      User's full name
+    </ParamField>
+    
+    <ParamField body="role" type="string">
+      User's role: "owner", "admin", "member", or "viewer"
+    </ParamField>
+    
+    <ParamField body="sendInvite" type="boolean">
+      Whether to send an invitation email (defaults to true)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+**Status Code:** `201 Created`
+
+<ResponseField name="id" type="string">
+  Unique identifier for the organization
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Organization's display name
+</ResponseField>
+
+<ResponseField name="slug" type="string">
+  URL-safe organization identifier
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Organization description
+</ResponseField>
+
+<ResponseField name="settings" type="object">
+  Organization settings and preferences
+</ResponseField>
+
+<ResponseField name="billing" type="object">
+  Billing configuration (sensitive fields masked)
+</ResponseField>
+
+<ResponseField name="limits" type="object">
+  Usage limits based on the selected plan
+  
+  <Expandable title="Usage Limits">
+    <ResponseField name="maxWorkflows" type="number">
+      Maximum number of workflows allowed
+    </ResponseField>
+    
+    <ResponseField name="maxExecutionsPerMonth" type="number">
+      Maximum workflow executions per month
+    </ResponseField>
+    
+    <ResponseField name="maxUsers" type="number">
+      Maximum number of users allowed
+    </ResponseField>
+    
+    <ResponseField name="maxToolConnections" type="number">
+      Maximum number of tool connections
+    </ResponseField>
+    
+    <ResponseField name="executionTimeout" type="number">
+      Maximum execution time per workflow in seconds
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="usage" type="object">
+  Current usage statistics
+  
+  <Expandable title="Usage Statistics">
+    <ResponseField name="workflows" type="number">
+      Current number of workflows
+    </ResponseField>
+    
+    <ResponseField name="executionsThisMonth" type="number">
+      Workflow executions this billing period
+    </ResponseField>
+    
+    <ResponseField name="users" type="number">
+      Current number of users
+    </ResponseField>
+    
+    <ResponseField name="toolConnections" type="number">
+      Current number of tool connections
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="apiKeys" type="array">
+  Initial API keys generated for the organization
+  
+  <Expandable title="API Key Details">
+    <ResponseField name="id" type="string">
+      API key identifier
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      API key name
+    </ResponseField>
+    
+    <ResponseField name="key" type="string">
+      The API key value (only shown once upon creation)
+    </ResponseField>
+    
+    <ResponseField name="permissions" type="array">
+      Array of permissions granted to this key
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO timestamp when the organization was created
+</ResponseField>
+
+<ResponseField name="createdBy" type="string">
+  User ID who created the organization
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid data or missing required fields
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - Organization slug already exists
+  
+  <Expandable title="Slug Conflict">
+    <ResponseField name="error" type="string">
+      "SLUG_ALREADY_EXISTS"
+    </ResponseField>
+    
+    <ResponseField name="message" type="string">
+      "Organization slug is already in use"
+    </ResponseField>
+    
+    <ResponseField name="suggestions" type="array">
+      Array of suggested alternative slugs
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="422" type="object">
+  Unprocessable Entity - Invalid plan or billing configuration
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "https://api.tolstoy.com/v1/organizations" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme Corporation",
+    "slug": "acme-corp",
+    "description": "Leading provider of innovative solutions",
+    "settings": {
+      "timezone": "America/New_York",
+      "dateFormat": "MM/DD/YYYY",
+      "timeFormat": "12h",
+      "allowPublicWorkflows": false,
+      "defaultExecutionTimeout": 300
+    },
+    "billing": {
+      "plan": "professional",
+      "billingEmail": "billing@acme-corp.com",
+      "companyName": "Acme Corporation Inc.",
+      "address": {
+        "street": "123 Business St",
+        "city": "New York",
+        "state": "NY",
+        "postalCode": "10001",
+        "country": "US"
+      }
+    },
+    "initialUsers": [
+      {
+        "email": "admin@acme-corp.com",
+        "name": "John Admin",
+        "role": "owner"
+      },
+      {
+        "email": "developer@acme-corp.com",
+        "name": "Jane Developer",
+        "role": "admin"
+      }
+    ]
+  }'
+```
+
+```javascript JavaScript
+const organization = await fetch('/api/v1/organizations', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    name: 'Acme Corporation',
+    slug: 'acme-corp',
+    description: 'Leading provider of innovative solutions',
+    settings: {
+      timezone: 'America/New_York',
+      dateFormat: 'MM/DD/YYYY',
+      timeFormat: '12h',
+      allowPublicWorkflows: false,
+      defaultExecutionTimeout: 300
+    },
+    billing: {
+      plan: 'professional',
+      billingEmail: 'billing@acme-corp.com',
+      companyName: 'Acme Corporation Inc.',
+      address: {
+        street: '123 Business St',
+        city: 'New York',
+        state: 'NY',
+        postalCode: '10001',
+        country: 'US'
+      }
+    },
+    initialUsers: [
+      {
+        email: 'admin@acme-corp.com',
+        name: 'John Admin',
+        role: 'owner'
+      },
+      {
+        email: 'developer@acme-corp.com',
+        name: 'Jane Developer',
+        role: 'admin'
+      }
+    ]
+  })
+});
+
+const orgData = await organization.json();
+console.log('Created organization:', orgData.id);
+```
+
+```python Python
+import requests
+
+organization_data = {
+    "name": "Acme Corporation",
+    "slug": "acme-corp",
+    "description": "Leading provider of innovative solutions",
+    "settings": {
+        "timezone": "America/New_York",
+        "dateFormat": "MM/DD/YYYY",
+        "timeFormat": "12h",
+        "allowPublicWorkflows": False,
+        "defaultExecutionTimeout": 300
+    },
+    "billing": {
+        "plan": "professional",
+        "billingEmail": "billing@acme-corp.com",
+        "companyName": "Acme Corporation Inc.",
+        "address": {
+            "street": "123 Business St",
+            "city": "New York",
+            "state": "NY",
+            "postalCode": "10001",
+            "country": "US"
+        }
+    },
+    "initialUsers": [
+        {
+            "email": "admin@acme-corp.com",
+            "name": "John Admin",
+            "role": "owner"
+        },
+        {
+            "email": "developer@acme-corp.com",
+            "name": "Jane Developer",
+            "role": "admin"
+        }
+    ]
+}
+
+response = requests.post(
+    "https://api.tolstoy.com/v1/organizations",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "Content-Type": "application/json"
+    },
+    json=organization_data
+)
+
+if response.status_code == 201:
+    org = response.json()
+    print(f"Created organization: {org['id']}")
+else:
+    print(f"Error: {response.json()}")
+```
+
+</CodeGroup>
+
+## Post-Creation Setup
+
+After creating an organization, you typically want to:
+
+1. **Configure Tool Integrations**: Set up authentication for external tools
+2. **Create Workflows**: Build your first automation workflows
+3. **Set Up Webhooks**: Configure event notifications
+4. **Invite Additional Users**: Add team members with appropriate roles
+5. **Configure API Keys**: Create additional API keys with specific permissions
+
+## Organization Slug Rules
+
+Organization slugs must:
+- Be 3-50 characters long
+- Contain only lowercase letters, numbers, and hyphens
+- Start and end with a letter or number
+- Not contain consecutive hyphens
+- Be globally unique across all Tolstoy organizations
+
+## Billing Plans
+
+| Plan | Max Workflows | Max Executions/Month | Max Users | Max Tools |
+|------|---------------|----------------------|-----------|-----------|
+| Free | 5 | 100 | 2 | 3 |
+| Starter | 25 | 1,000 | 5 | 10 |
+| Professional | 100 | 10,000 | 25 | 50 |
+| Enterprise | Unlimited | Unlimited | Unlimited | Unlimited |
+
+## Related Endpoints
+
+- [List Organizations](/api/endpoints/organizations/list-organizations) - List all organizations
+- [Get Organization](/api/endpoints/organizations/get-organization) - Get organization details
+- [Update Organization](/api/endpoints/organizations/update-organization) - Update organization settings
+- [Delete Organization](/api/endpoints/organizations/delete-organization) - Delete organization

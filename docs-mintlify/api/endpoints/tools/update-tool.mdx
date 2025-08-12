@@ -1,0 +1,154 @@
+---
+title: "Update Tool"
+api: "PUT /tools/{id}"
+description: "Update an existing tool's configuration and settings"
+---
+
+## Overview
+
+The Update Tool endpoint allows you to modify an existing tool's configuration, including its name, authentication settings, and rate limits.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the tool to update
+</ParamField>
+
+## Request Body
+
+<ParamField body="name" type="string">
+  Updated name of the tool
+</ParamField>
+
+<ParamField body="description" type="string">
+  Updated description
+</ParamField>
+
+<ParamField body="baseUrl" type="string">
+  Updated base URL for the API
+</ParamField>
+
+<ParamField body="category" type="string">
+  Updated category: `api`, `database`, `messaging`, `storage`, `analytics`, `payment`
+</ParamField>
+
+<ParamField body="authConfig" type="object">
+  Updated authentication configuration
+  
+  <Note>
+    Changing authConfig may require re-authentication. Existing credentials will be cleared.
+  </Note>
+</ParamField>
+
+<ParamField body="headers" type="object">
+  Updated default headers
+</ParamField>
+
+<ParamField body="rateLimits" type="object">
+  Updated rate limiting configuration
+  
+  <Expandable title="Rate Limits">
+    <ParamField body="requestsPerMinute" type="number">
+      Maximum requests per minute
+    </ParamField>
+    
+    <ParamField body="requestsPerHour" type="number">
+      Maximum requests per hour
+    </ParamField>
+    
+    <ParamField body="concurrentRequests" type="number">
+      Maximum concurrent requests
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="timeout" type="number">
+  Updated timeout in milliseconds
+</ParamField>
+
+<ParamField body="retryPolicy" type="object">
+  Updated retry configuration
+</ParamField>
+
+<ParamField body="icon" type="string">
+  Updated icon URL
+</ParamField>
+
+<ParamField body="documentation" type="string">
+  Updated documentation URL
+</ParamField>
+
+<ParamField body="status" type="string">
+  Tool status: `active`, `inactive`, `testing`
+</ParamField>
+
+<RequestExample>
+```json
+{
+  "name": "Stripe Production API",
+  "description": "Production Stripe API for payment processing",
+  "rateLimits": {
+    "requestsPerMinute": 200,
+    "requestsPerHour": 10000,
+    "concurrentRequests": 50
+  },
+  "timeout": 60000,
+  "headers": {
+    "Content-Type": "application/x-www-form-urlencoded",
+    "Stripe-Version": "2024-01-01"
+  },
+  "status": "active"
+}
+```
+</RequestExample>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Tool identifier
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Updated tool name
+</ResponseField>
+
+<ResponseField name="baseUrl" type="string">
+  Base URL
+</ResponseField>
+
+<ResponseField name="category" type="string">
+  Tool category
+</ResponseField>
+
+<ResponseField name="authType" type="string">
+  Authentication type
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current status
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO 8601 timestamp when updated
+</ResponseField>
+
+<ResponseField name="updatedBy" type="string">
+  User ID who performed the update
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "id": "tool_stripe_123",
+  "name": "Stripe Production API",
+  "baseUrl": "https://api.stripe.com/v1",
+  "category": "payment",
+  "authType": "bearer_token",
+  "status": "active",
+  "updatedAt": "2024-01-15T14:30:00Z",
+  "updatedBy": "user_admin_123"
+}
+```
+</ResponseExample>
+
+<Snippet file="api-footer.mdx" />

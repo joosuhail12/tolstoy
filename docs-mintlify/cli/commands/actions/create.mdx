@@ -1,0 +1,695 @@
+---
+title: "tolstoy actions create"
+description: "Create reusable actions that can be used in workflow automation"
+---
+
+# tolstoy actions create
+
+Create reusable actions that encapsulate specific operations, API calls, or business logic for use in your workflow automations.
+
+## Usage
+
+```bash
+tolstoy actions create [OPTIONS] <ACTION_NAME>
+```
+
+## Description
+
+The `tolstoy actions create` command helps you build reusable actions that can be executed within workflows. Actions define specific operations like API calls, database queries, data transformations, or custom business logic.
+
+## Basic Usage
+
+```bash
+# Create a simple API call action
+tolstoy actions create "Send Email" \
+  --tool sendgrid \
+  --method POST \
+  --endpoint "/mail/send" \
+  --description "Send transactional email via SendGrid"
+
+# Create database query action
+tolstoy actions create "Get Customer" \
+  --tool customer_db \
+  --method GET \
+  --query "SELECT * FROM customers WHERE id = {{.customer_id}}"
+
+# Interactive action creation
+tolstoy actions create --interactive
+```
+
+## Arguments
+
+<ParamField path="ACTION_NAME" type="string" required>
+  Name of the action to create
+  
+  ```bash
+  tolstoy actions create "Process Payment"
+  ```
+</ParamField>
+
+## Options
+
+<ParamField path="--tool, -t" type="string" required>
+  Tool ID to use for this action
+  
+  ```bash
+  tolstoy actions create "API Call" --tool stripe_api
+  ```
+</ParamField>
+
+<ParamField path="--method, -m" type="string">
+  HTTP method or operation type
+  
+  **Options**: `GET`, `POST`, `PUT`, `DELETE`, `PATCH`
+  
+  ```bash
+  tolstoy actions create "Create User" --method POST
+  ```
+</ParamField>
+
+<ParamField path="--endpoint, -e" type="string">
+  API endpoint or path
+  
+  ```bash
+  tolstoy actions create "Get Order" --endpoint "/orders/{{.order_id}}"
+  ```
+</ParamField>
+
+<ParamField path="--description, -d" type="string">
+  Description of what this action does
+  
+  ```bash
+  tolstoy actions create "Send SMS" --description "Send SMS notification via Twilio"
+  ```
+</ParamField>
+
+<ParamField path="--input-schema" type="string">
+  JSON schema defining expected input parameters
+  
+  ```bash
+  tolstoy actions create "Action" --input-schema '[{"name":"user_id","type":"string","required":true}]'
+  ```
+</ParamField>
+
+<ParamField path="--output-schema" type="string">
+  JSON schema defining expected output format
+  
+  ```bash
+  tolstoy actions create "Action" --output-schema '{"type":"object","properties":{"success":{"type":"boolean"}}}'
+  ```
+</ParamField>
+
+<ParamField path="--body" type="string">
+  Request body template for API calls
+  
+  ```bash
+  tolstoy actions create "Create Order" --body '{"customer_id":"{{.customer_id}}","amount":{{.amount}}}'
+  ```
+</ParamField>
+
+<ParamField path="--headers" type="string">
+  Additional headers (key=value, comma-separated)
+  
+  ```bash
+  tolstoy actions create "API Call" --headers "Content-Type=application/json,X-Custom=value"
+  ```
+</ParamField>
+
+<ParamField path="--query" type="string">
+  SQL query for database actions
+  
+  ```bash
+  tolstoy actions create "Get User" --query "SELECT * FROM users WHERE email = {{.email}}"
+  ```
+</ParamField>
+
+<ParamField path="--config, -c" type="string">
+  Path to action configuration file
+  
+  ```bash
+  tolstoy actions create "Complex Action" --config ./action-config.yaml
+  ```
+</ParamField>
+
+<ParamField path="--interactive, -i" type="boolean">
+  Use interactive mode for action creation
+  
+  ```bash
+  tolstoy actions create --interactive
+  ```
+</ParamField>
+
+<ParamField path="--dry-run" type="boolean">
+  Validate configuration without creating the action
+  
+  ```bash
+  tolstoy actions create "Test" --dry-run
+  ```
+</ParamField>
+
+## Action Types
+
+### REST API Actions
+
+```bash
+# GET request action
+tolstoy actions create "Get Customer" \
+  --tool crm_api \
+  --method GET \
+  --endpoint "/customers/{{.customer_id}}" \
+  --description "Retrieve customer details from CRM"
+
+# POST request with body
+tolstoy actions create "Create Payment" \
+  --tool stripe \
+  --method POST \
+  --endpoint "/payment_intents" \
+  --body '{"amount":{{.amount}},"currency":"{{.currency}}","payment_method":"{{.payment_method}}"}' \
+  --headers "Idempotency-Key={{.idempotency_key}}"
+```
+
+### Database Actions
+
+```bash
+# SQL query action
+tolstoy actions create "Get User Orders" \
+  --tool orders_db \
+  --query "SELECT * FROM orders WHERE user_id = {{.user_id}} ORDER BY created_at DESC" \
+  --description "Retrieve user's order history"
+
+# SQL update action
+tolstoy actions create "Update User Status" \
+  --tool users_db \
+  --query "UPDATE users SET status = {{.status}}, updated_at = NOW() WHERE id = {{.user_id}}" \
+  --description "Update user account status"
+```
+
+### GraphQL Actions
+
+```bash
+# GraphQL query action
+tolstoy actions create "Get Products" \
+  --tool shopify_graphql \
+  --method POST \
+  --body '{"query":"query GetProducts($first: Int!) { products(first: $first) { edges { node { id title handle } } } }","variables":{"first":{{.limit}}}}'
+```
+
+### Custom Script Actions
+
+```bash
+# JavaScript/Python script action
+tolstoy actions create "Data Transform" \
+  --tool custom_script \
+  --script-file ./transform.js \
+  --description "Transform customer data format"
+```
+
+## Configuration File Format
+
+### API Action Configuration
+
+```yaml
+# action-config.yaml
+name: "Process Stripe Payment"
+description: "Create and confirm a Stripe payment intent"
+tool_id: "stripe_api"
+method: POST
+endpoint: "/payment_intents"
+headers:
+  Content-Type: "application/json"
+  Idempotency-Key: "{{.idempotency_key}}"
+body: |
+  {
+    "amount": {{.amount}},
+    "currency": "{{.currency}}",
+    "payment_method": "{{.payment_method}}",
+    "confirm": true,
+    "metadata": {
+      "order_id": "{{.order_id}}",
+      "customer_id": "{{.customer_id}}"
+    }
+  }
+input_schema:
+  - name: "amount"
+    type: "integer"
+    required: true
+    description: "Payment amount in cents"
+  - name: "currency"
+    type: "string"
+    required: true
+    default: "usd"
+    enum: ["usd", "eur", "gbp"]
+  - name: "payment_method"
+    type: "string"
+    required: true
+    description: "Stripe payment method ID"
+  - name: "order_id"
+    type: "string"
+    required: true
+output_schema:
+  type: "object"
+  properties:
+    id:
+      type: "string"
+      description: "Payment intent ID"
+    status:
+      type: "string"
+      enum: ["succeeded", "processing", "failed"]
+    amount:
+      type: "integer"
+```
+
+### Database Action Configuration
+
+```yaml
+# db-action-config.yaml
+name: "Get Customer Analytics"
+description: "Retrieve customer analytics and metrics"
+tool_id: "analytics_db"
+query: |
+  SELECT 
+    c.id,
+    c.email,
+    COUNT(o.id) as total_orders,
+    COALESCE(SUM(o.amount), 0) as total_spent,
+    MAX(o.created_at) as last_order_date
+  FROM customers c
+  LEFT JOIN orders o ON c.id = o.customer_id
+  WHERE c.id = {{.customer_id}}
+  AND c.created_at >= {{.date_from}}
+  GROUP BY c.id, c.email
+input_schema:
+  - name: "customer_id"
+    type: "string"
+    required: true
+  - name: "date_from"
+    type: "string"
+    format: "date"
+    default: "30 days ago"
+output_schema:
+  type: "object"
+  properties:
+    id: {"type": "string"}
+    email: {"type": "string"}
+    total_orders: {"type": "integer"}
+    total_spent: {"type": "number"}
+    last_order_date: {"type": "string", "format": "date-time"}
+```
+
+## Interactive Mode
+
+```bash
+tolstoy actions create --interactive
+```
+
+**Interactive Flow**:
+1. **Action Name**: Enter descriptive name
+2. **Tool Selection**: Choose from available tools
+3. **Operation Type**: Select HTTP method or operation
+4. **Endpoint/Query**: Define the endpoint or query
+5. **Input Parameters**: Define expected inputs
+6. **Request Configuration**: Set headers, body, etc.
+7. **Output Schema**: Define expected output structure
+8. **Test Action**: Validate with sample data
+9. **Save Action**: Create the action
+
+```
+? Action name: Send Welcome Email
+? Select tool: › SendGrid API
+? HTTP method: POST
+? Endpoint: /mail/send
+? Input parameters:
+  ✓ recipient_email (string, required)
+  ✓ customer_name (string, required)
+  ✓ template_id (string, default: "welcome-template")
+? Request body template: 
+  {
+    "personalizations": [{
+      "to": [{"email": "{{.recipient_email}}"}],
+      "dynamic_template_data": {
+        "customer_name": "{{.customer_name}}"
+      }
+    }],
+    "template_id": "{{.template_id}}"
+  }
+? Test action with sample data? Yes
+✓ Action test successful
+✓ Action 'Send Welcome Email' created (act_welcome_123)
+```
+
+## Input and Output Schemas
+
+### Input Schema Definition
+
+```json
+[
+  {
+    "name": "customer_id",
+    "type": "string",
+    "required": true,
+    "description": "Unique customer identifier",
+    "pattern": "^cust_[a-zA-Z0-9]+$"
+  },
+  {
+    "name": "amount",
+    "type": "number",
+    "required": true,
+    "minimum": 0.01,
+    "description": "Payment amount in dollars"
+  },
+  {
+    "name": "currency",
+    "type": "string",
+    "required": false,
+    "default": "USD",
+    "enum": ["USD", "EUR", "GBP"],
+    "description": "Three-letter currency code"
+  },
+  {
+    "name": "metadata",
+    "type": "object",
+    "required": false,
+    "description": "Additional key-value data"
+  }
+]
+```
+
+### Output Schema Definition
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "payment_id": {
+      "type": "string",
+      "description": "Generated payment ID"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["succeeded", "pending", "failed"],
+      "description": "Payment processing status"
+    },
+    "amount_received": {
+      "type": "number",
+      "description": "Actual amount processed"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Payment creation timestamp"
+    }
+  },
+  "required": ["payment_id", "status"]
+}
+```
+
+## Template Variables
+
+Actions support template variables for dynamic content:
+
+### Input Variable References
+
+```bash
+# Reference input parameters
+--endpoint "/customers/{{.customer_id}}"
+--body '{"email": "{{.email}}", "name": "{{.name}}"}'
+
+# With default values
+--body '{"currency": "{{.currency | default "USD"}}"}'
+
+# Array and object access
+--body '{"items": {{.order.items}}, "total": {{.order.total}}}'
+```
+
+### Built-in Variables
+
+```bash
+# Timestamp variables
+--body '{"created_at": "{{.now}}", "expires_at": "{{.now | addHours 24}}"}'
+
+# UUID generation
+--headers "X-Request-ID={{.uuid}}"
+
+# Environment variables
+--body '{"api_version": "{{.env.API_VERSION}}"}'
+```
+
+### Helper Functions
+
+```bash
+# String manipulation
+--body '{"email": "{{.email | lower}}", "name": "{{.name | title}}"}'
+
+# Number formatting
+--body '{"amount_cents": {{.amount | multiply 100 | round}}}'
+
+# Date formatting
+--body '{"date": "{{.created_at | formatTime "2006-01-02"}}"}'
+```
+
+## Examples
+
+### E-commerce Actions
+
+```bash
+# Create order action
+tolstoy actions create "Create Order" \
+  --tool shopify_api \
+  --method POST \
+  --endpoint "/orders.json" \
+  --body '{
+    "order": {
+      "customer": {"id": {{.customer_id}}},
+      "line_items": {{.items}},
+      "financial_status": "pending",
+      "tags": "{{.source}}"
+    }
+  }' \
+  --input-schema '[
+    {"name":"customer_id","type":"integer","required":true},
+    {"name":"items","type":"array","required":true},
+    {"name":"source","type":"string","default":"api"}
+  ]'
+
+# Update inventory action
+tolstoy actions create "Update Inventory" \
+  --tool inventory_db \
+  --query "UPDATE products SET stock_quantity = stock_quantity - {{.quantity}} WHERE sku = '{{.sku}}'" \
+  --input-schema '[
+    {"name":"sku","type":"string","required":true},
+    {"name":"quantity","type":"integer","required":true}
+  ]'
+```
+
+### CRM Integration
+
+```bash
+# Create contact action
+tolstoy actions create "Create HubSpot Contact" \
+  --tool hubspot_api \
+  --method POST \
+  --endpoint "/contacts/v1/contact" \
+  --body '{
+    "properties": [
+      {"property": "email", "value": "{{.email}}"},
+      {"property": "firstname", "value": "{{.first_name}}"},
+      {"property": "lastname", "value": "{{.last_name}}"},
+      {"property": "company", "value": "{{.company}}"}
+    ]
+  }'
+
+# Update deal stage
+tolstoy actions create "Update Deal Stage" \
+  --tool hubspot_api \
+  --method PUT \
+  --endpoint "/deals/v1/deal/{{.deal_id}}" \
+  --body '{
+    "properties": [
+      {"name": "dealstage", "value": "{{.stage}}"},
+      {"name": "closedate", "value": "{{.close_date}}"}
+    ]
+  }'
+```
+
+### Notification Actions
+
+```bash
+# Send Slack message
+tolstoy actions create "Send Slack Alert" \
+  --tool slack_api \
+  --method POST \
+  --endpoint "/chat.postMessage" \
+  --body '{
+    "channel": "{{.channel}}",
+    "text": "{{.message}}",
+    "attachments": [{
+      "color": "{{.color | default "warning"}}",
+      "fields": [
+        {"title": "Severity", "value": "{{.severity}}", "short": true},
+        {"title": "Source", "value": "{{.source}}", "short": true}
+      ]
+    }]
+  }'
+
+# Send email notification
+tolstoy actions create "Send Alert Email" \
+  --tool sendgrid_api \
+  --method POST \
+  --endpoint "/mail/send" \
+  --body '{
+    "personalizations": [{
+      "to": [{{#each .recipients}}{"email": "{{.}}"}{{#unless @last}},{{/unless}}{{/each}}],
+      "dynamic_template_data": {
+        "alert_title": "{{.title}}",
+        "alert_message": "{{.message}}",
+        "severity": "{{.severity}}"
+      }
+    }],
+    "template_id": "{{.template_id}}"
+  }'
+```
+
+## Testing Actions
+
+### Test During Creation
+
+```bash
+# Create and test action
+tolstoy actions create "Get User" \
+  --tool api_tool \
+  --method GET \
+  --endpoint "/users/{{.user_id}}" \
+  --test '{"user_id": "123"}'
+```
+
+### Test Existing Action
+
+```bash
+# Test action with sample data
+tolstoy actions test act_get_user_123 --input '{
+  "user_id": "test_user_456",
+  "include_orders": true
+}'
+
+# Test with file input
+echo '{"user_id": "123", "include_profile": true}' > test_input.json
+tolstoy actions test act_get_user_123 --input-file test_input.json
+```
+
+## Validation and Debugging
+
+### Schema Validation
+
+```bash
+# Validate input schema
+tolstoy actions validate act_payment_123 --input '{
+  "amount": 100,
+  "currency": "USD",
+  "customer_id": "cust_123"
+}'
+
+# Check for schema errors
+tolstoy actions validate act_payment_123 --input '{
+  "amount": "invalid",
+  "missing_required": true
+}'
+```
+
+### Debug Mode
+
+```bash
+# Create action with debug output
+tolstoy actions create "Debug Action" \
+  --tool api_tool \
+  --method POST \
+  --endpoint "/test" \
+  --debug
+
+# Test action with debug info
+tolstoy actions test act_debug_123 --input '{"test": true}' --debug
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Schema Validation Failed">
+    **Error**: `input validation failed: missing required field`
+    
+    **Solutions**:
+    ```bash
+    # Check input schema
+    tolstoy actions show act_123 --show-schema
+    
+    # Validate specific input
+    tolstoy actions validate act_123 --input '{"field": "value"}'
+    
+    # Update schema if needed
+    tolstoy actions update act_123 --input-schema '[{"name":"field","required":true}]'
+    ```
+  </Accordion>
+  
+  <Accordion title="Template Rendering Error">
+    **Error**: `template execution failed: undefined variable`
+    
+    **Solutions**:
+    ```bash
+    # Check template variables
+    tolstoy actions show act_123 --show-template
+    
+    # Test with all required variables
+    tolstoy actions test act_123 --input '{"all_vars": "included"}' --debug
+    
+    # Use default values in templates
+    --body '{"field": "{{.field | default \"fallback\"}}"}'
+    ```
+  </Accordion>
+  
+  <Accordion title="Tool Connection Error">
+    **Error**: `tool connection failed` or `unauthorized`
+    
+    **Solutions**:
+    ```bash
+    # Test tool connectivity
+    tolstoy tools test tool_123
+    
+    # Verify tool configuration
+    tolstoy tools show tool_123
+    
+    # Update tool authentication
+    tolstoy tools update tool_123 --auth-env "NEW_TOKEN"
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="actions list" icon="list">
+    ```bash
+    tolstoy actions list
+    ```
+    List all created actions
+  </Card>
+  <Card title="actions show" icon="eye">
+    ```bash
+    tolstoy actions show act_123
+    ```
+    View action details and configuration
+  </Card>
+  <Card title="actions test" icon="flask">
+    ```bash
+    tolstoy actions test act_123
+    ```
+    Test action execution with sample data
+  </Card>
+  <Card title="flows create" icon="workflow">
+    ```bash
+    tolstoy flows create
+    ```
+    Create workflows that use these actions
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="cli-footer.mdx" />

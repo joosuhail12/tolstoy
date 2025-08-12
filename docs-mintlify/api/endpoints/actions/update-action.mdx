@@ -1,0 +1,689 @@
+---
+title: "Update Action"
+api: "PUT /actions/{id}"
+description: "Update an existing action's configuration, input schema, or metadata"
+---
+
+## Overview
+
+Updates an existing action's configuration while preserving execution history and maintaining backward compatibility. This endpoint allows you to:
+
+- Modify action names, descriptions, and metadata
+- Update HTTP method, endpoint, or headers
+- Extend or refine input schemas and validation rules
+- Change conditional execution logic
+- Adjust action status (active/inactive/draft)
+
+<Warning>
+  Updating an action creates a new version. Existing workflows will continue using the previous version unless explicitly updated.
+</Warning>
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID - determines which organization context to operate in
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID - used for audit logging and permission checks
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the action to update
+</ParamField>
+
+## Request Body
+
+<ParamField body="name" type="string">
+  Human-readable name for the action. Must be unique within the organization.
+</ParamField>
+
+<ParamField body="description" type="string">
+  Optional description explaining what this action does and when to use it
+</ParamField>
+
+<ParamField body="method" type="string">
+  HTTP method for the API call
+  
+  **Options:** `GET`, `POST`, `PUT`, `PATCH`, `DELETE`
+</ParamField>
+
+<ParamField body="endpoint" type="string">
+  API endpoint path (relative to tool's base URL)
+  
+  **Examples:**
+  - `/customers`
+  - `/users/{id}`
+  - `/orders/{orderId}/items`
+</ParamField>
+
+<ParamField body="headers" type="object">
+  HTTP headers to include with the request. These are merged with tool-level authentication headers.
+</ParamField>
+
+<ParamField body="inputSchema" type="array">
+  Array defining the input parameters this action accepts
+  
+  <Expandable title="Schema Extension Rules">
+    - **Adding Parameters**: Always safe - won't break existing workflows
+    - **Making Parameters Required**: Breaking change - increment major version
+    - **Removing Parameters**: Breaking change - consider deprecation instead
+    - **Changing Types**: Breaking change - use new parameter names instead
+    - **Updating Validation**: Generally safe if rules are less restrictive
+  </Expandable>
+</ParamField>
+
+<ParamField body="executeIf" type="string">
+  JSON Logic expression to conditionally execute this action based on workflow context
+</ParamField>
+
+<ParamField body="status" type="string">
+  Action status
+  
+  **Options:**
+  - `active`: Available for use in workflows and direct execution
+  - `inactive`: Hidden from workflow builder but existing uses still work
+  - `draft`: Visible only to creators for testing and development
+</ParamField>
+
+<ParamField body="versionType" type="string" default="minor">
+  Type of version increment for this update
+  
+  **Options:**
+  - `patch`: Bug fixes, documentation updates (1.0.1 → 1.0.2)
+  - `minor`: New features, additional parameters (1.0.1 → 1.1.0)
+  - `major`: Breaking changes, removed parameters (1.0.1 → 2.0.0)
+</ParamField>
+
+## Response
+
+Returns the updated action with new version information and change summary.
+
+<ResponseField name="id" type="string">
+  Unique identifier for the action (unchanged)
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Updated action name
+</ResponseField>
+
+<ResponseField name="key" type="string">
+  Action key (unchanged)
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Updated description
+</ResponseField>
+
+<ResponseField name="method" type="string">
+  Updated HTTP method
+</ResponseField>
+
+<ResponseField name="endpoint" type="string">
+  Updated endpoint path
+</ResponseField>
+
+<ResponseField name="headers" type="object">
+  Updated headers configuration
+</ResponseField>
+
+<ResponseField name="inputSchema" type="array">
+  Updated input schema
+</ResponseField>
+
+<ResponseField name="executeIf" type="string">
+  Updated conditional execution logic
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Updated action status
+</ResponseField>
+
+<ResponseField name="version" type="number">
+  New version number (incremented from previous)
+</ResponseField>
+
+<ResponseField name="versionType" type="string">
+  Type of version increment applied
+</ResponseField>
+
+<ResponseField name="changes" type="array">
+  Summary of changes made in this update
+  
+  <Expandable title="Change Object">
+    <ResponseField name="field" type="string">
+      Name of the field that was changed
+    </ResponseField>
+    <ResponseField name="type" type="string">
+      Type of change: `added`, `removed`, `modified`
+    </ResponseField>
+    <ResponseField name="oldValue" type="any">
+      Previous value (for modifications)
+    </ResponseField>
+    <ResponseField name="newValue" type="any">
+      New value
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO 8601 timestamp of this update
+</ResponseField>
+
+<ResponseField name="updatedBy" type="object">
+  User who made this update
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X PUT https://tolstoy.getpullse.com/actions/act_def456ghi789 \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc" \
+  -d '{
+    "name": "Create Stripe Customer (Enhanced)",
+    "description": "Creates a new customer in Stripe with enhanced validation and metadata support",
+    "inputSchema": [
+      {
+        "name": "email",
+        "type": "string",
+        "required": true,
+        "description": "Customer email address",
+        "validation": {
+          "format": "email"
+        }
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "required": true,
+        "description": "Customer full name",
+        "validation": {
+          "minLength": 2,
+          "maxLength": 100
+        }
+      },
+      {
+        "name": "phone",
+        "type": "string",
+        "required": false,
+        "description": "Customer phone number with international format",
+        "validation": {
+          "pattern": "^\\+[1-9]\\d{10,14}$"
+        }
+      },
+      {
+        "name": "companyName",
+        "type": "string",
+        "required": false,
+        "description": "Company name for business customers"
+      },
+      {
+        "name": "metadata",
+        "type": "object",
+        "required": false,
+        "description": "Additional metadata for the customer",
+        "default": {}
+      }
+    ],
+    "versionType": "minor"
+  }'
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const updatedAction = await tolstoy.actions.update('act_def456ghi789', {
+  name: 'Create Stripe Customer (Enhanced)',
+  description: 'Creates a new customer in Stripe with enhanced validation and metadata support',
+  inputSchema: [
+    {
+      name: 'email',
+      type: 'string',
+      required: true,
+      description: 'Customer email address',
+      validation: { format: 'email' }
+    },
+    {
+      name: 'name',
+      type: 'string',
+      required: true,
+      description: 'Customer full name',
+      validation: { minLength: 2, maxLength: 100 }
+    },
+    {
+      name: 'phone',
+      type: 'string',
+      required: false,
+      description: 'Customer phone number with international format',
+      validation: { pattern: '^\\+[1-9]\\d{10,14}$' }
+    },
+    {
+      name: 'companyName',
+      type: 'string',
+      required: false,
+      description: 'Company name for business customers'
+    },
+    {
+      name: 'metadata',
+      type: 'object',
+      required: false,
+      description: 'Additional metadata for the customer',
+      default: {}
+    }
+  ],
+  versionType: 'minor'
+});
+
+console.log(`Action updated to version ${updatedAction.version}`);
+console.log('Changes:', updatedAction.changes);
+```
+
+```python Python SDK
+from tolstoy import TolstoyClient
+
+client = TolstoyClient(
+    org_id='org_abc123def456',
+    user_id='user_xyz789abc'
+)
+
+updated_action = client.actions.update(
+    action_id='act_def456ghi789',
+    name='Create Stripe Customer (Enhanced)',
+    description='Creates a new customer in Stripe with enhanced validation and metadata support',
+    input_schema=[
+        {
+            'name': 'email',
+            'type': 'string',
+            'required': True,
+            'description': 'Customer email address',
+            'validation': {'format': 'email'}
+        },
+        {
+            'name': 'name',
+            'type': 'string',
+            'required': True,
+            'description': 'Customer full name',
+            'validation': {'min_length': 2, 'max_length': 100}
+        },
+        {
+            'name': 'phone',
+            'type': 'string',
+            'required': False,
+            'description': 'Customer phone number with international format',
+            'validation': {'pattern': r'^\+[1-9]\d{10,14}$'}
+        },
+        {
+            'name': 'company_name',
+            'type': 'string',
+            'required': False,
+            'description': 'Company name for business customers'
+        },
+        {
+            'name': 'metadata',
+            'type': 'object',
+            'required': False,
+            'description': 'Additional metadata for the customer',
+            'default': {}
+        }
+    ],
+    version_type='minor'
+)
+
+print(f"Action updated to version {updated_action.version}")
+print("Changes:", updated_action.changes)
+```
+</CodeGroup>
+
+## Success Response
+
+<ResponseExample>
+```json 200 OK
+{
+  "id": "act_def456ghi789",
+  "name": "Create Stripe Customer (Enhanced)",
+  "key": "stripe-create-customer",
+  "description": "Creates a new customer in Stripe with enhanced validation and metadata support",
+  "orgId": "org_abc123def456",
+  "toolId": "tool_stripe_api",
+  "method": "POST",
+  "endpoint": "/customers",
+  "headers": {
+    "Content-Type": "application/x-www-form-urlencoded"
+  },
+  "inputSchema": [
+    {
+      "name": "email",
+      "type": "string",
+      "required": true,
+      "description": "Customer email address",
+      "validation": {
+        "format": "email"
+      }
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "required": true,
+      "description": "Customer full name",
+      "validation": {
+        "minLength": 2,
+        "maxLength": 100
+      }
+    },
+    {
+      "name": "phone",
+      "type": "string",
+      "required": false,
+      "description": "Customer phone number with international format",
+      "validation": {
+        "pattern": "^\\+[1-9]\\d{10,14}$"
+      }
+    },
+    {
+      "name": "companyName",
+      "type": "string",
+      "required": false,
+      "description": "Company name for business customers"
+    },
+    {
+      "name": "metadata",
+      "type": "object",
+      "required": false,
+      "description": "Additional metadata for the customer",
+      "default": {}
+    }
+  ],
+  "executeIf": null,
+  "status": "active",
+  "version": 3,
+  "versionType": "minor",
+  "changes": [
+    {
+      "field": "name",
+      "type": "modified",
+      "oldValue": "Create Stripe Customer",
+      "newValue": "Create Stripe Customer (Enhanced)"
+    },
+    {
+      "field": "description",
+      "type": "modified",
+      "oldValue": "Creates a new customer in Stripe with email, name, and optional metadata",
+      "newValue": "Creates a new customer in Stripe with enhanced validation and metadata support"
+    },
+    {
+      "field": "inputSchema",
+      "type": "added",
+      "newValue": {
+        "name": "companyName",
+        "type": "string",
+        "required": false,
+        "description": "Company name for business customers"
+      }
+    },
+    {
+      "field": "inputSchema.name.validation",
+      "type": "modified",
+      "oldValue": {
+        "minLength": 1,
+        "maxLength": 100
+      },
+      "newValue": {
+        "minLength": 2,
+        "maxLength": 100
+      }
+    },
+    {
+      "field": "inputSchema.phone.validation",
+      "type": "added",
+      "newValue": {
+        "pattern": "^\\+[1-9]\\d{10,14}$"
+      }
+    }
+  ],
+  "createdAt": "2024-01-10T10:30:00.000Z",
+  "updatedAt": "2024-01-15T14:20:00.000Z",
+  "updatedBy": {
+    "id": "user_xyz789abc",
+    "name": "John Smith",
+    "email": "john@company.com"
+  }
+}
+```
+</ResponseExample>
+
+## Update Scenarios
+
+<Tabs>
+  <Tab title="Add New Parameters">
+    Safely extend functionality without breaking existing workflows:
+    ```json
+    {
+      "inputSchema": [
+        // ... existing parameters
+        {
+          "name": "timezone",
+          "type": "string", 
+          "required": false,
+          "description": "Customer timezone",
+          "default": "UTC"
+        }
+      ],
+      "versionType": "minor"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Enhance Validation">
+    Improve data quality with better validation rules:
+    ```json
+    {
+      "inputSchema": [
+        {
+          "name": "email",
+          "type": "string",
+          "required": true,
+          "validation": {
+            "format": "email",
+            "maxLength": 254,  // Added length limit
+            "pattern": "^[^@]+@[^@]+\\.[^@]+$"  // Custom pattern
+          }
+        }
+      ],
+      "versionType": "patch"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Change Endpoint">
+    Update API endpoint while maintaining functionality:
+    ```json
+    {
+      "endpoint": "/v2/customers",
+      "headers": {
+        "Content-Type": "application/json",
+        "API-Version": "2024-01-15"
+      },
+      "versionType": "major"
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Add Conditional Logic">
+    Implement conditional execution based on context:
+    ```json
+    {
+      "executeIf": {
+        "and": [
+          {"==": [{"var": "environment"}, "production"]},
+          {">": [{"var": "amount"}, 0]}
+        ]
+      },
+      "versionType": "minor"
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Version Management
+
+Actions use semantic versioning to manage changes:
+
+<AccordionGroup>
+  <Accordion title="Patch Updates (1.0.1)">
+    **Safe changes that don't affect functionality:**
+    - Documentation updates
+    - Bug fixes in validation logic
+    - Performance improvements
+    - Adding optional headers
+    
+    Existing workflows continue working without issues.
+  </Accordion>
+  
+  <Accordion title="Minor Updates (1.1.0)">
+    **Backward-compatible feature additions:**
+    - New optional parameters
+    - Enhanced validation rules (less restrictive)
+    - Additional headers or metadata
+    - New conditional execution logic
+    
+    Existing workflows work with new features available for adoption.
+  </Accordion>
+  
+  <Accordion title="Major Updates (2.0.0)">
+    **Breaking changes requiring workflow updates:**
+    - Removing required parameters
+    - Changing parameter data types
+    - Making optional parameters required
+    - Changing endpoint URLs or methods
+    
+    Existing workflows continue using the previous version until explicitly updated.
+  </Accordion>
+</AccordionGroup>
+
+## Error Responses
+
+<ResponseExample>
+```json 400 Bad Request - Validation Error
+{
+  "error": "ValidationError",
+  "message": "Invalid action configuration",
+  "details": {
+    "field": "inputSchema[2].type",
+    "issue": "Invalid type 'text', must be one of: string, number, boolean, object, array"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 409 Conflict - Breaking Change Without Major Version
+{
+  "error": "ConflictError",
+  "message": "Breaking change detected without major version increment",
+  "details": {
+    "breakingChanges": [
+      "Parameter 'email' changed from optional to required",
+      "Parameter 'userId' was removed"
+    ],
+    "suggestedVersionType": "major"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 404 Not Found
+{
+  "error": "NotFoundError",
+  "message": "Action not found or access denied",
+  "details": {
+    "actionId": "act_invalid123"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+
+```json 403 Forbidden
+{
+  "error": "PermissionError",
+  "message": "Insufficient permissions to update action",
+  "details": {
+    "required": "actions:update",
+    "current": "actions:read"
+  },
+  "timestamp": "2024-01-15T10:30:00.000Z"
+}
+```
+</ResponseExample>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Schema Evolution">
+    - Always add new parameters as optional to maintain backward compatibility
+    - Use descriptive parameter names and documentation
+    - Implement validation rules that prevent common errors
+    - Consider deprecation warnings before removing parameters
+  </Accordion>
+  
+  <Accordion title="Version Strategy">
+    - Use patch versions for documentation and bug fixes
+    - Use minor versions for new optional features
+    - Reserve major versions for true breaking changes
+    - Document version changes in release notes
+  </Accordion>
+  
+  <Accordion title="Testing Updates">
+    - Test updated actions in a development environment first
+    - Validate that existing workflows continue working
+    - Use dry-run mode to test parameter validation
+    - Monitor execution success rates after updates
+  </Accordion>
+  
+  <Accordion title="Communication">
+    - Notify team members about major version updates
+    - Document breaking changes and migration steps
+    - Provide examples of how to use new parameters
+    - Consider gradual rollouts for critical actions
+  </Accordion>
+</AccordionGroup>
+
+## Workflow Impact
+
+<Warning>
+  **Important:** Understanding how updates affect existing workflows:
+  
+  - **Active Workflows**: Continue using the version they were created with
+  - **New Workflows**: Automatically use the latest version
+  - **Manual Updates**: Workflows can be updated to newer versions individually
+  - **Deprecated Versions**: Can be marked for removal after migration period
+</Warning>
+
+## Related Operations
+
+<CardGroup cols={2}>
+  <Card title="Get Action" icon="eye" href="/api/endpoints/actions/get-action">
+    View current action configuration
+  </Card>
+  <Card title="List Action Versions" icon="history" href="/api/endpoints/actions/list-versions">
+    View version history and changes
+  </Card>
+  <Card title="Execute Action" icon="play" href="/api/endpoints/actions/execute-action">
+    Test updated action configuration
+  </Card>
+  <Card title="Delete Action" icon="trash" href="/api/endpoints/actions/delete-action">
+    Remove action from organization
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="api-footer.mdx" />

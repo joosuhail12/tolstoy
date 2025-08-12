@@ -1,0 +1,284 @@
+---
+title: "Python SDK"
+description: "Official Python SDK for the Tolstoy workflow automation platform"
+---
+
+# Tolstoy Python SDK
+
+The official Python SDK for Tolstoy provides a comprehensive, Pythonic interface to the Tolstoy API. Build powerful workflow automations with clean, readable code.
+
+## Features
+
+<CardGroup cols={2}>
+  <Card title="Pythonic Interface" icon="python">
+    Intuitive Python APIs with type hints and excellent IDE support
+  </Card>
+  <Card title="Async Support" icon="bolt">
+    Full async/await support for high-performance applications
+  </Card>
+  <Card title="Auto-retry & Error Handling" icon="shield-alt">
+    Built-in retry logic and comprehensive error handling
+  </Card>
+  <Card title="Type Safety" icon="check-double">
+    Complete type annotations with mypy support
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+```python
+import asyncio
+from tolstoy import TolstoyClient
+
+# Initialize client
+client = TolstoyClient(
+    api_key="your-api-key",
+    organization_id="your-org-id"
+)
+
+async def main():
+    # Create a tool
+    tool = await client.tools.create(
+        name="My API Tool",
+        base_url="https://api.example.com",
+        auth_type="bearer_token"
+    )
+    
+    # Create an action
+    action = await client.actions.create(
+        name="Fetch User Data",
+        tool_id=tool.id,
+        method="GET",
+        endpoint="/users/{user_id}"
+    )
+    
+    # Execute the action
+    result = await client.actions.execute(
+        action_id=action.id,
+        input={"user_id": "12345"}
+    )
+    
+    print(f"Action result: {result.output}")
+
+# Run the async function
+asyncio.run(main())
+```
+
+## Installation
+
+Install the SDK using pip:
+
+```bash
+pip install tolstoy-sdk
+```
+
+For development with optional dependencies:
+
+```bash
+pip install tolstoy-sdk[dev]
+```
+
+## Key Concepts
+
+### Client Initialization
+
+The `TolstoyClient` is your main entry point to the Tolstoy API:
+
+```python
+from tolstoy import TolstoyClient
+
+# Basic initialization
+client = TolstoyClient(
+    api_key="your-api-key",
+    organization_id="your-org-id"
+)
+
+# Advanced configuration
+client = TolstoyClient(
+    api_key="your-api-key",
+    organization_id="your-org-id",
+    base_url="https://api.tolstoy.com",  # Optional: custom API endpoint
+    timeout=30.0,                        # Request timeout in seconds
+    max_retries=3,                       # Maximum retry attempts
+    retry_backoff_factor=2.0,            # Exponential backoff factor
+    debug=True                           # Enable debug logging
+)
+```
+
+### Resource Management
+
+The SDK provides resource managers for each API endpoint:
+
+```python
+# Tools management
+tools = client.tools
+await tools.list()
+await tools.create(...)
+await tools.get(tool_id)
+
+# Actions management  
+actions = client.actions
+await actions.list()
+await actions.create(...)
+await actions.execute(...)
+
+# Flows management
+flows = client.flows
+await flows.create(...)
+await flows.execute(...)
+```
+
+### Error Handling
+
+The SDK includes comprehensive error handling:
+
+```python
+from tolstoy import TolstoyClient
+from tolstoy.exceptions import (
+    TolstoyError,
+    AuthenticationError,
+    RateLimitError,
+    ValidationError,
+    NotFoundError
+)
+
+client = TolstoyClient(api_key="your-key", organization_id="your-org")
+
+try:
+    result = await client.actions.execute(action_id="invalid-id")
+except NotFoundError as e:
+    print(f"Action not found: {e}")
+except RateLimitError as e:
+    print(f"Rate limit exceeded. Retry after: {e.retry_after}")
+except ValidationError as e:
+    print(f"Validation failed: {e.errors}")
+except AuthenticationError as e:
+    print(f"Authentication failed: {e}")
+except TolstoyError as e:
+    print(f"API error: {e}")
+```
+
+### Type Safety
+
+The SDK provides complete type annotations:
+
+```python
+from typing import Dict, Any, Optional
+from tolstoy import TolstoyClient
+from tolstoy.models import Tool, Action, Flow, ExecutionResult
+
+client: TolstoyClient = TolstoyClient(...)
+
+# Type-safe operations
+tool: Tool = await client.tools.create(
+    name="My Tool",
+    base_url="https://api.example.com",
+    auth_type="api_key"
+)
+
+action: Action = await client.actions.create(
+    name="My Action",
+    tool_id=tool.id,
+    method="POST",
+    endpoint="/data"
+)
+
+result: ExecutionResult = await client.actions.execute(
+    action_id=action.id,
+    input={"key": "value"}
+)
+```
+
+## Environment Variables
+
+The SDK supports configuration via environment variables:
+
+```bash
+export TOLSTOY_API_KEY="your-api-key"
+export TOLSTOY_ORGANIZATION_ID="your-org-id"
+export TOLSTOY_BASE_URL="https://api.tolstoy.com"  # Optional
+export TOLSTOY_DEBUG="true"                        # Optional
+```
+
+```python
+from tolstoy import TolstoyClient
+
+# Client will automatically use environment variables
+client = TolstoyClient()
+```
+
+## Framework Integration
+
+### Django Integration
+
+```python
+# settings.py
+TOLSTOY_API_KEY = "your-api-key"
+TOLSTOY_ORGANIZATION_ID = "your-org-id"
+
+# utils.py
+from django.conf import settings
+from tolstoy import TolstoyClient
+
+def get_tolstoy_client():
+    return TolstoyClient(
+        api_key=settings.TOLSTOY_API_KEY,
+        organization_id=settings.TOLSTOY_ORGANIZATION_ID
+    )
+
+# views.py
+from django.http import JsonResponse
+from .utils import get_tolstoy_client
+
+async def trigger_workflow(request):
+    client = get_tolstoy_client()
+    result = await client.flows.execute(
+        flow_id="flow_123",
+        input=request.json()
+    )
+    return JsonResponse({"execution_id": result.id})
+```
+
+### FastAPI Integration
+
+```python
+from fastapi import FastAPI, Depends
+from tolstoy import TolstoyClient
+import os
+
+app = FastAPI()
+
+def get_tolstoy_client():
+    return TolstoyClient(
+        api_key=os.getenv("TOLSTOY_API_KEY"),
+        organization_id=os.getenv("TOLSTOY_ORGANIZATION_ID")
+    )
+
+@app.post("/execute-workflow")
+async def execute_workflow(
+    payload: dict,
+    client: TolstoyClient = Depends(get_tolstoy_client)
+):
+    result = await client.flows.execute(
+        flow_id="flow_123",
+        input=payload
+    )
+    return {"execution_id": result.id}
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/sdk/python/installation">
+    Get started with installation and setup
+  </Card>
+  <Card title="Quick Start Tutorial" icon="play" href="/sdk/python/quickstart">
+    Build your first workflow with Python
+  </Card>
+  <Card title="Examples & Recipes" icon="code" href="/sdk/python/examples">
+    Real-world examples and best practices
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/index">
+    Complete API documentation
+  </Card>
+</CardGroup>

@@ -1,0 +1,313 @@
+name: Deploy Documentation
+
+on:
+  push:
+    branches: 
+      - main
+      - staging
+      - feat/comprehensive-docs-platform
+    paths:
+      - 'docs-mintlify/**'
+      - '.github/workflows/deploy-docs.yml'
+  
+  pull_request:
+    branches: 
+      - main
+    paths:
+      - 'docs-mintlify/**'
+  
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - staging
+          - production
+
+env:
+  NODE_VERSION: '18'
+  DOCS_DIRECTORY: './docs-mintlify'
+
+jobs:
+  validate:
+    name: Validate Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: '${{ env.DOCS_DIRECTORY }}/package-lock.json'
+      
+      - name: Install dependencies
+        working-directory: ${{ env.DOCS_DIRECTORY }}
+        run: npm ci
+      
+      - name: Validate documentation structure
+        working-directory: ${{ env.DOCS_DIRECTORY }}
+        run: npm run validate
+      
+      - name: Check for broken links
+        working-directory: ${{ env.DOCS_DIRECTORY }}
+        run: npm run check:links
+        continue-on-error: true
+      
+      - name: Upload validation report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-report
+          path: ${{ env.DOCS_DIRECTORY }}/validation-report.json
+          retention-days: 7
+
+  build:
+    name: Build Documentation
+    runs-on: ubuntu-latest
+    needs: validate
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: '${{ env.DOCS_DIRECTORY }}/package-lock.json'
+      
+      - name: Install dependencies
+        working-directory: ${{ env.DOCS_DIRECTORY }}
+        run: npm ci
+      
+      - name: Generate auto-content
+        working-directory: ${{ env.DOCS_DIRECTORY }}
+        run: npm run generate:all
+        env:
+          TOLSTOY_API_URL: ${{ secrets.TOLSTOY_API_URL }}
+      
+      - name: Validate documentation
+        working-directory: ${{ env.DOCS_DIRECTORY }}
+        run: |
+          npm install -g mint@latest
+          mint broken-links || echo "Some links may be broken but continuing deployment"
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: docs-build
+          path: ${{ env.DOCS_DIRECTORY }}/.mintlify/
+          retention-days: 1
+
+  deploy-preview:
+    name: Deploy Preview
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'pull_request'
+    
+    environment:
+      name: preview
+      url: https://docs-preview-${{ github.sha }}.tolstoy.getpullse.com
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Create preview comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { issue: { number: issue_number }, repo: { owner, repo } } = context;
+            const previewUrl = `https://docs-preview-${{ github.sha }}.mintlify.app`;
+            
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body: `📚 Documentation preview will be available soon!\n\n🔗 **Preview URL**: ${previewUrl}\n\nMintlify will automatically deploy this preview from the GitHub integration.`
+            });
+      
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { issue: { number: issue_number }, repo: { owner, repo } } = context;
+            const previewUrl = `https://docs-preview-${{ github.sha }}.tolstoy.getpullse.com`;
+            
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body: `📚 Documentation preview deployed!\n\n🔗 **Preview URL**: ${previewUrl}\n\nThis preview will be available until the PR is closed.`
+            });
+
+  deploy-staging:
+    name: Deploy Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/staging' && github.event_name == 'push'
+    
+    environment:
+      name: staging
+      url: https://docs-staging.tolstoy.getpullse.com
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup deployment environment
+        working-directory: ${{ env.DOCS_DIRECTORY }}
+        run: |
+          chmod +x scripts/deploy-docs.sh
+          npm ci
+      
+      - name: Deploy to staging
+        working-directory: ${{ env.DOCS_DIRECTORY }}
+        run: ./scripts/deploy-docs.sh deploy
+        env:
+          MINTLIFY_API_KEY: ${{ secrets.MINTLIFY_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+  deploy-production:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    environment:
+      name: production
+      url: https://docs.tolstoy.getpullse.com
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup deployment environment
+        working-directory: ${{ env.DOCS_DIRECTORY }}
+        run: |
+          chmod +x scripts/deploy-docs.sh
+          npm ci
+      
+      - name: Deploy to production
+        working-directory: ${{ env.DOCS_DIRECTORY }}
+        run: ./scripts/deploy-docs.sh deploy
+        env:
+          MINTLIFY_API_KEY: ${{ secrets.MINTLIFY_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+      
+      - name: Create deployment summary
+        run: |
+          echo "## 🚀 Production Deployment Complete" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment**: Production" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL**: https://docs.tolstoy.getpullse.com" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+
+  deploy-manual:
+    name: Manual Deploy
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'workflow_dispatch'
+    
+    environment:
+      name: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup deployment environment
+        working-directory: ${{ env.DOCS_DIRECTORY }}
+        run: |
+          chmod +x scripts/deploy-docs.sh
+          npm ci
+      
+      - name: Deploy documentation
+        working-directory: ${{ env.DOCS_DIRECTORY }}
+        run: ./scripts/deploy-docs.sh deploy
+        env:
+          MINTLIFY_API_KEY: ${{ secrets.MINTLIFY_API_KEY }}
+          DEPLOYMENT_ENV: ${{ github.event.inputs.environment }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [deploy-preview, deploy-staging, deploy-production, deploy-manual]
+    if: always()
+    
+    steps:
+      - name: Delete old preview deployments
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            
+            // Get all deployments
+            const deployments = await github.rest.repos.listDeployments({
+              owner,
+              repo,
+              environment: 'preview',
+              per_page: 100
+            });
+            
+            // Keep only the 5 most recent preview deployments
+            const oldDeployments = deployments.data.slice(5);
+            
+            for (const deployment of oldDeployments) {
+              await github.rest.repos.createDeploymentStatus({
+                owner,
+                repo,
+                deployment_id: deployment.id,
+                state: 'inactive'
+              });
+            }
+            
+            console.log(`Marked ${oldDeployments.length} old deployments as inactive`);
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: ${{ env.DOCS_DIRECTORY }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'

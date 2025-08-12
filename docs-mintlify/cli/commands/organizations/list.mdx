@@ -1,0 +1,574 @@
+---
+title: "tolstoy organizations list"  
+description: "List and manage Tolstoy organizations you have access to"
+---
+
+# tolstoy organizations list
+
+Display all Tolstoy organizations you have access to, along with their details, membership status, and permissions.
+
+## Usage
+
+```bash
+tolstoy organizations list [OPTIONS]
+```
+
+## Description
+
+The `tolstoy organizations list` command shows all organizations associated with your account. This includes organizations where you're a member, admin, or owner, along with relevant metadata and access levels.
+
+## Basic Usage
+
+```bash
+# List all organizations
+tolstoy organizations list
+
+# List with detailed information
+tolstoy organizations list --detailed
+
+# Filter by role
+tolstoy organizations list --role admin
+```
+
+## Options
+
+<ParamField path="--format, -f" type="string">
+  Output format for the organization list
+  
+  **Options**: `table`, `json`, `yaml`, `csv`  
+  **Default**: `table`
+  
+  ```bash
+  tolstoy organizations list --format json
+  ```
+</ParamField>
+
+<ParamField path="--detailed, -d" type="boolean">
+  Show detailed information including member counts, created dates, and settings
+  
+  ```bash
+  tolstoy organizations list --detailed
+  ```
+</ParamField>
+
+<ParamField path="--role, -r" type="string">
+  Filter organizations by your role
+  
+  **Options**: `owner`, `admin`, `member`, `viewer`
+  
+  ```bash
+  tolstoy organizations list --role admin
+  ```
+</ParamField>
+
+<ParamField path="--status" type="string">
+  Filter organizations by status
+  
+  **Options**: `active`, `suspended`, `archived`
+  
+  ```bash
+  tolstoy organizations list --status active
+  ```
+</ParamField>
+
+<ParamField path="--search, -s" type="string">
+  Search organizations by name or description
+  
+  ```bash
+  tolstoy organizations list --search "acme"
+  ```
+</ParamField>
+
+<ParamField path="--limit" type="number">
+  Maximum number of organizations to display
+  
+  **Default**: `50`
+  
+  ```bash
+  tolstoy organizations list --limit 10
+  ```
+</ParamField>
+
+<ParamField path="--sort" type="string">
+  Sort organizations by field
+  
+  **Options**: `name`, `created`, `updated`, `member_count`  
+  **Default**: `name`
+  
+  ```bash
+  tolstoy organizations list --sort created --reverse
+  ```
+</ParamField>
+
+<ParamField path="--reverse" type="boolean">
+  Reverse the sort order
+  
+  ```bash
+  tolstoy organizations list --sort name --reverse
+  ```
+</ParamField>
+
+<ParamField path="--fields" type="string">
+  Specify which fields to display (comma-separated)
+  
+  ```bash
+  tolstoy organizations list --fields "id,name,role,member_count"
+  ```
+</ParamField>
+
+## Output Examples
+
+### Table Format (Default)
+
+```bash
+tolstoy organizations list
+```
+
+```
+┌─────────────┬─────────────┬────────┬────────┬──────────────┬─────────────────┐
+│ ID          │ Name        │ Role   │ Status │ Members      │ Created         │
+├─────────────┼─────────────┼────────┼────────┼──────────────┼─────────────────┤
+│ org_123     │ Acme Corp   │ owner  │ active │ 12           │ 2023-06-15      │
+│ org_456     │ Dev Team    │ admin  │ active │ 8            │ 2023-08-20      │
+│ org_789     │ Marketing   │ member │ active │ 25           │ 2023-09-10      │
+└─────────────┴─────────────┴────────┴────────┴──────────────┴─────────────────┘
+```
+
+### Detailed Table Format
+
+```bash
+tolstoy organizations list --detailed
+```
+
+```
+Organization: Acme Corp (org_123)
+├── Role: Owner
+├── Status: Active
+├── Members: 12 total (3 admins, 9 members)
+├── Created: June 15, 2023
+├── Plan: Professional
+├── Workflows: 45 active, 12 paused
+├── API Usage: 2.4M calls this month
+└── Billing: $299/month
+
+Organization: Dev Team (org_456)  
+├── Role: Admin
+├── Status: Active
+├── Members: 8 total (2 admins, 6 members)
+├── Created: August 20, 2023
+├── Plan: Team
+├── Workflows: 23 active, 3 paused
+├── API Usage: 850K calls this month
+└── Billing: $99/month
+```
+
+### JSON Format
+
+```bash
+tolstoy organizations list --format json
+```
+
+```json
+[
+  {
+    "id": "org_123",
+    "name": "Acme Corp",
+    "description": "Main company organization",
+    "role": "owner",
+    "status": "active",
+    "member_count": 12,
+    "plan": {
+      "name": "Professional",
+      "price": 299,
+      "currency": "USD"
+    },
+    "usage": {
+      "workflows_active": 45,
+      "workflows_paused": 12,
+      "api_calls_month": 2400000
+    },
+    "created_at": "2023-06-15T10:30:00Z",
+    "updated_at": "2023-12-01T15:45:30Z"
+  },
+  {
+    "id": "org_456", 
+    "name": "Dev Team",
+    "description": "Development and testing environment",
+    "role": "admin",
+    "status": "active",
+    "member_count": 8,
+    "plan": {
+      "name": "Team",
+      "price": 99,
+      "currency": "USD"
+    },
+    "usage": {
+      "workflows_active": 23,
+      "workflows_paused": 3,
+      "api_calls_month": 850000
+    },
+    "created_at": "2023-08-20T14:20:00Z",
+    "updated_at": "2023-11-28T09:15:20Z"
+  }
+]
+```
+
+## Filtering and Searching
+
+### Filter by Role
+
+```bash
+# Show only organizations where you're an owner
+tolstoy organizations list --role owner
+
+# Show admin and owner organizations
+tolstoy organizations list --role admin,owner
+```
+
+### Search Organizations
+
+```bash
+# Search by name
+tolstoy organizations list --search "acme"
+
+# Search in description
+tolstoy organizations list --search "development"
+
+# Case-insensitive search
+tolstoy organizations list --search "MARKETING"
+```
+
+### Status Filtering
+
+```bash
+# Active organizations only
+tolstoy organizations list --status active
+
+# Include suspended organizations
+tolstoy organizations list --status active,suspended
+```
+
+## Custom Field Selection
+
+```bash
+# Show only specific fields
+tolstoy organizations list --fields "id,name,role"
+
+# Include usage statistics
+tolstoy organizations list --fields "name,role,usage.workflows_active,usage.api_calls_month"
+
+# Custom format with selected fields
+tolstoy organizations list \
+  --fields "name,role,plan.name,member_count" \
+  --format table
+```
+
+## Sorting Options
+
+```bash
+# Sort by creation date (newest first)
+tolstoy organizations list --sort created --reverse
+
+# Sort by member count (largest first)
+tolstoy organizations list --sort member_count --reverse
+
+# Sort by name alphabetically
+tolstoy organizations list --sort name
+
+# Sort by last update
+tolstoy organizations list --sort updated --reverse
+```
+
+## Integration with Other Commands
+
+### Switch Organizations
+
+```bash
+# List organizations and switch to one
+ORG_ID=$(tolstoy organizations list --format json | jq -r '.[0].id')
+tolstoy config set organization_id "$ORG_ID"
+
+# Interactive organization selection
+tolstoy organizations select
+```
+
+### Organization-Specific Operations
+
+```bash
+# List workflows for specific organization
+tolstoy organizations list --format json | \
+  jq -r '.[] | select(.name=="Acme Corp") | .id' | \
+  xargs -I {} tolstoy flows list --org {}
+
+# Get organization details
+tolstoy organizations show org_123
+```
+
+## Output Formats
+
+<Tabs>
+  <Tab title="Table">
+    ```bash
+    tolstoy organizations list --format table
+    ```
+    
+    Best for: Quick overview, human-readable output
+  </Tab>
+  
+  <Tab title="JSON">
+    ```bash
+    tolstoy organizations list --format json
+    ```
+    
+    Best for: Scripting, API integration, detailed data access
+  </Tab>
+  
+  <Tab title="YAML">
+    ```bash
+    tolstoy organizations list --format yaml
+    ```
+    
+    Best for: Configuration files, human-readable structured data
+  </Tab>
+  
+  <Tab title="CSV">
+    ```bash
+    tolstoy organizations list --format csv
+    ```
+    
+    Best for: Excel import, data analysis, reporting
+  </Tab>
+</Tabs>
+
+## Role-Based Access
+
+### Understanding Roles
+
+<AccordionGroup>
+  <Accordion title="Owner">
+    **Permissions**:
+    - Full access to organization settings
+    - Billing and subscription management
+    - Member management and role assignment
+    - Delete organization
+    - All admin and member permissions
+    
+    **Indicators**: 
+    - Crown icon in CLI output
+    - "owner" role badge
+  </Accordion>
+  
+  <Accordion title="Admin">
+    **Permissions**:
+    - Manage workflows, tools, and actions
+    - Invite and remove members
+    - View organization analytics
+    - Configure integrations
+    - All member permissions
+    
+    **Indicators**: 
+    - Shield icon in CLI output
+    - "admin" role badge
+  </Accordion>
+  
+  <Accordion title="Member">
+    **Permissions**:
+    - Create and modify own workflows
+    - View organization workflows
+    - Execute workflows
+    - Access organization tools
+    
+    **Indicators**: 
+    - User icon in CLI output
+    - "member" role badge
+  </Accordion>
+  
+  <Accordion title="Viewer">
+    **Permissions**:
+    - Read-only access to workflows
+    - View execution history
+    - Access organization directory
+    
+    **Indicators**: 
+    - Eye icon in CLI output  
+    - "viewer" role badge
+  </Accordion>
+</AccordionGroup>
+
+## Scripting and Automation
+
+### Bash Scripts
+
+```bash
+#!/bin/bash
+
+# Get all organization IDs
+ORG_IDS=$(tolstoy organizations list --format json | jq -r '.[].id')
+
+# Process each organization
+for org_id in $ORG_IDS; do
+  echo "Processing organization: $org_id"
+  tolstoy flows list --org "$org_id" --format json > "flows-${org_id}.json"
+done
+```
+
+### PowerShell Scripts
+
+```powershell
+# Get organizations as PowerShell objects
+$orgs = tolstoy organizations list --format json | ConvertFrom-Json
+
+# Filter and process
+$orgs | Where-Object { $_.role -eq "admin" } | ForEach-Object {
+    Write-Host "Admin access to: $($_.name)"
+    & tolstoy workflows list --org $_.id
+}
+```
+
+### Python Integration
+
+```python
+import subprocess
+import json
+
+# Get organizations
+result = subprocess.run(
+    ['tolstoy', 'organizations', 'list', '--format', 'json'],
+    capture_output=True, text=True
+)
+
+organizations = json.loads(result.stdout)
+
+# Find organizations by criteria
+admin_orgs = [org for org in organizations if org['role'] == 'admin']
+large_orgs = [org for org in organizations if org['member_count'] > 10]
+
+print(f"You are admin in {len(admin_orgs)} organizations")
+print(f"Found {len(large_orgs)} organizations with >10 members")
+```
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="No Organizations Listed">
+    **Cause**: Not authenticated or no organization access
+    
+    **Solutions**:
+    ```bash
+    # Check authentication status
+    tolstoy auth status
+    
+    # Re-authenticate
+    tolstoy auth login
+    
+    # Verify organization access
+    tolstoy auth whoami
+    ```
+  </Accordion>
+  
+  <Accordion title="Missing Organizations">
+    **Cause**: Organizations may be suspended or you've lost access
+    
+    **Solutions**:
+    ```bash
+    # Include all statuses
+    tolstoy organizations list --status active,suspended,archived
+    
+    # Check with organization admin
+    # Contact support if access was revoked unexpectedly
+    ```
+  </Accordion>
+  
+  <Accordion title="Permission Denied">
+    **Error**: `insufficient permissions to list organizations`
+    
+    **Solutions**:
+    ```bash
+    # Check current user permissions
+    tolstoy auth whoami
+    
+    # Ensure you're using correct account
+    tolstoy auth login --force
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Examples
+
+### Development Workflow
+
+```bash
+# List development environments
+tolstoy organizations list --search "dev\|test\|staging"
+
+# Switch to development organization
+DEV_ORG=$(tolstoy organizations list --format json | \
+  jq -r '.[] | select(.name | contains("Dev")) | .id')
+tolstoy config set organization_id "$DEV_ORG"
+
+# Verify switch
+tolstoy auth whoami
+```
+
+### Audit and Reporting
+
+```bash
+# Generate organization report
+tolstoy organizations list --detailed --format json > org_report.json
+
+# Count organizations by role
+tolstoy organizations list --format json | \
+  jq 'group_by(.role) | map({role: .[0].role, count: length})'
+
+# Find high-usage organizations
+tolstoy organizations list --format json | \
+  jq '.[] | select(.usage.api_calls_month > 1000000) | .name'
+```
+
+### Bulk Operations
+
+```bash
+# Export all organization data
+mkdir -p org_exports
+tolstoy organizations list --format json | \
+  jq -r '.[].id' | \
+  while read org_id; do
+    tolstoy flows list --org "$org_id" --format json > "org_exports/flows_${org_id}.json"
+    tolstoy tools list --org "$org_id" --format json > "org_exports/tools_${org_id}.json"
+  done
+```
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="organizations show" icon="eye">
+    ```bash
+    tolstoy organizations show org_123
+    ```
+    View detailed organization information
+  </Card>
+  <Card title="organizations select" icon="hand-pointer">
+    ```bash
+    tolstoy organizations select
+    ```
+    Interactive organization selection
+  </Card>
+  <Card title="organizations members" icon="users">
+    ```bash
+    tolstoy organizations members org_123
+    ```
+    List organization members
+  </Card>
+  <Card title="auth whoami" icon="user">
+    ```bash
+    tolstoy auth whoami
+    ```
+    Show current user and organization
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="cli-footer.mdx" />

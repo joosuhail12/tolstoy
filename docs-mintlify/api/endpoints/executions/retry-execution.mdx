@@ -1,0 +1,345 @@
+---
+title: "Retry Execution"
+api: "POST /executions/{id}/retry"
+description: "Retry a failed workflow execution"
+---
+
+## Overview
+
+The Retry Execution endpoint allows you to restart a failed workflow execution, optionally with modified parameters or starting from a specific step. This is useful for handling transient failures or continuing from where an execution stopped.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the execution to retry
+</ParamField>
+
+## Request Body
+
+<ParamField body="fromStep" type="string">
+  Step ID to resume execution from (defaults to failed step)
+</ParamField>
+
+<ParamField body="parameters" type="object">
+  Override execution parameters for the retry
+</ParamField>
+
+<ParamField body="retryMode" type="string">
+  Retry mode: "from_failure", "from_beginning", or "from_step" (defaults to "from_failure")
+</ParamField>
+
+<ParamField body="maxRetries" type="number">
+  Maximum number of retry attempts for this execution (defaults to 3)
+</ParamField>
+
+<ParamField body="retryDelay" type="number">
+  Delay in seconds before starting the retry (defaults to 0)
+</ParamField>
+
+<ParamField body="reason" type="string">
+  Optional reason for retrying the execution
+</ParamField>
+
+## Response
+
+**Status Code:** `201 Created`
+
+<ResponseField name="id" type="string">
+  Unique identifier for the new retry execution
+</ResponseField>
+
+<ResponseField name="originalExecutionId" type="string">
+  The ID of the original failed execution
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Initial status of the retry execution: "pending" or "running"
+</ResponseField>
+
+<ResponseField name="retryAttempt" type="number">
+  The retry attempt number (1 for first retry, 2 for second, etc.)
+</ResponseField>
+
+<ResponseField name="retryMode" type="string">
+  The retry mode used for this execution
+</ResponseField>
+
+<ResponseField name="startedAt" type="string">
+  ISO timestamp when the retry execution started
+</ResponseField>
+
+<ResponseField name="startedBy" type="string">
+  User ID who initiated the retry
+</ResponseField>
+
+<ResponseField name="fromStep" type="string">
+  Step ID where execution will resume (if applicable)
+</ResponseField>
+
+<ResponseField name="estimatedDuration" type="number">
+  Estimated duration in seconds for the retry execution
+</ResponseField>
+
+<ResponseField name="reason" type="string">
+  Reason provided for the retry (if any)
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid parameters or execution cannot be retried
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Additional error context and validation failures
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="404" type="object">
+  Not Found - Execution does not exist
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - Execution is not in a retryable state or retry limit exceeded
+  
+  <Expandable title="Retry Conflict">
+    <ResponseField name="error" type="string">
+      "RETRY_LIMIT_EXCEEDED" or "INVALID_EXECUTION_STATE"
+    </ResponseField>
+    <ResponseField name="currentStatus" type="string">
+      Current execution status
+    </ResponseField>
+    <ResponseField name="retryCount" type="number">
+      Number of retries already attempted
+    </ResponseField>
+    <ResponseField name="maxRetries" type="number">
+      Maximum allowed retries
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="422" type="object">
+  Unprocessable Entity - Invalid step ID or parameters
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL Basic Retry
+curl -X POST "https://api.tolstoy.com/v1/executions/exec_abc123/retry" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "reason": "Retrying after fixing network connectivity issue"
+  }'
+```
+
+```bash cURL Advanced Retry
+curl -X POST "https://api.tolstoy.com/v1/executions/exec_abc123/retry" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "retryMode": "from_step",
+    "fromStep": "step_def456",
+    "parameters": {
+      "timeout": 300,
+      "retryCount": 2
+    },
+    "maxRetries": 5,
+    "retryDelay": 30,
+    "reason": "Retrying from failed API call step with increased timeout"
+  }'
+```
+
+```javascript JavaScript
+// Basic retry from failure point
+const basicRetry = await fetch('/api/v1/executions/exec_abc123/retry', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    reason: 'Retrying after fixing network connectivity issue'
+  })
+});
+
+// Advanced retry with custom parameters
+const advancedRetry = await fetch('/api/v1/executions/exec_abc123/retry', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    retryMode: 'from_step',
+    fromStep: 'step_def456',
+    parameters: {
+      timeout: 300,
+      retryCount: 2
+    },
+    maxRetries: 5,
+    retryDelay: 30,
+    reason: 'Retrying from failed API call step with increased timeout'
+  })
+});
+
+if (advancedRetry.ok) {
+  const result = await advancedRetry.json();
+  console.log(`Retry execution started: ${result.id} (attempt ${result.retryAttempt})`);
+}
+```
+
+```python Python
+import requests
+
+# Basic retry
+basic_retry_response = requests.post(
+    "https://api.tolstoy.com/v1/executions/exec_abc123/retry",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json={
+        "reason": "Retrying after fixing network connectivity issue"
+    }
+)
+
+# Advanced retry with custom parameters
+advanced_retry_response = requests.post(
+    "https://api.tolstoy.com/v1/executions/exec_abc123/retry",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json={
+        "retryMode": "from_step",
+        "fromStep": "step_def456",
+        "parameters": {
+            "timeout": 300,
+            "retryCount": 2
+        },
+        "maxRetries": 5,
+        "retryDelay": 30,
+        "reason": "Retrying from failed API call step with increased timeout"
+    }
+)
+
+if advanced_retry_response.status_code == 201:
+    result = advanced_retry_response.json()
+    print(f"Retry execution started: {result['id']} (attempt {result['retryAttempt']})")
+```
+
+</CodeGroup>
+
+## Retry Modes
+
+### from_failure (Default)
+- Resumes from the step that failed
+- Maintains previous step results
+- Most efficient for transient failures
+
+### from_beginning  
+- Restarts the entire workflow
+- Clears all previous step results
+- Use when early steps need correction
+
+### from_step
+- Resumes from a specific step ID
+- Requires `fromStep` parameter
+- Useful for debugging or partial re-execution
+
+## Retry Limits
+
+Each execution has retry limits to prevent infinite loops:
+- **Default limit**: 3 retries per execution
+- **Maximum limit**: 10 retries (for enterprise plans)
+- **Retry counter**: Tracks attempts across all retry modes
+
+## Parameter Overrides
+
+When retrying, you can override original execution parameters:
+- **Timeout values**: Adjust step timeouts
+- **Retry settings**: Modify step-level retry behavior  
+- **Input data**: Update workflow inputs
+- **Environment**: Change execution environment
+
+## State Preservation
+
+During retries:
+- **Success states**: Completed steps remain completed
+- **Failed states**: Failed steps are reset to pending
+- **Data**: Previous step outputs are preserved unless overridden
+- **Context**: Execution context and variables are maintained
+
+## Retryable States
+
+Executions can only be retried when in these states:
+- `failed` - Execution failed and can be retried
+- `canceled` - Manually canceled execution can be retried
+
+Cannot retry executions in these states:
+- `completed` - Successfully finished executions
+- `running` - Currently executing
+- `pending` - Not yet started
+
+## Automatic vs Manual Retries
+
+### Automatic Retries
+- Configured per step in workflow definition
+- Trigger immediately on step failure
+- Use exponential backoff delays
+- Limited to step-level retry counts
+
+### Manual Retries
+- Triggered via this API endpoint
+- Allow human intervention and analysis
+- Support custom parameters and modes
+- Subject to execution-level retry limits
+
+## Webhook Events
+
+Retry operations trigger webhook events:
+- `execution.retry_started` - When retry execution begins
+- `execution.retry_completed` - When retry succeeds
+- `execution.retry_failed` - When retry also fails
+
+## Related Endpoints
+
+- [Cancel Execution](/api/endpoints/executions/cancel-execution) - Stop running execution
+- [Get Execution Status](/api/endpoints/executions/get-execution) - Check execution details
+- [List Executions](/api/endpoints/executions/list-executions) - View all executions

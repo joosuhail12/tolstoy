@@ -1,0 +1,161 @@
+---
+title: "List Webhooks"
+api: "GET /webhooks"
+description: "Retrieve a list of configured webhooks for your organization"
+---
+
+## Overview
+
+The List Webhooks endpoint returns all webhooks configured in your organization, including their status and recent delivery statistics.
+
+## Query Parameters
+
+<ParamField query="page" type="number" default="1">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="limit" type="number" default="20">
+  Number of items per page (max: 100)
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by status: `active`, `inactive`, `failing`
+</ParamField>
+
+<ParamField query="eventType" type="string">
+  Filter by event type: `flow.started`, `flow.completed`, `flow.failed`, `action.executed`
+</ParamField>
+
+## Response
+
+<ResponseField name="webhooks" type="array">
+  Array of webhook objects
+  
+  <Expandable title="Webhook Object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the webhook
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Name of the webhook
+    </ResponseField>
+    
+    <ResponseField name="url" type="string">
+      Webhook endpoint URL
+    </ResponseField>
+    
+    <ResponseField name="events" type="array">
+      List of subscribed event types
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Current status: `active`, `inactive`, `failing`
+    </ResponseField>
+    
+    <ResponseField name="headers" type="object">
+      Custom headers sent with webhook requests
+    </ResponseField>
+    
+    <ResponseField name="retryPolicy" type="object">
+      Retry configuration for failed deliveries
+    </ResponseField>
+    
+    <ResponseField name="statistics" type="object">
+      Delivery statistics for the last 24 hours
+      
+      <Expandable title="Statistics Object">
+        <ResponseField name="totalDeliveries" type="number">
+          Total delivery attempts
+        </ResponseField>
+        
+        <ResponseField name="successfulDeliveries" type="number">
+          Successful deliveries
+        </ResponseField>
+        
+        <ResponseField name="failedDeliveries" type="number">
+          Failed deliveries
+        </ResponseField>
+        
+        <ResponseField name="averageResponseTime" type="number">
+          Average response time in milliseconds
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      ISO 8601 timestamp when created
+    </ResponseField>
+    
+    <ResponseField name="lastTriggeredAt" type="string">
+      ISO 8601 timestamp of last trigger
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination metadata
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "webhooks": [
+    {
+      "id": "webhook_abc123",
+      "name": "Flow Completion Notifier",
+      "url": "https://api.example.com/webhooks/flow-complete",
+      "events": ["flow.completed", "flow.failed"],
+      "status": "active",
+      "headers": {
+        "Authorization": "Bearer webhook_token_123",
+        "Content-Type": "application/json"
+      },
+      "retryPolicy": {
+        "maxRetries": 3,
+        "backoffMultiplier": 2,
+        "initialDelay": 1000
+      },
+      "statistics": {
+        "totalDeliveries": 245,
+        "successfulDeliveries": 240,
+        "failedDeliveries": 5,
+        "averageResponseTime": 250
+      },
+      "createdAt": "2023-10-01T00:00:00Z",
+      "lastTriggeredAt": "2024-01-15T10:45:00Z"
+    },
+    {
+      "id": "webhook_def456",
+      "name": "Error Alert Webhook",
+      "url": "https://slack.com/api/webhooks/errors",
+      "events": ["flow.failed", "action.failed"],
+      "status": "active",
+      "headers": {
+        "Content-Type": "application/json"
+      },
+      "retryPolicy": {
+        "maxRetries": 5,
+        "backoffMultiplier": 2,
+        "initialDelay": 2000
+      },
+      "statistics": {
+        "totalDeliveries": 42,
+        "successfulDeliveries": 41,
+        "failedDeliveries": 1,
+        "averageResponseTime": 180
+      },
+      "createdAt": "2023-11-15T00:00:00Z",
+      "lastTriggeredAt": "2024-01-15T09:30:00Z"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 2,
+    "totalPages": 1
+  }
+}
+```
+</ResponseExample>
+
+<Snippet file="api-footer.mdx" />

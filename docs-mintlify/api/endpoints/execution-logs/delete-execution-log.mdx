@@ -1,0 +1,296 @@
+---
+title: "Delete Execution Log"
+api: "DELETE /execution-logs/{id}"
+description: "Delete an execution log entry"
+---
+
+## Overview
+
+The Delete Execution Log endpoint removes an execution log entry from the system. Use this endpoint with caution as it permanently removes audit trail information and cannot be undone.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the execution log to delete
+</ParamField>
+
+## Response
+
+**Status Code:** `204 No Content`
+
+The endpoint returns an empty response body with a 204 status code when the deletion is successful.
+
+## Error Responses
+
+<ResponseField name="404" type="object">
+  Not Found - Execution log does not exist
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      "LOG_NOT_FOUND"
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      "Execution log with the specified ID was not found"
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - Cannot delete log entry that is part of active execution
+  
+  <Expandable title="Deletion Conflict">
+    <ResponseField name="error" type="string">
+      "ACTIVE_EXECUTION"
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      "Cannot delete log entry for active execution"
+    </ResponseField>
+    <ResponseField name="executionId" type="string">
+      ID of the active execution
+    </ResponseField>
+    <ResponseField name="executionStatus" type="string">
+      Current status of the execution
+    </ResponseField>
+    <ResponseField name="suggestion" type="string">
+      "Wait for execution to complete or cancel it first"
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="403" type="object">
+  Forbidden - Insufficient permissions to delete execution logs
+  
+  <Expandable title="Permission Error">
+    <ResponseField name="error" type="string">
+      "INSUFFICIENT_PERMISSIONS"
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      "User does not have permission to delete execution logs"
+    </ResponseField>
+    <ResponseField name="requiredRole" type="string">
+      Minimum role required for deletion
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X DELETE "https://api.tolstoy.com/v1/execution-logs/log_def456" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```javascript JavaScript
+const deleteResponse = await fetch('/api/v1/execution-logs/log_def456', {
+  method: 'DELETE',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+if (deleteResponse.status === 204) {
+  console.log('Execution log deleted successfully');
+} else if (deleteResponse.status === 409) {
+  const error = await deleteResponse.json();
+  console.error('Cannot delete log:', error.message);
+} else {
+  console.error('Deletion failed:', deleteResponse.status);
+}
+```
+
+```python Python
+import requests
+
+response = requests.delete(
+    "https://api.tolstoy.com/v1/execution-logs/log_def456",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    }
+)
+
+if response.status_code == 204:
+    print("Execution log deleted successfully")
+elif response.status_code == 409:
+    error = response.json()
+    print(f"Cannot delete log: {error['message']}")
+else:
+    print(f"Deletion failed: {response.status_code}")
+```
+
+</CodeGroup>
+
+## Deletion Restrictions
+
+### Active Executions
+Cannot delete logs for executions that are currently:
+- `running` - Execution is in progress
+- `pending` - Execution is queued to start
+- `canceling` - Execution is being canceled
+
+### Permission Requirements
+Deletion requires elevated permissions:
+- **Admin role**: Can delete any execution log in organization
+- **Member role**: Can delete logs from own executions only
+- **Viewer role**: Cannot delete execution logs
+
+### Audit Trail Considerations
+Before deleting execution logs, consider:
+- **Compliance requirements**: May need to retain logs for regulatory compliance
+- **Debugging needs**: Logs may be needed for future troubleshooting
+- **Analytics**: Historical data may be valuable for performance analysis
+
+## Bulk Deletion
+
+For bulk deletion of execution logs, consider these approaches:
+
+### Delete by Execution
+```javascript
+// Get all logs for a specific execution
+const logs = await fetch(`/api/v1/execution-logs?executionId=${executionId}`);
+const logData = await logs.json();
+
+// Delete each log entry
+const deletePromises = logData.logs.map(log => 
+  fetch(`/api/v1/execution-logs/${log.id}`, { method: 'DELETE' })
+);
+
+await Promise.all(deletePromises);
+```
+
+### Delete by Date Range
+```javascript
+// Get logs older than specified date
+const cutoffDate = new Date();
+cutoffDate.setDate(cutoffDate.getDate() - 30); // 30 days ago
+
+const oldLogs = await fetch(
+  `/api/v1/execution-logs?createdBefore=${cutoffDate.toISOString()}`
+);
+const oldLogData = await oldLogs.json();
+
+// Delete old logs
+for (const log of oldLogData.logs) {
+  await fetch(`/api/v1/execution-logs/${log.id}`, { method: 'DELETE' });
+}
+```
+
+## Safety Measures
+
+### Pre-deletion Checks
+Before deletion, the system verifies:
+1. **Execution Status**: Ensures execution is not active
+2. **User Permissions**: Validates user can delete logs
+3. **Retention Policies**: Checks if log must be retained
+4. **Dependencies**: Ensures no other systems depend on the log
+
+### Soft Delete Option
+Consider implementing soft delete for better safety:
+```javascript
+// Instead of DELETE, use PUT to mark as deleted
+await fetch(`/api/v1/execution-logs/${logId}`, {
+  method: 'PUT',
+  body: JSON.stringify({
+    metadata: { 
+      deleted: true, 
+      deletedAt: new Date().toISOString(),
+      deletedBy: userId 
+    }
+  })
+});
+```
+
+## Alternative Approaches
+
+### Archiving
+Instead of deletion, consider archiving old logs:
+```javascript
+// Move logs to archive storage
+await fetch(`/api/v1/execution-logs/${logId}/archive`, {
+  method: 'POST'
+});
+```
+
+### Retention Policies
+Implement automatic cleanup based on policies:
+```javascript
+// Set retention policy for execution logs
+await fetch('/api/v1/organizations/settings', {
+  method: 'PUT',
+  body: JSON.stringify({
+    executionLogRetention: {
+      maxAgeDays: 90,
+      maxCount: 10000,
+      autoCleanup: true
+    }
+  })
+});
+```
+
+## Audit Logging
+
+Deletion operations are logged in the audit trail:
+- **User**: Who performed the deletion
+- **Timestamp**: When the deletion occurred
+- **Log Details**: Information about the deleted log
+- **Reason**: Why the log was deleted (if provided)
+
+## Recovery
+
+Once deleted, execution logs cannot be recovered through the API. However:
+- **Database backups**: May contain deleted logs
+- **Archive systems**: Logs may be archived before deletion
+- **External logging**: Logs may exist in external systems
+
+## Use Cases
+
+### Cleanup Operations
+- Remove logs from test executions
+- Clean up failed workflow attempts
+- Archive old execution data
+
+### Data Management
+- Comply with data retention policies
+- Reduce storage costs
+- Maintain database performance
+
+### Privacy Requirements
+- Remove logs containing sensitive data
+- Comply with data deletion requests
+- Clean up deprecated workflows
+
+## Best Practices
+
+1. **Verify Before Deletion**: Always confirm log is no longer needed
+2. **Backup First**: Consider backing up logs before deletion
+3. **Check Dependencies**: Ensure no other processes depend on the log
+4. **Document Reasons**: Log why deletion was performed
+5. **Batch Operations**: Use bulk deletion for efficiency
+
+## Related Endpoints
+
+- [Create Execution Log](/api/endpoints/execution-logs/create-execution-log) - Create new log entry
+- [Get Execution Log](/api/endpoints/execution-logs/get-log) - Retrieve specific log
+- [Update Execution Log](/api/endpoints/execution-logs/update-execution-log) - Update log entry
+- [List Execution Logs](/api/endpoints/execution-logs/list-logs) - View all logs

@@ -1,0 +1,210 @@
+---
+title: "Get User"
+api: "GET /users/{id}"
+description: "Retrieve information about a specific user within your organization"
+---
+
+## Overview
+
+The Get User endpoint returns detailed information about a specific user within your organization, including their profile, permissions, and role assignments.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the user to retrieve
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the user
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  User's email address
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  User's full name
+</ResponseField>
+
+<ResponseField name="avatar" type="string">
+  URL to the user's avatar image
+</ResponseField>
+
+<ResponseField name="verified" type="boolean">
+  Whether the user's email is verified
+</ResponseField>
+
+<ResponseField name="mfaEnabled" type="boolean">
+  Whether MFA is enabled for the user
+</ResponseField>
+
+<ResponseField name="organizations" type="array">
+  List of organizations the user belongs to
+  
+  <Expandable title="Organization Membership">
+    <ResponseField name="organizationId" type="string">
+      Organization's unique identifier
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Organization name
+    </ResponseField>
+    
+    <ResponseField name="role" type="string">
+      User's role in the organization: `owner`, `admin`, `member`, `viewer`
+    </ResponseField>
+    
+    <ResponseField name="permissions" type="array">
+      List of permissions in the organization
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="preferences" type="object">
+  User preferences and settings
+  
+  <Expandable title="Preferences Object">
+    <ResponseField name="theme" type="string">
+      UI theme: `light`, `dark`, `system`
+    </ResponseField>
+    
+    <ResponseField name="timezone" type="string">
+      User's timezone (e.g., "America/New_York")
+    </ResponseField>
+    
+    <ResponseField name="language" type="string">
+      Preferred language code (e.g., "en", "es", "fr")
+    </ResponseField>
+    
+    <ResponseField name="notifications" type="object">
+      Notification preferences
+      
+      <Expandable title="Notification Settings">
+        <ResponseField name="email" type="boolean">
+          Receive email notifications
+        </ResponseField>
+        
+        <ResponseField name="inApp" type="boolean">
+          Receive in-app notifications
+        </ResponseField>
+        
+        <ResponseField name="webhook" type="boolean">
+          Receive webhook notifications
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="apiKeys" type="array">
+  List of API keys associated with the user
+  
+  <Expandable title="API Key Object">
+    <ResponseField name="id" type="string">
+      API key identifier
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      API key name/description
+    </ResponseField>
+    
+    <ResponseField name="lastUsed" type="string">
+      ISO 8601 timestamp of last use
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      ISO 8601 timestamp when created
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp when the user account was created
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO 8601 timestamp when the user profile was last updated
+</ResponseField>
+
+<ResponseField name="lastLoginAt" type="string">
+  ISO 8601 timestamp of the user's last login
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "id": "user_123",
+  "email": "john.doe@example.com",
+  "name": "John Doe",
+  "avatar": "https://cdn.example.com/avatars/user_123.jpg",
+  "verified": true,
+  "mfaEnabled": true,
+  "organizations": [
+    {
+      "organizationId": "org_abc123",
+      "name": "Acme Corporation",
+      "role": "admin",
+      "permissions": [
+        "flows:read",
+        "flows:write",
+        "flows:delete",
+        "actions:read",
+        "actions:write",
+        "members:read"
+      ]
+    },
+    {
+      "organizationId": "org_def456",
+      "name": "StartupCo",
+      "role": "owner",
+      "permissions": ["*"]
+    }
+  ],
+  "preferences": {
+    "theme": "dark",
+    "timezone": "America/New_York",
+    "language": "en",
+    "notifications": {
+      "email": true,
+      "inApp": true,
+      "webhook": false
+    }
+  },
+  "apiKeys": [
+    {
+      "id": "key_abc123",
+      "name": "Production API Key",
+      "lastUsed": "2024-01-15T10:00:00Z",
+      "createdAt": "2023-06-01T00:00:00Z"
+    },
+    {
+      "id": "key_def456",
+      "name": "Development API Key",
+      "lastUsed": "2024-01-14T15:30:00Z",
+      "createdAt": "2023-08-15T00:00:00Z"
+    }
+  ],
+  "createdAt": "2023-01-15T00:00:00Z",
+  "updatedAt": "2024-01-10T14:20:00Z",
+  "lastLoginAt": "2024-01-15T08:00:00Z"
+}
+```
+</ResponseExample>
+
+<Snippet file="api-footer.mdx" />

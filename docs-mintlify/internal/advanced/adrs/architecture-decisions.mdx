@@ -1,0 +1,606 @@
+---
+title: "Architecture Decision Records"
+description: "Comprehensive collection of architecture decision records documenting key technical decisions for the Tolstoy platform"
+---
+
+# Architecture Decision Records (ADRs)
+
+## Overview
+
+This document contains Architecture Decision Records (ADRs) that capture important architectural decisions made during the development of the Tolstoy platform. Each ADR documents the context, decision, and consequences of significant technical choices.
+
+## ADR Format
+
+Each ADR follows this structure:
+- **Status**: Proposed, Accepted, Deprecated, Superseded
+- **Context**: The situation that led to the decision
+- **Decision**: What was decided
+- **Consequences**: The impact of the decision
+
+---
+
+## ADR-001: Database Technology Selection
+
+**Status**: Accepted  
+**Date**: 2024-01-15  
+**Deciders**: Platform Architecture Team
+
+### Context
+
+The Tolstoy platform requires a robust database solution to handle:
+- Complex workflow definitions stored as JSON
+- High-frequency execution logs and metrics
+- User management and organization data
+- Real-time analytics and reporting
+- ACID transactions for critical operations
+
+Options considered:
+1. PostgreSQL with JSONB support
+2. MongoDB (document database)
+3. MySQL with JSON column type
+4. Multi-database approach (SQL + NoSQL)
+
+### Decision
+
+We will use **PostgreSQL** as our primary database with the following rationale:
+- Native JSONB support for flexible workflow definitions
+- Strong consistency guarantees with ACID transactions
+- Excellent performance with proper indexing
+- Rich ecosystem of tools and extensions
+- Battle-tested reliability in production environments
+- Strong typing system for structured data
+
+### Consequences
+
+**Positive:**
+- Single database technology reduces operational complexity
+- JSONB provides flexibility for workflow definitions while maintaining query performance
+- Strong consistency ensures data integrity
+- Extensive PostgreSQL expertise available in the team
+- Rich indexing capabilities (GIN, GiST) for complex queries
+- Full-text search capabilities built-in
+
+**Negative:**
+- Learning curve for advanced PostgreSQL features (JSONB indexing, partitioning)
+- Vertical scaling limitations compared to distributed databases
+- Requires careful schema design for optimal performance
+
+**Mitigation:**
+- Implement read replicas for scaling read operations
+- Use connection pooling (PgBouncer) for efficient connection management
+- Plan for table partitioning for large datasets (execution logs)
+
+---
+
+## ADR-002: API Design Pattern
+
+**Status**: Accepted  
+**Date**: 2024-01-20  
+**Deciders**: Backend Development Team
+
+### Context
+
+The Tolstoy platform needs a consistent API design that supports:
+- RESTful operations for CRUD functionality
+- Real-time capabilities for workflow execution
+- Webhook integrations for external systems
+- Rate limiting and authentication
+- Versioning for backward compatibility
+
+Options considered:
+1. REST API only
+2. GraphQL API
+3. Hybrid REST + GraphQL
+4. REST + WebSocket for real-time features
+
+### Decision
+
+We will implement a **REST-first API** with the following specifications:
+- RESTful endpoints for core CRUD operations
+- Webhook endpoints for external integrations
+- Server-Sent Events (SSE) for real-time workflow status updates
+- OpenAPI/Swagger specification for documentation
+- API versioning through URL path (`/api/v1/`)
+
+### Consequences
+
+**Positive:**
+- Industry-standard approach familiar to developers
+- Simple caching strategies with HTTP headers
+- Clear resource-based URL structure
+- Easy to test and debug
+- Broad tooling support
+- Straightforward rate limiting implementation
+
+**Negative:**
+- Over-fetching data in some scenarios
+- Multiple requests needed for related data
+- Limited real-time capabilities compared to GraphQL subscriptions
+
+**Mitigation:**
+- Implement field selection via query parameters
+- Use Server-Sent Events for real-time updates
+- Consider GraphQL for complex data fetching in future iterations
+
+---
+
+## ADR-003: Authentication and Authorization Strategy
+
+**Status**: Accepted  
+**Date**: 2024-01-25  
+**Deciders**: Security Team, Backend Team
+
+### Context
+
+The platform requires secure authentication and flexible authorization:
+- Support for both user accounts and API keys
+- Multi-tenant organization structure
+- Role-based access control (RBAC)
+- Integration with external identity providers
+- API rate limiting based on authentication context
+
+Options considered:
+1. JWT tokens only
+2. Session-based authentication
+3. OAuth 2.0 with external providers
+4. Hybrid approach (JWT + session)
+
+### Decision
+
+We will implement a **hybrid authentication system**:
+- JWT tokens for API access and stateless authentication
+- Session cookies for web application access
+- API keys for server-to-server communication
+- OAuth 2.0 integration for SSO capabilities
+- Role-based permissions with organization-level isolation
+
+### Consequences
+
+**Positive:**
+- Flexible authentication suitable for different client types
+- Stateless API authentication enables horizontal scaling
+- Strong security with proper token management
+- Support for external identity providers
+- Clear permission boundaries
+
+**Negative:**
+- Increased complexity in authentication middleware
+- Token refresh mechanism required
+- Multiple authentication methods to maintain
+
+**Mitigation:**
+- Comprehensive authentication middleware with clear interfaces
+- Automated token rotation for API keys
+- Clear documentation for different authentication flows
+
+---
+
+## ADR-004: Workflow Execution Architecture
+
+**Status**: Accepted  
+**Date**: 2024-02-01  
+**Deciders**: Platform Architecture Team
+
+### Context
+
+Workflow execution is the core functionality requiring:
+- Reliable execution of user-defined workflows
+- Support for long-running and short-duration tasks
+- Error handling and retry mechanisms
+- Scalable processing of concurrent executions
+- Audit trail for debugging and compliance
+
+Options considered:
+1. Synchronous execution within API requests
+2. Background job processing with Redis/Bull
+3. Kubernetes Jobs for each execution
+4. Separate workflow engine service
+5. Serverless functions (AWS Lambda)
+
+### Decision
+
+We will implement a **dedicated workflow engine service** with:
+- Asynchronous execution using message queues (SQS)
+- In-process execution for simple, fast workflows
+- Kubernetes Jobs for resource-intensive workflows
+- Persistent execution state in PostgreSQL
+- Comprehensive logging and error handling
+
+### Consequences
+
+**Positive:**
+- Dedicated service allows independent scaling
+- Queue-based processing handles traffic spikes
+- Persistent state enables recovery from failures
+- Flexible execution strategies based on workflow requirements
+- Clear separation of concerns
+
+**Negative:**
+- Additional service to deploy and maintain
+- Increased system complexity
+- Network latency between API and execution engine
+
+**Mitigation:**
+- Comprehensive monitoring and alerting
+- Circuit breaker pattern for API-to-engine communication
+- Fallback mechanisms for critical workflows
+
+---
+
+## ADR-005: Caching Strategy
+
+**Status**: Accepted  
+**Date**: 2024-02-10  
+**Deciders**: Performance Team
+
+### Context
+
+The platform needs effective caching to:
+- Reduce database load for frequently accessed data
+- Improve API response times
+- Handle traffic spikes efficiently
+- Support real-time features without overwhelming the database
+
+Options considered:
+1. Application-level caching only (in-memory)
+2. Redis cluster for distributed caching
+3. Multi-tier caching (in-memory + Redis + CDN)
+4. Database query result caching
+
+### Decision
+
+We will implement a **multi-tier caching strategy**:
+- L1: Application-level in-memory cache (LRU)
+- L2: Redis cluster for distributed caching
+- L3: CloudFront CDN for static assets and API responses
+- Database query result caching with automatic invalidation
+
+### Consequences
+
+**Positive:**
+- Optimal performance with multiple cache tiers
+- Reduced database load and improved response times
+- Scalable caching infrastructure
+- Automatic cache warming and invalidation
+
+**Negative:**
+- Cache consistency challenges across tiers
+- Increased complexity in cache management
+- Additional infrastructure to monitor
+
+**Mitigation:**
+- Cache invalidation strategies based on data patterns
+- Monitoring for cache hit rates and performance
+- Graceful degradation when cache layers fail
+
+---
+
+## ADR-006: Container Orchestration Platform
+
+**Status**: Accepted  
+**Date**: 2024-02-15  
+**Deciders**: Infrastructure Team
+
+### Context
+
+The platform requires container orchestration for:
+- Scalable deployment of microservices
+- High availability and fault tolerance
+- Efficient resource utilization
+- DevOps automation and CI/CD integration
+
+Options considered:
+1. Amazon EKS (Kubernetes)
+2. Amazon ECS with Fargate
+3. Docker Swarm
+4. HashiCorp Nomad
+
+### Decision
+
+We will use **Amazon EKS (Kubernetes)** for container orchestration:
+- Managed Kubernetes service reducing operational overhead
+- Rich ecosystem of tools and operators
+- Horizontal Pod Autoscaling for dynamic scaling
+- Native support for microservices architecture
+- Industry standard with extensive community support
+
+### Consequences
+
+**Positive:**
+- Proven platform for container orchestration
+- Automatic scaling based on metrics
+- Rich networking and security features
+- Integration with AWS services (ALB, IAM, etc.)
+- Strong community and tooling ecosystem
+
+**Negative:**
+- Kubernetes complexity and learning curve
+- Additional operational overhead for cluster management
+- Cost considerations for managed service
+
+**Mitigation:**
+- Comprehensive training for development and operations teams
+- Infrastructure as Code for cluster management
+- Cost optimization through spot instances and resource limits
+
+---
+
+## ADR-007: Monitoring and Observability Stack
+
+**Status**: Accepted  
+**Date**: 2024-02-20  
+**Deciders**: Platform Team, SRE Team
+
+### Context
+
+Comprehensive observability is crucial for:
+- System health monitoring and alerting
+- Performance optimization and debugging
+- Compliance and audit requirements
+- User experience monitoring
+
+Options considered:
+1. Prometheus + Grafana + Jaeger
+2. Datadog (full managed solution)
+3. AWS CloudWatch + X-Ray
+4. Elastic Stack (ELK)
+5. Hybrid approach
+
+### Decision
+
+We will implement **Prometheus + Grafana + Jaeger** for observability:
+- Prometheus for metrics collection and alerting
+- Grafana for visualization and dashboards
+- Jaeger for distributed tracing
+- Fluentd/Fluent Bit for log aggregation
+- AlertManager for notification routing
+
+### Consequences
+
+**Positive:**
+- Open-source stack with full control over data
+- Cost-effective compared to managed solutions
+- Excellent integration with Kubernetes
+- Flexible and customizable dashboards
+- Strong community support
+
+**Negative:**
+- Self-managed infrastructure requiring maintenance
+- Learning curve for optimal configuration
+- Storage and retention management complexity
+
+**Mitigation:**
+- Dedicated observability infrastructure team
+- Automated backup and disaster recovery procedures
+- Clear runbooks for common operational tasks
+
+---
+
+## ADR-008: Event-Driven Architecture for Integrations
+
+**Status**: Accepted  
+**Date**: 2024-02-25  
+**Deciders**: Integration Team
+
+### Context
+
+The platform needs to integrate with external systems:
+- Webhook notifications for workflow events
+- Third-party service integrations
+- Real-time event streaming
+- Decoupled service communication
+
+Options considered:
+1. Direct API calls between services
+2. Message queues (SQS/SNS)
+3. Event streaming platform (Apache Kafka)
+4. Database change data capture (CDC)
+
+### Decision
+
+We will implement **event-driven architecture** using:
+- Amazon SQS for reliable message queuing
+- Amazon SNS for fan-out messaging patterns
+- CloudWatch Events for AWS service integration
+- Custom event bus for internal service communication
+- Webhook delivery system for external notifications
+
+### Consequences
+
+**Positive:**
+- Loose coupling between services
+- Reliable event delivery with retry mechanisms
+- Scalable integration patterns
+- Better fault tolerance and resilience
+- Clear audit trail for system events
+
+**Negative:**
+- Eventual consistency challenges
+- Increased complexity in debugging distributed flows
+- Message ordering and duplicate handling
+
+**Mitigation:**
+- Idempotent event handlers design
+- Comprehensive event logging and tracing
+- Circuit breaker patterns for external integrations
+
+---
+
+## ADR-009: Secret Management Strategy
+
+**Status**: Accepted  
+**Date**: 2024-03-01  
+**Deciders**: Security Team, DevOps Team
+
+### Context
+
+Secure management of sensitive information:
+- Database credentials and API keys
+- Encryption keys and certificates
+- Third-party service credentials
+- Environment-specific configuration
+
+Options considered:
+1. Environment variables only
+2. AWS Secrets Manager
+3. HashiCorp Vault
+4. Kubernetes Secrets with external secrets operator
+5. AWS Parameter Store
+
+### Decision
+
+We will use **AWS Secrets Manager** with External Secrets Operator:
+- AWS Secrets Manager for centralized secret storage
+- External Secrets Operator for Kubernetes integration
+- Automatic secret rotation for database credentials
+- IAM-based access control with least privilege
+- Audit logging for secret access
+
+### Consequences
+
+**Positive:**
+- Centralized secret management with encryption at rest
+- Automatic rotation capabilities
+- Integration with AWS IAM for access control
+- Audit trail for compliance requirements
+- Kubernetes-native secret injection
+
+**Negative:**
+- AWS vendor lock-in for secret management
+- Additional complexity in deployment pipelines
+- Cost considerations for secret storage and API calls
+
+**Mitigation:**
+- Abstraction layer for secret retrieval to enable provider changes
+- Cost optimization through secret consolidation
+- Fallback mechanisms for secret unavailability
+
+---
+
+## ADR-010: API Rate Limiting Implementation
+
+**Status**: Accepted  
+**Date**: 2024-03-05  
+**Deciders**: Backend Team, Product Team
+
+### Context
+
+Rate limiting is essential for:
+- Protecting against abuse and DoS attacks
+- Ensuring fair resource allocation
+- Supporting tiered pricing models
+- Maintaining system stability under load
+
+Options considered:
+1. Application-level rate limiting
+2. API Gateway rate limiting
+3. Redis-based distributed rate limiting
+4. Token bucket algorithm implementation
+5. Sliding window rate limiting
+
+### Decision
+
+We will implement **Redis-based sliding window rate limiting**:
+- Sliding window algorithm for smooth rate limiting
+- Redis for distributed rate limiting state
+- Multiple rate limit tiers based on user plan
+- Rate limit headers in API responses
+- Bypass mechanisms for internal services
+
+### Consequences
+
+**Positive:**
+- Fair and predictable rate limiting behavior
+- Distributed implementation supports horizontal scaling
+- Flexible configuration for different endpoints
+- Clear feedback to clients through HTTP headers
+- Protection against various attack patterns
+
+**Negative:**
+- Additional Redis infrastructure dependency
+- Complexity in rate limit configuration management
+- Potential impact on legitimate traffic during attacks
+
+**Mitigation:**
+- Redis high availability setup with failover
+- Graceful degradation when Redis is unavailable
+- Monitoring and alerting for rate limit effectiveness
+
+---
+
+## Decision Status Summary
+
+| ADR | Title | Status | Date |
+|-----|-------|--------|------|
+| ADR-001 | Database Technology Selection | Accepted | 2024-01-15 |
+| ADR-002 | API Design Pattern | Accepted | 2024-01-20 |
+| ADR-003 | Authentication and Authorization Strategy | Accepted | 2024-01-25 |
+| ADR-004 | Workflow Execution Architecture | Accepted | 2024-02-01 |
+| ADR-005 | Caching Strategy | Accepted | 2024-02-10 |
+| ADR-006 | Container Orchestration Platform | Accepted | 2024-02-15 |
+| ADR-007 | Monitoring and Observability Stack | Accepted | 2024-02-20 |
+| ADR-008 | Event-Driven Architecture for Integrations | Accepted | 2024-02-25 |
+| ADR-009 | Secret Management Strategy | Accepted | 2024-03-01 |
+| ADR-010 | API Rate Limiting Implementation | Accepted | 2024-03-05 |
+
+## Future Decisions Under Consideration
+
+### Proposed ADRs
+
+**ADR-011: Multi-Region Deployment Strategy**
+- Context: Geographic expansion and disaster recovery requirements
+- Options: Active-active, active-passive, regional isolation
+- Timeline: Q2 2024
+
+**ADR-012: Search and Analytics Platform**
+- Context: Advanced search capabilities and analytics requirements
+- Options: Elasticsearch, OpenSearch, PostgreSQL full-text search
+- Timeline: Q2 2024
+
+**ADR-013: Mobile API Strategy**
+- Context: Mobile application development requirements
+- Options: REST API optimization, GraphQL, BFF pattern
+- Timeline: Q3 2024
+
+## ADR Review Process
+
+1. **Proposal**: Technical lead creates ADR draft
+2. **Review**: Architecture team reviews and provides feedback
+3. **Discussion**: Open discussion with stakeholders
+4. **Decision**: Final decision by architecture committee
+5. **Documentation**: ADR updated with final decision and consequences
+6. **Implementation**: Decision implemented with tracking
+7. **Review**: Periodic review of consequences and effectiveness
+
+## Templates
+
+### ADR Template
+```markdown
+# ADR-XXX: [Title]
+
+**Status**: [Proposed/Accepted/Deprecated/Superseded]  
+**Date**: YYYY-MM-DD  
+**Deciders**: [List of decision makers]
+
+## Context
+[Describe the situation that led to this decision]
+
+## Decision
+[Describe what was decided and why]
+
+## Consequences
+**Positive:**
+- [List positive outcomes]
+
+**Negative:**
+- [List negative outcomes or trade-offs]
+
+**Mitigation:**
+- [List mitigation strategies for negative consequences]
+```
+
+---
+
+<Note>
+Architecture Decision Records are living documents that should be updated as decisions evolve or are superseded. Regular review of ADRs helps ensure architectural consistency and provides valuable context for future decisions.
+</Note>

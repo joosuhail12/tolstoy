@@ -1,0 +1,365 @@
+---
+title: "Update Organization"
+api: "PUT /organizations/{id}"
+description: "Update organization settings, billing, and configuration"
+---
+
+## Overview
+
+The Update Organization endpoint allows you to modify organization settings, billing information, user permissions, and other configuration options. This is typically used for ongoing organization management and settings updates.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the organization to update
+</ParamField>
+
+## Request Body
+
+<ParamField body="name" type="string">
+  The organization's display name
+</ParamField>
+
+<ParamField body="description" type="string">
+  Organization description
+</ParamField>
+
+<ParamField body="settings" type="object">
+  Organization-specific settings and preferences
+  
+  <Expandable title="Settings Configuration">
+    <ParamField body="timezone" type="string">
+      Organization's default timezone (IANA timezone identifier)
+    </ParamField>
+    
+    <ParamField body="dateFormat" type="string">
+      Preferred date format: "MM/DD/YYYY", "DD/MM/YYYY", or "YYYY-MM-DD"
+    </ParamField>
+    
+    <ParamField body="timeFormat" type="string">
+      Preferred time format: "12h" or "24h"
+    </ParamField>
+    
+    <ParamField body="weekStartDay" type="number">
+      Day of week that starts the week (0 = Sunday, 1 = Monday, etc.)
+    </ParamField>
+    
+    <ParamField body="allowPublicWorkflows" type="boolean">
+      Whether workflows can be made publicly accessible
+    </ParamField>
+    
+    <ParamField body="defaultExecutionTimeout" type="number">
+      Default workflow execution timeout in seconds
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="billing" type="object">
+  Billing and subscription configuration updates
+  
+  <Expandable title="Billing Configuration">
+    <ParamField body="plan" type="string">
+      Subscription plan: "free", "starter", "professional", or "enterprise"
+    </ParamField>
+    
+    <ParamField body="billingEmail" type="string">
+      Email address for billing notifications
+    </ParamField>
+    
+    <ParamField body="companyName" type="string">
+      Legal company name for billing
+    </ParamField>
+    
+    <ParamField body="taxId" type="string">
+      Company tax identification number
+    </ParamField>
+    
+    <ParamField body="address" type="object">
+      Billing address information
+      
+      <Expandable title="Address Details">
+        <ParamField body="street" type="string">
+          Street address
+        </ParamField>
+        <ParamField body="city" type="string">
+          City name
+        </ParamField>
+        <ParamField body="state" type="string">
+          State or province
+        </ParamField>
+        <ParamField body="postalCode" type="string">
+          Postal or ZIP code
+        </ParamField>
+        <ParamField body="country" type="string">
+          Country code (ISO 3166-1 alpha-2)
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="id" type="string">
+  Unique identifier for the organization
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Organization's display name
+</ResponseField>
+
+<ResponseField name="slug" type="string">
+  URL-safe organization identifier (cannot be changed)
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Organization description
+</ResponseField>
+
+<ResponseField name="settings" type="object">
+  Updated organization settings and preferences
+</ResponseField>
+
+<ResponseField name="billing" type="object">
+  Updated billing configuration (sensitive fields masked)
+</ResponseField>
+
+<ResponseField name="limits" type="object">
+  Usage limits based on the selected plan
+  
+  <Expandable title="Usage Limits">
+    <ResponseField name="maxWorkflows" type="number">
+      Maximum number of workflows allowed
+    </ResponseField>
+    
+    <ResponseField name="maxExecutionsPerMonth" type="number">
+      Maximum workflow executions per month
+    </ResponseField>
+    
+    <ResponseField name="maxUsers" type="number">
+      Maximum number of users allowed
+    </ResponseField>
+    
+    <ResponseField name="maxToolConnections" type="number">
+      Maximum number of tool connections
+    </ResponseField>
+    
+    <ResponseField name="executionTimeout" type="number">
+      Maximum execution time per workflow in seconds
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="usage" type="object">
+  Current usage statistics
+  
+  <Expandable title="Usage Statistics">
+    <ResponseField name="workflows" type="number">
+      Current number of workflows
+    </ResponseField>
+    
+    <ResponseField name="executionsThisMonth" type="number">
+      Workflow executions this billing period
+    </ResponseField>
+    
+    <ResponseField name="users" type="number">
+      Current number of users
+    </ResponseField>
+    
+    <ResponseField name="toolConnections" type="number">
+      Current number of tool connections
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO timestamp when the organization was last updated
+</ResponseField>
+
+<ResponseField name="updatedBy" type="string">
+  User ID who last updated the organization
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid data or validation errors
+</ResponseField>
+
+<ResponseField name="403" type="object">
+  Forbidden - Insufficient permissions to update this organization
+</ResponseField>
+
+<ResponseField name="404" type="object">
+  Not Found - Organization does not exist
+</ResponseField>
+
+<ResponseField name="422" type="object">
+  Unprocessable Entity - Plan downgrade would exceed current usage
+  
+  <Expandable title="Plan Downgrade Error">
+    <ResponseField name="error" type="string">
+      "PLAN_DOWNGRADE_BLOCKED"
+    </ResponseField>
+    
+    <ResponseField name="message" type="string">
+      "Cannot downgrade plan due to current usage"
+    </ResponseField>
+    
+    <ResponseField name="currentUsage" type="object">
+      Current usage that prevents downgrade
+    </ResponseField>
+    
+    <ResponseField name="targetLimits" type="object">
+      Limits for the requested plan
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X PUT "https://api.tolstoy.com/v1/organizations/org_123456" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Acme Corporation (Updated)",
+    "description": "Leading provider of innovative automation solutions",
+    "settings": {
+      "timezone": "America/Los_Angeles",
+      "dateFormat": "YYYY-MM-DD",
+      "timeFormat": "24h",
+      "allowPublicWorkflows": true,
+      "defaultExecutionTimeout": 600
+    },
+    "billing": {
+      "plan": "enterprise",
+      "billingEmail": "billing@acme-corp.com",
+      "address": {
+        "street": "456 Innovation Blvd",
+        "city": "San Francisco",
+        "state": "CA",
+        "postalCode": "94105",
+        "country": "US"
+      }
+    }
+  }'
+```
+
+```javascript JavaScript
+const updatedOrg = await fetch('/api/v1/organizations/org_123456', {
+  method: 'PUT',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    name: 'Acme Corporation (Updated)',
+    description: 'Leading provider of innovative automation solutions',
+    settings: {
+      timezone: 'America/Los_Angeles',
+      dateFormat: 'YYYY-MM-DD',
+      timeFormat: '24h',
+      allowPublicWorkflows: true,
+      defaultExecutionTimeout: 600
+    },
+    billing: {
+      plan: 'enterprise',
+      billingEmail: 'billing@acme-corp.com',
+      address: {
+        street: '456 Innovation Blvd',
+        city: 'San Francisco',
+        state: 'CA',
+        postalCode: '94105',
+        country: 'US'
+      }
+    }
+  })
+});
+
+const orgData = await updatedOrg.json();
+console.log('Updated organization:', orgData.id);
+```
+
+```python Python
+import requests
+
+updated_org_data = {
+    "name": "Acme Corporation (Updated)",
+    "description": "Leading provider of innovative automation solutions",
+    "settings": {
+        "timezone": "America/Los_Angeles",
+        "dateFormat": "YYYY-MM-DD",
+        "timeFormat": "24h",
+        "allowPublicWorkflows": True,
+        "defaultExecutionTimeout": 600
+    },
+    "billing": {
+        "plan": "enterprise",
+        "billingEmail": "billing@acme-corp.com",
+        "address": {
+            "street": "456 Innovation Blvd",
+            "city": "San Francisco",
+            "state": "CA",
+            "postalCode": "94105",
+            "country": "US"
+        }
+    }
+}
+
+response = requests.put(
+    "https://api.tolstoy.com/v1/organizations/org_123456",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json=updated_org_data
+)
+
+if response.status_code == 200:
+    org = response.json()
+    print(f"Updated organization: {org['id']}")
+else:
+    print(f"Error: {response.json()}")
+```
+
+</CodeGroup>
+
+## Plan Changes
+
+When updating the billing plan:
+
+- **Upgrades**: Take effect immediately with prorated billing
+- **Downgrades**: Require validation that current usage fits within new limits
+- **Enterprise**: Contact support for custom configurations
+
+## Related Endpoints
+
+- [Create Organization](/api/endpoints/organizations/create-organization) - Create new organization
+- [Get Organization](/api/endpoints/organizations/get-organization) - Retrieve organization details
+- [List Organizations](/api/endpoints/organizations/list-organizations) - List all organizations
+- [Delete Organization](/api/endpoints/organizations/delete-organization) - Delete organization

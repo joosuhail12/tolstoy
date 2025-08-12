@@ -1,0 +1,112 @@
+---
+title: "Delete Tool"
+api: "DELETE /tools/{id}"
+description: "Delete a tool and all its associated configurations"
+---
+
+## Overview
+
+The Delete Tool endpoint permanently removes a tool from your organization. This action cannot be undone.
+
+<Warning>
+  Deleting a tool will:
+  - Remove all stored credentials
+  - Break any actions that depend on this tool
+  - Fail any flows that use actions from this tool
+  - Delete all associated configuration and settings
+</Warning>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the tool to delete
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="force" type="boolean" default="false">
+  Force deletion even if the tool is used by active actions
+</ParamField>
+
+<ParamField query="deleteActions" type="boolean" default="false">
+  Also delete all actions associated with this tool
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Whether the deletion was successful
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Confirmation message
+</ResponseField>
+
+<ResponseField name="deletedAt" type="string">
+  ISO 8601 timestamp when deleted
+</ResponseField>
+
+<ResponseField name="affectedResources" type="object">
+  Resources affected by the deletion
+  
+  <Expandable title="Affected Resources">
+    <ResponseField name="actionsDeleted" type="number">
+      Number of actions deleted (if deleteActions=true)
+    </ResponseField>
+    
+    <ResponseField name="actionsDisabled" type="number">
+      Number of actions disabled
+    </ResponseField>
+    
+    <ResponseField name="flowsAffected" type="array">
+      List of flow IDs that were affected
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "success": true,
+  "message": "Tool successfully deleted",
+  "deletedAt": "2024-01-15T15:00:00Z",
+  "affectedResources": {
+    "actionsDeleted": 5,
+    "actionsDisabled": 0,
+    "flowsAffected": ["flow_123", "flow_456"]
+  }
+}
+```
+</ResponseExample>
+
+## Error Responses
+
+### 404 Not Found
+Tool not found.
+
+```json
+{
+  "error": {
+    "code": "TOOL_NOT_FOUND",
+    "message": "Tool with ID tool_abc123 not found"
+  }
+}
+```
+
+### 409 Conflict
+Tool is in use and force flag is not set.
+
+```json
+{
+  "error": {
+    "code": "TOOL_IN_USE",
+    "message": "Tool is used by 12 active actions. Use force=true to delete anyway",
+    "details": {
+      "activeActions": 12,
+      "affectedFlows": 3
+    }
+  }
+}
+```
+
+<Snippet file="api-footer.mdx" />

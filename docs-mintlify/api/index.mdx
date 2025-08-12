@@ -1,0 +1,349 @@
+---
+title: "API Reference"
+description: "Complete reference for the Tolstoy REST API"
+---
+
+# Tolstoy REST API
+
+Welcome to the Tolstoy REST API documentation. Our API enables you to programmatically manage workflows, execute actions, and integrate with your existing systems.
+
+## Base URL
+
+All API requests should be made to:
+
+```
+https://tolstoy.getpullse.com
+```
+
+## Authentication
+
+The Tolstoy API uses header-based authentication with organization and user identifiers:
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID - identifies which organization context the request operates in
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID - identifies the user making the request for audit and permission purposes
+</ParamField>
+
+### Finding Your IDs
+
+<Steps>
+  <Step title="Organization ID">
+    Get your organization ID from the dashboard settings or API:
+    ```bash
+    curl -X GET https://tolstoy.getpullse.com/organizations \
+      -H "x-org-id: temp" -H "x-user-id: temp"
+    ```
+  </Step>
+  
+  <Step title="User ID">
+    Get your user ID from the dashboard profile or after authentication:
+    ```bash
+    curl -X GET https://tolstoy.getpullse.com/users \
+      -H "x-org-id: YOUR_ORG_ID" -H "x-user-id: temp"
+    ```
+  </Step>
+</Steps>
+
+## Request Format
+
+The API accepts and returns JSON. Always include the `Content-Type` header:
+
+```bash
+Content-Type: application/json
+```
+
+### Example Request
+
+```bash
+curl -X POST https://tolstoy.getpullse.com/actions \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_abc123" \
+  -H "x-user-id: user_xyz789" \
+  -d '{
+    "name": "Create Customer",
+    "method": "POST",
+    "endpoint": "/customers"
+  }'
+```
+
+## Response Format
+
+All API responses follow a consistent format:
+
+### Success Response
+
+```json
+{
+  "id": "resource_id",
+  "name": "Resource Name", 
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z"
+}
+```
+
+### Error Response
+
+```json
+{
+  "error": "ValidationError",
+  "message": "Invalid input provided",
+  "details": {
+    "field": "email",
+    "issue": "Email format is invalid"
+  },
+  "timestamp": "2024-01-15T10:30:00Z"
+}
+```
+
+## HTTP Status Codes
+
+The API uses standard HTTP status codes:
+
+<ResponseExample>
+```json 200 OK
+{
+  "message": "Request successful"
+}
+```
+
+```json 201 Created  
+{
+  "id": "new_resource_id",
+  "message": "Resource created successfully"
+}
+```
+
+```json 400 Bad Request
+{
+  "error": "ValidationError", 
+  "message": "Invalid request data"
+}
+```
+
+```json 401 Unauthorized
+{
+  "error": "AuthenticationError",
+  "message": "Invalid or missing authentication headers"
+}
+```
+
+```json 403 Forbidden
+{
+  "error": "PermissionError",
+  "message": "Insufficient permissions for this action"
+}
+```
+
+```json 404 Not Found
+{
+  "error": "NotFoundError", 
+  "message": "Resource not found"
+}
+```
+
+```json 409 Conflict
+{
+  "error": "ConflictError",
+  "message": "Resource already exists"
+}
+```
+
+```json 429 Too Many Requests  
+{
+  "error": "RateLimitError",
+  "message": "Rate limit exceeded"
+}
+```
+
+```json 500 Internal Server Error
+{
+  "error": "InternalError",
+  "message": "An unexpected error occurred"
+}
+```
+</ResponseExample>
+
+## Rate Limiting
+
+API requests are rate limited to ensure fair usage:
+
+- **Free Plan**: 100 requests per minute
+- **Pro Plan**: 1,000 requests per minute  
+- **Enterprise Plan**: 10,000 requests per minute
+
+Rate limit headers are included in responses:
+
+```bash
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1642251600
+```
+
+<Warning>
+  When rate limits are exceeded, the API returns a `429 Too Many Requests` status code. Implement exponential backoff in your applications.
+</Warning>
+
+## Pagination
+
+List endpoints support pagination with these parameters:
+
+<ParamField query="page" type="integer" default="1">
+  Page number (1-based)
+</ParamField>
+
+<ParamField query="limit" type="integer" default="20">
+  Number of items per page (max 100)
+</ParamField>
+
+### Pagination Response
+
+```json
+{
+  "data": [...],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 150,
+    "pages": 8,
+    "hasNext": true,
+    "hasPrev": false
+  }
+}
+```
+
+## Sorting & Filtering
+
+Most list endpoints support sorting and filtering:
+
+### Sorting
+
+<ParamField query="sort" type="string" default="createdAt">
+  Field to sort by
+</ParamField>
+
+<ParamField query="order" type="string" default="desc">
+  Sort order: `asc` or `desc`
+</ParamField>
+
+### Filtering
+
+<ParamField query="search" type="string">
+  Search term for name-based filtering
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by status (varies by resource)
+</ParamField>
+
+<ParamField query="createdAfter" type="string">
+  ISO 8601 timestamp - filter resources created after this date
+</ParamField>
+
+<ParamField query="createdBefore" type="string">
+  ISO 8601 timestamp - filter resources created before this date
+</ParamField>
+
+### Example
+
+```bash
+GET /actions?search=stripe&status=active&sort=name&order=asc&page=2&limit=10
+```
+
+## Webhooks
+
+Tolstoy can send webhooks for various events. See the [Webhooks Guide](/api/webhooks/webhook-payloads) for details.
+
+## SDKs & Tools
+
+<CardGroup cols={3}>
+  <Card title="TypeScript SDK" icon="js" href="/sdk/typescript">
+    Official TypeScript/Node.js SDK
+  </Card>
+  <Card title="Python SDK" icon="python" href="/sdk/python">  
+    Official Python SDK
+  </Card>
+  <Card title="CLI Tool" icon="terminal" href="/cli">
+    Command line interface
+  </Card>
+</CardGroup>
+
+## API Resources
+
+<AccordionGroup>
+  <Accordion title="Organizations">
+    Manage organization settings, team members, and billing information.
+    
+    **Key Endpoints:**
+    - `GET /organizations` - List organizations
+    - `GET /organizations/{id}` - Get organization details
+    - `PUT /organizations/{id}` - Update organization
+  </Accordion>
+  
+  <Accordion title="Users">
+    Manage users within your organization and their permissions.
+    
+    **Key Endpoints:**
+    - `GET /users` - List users in organization
+    - `POST /users` - Create new user
+    - `GET /users/{id}` - Get user details
+  </Accordion>
+  
+  <Accordion title="Tools">
+    Connect to external APIs and manage authentication configurations.
+    
+    **Key Endpoints:**
+    - `GET /tools` - List tools
+    - `POST /tools` - Create new tool
+    - `POST /tools/{id}/secrets` - Store authentication secrets
+  </Accordion>
+  
+  <Accordion title="Actions">
+    Create reusable API operations that can be used in workflows.
+    
+    **Key Endpoints:**
+    - `GET /actions` - List actions
+    - `POST /actions` - Create new action
+    - `POST /actions/{id}/execute` - Execute action
+  </Accordion>
+  
+  <Accordion title="Flows">
+    Build and manage complex workflows with multiple steps and conditions.
+    
+    **Key Endpoints:**
+    - `GET /flows` - List flows
+    - `POST /flows` - Create new flow
+    - `POST /flows/{id}/execute` - Execute flow
+  </Accordion>
+  
+  <Accordion title="Webhooks">
+    Configure webhook endpoints to trigger workflows from external events.
+    
+    **Key Endpoints:**
+    - `GET /webhooks` - List webhooks
+    - `POST /webhooks` - Create new webhook
+    - `GET /webhooks/event-types` - List available event types
+  </Accordion>
+</AccordionGroup>
+
+## Interactive API Playground
+
+Try out the API directly in your browser with our interactive playground. Each endpoint includes:
+
+- ✅ Live API testing with your real data
+- ✅ Automatic authentication header injection
+- ✅ Request/response examples in multiple languages
+- ✅ Schema validation and error handling
+- ✅ Copy-paste code snippets
+
+<Card title="Try the API Playground" icon="play" href="/api/endpoints/health/health-check">
+  Start with a simple health check to test your setup
+</Card>
+
+---
+
+<Note>
+  **Need Help?** Check our [troubleshooting guide](/cli/troubleshooting) or contact support at support@tolstoy.com
+</Note>

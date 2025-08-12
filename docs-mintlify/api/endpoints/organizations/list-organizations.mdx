@@ -1,0 +1,320 @@
+---
+title: "List Organizations"
+api: "GET /organizations"
+description: "Retrieve a list of organizations accessible to the authenticated user"
+---
+
+## Overview
+
+The List Organizations endpoint returns all organizations that the authenticated user has access to, along with their basic information, usage statistics, and user role within each organization.
+
+## Authentication
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="limit" type="number">
+  Maximum number of organizations to return (1-100, defaults to 20)
+</ParamField>
+
+<ParamField query="offset" type="number">
+  Number of organizations to skip for pagination (defaults to 0)
+</ParamField>
+
+<ParamField query="sort" type="string">
+  Sort order: "name", "created", "updated", or "usage" (defaults to "name")
+</ParamField>
+
+<ParamField query="order" type="string">
+  Sort direction: "asc" or "desc" (defaults to "asc")
+</ParamField>
+
+<ParamField query="role" type="string">
+  Filter by user role: "owner", "admin", "member", or "viewer"
+</ParamField>
+
+<ParamField query="plan" type="string">
+  Filter by billing plan: "free", "starter", "professional", or "enterprise"
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search organizations by name or description
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="organizations" type="array">
+  Array of organization objects
+  
+  <Expandable title="Organization Object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the organization
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Organization's display name
+    </ResponseField>
+    
+    <ResponseField name="slug" type="string">
+      URL-safe organization identifier
+    </ResponseField>
+    
+    <ResponseField name="description" type="string">
+      Organization description
+    </ResponseField>
+    
+    <ResponseField name="plan" type="string">
+      Current billing plan: "free", "starter", "professional", or "enterprise"
+    </ResponseField>
+    
+    <ResponseField name="userRole" type="string">
+      Current user's role in this organization
+    </ResponseField>
+    
+    <ResponseField name="limits" type="object">
+      Usage limits for this organization
+      
+      <Expandable title="Usage Limits">
+        <ResponseField name="maxWorkflows" type="number">
+          Maximum number of workflows allowed
+        </ResponseField>
+        
+        <ResponseField name="maxExecutionsPerMonth" type="number">
+          Maximum workflow executions per month
+        </ResponseField>
+        
+        <ResponseField name="maxUsers" type="number">
+          Maximum number of users allowed
+        </ResponseField>
+        
+        <ResponseField name="maxToolConnections" type="number">
+          Maximum number of tool connections
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="usage" type="object">
+      Current usage statistics
+      
+      <Expandable title="Usage Statistics">
+        <ResponseField name="workflows" type="number">
+          Current number of workflows
+        </ResponseField>
+        
+        <ResponseField name="executionsThisMonth" type="number">
+          Workflow executions this billing period
+        </ResponseField>
+        
+        <ResponseField name="users" type="number">
+          Current number of users
+        </ResponseField>
+        
+        <ResponseField name="toolConnections" type="number">
+          Current number of tool connections
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Organization status: "active", "suspended", or "pending_deletion"
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      ISO timestamp when the organization was created
+    </ResponseField>
+    
+    <ResponseField name="lastActivityAt" type="string">
+      ISO timestamp of the last activity in this organization
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination information
+  
+  <Expandable title="Pagination Object">
+    <ResponseField name="total" type="number">
+      Total number of organizations available
+    </ResponseField>
+    
+    <ResponseField name="count" type="number">
+      Number of organizations returned in this response
+    </ResponseField>
+    
+    <ResponseField name="offset" type="number">
+      Current offset value
+    </ResponseField>
+    
+    <ResponseField name="limit" type="number">
+      Current limit value
+    </ResponseField>
+    
+    <ResponseField name="hasMore" type="boolean">
+      Whether there are more organizations to fetch
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid query parameters
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Parameter-specific validation errors
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="401" type="object">
+  Unauthorized - Invalid or expired authentication token
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL Basic
+curl -X GET "https://api.tolstoy.com/v1/organizations" \
+  -H "Authorization: Bearer $API_TOKEN"
+```
+
+```bash cURL Filtered
+curl -X GET "https://api.tolstoy.com/v1/organizations?role=owner&plan=professional&limit=10&sort=usage&order=desc" \
+  -H "Authorization: Bearer $API_TOKEN"
+```
+
+```javascript JavaScript
+// Basic list
+const organizations = await fetch('/api/v1/organizations', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`
+  }
+});
+
+const orgData = await organizations.json();
+console.log(`Found ${orgData.pagination.total} organizations`);
+
+// Filtered list with pagination
+const filteredOrgs = await fetch('/api/v1/organizations?role=owner&plan=professional&limit=10', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`
+  }
+});
+
+const filteredData = await filteredOrgs.json();
+filteredData.organizations.forEach(org => {
+  console.log(`${org.name}: ${org.usage.workflows} workflows, ${org.usage.users} users`);
+});
+```
+
+```python Python
+import requests
+
+# Basic list
+response = requests.get(
+    "https://api.tolstoy.com/v1/organizations",
+    headers={
+        "Authorization": f"Bearer {api_token}"
+    }
+)
+
+if response.status_code == 200:
+    data = response.json()
+    print(f"Found {data['pagination']['total']} organizations")
+    
+    for org in data['organizations']:
+        print(f"- {org['name']} ({org['plan']} plan, {org['userRole']} role)")
+
+# Filtered and paginated list
+filtered_response = requests.get(
+    "https://api.tolstoy.com/v1/organizations",
+    headers={
+        "Authorization": f"Bearer {api_token}"
+    },
+    params={
+        "role": "owner",
+        "plan": "professional",
+        "limit": 10,
+        "sort": "usage",
+        "order": "desc"
+    }
+)
+
+if filtered_response.status_code == 200:
+    filtered_data = filtered_response.json()
+    for org in filtered_data['organizations']:
+        usage = org['usage']
+        print(f"{org['name']}: {usage['workflows']} workflows, {usage['users']} users")
+```
+
+</CodeGroup>
+
+## Filtering and Sorting
+
+### Available Filters
+- **role**: Filter by your role in the organization
+- **plan**: Filter by billing plan
+- **search**: Text search in name and description
+- **status**: Filter by organization status
+
+### Sort Options
+- **name**: Alphabetical by organization name
+- **created**: By creation date
+- **updated**: By last update time
+- **usage**: By current usage metrics (workflows + executions)
+
+## Pagination
+
+Use `limit` and `offset` parameters for pagination:
+- Maximum `limit` is 100
+- Use `hasMore` field to determine if more results exist
+- Calculate next offset: `current_offset + limit`
+
+## Response Optimization
+
+The endpoint automatically optimizes responses based on your access level:
+- **Owners/Admins**: See full usage statistics and billing information
+- **Members/Viewers**: See limited usage statistics
+- **Suspended orgs**: Only basic information is returned
+
+## Use Cases
+
+### Dashboard Overview
+```javascript
+// Get organizations with high-level stats for dashboard
+const dashboardOrgs = await fetch('/api/v1/organizations?limit=5&sort=usage&order=desc');
+```
+
+### Organization Selector
+```javascript
+// Get all organizations for a dropdown selector
+const allOrgs = await fetch('/api/v1/organizations?limit=100&sort=name');
+```
+
+### Admin Management
+```javascript
+// Find organizations you own for administrative tasks
+const ownedOrgs = await fetch('/api/v1/organizations?role=owner');
+```
+
+## Related Endpoints
+
+- [Get Organization](/api/endpoints/organizations/get-organization) - Get detailed organization info
+- [Create Organization](/api/endpoints/organizations/create-organization) - Create new organization
+- [Update Organization](/api/endpoints/organizations/update-organization) - Update organization settings
+- [Delete Organization](/api/endpoints/organizations/delete-organization) - Delete organization

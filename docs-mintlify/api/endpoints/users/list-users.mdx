@@ -1,0 +1,417 @@
+---
+title: "List Users"
+api: "GET /users"
+description: "Get all users in the organization"
+---
+
+## Overview
+
+The List Users endpoint retrieves all users in your organization, including their roles, profile information, and current status. This is useful for user management, role assignment, and organization administration.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="limit" type="number">
+  Maximum number of users to return (1-100, defaults to 20)
+</ParamField>
+
+<ParamField query="offset" type="number">
+  Number of users to skip for pagination (defaults to 0)
+</ParamField>
+
+<ParamField query="role" type="string">
+  Filter by user role: "owner", "admin", "member", or "viewer"
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by user status: "pending", "active", "inactive", or "suspended"
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search users by name or email address
+</ParamField>
+
+<ParamField query="sort" type="string">
+  Sort order: "name", "email", "role", "created", or "lastActive" (defaults to "name")
+</ParamField>
+
+<ParamField query="order" type="string">
+  Sort direction: "asc" or "desc" (defaults to "asc")
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="users" type="array">
+  Array of user objects
+  
+  <Expandable title="User Object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the user
+    </ResponseField>
+    
+    <ResponseField name="email" type="string">
+      User's email address
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      User's full name
+    </ResponseField>
+    
+    <ResponseField name="role" type="string">
+      User's role: "owner", "admin", "member", or "viewer"
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Account status: "pending", "active", "inactive", or "suspended"
+    </ResponseField>
+    
+    <ResponseField name="profile" type="object">
+      User's profile information
+      
+      <Expandable title="Profile Object">
+        <ResponseField name="department" type="string">
+          Department or team
+        </ResponseField>
+        
+        <ResponseField name="title" type="string">
+          Job title or position
+        </ResponseField>
+        
+        <ResponseField name="phone" type="string">
+          Phone number
+        </ResponseField>
+        
+        <ResponseField name="location" type="string">
+          Office location or timezone
+        </ResponseField>
+        
+        <ResponseField name="avatar" type="string">
+          URL to profile picture
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="permissions" type="object">
+      User's permissions within the organization
+    </ResponseField>
+    
+    <ResponseField name="lastLoginAt" type="string">
+      ISO timestamp of last login (null if never logged in)
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      ISO timestamp when user was created
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="string">
+      ISO timestamp when user was last updated
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination information
+  
+  <Expandable title="Pagination Object">
+    <ResponseField name="total" type="number">
+      Total number of users in organization
+    </ResponseField>
+    
+    <ResponseField name="count" type="number">
+      Number of users returned in this response
+    </ResponseField>
+    
+    <ResponseField name="offset" type="number">
+      Current offset value
+    </ResponseField>
+    
+    <ResponseField name="limit" type="number">
+      Current limit value
+    </ResponseField>
+    
+    <ResponseField name="hasMore" type="boolean">
+      Whether there are more users to fetch
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="summary" type="object">
+  Organization user statistics
+  
+  <Expandable title="Summary Object">
+    <ResponseField name="totalUsers" type="number">
+      Total number of users
+    </ResponseField>
+    
+    <ResponseField name="activeUsers" type="number">
+      Number of active users
+    </ResponseField>
+    
+    <ResponseField name="pendingUsers" type="number">
+      Number of pending invitation users
+    </ResponseField>
+    
+    <ResponseField name="roleBreakdown" type="object">
+      Count of users by role
+      
+      <Expandable title="Role Breakdown">
+        <ResponseField name="owners" type="number">
+          Number of owners
+        </ResponseField>
+        <ResponseField name="admins" type="number">
+          Number of admins
+        </ResponseField>
+        <ResponseField name="members" type="number">
+          Number of members
+        </ResponseField>
+        <ResponseField name="viewers" type="number">
+          Number of viewers
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid query parameters
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Parameter-specific validation errors
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="403" type="object">
+  Forbidden - Insufficient permissions to list users
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL Basic
+curl -X GET "https://api.tolstoy.com/v1/users" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```bash cURL Filtered
+curl -X GET "https://api.tolstoy.com/v1/users?role=admin&status=active&limit=10&sort=lastActive&order=desc" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```javascript JavaScript
+// Basic user list
+const users = await fetch('/api/v1/users', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+const userData = await users.json();
+console.log(`Organization has ${userData.summary.totalUsers} users`);
+
+// Filtered user list
+const activeAdmins = await fetch('/api/v1/users?role=admin&status=active&sort=lastActive&order=desc', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+const adminData = await activeAdmins.json();
+adminData.users.forEach(user => {
+  console.log(`Admin: ${user.name} (${user.email}) - Last login: ${user.lastLoginAt}`);
+});
+```
+
+```python Python
+import requests
+
+# Basic user list
+response = requests.get(
+    "https://api.tolstoy.com/v1/users",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    }
+)
+
+if response.status_code == 200:
+    data = response.json()
+    print(f"Organization has {data['summary']['totalUsers']} users")
+    
+    for user in data['users']:
+        status = "✓" if user['status'] == 'active' else "○"
+        print(f"{status} {user['name']} ({user['role']}) - {user['email']}")
+
+# Filtered user list
+filtered_response = requests.get(
+    "https://api.tolstoy.com/v1/users",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    },
+    params={
+        "role": "admin",
+        "status": "active",
+        "sort": "lastActive",
+        "order": "desc"
+    }
+)
+
+if filtered_response.status_code == 200:
+    admin_data = filtered_response.json()
+    for user in admin_data['users']:
+        last_login = user['lastLoginAt'] or 'Never'
+        print(f"Admin: {user['name']} - Last login: {last_login}")
+```
+
+</CodeGroup>
+
+## Filtering Options
+
+### By Role
+- `owner` - Organization owners
+- `admin` - Organization administrators  
+- `member` - Regular members
+- `viewer` - Read-only users
+
+### By Status
+- `pending` - Invited but not yet activated
+- `active` - Active users who can log in
+- `inactive` - Temporarily deactivated users
+- `suspended` - Suspended users (cannot log in)
+
+### By Activity
+- `lastActive` - Sort by most recent activity
+- `created` - Sort by creation date
+- `name` - Alphabetical by name
+- `email` - Alphabetical by email
+
+## Search Functionality
+
+The search parameter supports:
+- **Name matching**: Partial matches on first or last name
+- **Email matching**: Partial matches on email address
+- **Case insensitive**: Search is not case sensitive
+
+```javascript
+// Search for users with "john" in name or email
+const searchResults = await fetch('/api/v1/users?search=john');
+
+// Search for users from specific domain
+const domainUsers = await fetch('/api/v1/users?search=@company.com');
+```
+
+## Pagination Examples
+
+```javascript
+// Get first page of users
+let offset = 0;
+const limit = 10;
+
+do {
+  const response = await fetch(`/api/v1/users?offset=${offset}&limit=${limit}`);
+  const data = await response.json();
+  
+  // Process users
+  data.users.forEach(user => console.log(user.name));
+  
+  offset += limit;
+} while (data.pagination.hasMore);
+```
+
+## Permission-Based Filtering
+
+Response content varies based on your role:
+
+### Organization Owner/Admin
+- See all user details including permissions
+- Access to user statistics and role breakdown
+- Can view inactive and suspended users
+
+### Regular Member
+- See basic information for all users
+- Limited profile information
+- Cannot see administrative details
+
+### Viewer
+- See only basic user list
+- No sensitive information
+- Limited to active users only
+
+## Use Cases
+
+### User Management Dashboard
+```javascript
+// Get overview for admin dashboard
+const users = await fetch('/api/v1/users?limit=100');
+const data = await users.json();
+
+console.log(`Total Users: ${data.summary.totalUsers}`);
+console.log(`Active: ${data.summary.activeUsers}`);
+console.log(`Pending: ${data.summary.pendingUsers}`);
+console.log(`Admins: ${data.summary.roleBreakdown.admins}`);
+```
+
+### Team Directory
+```javascript
+// Get active users for team directory
+const teamMembers = await fetch('/api/v1/users?status=active&sort=name');
+const members = await teamMembers.json();
+
+members.users.forEach(user => {
+  console.log(`${user.name} - ${user.profile?.title || user.role}`);
+});
+```
+
+### Security Audit
+```javascript
+// Find inactive admins for security review
+const inactiveAdmins = await fetch('/api/v1/users?role=admin&status=inactive');
+const admins = await inactiveAdmins.json();
+
+console.log('Inactive admin accounts:', admins.users.length);
+```
+
+## Related Endpoints
+
+- [Create User](/api/endpoints/users/create-user) - Add new user to organization
+- [Get User](/api/endpoints/users/get-current-user) - Retrieve specific user details
+- [Update User](/api/endpoints/users/update-user) - Modify user information
+- [Delete User](/api/endpoints/users/delete-user) - Remove user from organization

@@ -1,0 +1,205 @@
+---
+title: "Get Flow"
+api: "GET /flows/{id}"
+description: "Retrieve detailed information about a specific flow"
+---
+
+## Overview
+
+The Get Flow endpoint returns comprehensive details about a specific flow, including its configuration, steps, and execution settings.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the flow
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the flow
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the flow
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Description of what the flow does
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  Version of the flow
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current status: `active`, `inactive`, `draft`
+</ResponseField>
+
+<ResponseField name="trigger" type="object">
+  Flow trigger configuration
+  
+  <Expandable title="Trigger Object">
+    <ResponseField name="type" type="string">
+      Trigger type: `manual`, `webhook`, `schedule`, `event`
+    </ResponseField>
+    
+    <ResponseField name="config" type="object">
+      Trigger-specific configuration
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="steps" type="array">
+  Array of flow steps
+  
+  <Expandable title="Step Object">
+    <ResponseField name="id" type="string">
+      Step identifier
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Step name
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Step type: `action`, `condition`, `loop`, `parallel`
+    </ResponseField>
+    
+    <ResponseField name="actionId" type="string">
+      ID of the action to execute (for action steps)
+    </ResponseField>
+    
+    <ResponseField name="config" type="object">
+      Step configuration
+    </ResponseField>
+    
+    <ResponseField name="dependencies" type="array">
+      IDs of steps that must complete before this step
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="variables" type="object">
+  Flow variables and their default values
+</ResponseField>
+
+<ResponseField name="settings" type="object">
+  Flow execution settings
+  
+  <Expandable title="Settings Object">
+    <ResponseField name="timeout" type="number">
+      Maximum execution time in seconds
+    </ResponseField>
+    
+    <ResponseField name="retryPolicy" type="object">
+      Retry configuration for failed executions
+    </ResponseField>
+    
+    <ResponseField name="notifications" type="object">
+      Notification settings for flow events
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp when the flow was created
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO 8601 timestamp when the flow was last updated
+</ResponseField>
+
+<ResponseField name="createdBy" type="string">
+  User ID who created the flow
+</ResponseField>
+
+<ResponseField name="lastExecutedAt" type="string">
+  ISO 8601 timestamp of the last execution
+</ResponseField>
+
+<ResponseField name="executionCount" type="number">
+  Total number of times the flow has been executed
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "id": "flow_abc123",
+  "name": "Customer Onboarding Flow",
+  "description": "Automated workflow for new customer onboarding",
+  "version": "1.2.0",
+  "status": "active",
+  "trigger": {
+    "type": "webhook",
+    "config": {
+      "url": "https://api.example.com/webhook/onboarding",
+      "method": "POST",
+      "headers": {
+        "Authorization": "Bearer {{webhook_token}}"
+      }
+    }
+  },
+  "steps": [
+    {
+      "id": "step_1",
+      "name": "Validate Customer Data",
+      "type": "action",
+      "actionId": "action_validate_123",
+      "config": {
+        "inputMapping": {
+          "email": "{{trigger.email}}",
+          "name": "{{trigger.name}}"
+        }
+      },
+      "dependencies": []
+    },
+    {
+      "id": "step_2",
+      "name": "Create Account",
+      "type": "action",
+      "actionId": "action_create_456",
+      "config": {
+        "inputMapping": {
+          "validatedData": "{{step_1.output}}"
+        }
+      },
+      "dependencies": ["step_1"]
+    },
+    {
+      "id": "step_3",
+      "name": "Send Welcome Email",
+      "type": "action",
+      "actionId": "action_email_789",
+      "config": {
+        "template": "welcome",
+        "recipient": "{{step_2.output.email}}"
+      },
+      "dependencies": ["step_2"]
+    }
+  ],
+  "variables": {
+    "environment": "production",
+    "region": "us-east-1"
+  },
+  "settings": {
+    "timeout": 300,
+    "retryPolicy": {
+      "maxRetries": 3,
+      "backoffMultiplier": 2
+    },
+    "notifications": {
+      "onSuccess": ["admin@example.com"],
+      "onFailure": ["alerts@example.com"]
+    }
+  },
+  "createdAt": "2024-01-01T00:00:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z",
+  "createdBy": "user_admin_123",
+  "lastExecutedAt": "2024-01-15T09:00:00Z",
+  "executionCount": 156
+}
+```
+</ResponseExample>
+
+<Snippet file="api-footer.mdx" />

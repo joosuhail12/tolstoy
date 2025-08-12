@@ -1,0 +1,168 @@
+---
+title: "OAuth Login"
+api: "GET /auth/{toolId}/login"
+description: "Initiate OAuth2 authentication flow for a tool integration"
+---
+
+## Overview
+
+The OAuth Login endpoint initiates the OAuth2 authentication flow for connecting external tools to your organization. This endpoint redirects users to the tool's OAuth provider for authentication and authorization.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="toolId" type="string" required>
+  The unique identifier of the tool to authenticate with
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="redirectUrl" type="string">
+  URL to redirect to after successful authentication (optional)
+</ParamField>
+
+<ParamField query="scopes" type="string">
+  Comma-separated list of OAuth scopes to request (optional)
+</ParamField>
+
+<ParamField query="state" type="string">
+  Additional state parameter for OAuth flow security (optional)
+</ParamField>
+
+## Response
+
+**Status Code:** `302 Found`
+
+The endpoint responds with an HTTP redirect to the tool's OAuth authorization URL.
+
+### Headers
+
+<ResponseField name="Location" type="string">
+  The OAuth provider's authorization URL with required parameters
+</ResponseField>
+
+### OAuth URL Parameters
+
+The redirect URL will include:
+- `client_id` - The tool's OAuth client ID
+- `response_type` - Always set to "code"
+- `redirect_uri` - Callback URL for the OAuth flow
+- `scope` - Requested permissions
+- `state` - Security token to prevent CSRF attacks
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid tool ID or missing parameters
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Additional error context and validation failures
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="404" type="object">
+  Tool not found or OAuth not supported for this tool
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      "TOOL_NOT_FOUND" or "OAUTH_NOT_SUPPORTED"
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Error description
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Example
+
+<CodeGroup>
+
+```bash cURL
+curl -L -X GET "https://api.tolstoy.com/v1/auth/github-tool-123/login?scopes=repo,read:user" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```javascript JavaScript
+const response = await fetch('/api/v1/auth/github-tool-123/login', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  },
+  redirect: 'manual'
+});
+
+// Handle the redirect response
+if (response.status === 302) {
+  const oauthUrl = response.headers.get('Location');
+  window.location.href = oauthUrl;
+}
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    f"https://api.tolstoy.com/v1/auth/{tool_id}/login",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    },
+    params={
+        "scopes": "repo,read:user"
+    },
+    allow_redirects=False
+)
+
+if response.status_code == 302:
+    oauth_url = response.headers['Location']
+    print(f"Redirect to: {oauth_url}")
+```
+
+</CodeGroup>
+
+## Security Considerations
+
+- The `state` parameter is automatically generated if not provided to prevent CSRF attacks
+- All OAuth flows are validated server-side before redirecting
+- Redirect URLs are validated against registered callback URLs
+- OAuth tokens are securely stored and encrypted
+
+## Supported Tools
+
+This endpoint works with any tool that has been configured with OAuth2 authentication. Common supported providers include:
+
+- GitHub
+- Google
+- Microsoft
+- Slack
+- Shopify
+- Stripe
+- And many more
+
+## Next Steps
+
+After successful OAuth authentication, users will be redirected to the [OAuth Callback](/api/endpoints/auth/oauth-callback) endpoint to complete the authentication flow.

@@ -1,0 +1,203 @@
+---
+title: "List Tools"
+api: "GET /tools"
+description: "Retrieve a list of all available tools and integrations"
+---
+
+## Overview
+
+The List Tools endpoint returns all tools and integrations available in your organization, including their connection status and capabilities.
+
+## Query Parameters
+
+<ParamField query="page" type="number" default="1">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="limit" type="number" default="20">
+  Number of items per page (max: 100)
+</ParamField>
+
+<ParamField query="category" type="string">
+  Filter by tool category: `api`, `database`, `messaging`, `storage`, `analytics`, `payment`
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by connection status: `connected`, `disconnected`, `error`
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search tools by name or description
+</ParamField>
+
+## Response
+
+<ResponseField name="tools" type="array">
+  Array of tool objects
+  
+  <Expandable title="Tool Object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the tool
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Name of the tool
+    </ResponseField>
+    
+    <ResponseField name="description" type="string">
+      Description of the tool's capabilities
+    </ResponseField>
+    
+    <ResponseField name="category" type="string">
+      Tool category: `api`, `database`, `messaging`, `storage`, `analytics`, `payment`
+    </ResponseField>
+    
+    <ResponseField name="icon" type="string">
+      URL to the tool's icon
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Connection status: `connected`, `disconnected`, `error`
+    </ResponseField>
+    
+    <ResponseField name="authType" type="string">
+      Authentication type: `oauth2`, `api_key`, `basic`, `custom`
+    </ResponseField>
+    
+    <ResponseField name="capabilities" type="array">
+      List of available actions for this tool
+    </ResponseField>
+    
+    <ResponseField name="configuration" type="object">
+      Current configuration (sensitive data excluded)
+    </ResponseField>
+    
+    <ResponseField name="lastUsed" type="string">
+      ISO 8601 timestamp of last use
+    </ResponseField>
+    
+    <ResponseField name="connectedAt" type="string">
+      ISO 8601 timestamp when connected
+    </ResponseField>
+    
+    <ResponseField name="usage" type="object">
+      Usage statistics
+      
+      <Expandable title="Usage Stats">
+        <ResponseField name="totalExecutions" type="number">
+          Total number of executions
+        </ResponseField>
+        
+        <ResponseField name="successRate" type="number">
+          Success rate percentage
+        </ResponseField>
+        
+        <ResponseField name="averageResponseTime" type="number">
+          Average response time in milliseconds
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination metadata
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "tools": [
+    {
+      "id": "tool_slack_123",
+      "name": "Slack",
+      "description": "Send messages and notifications to Slack channels",
+      "category": "messaging",
+      "icon": "https://cdn.tolstoy.ai/icons/slack.png",
+      "status": "connected",
+      "authType": "oauth2",
+      "capabilities": [
+        "send_message",
+        "create_channel",
+        "upload_file",
+        "get_user_info"
+      ],
+      "configuration": {
+        "workspace": "acme-corp",
+        "defaultChannel": "#general"
+      },
+      "lastUsed": "2024-01-15T10:00:00Z",
+      "connectedAt": "2023-06-01T00:00:00Z",
+      "usage": {
+        "totalExecutions": 1245,
+        "successRate": 99.2,
+        "averageResponseTime": 150
+      }
+    },
+    {
+      "id": "tool_postgres_456",
+      "name": "PostgreSQL Database",
+      "description": "Execute queries and manage PostgreSQL databases",
+      "category": "database",
+      "icon": "https://cdn.tolstoy.ai/icons/postgresql.png",
+      "status": "connected",
+      "authType": "basic",
+      "capabilities": [
+        "execute_query",
+        "insert_records",
+        "update_records",
+        "delete_records",
+        "create_table"
+      ],
+      "configuration": {
+        "host": "db.example.com",
+        "port": 5432,
+        "database": "production"
+      },
+      "lastUsed": "2024-01-15T11:30:00Z",
+      "connectedAt": "2023-01-15T00:00:00Z",
+      "usage": {
+        "totalExecutions": 5420,
+        "successRate": 99.8,
+        "averageResponseTime": 45
+      }
+    },
+    {
+      "id": "tool_stripe_789",
+      "name": "Stripe",
+      "description": "Process payments and manage subscriptions",
+      "category": "payment",
+      "icon": "https://cdn.tolstoy.ai/icons/stripe.png",
+      "status": "connected",
+      "authType": "api_key",
+      "capabilities": [
+        "create_payment",
+        "refund_payment",
+        "create_subscription",
+        "cancel_subscription",
+        "get_customer"
+      ],
+      "configuration": {
+        "mode": "live",
+        "webhookEnabled": true
+      },
+      "lastUsed": "2024-01-15T09:45:00Z",
+      "connectedAt": "2023-03-20T00:00:00Z",
+      "usage": {
+        "totalExecutions": 890,
+        "successRate": 98.5,
+        "averageResponseTime": 320
+      }
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 15,
+    "totalPages": 1
+  }
+}
+```
+</ResponseExample>
+
+<Snippet file="api-footer.mdx" />

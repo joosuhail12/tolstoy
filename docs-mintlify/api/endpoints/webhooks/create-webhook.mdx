@@ -1,0 +1,199 @@
+---
+title: "Create Webhook"
+api: "POST /webhooks"
+description: "Create a new webhook to receive event notifications"
+---
+
+## Overview
+
+The Create Webhook endpoint allows you to configure a new webhook to receive real-time notifications about events in your Tolstoy workflows.
+
+## Request Body
+
+<ParamField body="name" type="string" required>
+  Name for the webhook
+</ParamField>
+
+<ParamField body="url" type="string" required>
+  HTTPS endpoint URL that will receive webhook events
+</ParamField>
+
+<ParamField body="events" type="array" required>
+  List of event types to subscribe to
+  
+  Available events:
+  - `flow.started` - Flow execution started
+  - `flow.completed` - Flow execution completed successfully
+  - `flow.failed` - Flow execution failed
+  - `action.executed` - Action was executed
+  - `action.failed` - Action execution failed
+  - `tool.connected` - Tool was connected
+  - `tool.disconnected` - Tool was disconnected
+</ParamField>
+
+<ParamField body="headers" type="object">
+  Custom headers to include with webhook requests
+</ParamField>
+
+<ParamField body="retryPolicy" type="object">
+  Configuration for retry behavior
+  
+  <Expandable title="Retry Policy">
+    <ParamField body="maxRetries" type="number" default="3">
+      Maximum number of retry attempts
+    </ParamField>
+    
+    <ParamField body="backoffMultiplier" type="number" default="2">
+      Exponential backoff multiplier
+    </ParamField>
+    
+    <ParamField body="initialDelay" type="number" default="1000">
+      Initial retry delay in milliseconds
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="filters" type="object">
+  Event filtering rules
+  
+  <Expandable title="Filter Options">
+    <ParamField body="flows" type="array">
+      Only receive events for specific flow IDs
+    </ParamField>
+    
+    <ParamField body="actions" type="array">
+      Only receive events for specific action IDs
+    </ParamField>
+    
+    <ParamField body="statuses" type="array">
+      Only receive events with specific statuses
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="secret" type="string">
+  Secret key for webhook signature validation (recommended)
+</ParamField>
+
+<ParamField body="enabled" type="boolean" default="true">
+  Whether the webhook is active immediately after creation
+</ParamField>
+
+<RequestExample>
+```json
+{
+  "name": "Production Flow Monitor",
+  "url": "https://api.example.com/webhooks/tolstoy",
+  "events": [
+    "flow.completed",
+    "flow.failed",
+    "action.failed"
+  ],
+  "headers": {
+    "Authorization": "Bearer webhook_token_xyz",
+    "X-Custom-Header": "custom-value"
+  },
+  "retryPolicy": {
+    "maxRetries": 5,
+    "backoffMultiplier": 2,
+    "initialDelay": 2000
+  },
+  "filters": {
+    "flows": ["flow_abc123", "flow_def456"],
+    "statuses": ["failed", "error"]
+  },
+  "secret": "whsec_abc123xyz789",
+  "enabled": true
+}
+```
+</RequestExample>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the created webhook
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the webhook
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  Webhook endpoint URL
+</ResponseField>
+
+<ResponseField name="events" type="array">
+  List of subscribed event types
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current status: `active` or `inactive`
+</ResponseField>
+
+<ResponseField name="secret" type="string">
+  Secret key for signature validation (only shown once)
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp when the webhook was created
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "id": "webhook_new123",
+  "name": "Production Flow Monitor",
+  "url": "https://api.example.com/webhooks/tolstoy",
+  "events": [
+    "flow.completed",
+    "flow.failed",
+    "action.failed"
+  ],
+  "status": "active",
+  "secret": "whsec_abc123xyz789",
+  "createdAt": "2024-01-15T12:00:00Z"
+}
+```
+</ResponseExample>
+
+## Webhook Payload Format
+
+When events occur, your webhook endpoint will receive POST requests with the following payload structure:
+
+```json
+{
+  "id": "evt_abc123",
+  "type": "flow.completed",
+  "timestamp": "2024-01-15T12:00:00Z",
+  "data": {
+    "flowId": "flow_abc123",
+    "executionId": "exec_xyz789",
+    "status": "success",
+    "duration": 4500,
+    "output": {
+      // Event-specific data
+    }
+  },
+  "webhookId": "webhook_new123",
+  "organizationId": "org_abc123"
+}
+```
+
+## Webhook Signature Validation
+
+If you provide a secret, webhook payloads will include a signature header `X-Tolstoy-Signature` that you can use to verify the authenticity of the webhook:
+
+```javascript
+const crypto = require('crypto');
+
+function verifyWebhookSignature(payload, signature, secret) {
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(JSON.stringify(payload))
+    .digest('hex');
+  
+  return signature === `sha256=${expectedSignature}`;
+}
+```
+
+<Snippet file="api-footer.mdx" />

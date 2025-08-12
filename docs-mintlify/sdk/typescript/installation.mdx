@@ -1,0 +1,658 @@
+---
+title: "Installation"
+description: "Install and configure the Tolstoy TypeScript SDK in your project"
+---
+
+# Installation
+
+Install the Tolstoy TypeScript SDK to integrate workflow automation into your JavaScript or TypeScript applications.
+
+## Requirements
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    **Version**: 16.0.0 or higher  
+    **LTS Recommended**: 18.x or 20.x
+  </Card>
+  <Card title="Package Manager" icon="package">
+    **Supported**: npm, yarn, pnpm, bun  
+    **TypeScript**: 4.5+ for full type support
+  </Card>
+</CardGroup>
+
+## Package Installation
+
+<Tabs>
+  <Tab title="npm">
+    ```bash
+    # Install the SDK
+    npm install @tolstoy/sdk
+    
+    # Install TypeScript types (if not using TypeScript)
+    npm install --save-dev @types/node
+    ```
+  </Tab>
+  
+  <Tab title="yarn">
+    ```bash
+    # Install the SDK
+    yarn add @tolstoy/sdk
+    
+    # Install TypeScript types (if not using TypeScript)
+    yarn add --dev @types/node
+    ```
+  </Tab>
+  
+  <Tab title="pnpm">
+    ```bash
+    # Install the SDK
+    pnpm add @tolstoy/sdk
+    
+    # Install TypeScript types (if not using TypeScript)
+    pnpm add -D @types/node
+    ```
+  </Tab>
+  
+  <Tab title="bun">
+    ```bash
+    # Install the SDK
+    bun add @tolstoy/sdk
+    
+    # TypeScript support is built-in with Bun
+    ```
+  </Tab>
+</Tabs>
+
+## TypeScript Configuration
+
+### tsconfig.json Setup
+
+```json
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+```
+
+### Environment Types (Optional)
+
+```typescript
+// types/environment.d.ts
+declare global {
+  namespace NodeJS {
+    interface ProcessEnv {
+      TOLSTOY_API_KEY: string;
+      TOLSTOY_ORG_ID: string;
+      TOLSTOY_BASE_URL?: string;
+      NODE_ENV: 'development' | 'production' | 'test';
+    }
+  }
+}
+
+export {};
+```
+
+## Environment Setup
+
+### Environment Variables
+
+Create a `.env` file in your project root:
+
+```bash
+# .env
+TOLSTOY_API_KEY=your_api_key_here
+TOLSTOY_ORG_ID=your_organization_id
+TOLSTOY_BASE_URL=https://api.tolstoy.getpullse.com
+NODE_ENV=development
+```
+
+### Environment Variable Loading
+
+<Tabs>
+  <Tab title="dotenv">
+    ```bash
+    # Install dotenv
+    npm install dotenv
+    ```
+    
+    ```typescript
+    // Load at the top of your entry file
+    import 'dotenv/config';
+    // or
+    require('dotenv').config();
+    
+    import { TolstoyClient } from '@tolstoy/sdk';
+    
+    const client = new TolstoyClient({
+      apiKey: process.env.TOLSTOY_API_KEY!,
+      organizationId: process.env.TOLSTOY_ORG_ID!
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Node.js 20+">
+    ```bash
+    # Run with built-in env file support
+    node --env-file=.env your-script.js
+    ```
+    
+    ```typescript
+    // No additional imports needed
+    import { TolstoyClient } from '@tolstoy/sdk';
+    
+    const client = new TolstoyClient({
+      apiKey: process.env.TOLSTOY_API_KEY!,
+      organizationId: process.env.TOLSTOY_ORG_ID!
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Verification
+
+### Basic Import Test
+
+```typescript
+// test-installation.ts
+import { TolstoyClient } from '@tolstoy/sdk';
+
+console.log('Tolstoy SDK imported successfully!');
+
+// Test client creation
+const client = new TolstoyClient({
+  apiKey: 'test-key',
+  organizationId: 'test-org'
+});
+
+console.log('Client created successfully!');
+console.log('SDK version:', client.version);
+```
+
+Run the test:
+
+```bash
+# TypeScript
+npx tsx test-installation.ts
+
+# Compiled JavaScript
+npx tsc test-installation.ts
+node test-installation.js
+```
+
+### Connection Test
+
+```typescript
+// test-connection.ts
+import { TolstoyClient } from '@tolstoy/sdk';
+
+async function testConnection() {
+  const client = new TolstoyClient({
+    apiKey: process.env.TOLSTOY_API_KEY!,
+    organizationId: process.env.TOLSTOY_ORG_ID!
+  });
+  
+  try {
+    const organizations = await client.organizations.list();
+    console.log('✅ Connection successful!');
+    console.log(`Found ${organizations.length} organizations`);
+  } catch (error) {
+    console.error('❌ Connection failed:', error.message);
+  }
+}
+
+testConnection();
+```
+
+## Framework Integration
+
+### Express.js
+
+```typescript
+// server.ts
+import express from 'express';
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const app = express();
+app.use(express.json());
+
+const tolstoy = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY!,
+  organizationId: process.env.TOLSTOY_ORG_ID!
+});
+
+// Execute workflow endpoint
+app.post('/api/workflows/:flowId/execute', async (req, res) => {
+  try {
+    const { flowId } = req.params;
+    const { input } = req.body;
+    
+    const execution = await tolstoy.flows.execute(flowId, input);
+    
+    res.json({
+      success: true,
+      executionId: execution.id,
+      status: execution.status
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+app.listen(3000, () => {
+  console.log('Server running on http://localhost:3000');
+});
+```
+
+### Next.js
+
+```typescript
+// lib/tolstoy.ts
+import { TolstoyClient } from '@tolstoy/sdk';
+
+if (!process.env.TOLSTOY_API_KEY || !process.env.TOLSTOY_ORG_ID) {
+  throw new Error('Missing Tolstoy configuration');
+}
+
+export const tolstoy = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  organizationId: process.env.TOLSTOY_ORG_ID
+});
+```
+
+```typescript
+// pages/api/execute-workflow.ts (Pages Router)
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { tolstoy } from '../../lib/tolstoy';
+
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+  
+  try {
+    const { flowId, input } = req.body;
+    
+    const execution = await tolstoy.flows.execute(flowId, input);
+    
+    res.status(200).json({
+      executionId: execution.id,
+      status: execution.status
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+}
+```
+
+```typescript
+// app/api/execute-workflow/route.ts (App Router)
+import { NextRequest, NextResponse } from 'next/server';
+import { tolstoy } from '../../../lib/tolstoy';
+
+export async function POST(request: NextRequest) {
+  try {
+    const { flowId, input } = await request.json();
+    
+    const execution = await tolstoy.flows.execute(flowId, input);
+    
+    return NextResponse.json({
+      executionId: execution.id,
+      status: execution.status
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error.message },
+      { status: 500 }
+    );
+  }
+}
+```
+
+### NestJS
+
+```typescript
+// tolstoy/tolstoy.module.ts
+import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
+import { TolstoyService } from './tolstoy.service';
+
+@Module({
+  imports: [ConfigModule],
+  providers: [TolstoyService],
+  exports: [TolstoyService]
+})
+export class TolstoyModule {}
+```
+
+```typescript
+// tolstoy/tolstoy.service.ts
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { TolstoyClient } from '@tolstoy/sdk';
+
+@Injectable()
+export class TolstoyService {
+  private readonly client: TolstoyClient;
+  
+  constructor(private configService: ConfigService) {
+    this.client = new TolstoyClient({
+      apiKey: this.configService.get<string>('TOLSTOY_API_KEY')!,
+      organizationId: this.configService.get<string>('TOLSTOY_ORG_ID')!
+    });
+  }
+  
+  async executeFlow(flowId: string, input: any) {
+    return this.client.flows.execute(flowId, input);
+  }
+  
+  async getExecution(executionId: string) {
+    return this.client.executions.get(executionId);
+  }
+}
+```
+
+## Browser Usage
+
+### Webpack Configuration
+
+```javascript
+// webpack.config.js
+module.exports = {
+  resolve: {
+    fallback: {
+      "buffer": require.resolve("buffer/"),
+      "crypto": require.resolve("crypto-browserify"),
+      "stream": require.resolve("stream-browserify"),
+      "util": require.resolve("util/")
+    }
+  },
+  plugins: [
+    new webpack.ProvidePlugin({
+      Buffer: ['buffer', 'Buffer'],
+    })
+  ]
+};
+```
+
+### Vite Configuration
+
+```typescript
+// vite.config.ts
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+  define: {
+    global: 'globalThis',
+  },
+  optimizeDeps: {
+    include: ['@tolstoy/sdk']
+  }
+});
+```
+
+### Browser Client Setup
+
+```typescript
+// browser-client.ts
+import { TolstoyClient } from '@tolstoy/sdk';
+
+// Use public API key only (never expose secret keys)
+const client = new TolstoyClient({
+  apiKey: 'pk_public_key_here', // Public key only!
+  organizationId: 'org_123456',
+  baseUrl: 'https://api.tolstoy.getpullse.com'
+});
+
+// Execute public workflows only
+async function executePublicWorkflow(flowId: string, input: any) {
+  try {
+    const execution = await client.flows.execute(flowId, input);
+    return execution;
+  } catch (error) {
+    console.error('Workflow execution failed:', error);
+    throw error;
+  }
+}
+```
+
+## Alternative Runtimes
+
+### Deno
+
+```typescript
+// deno-example.ts
+import { TolstoyClient } from 'https://esm.sh/@tolstoy/sdk';
+
+const client = new TolstoyClient({
+  apiKey: Deno.env.get('TOLSTOY_API_KEY')!,
+  organizationId: Deno.env.get('TOLSTOY_ORG_ID')!
+});
+
+const flows = await client.flows.list();
+console.log(`Found ${flows.length} flows`);
+```
+
+Run with Deno:
+
+```bash
+deno run --allow-env --allow-net deno-example.ts
+```
+
+### Bun
+
+```typescript
+// bun-example.ts
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const client = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY!,
+  organizationId: process.env.TOLSTOY_ORG_ID!
+});
+
+const execution = await client.flows.execute('flow_test', {
+  message: 'Hello from Bun!'
+});
+
+console.log('Execution started:', execution.id);
+```
+
+Run with Bun:
+
+```bash
+bun run bun-example.ts
+```
+
+## Troubleshooting
+
+### Common Installation Issues
+
+<AccordionGroup>
+  <Accordion title="Node.js Version Compatibility">
+    **Error**: `engines` field compatibility issues
+    
+    **Solution**: Ensure you're using Node.js 16 or higher
+    
+    ```bash
+    # Check Node.js version
+    node --version
+    
+    # Use nvm to install compatible version
+    nvm install 18
+    nvm use 18
+    
+    # Or update Node.js
+    npm install -g n
+    n latest
+    ```
+  </Accordion>
+  
+  <Accordion title="TypeScript Type Errors">
+    **Error**: Cannot find module '@tolstoy/sdk' or its corresponding type declarations
+    
+    **Solution**: Install TypeScript and configure properly
+    
+    ```bash
+    # Install TypeScript
+    npm install -D typescript @types/node
+    
+    # Generate tsconfig.json
+    npx tsc --init
+    
+    # Ensure proper module resolution
+    # Add to tsconfig.json:
+    # "moduleResolution": "node"
+    # "esModuleInterop": true
+    ```
+  </Accordion>
+  
+  <Accordion title="Network/Firewall Issues">
+    **Error**: Network timeout or connection refused
+    
+    **Solutions**:
+    
+    ```bash
+    # Test network connectivity
+    curl -I https://api.tolstoy.getpullse.com
+    
+    # Configure proxy if needed
+    npm config set proxy http://proxy.company.com:8080
+    npm config set https-proxy http://proxy.company.com:8080
+    
+    # Or use custom registry
+    npm install --registry https://registry.npmjs.org/
+    ```
+  </Accordion>
+  
+  <Accordion title="Module Resolution Issues">
+    **Error**: Cannot resolve module in browser/webpack
+    
+    **Solutions**:
+    
+    ```javascript
+    // Add to webpack.config.js
+    module.exports = {
+      resolve: {
+        alias: {
+          '@tolstoy/sdk': require.resolve('@tolstoy/sdk')
+        },
+        fallback: {
+          "fs": false,
+          "path": require.resolve("path-browserify")
+        }
+      }
+    };
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Verification Commands
+
+```bash
+# Check installation
+node -e "console.log(require('@tolstoy/sdk'))"
+
+# Check TypeScript compilation
+npx tsc --noEmit --skipLibCheck your-file.ts
+
+# Test import in Node.js
+node -e "import('@tolstoy/sdk').then(sdk => console.log('SDK loaded:', Object.keys(sdk)))"
+
+# Check package info
+npm list @tolstoy/sdk
+npm info @tolstoy/sdk
+```
+
+## Development Setup
+
+### Package.json Scripts
+
+```json
+{
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "lint": "eslint src/**/*.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "tsx": "^4.0.0",
+    "jest": "^29.0.0",
+    "@types/jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "eslint": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0"
+  }
+}
+```
+
+### Project Structure
+
+```
+my-tolstoy-app/
+├── src/
+│   ├── index.ts
+│   ├── lib/
+│   │   └── tolstoy.ts
+│   ├── workflows/
+│   │   ├── payment.ts
+│   │   └── notification.ts
+│   └── types/
+│       └── index.ts
+├── tests/
+│   └── workflows.test.ts
+├── .env
+├── .env.example
+├── .gitignore
+├── package.json
+├── tsconfig.json
+└── README.md
+```
+
+## Next Steps
+
+After successful installation:
+
+<CardGroup cols={2}>
+  <Card title="Quick Start Guide" icon="rocket" href="/sdk/typescript/quickstart">
+    Build your first workflow integration
+  </Card>
+  <Card title="Configuration" icon="gear" href="#environment-setup">
+    Set up environment variables and configuration
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/index">
+    Explore the complete API documentation
+  </Card>
+  <Card title="Examples" icon="lightbulb" href="/examples">
+    View code examples and best practices
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="sdk-footer.mdx" />

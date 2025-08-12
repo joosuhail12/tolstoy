@@ -1,0 +1,282 @@
+---
+title: "Delete Organization"
+api: "DELETE /organizations/{id}"
+description: "Permanently delete an organization and all associated data"
+---
+
+## Overview
+
+The Delete Organization endpoint permanently removes an organization and all its associated data, including workflows, executions, users, tool connections, and stored credentials. This action cannot be undone.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization (must be organization owner)
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the organization to delete
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="confirm" type="string" required>
+  Must be "DELETE" to confirm the destructive operation
+</ParamField>
+
+<ParamField query="backup" type="boolean">
+  Whether to create a backup before deletion (defaults to false)
+</ParamField>
+
+## Response
+
+**Status Code:** `202 Accepted`
+
+<ResponseField name="success" type="boolean">
+  Always `true` when deletion is initiated
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Confirmation message about the deletion process
+</ResponseField>
+
+<ResponseField name="deletionId" type="string">
+  Unique identifier for tracking the deletion process
+</ResponseField>
+
+<ResponseField name="estimatedCompletionTime" type="string">
+  ISO timestamp when deletion is expected to complete
+</ResponseField>
+
+<ResponseField name="deletedData" type="object">
+  Summary of data that will be deleted
+  
+  <Expandable title="Deletion Summary">
+    <ResponseField name="workflows" type="number">
+      Number of workflows to be deleted
+    </ResponseField>
+    
+    <ResponseField name="executions" type="number">
+      Number of workflow executions to be deleted
+    </ResponseField>
+    
+    <ResponseField name="users" type="number">
+      Number of users to be removed from organization
+    </ResponseField>
+    
+    <ResponseField name="toolConnections" type="number">
+      Number of tool connections to be deleted
+    </ResponseField>
+    
+    <ResponseField name="apiKeys" type="number">
+      Number of API keys to be revoked
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="backupInfo" type="object">
+  Backup information (if backup was requested)
+  
+  <Expandable title="Backup Details">
+    <ResponseField name="backupId" type="string">
+      Identifier for the created backup
+    </ResponseField>
+    
+    <ResponseField name="downloadUrl" type="string">
+      URL to download the backup (expires in 7 days)
+    </ResponseField>
+    
+    <ResponseField name="expiresAt" type="string">
+      ISO timestamp when backup download expires
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Missing confirmation parameter or invalid request
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="403" type="object">
+  Forbidden - Only organization owners can delete organizations
+  
+  <Expandable title="Permission Error">
+    <ResponseField name="error" type="string">
+      "INSUFFICIENT_PERMISSIONS"
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      "Only organization owners can delete organizations"
+    </ResponseField>
+    <ResponseField name="requiredRole" type="string">
+      "owner"
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="404" type="object">
+  Not Found - Organization does not exist
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - Organization has active subscriptions or dependencies
+  
+  <Expandable title="Dependency Conflict">
+    <ResponseField name="error" type="string">
+      "ACTIVE_DEPENDENCIES"
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      "Cannot delete organization with active dependencies"
+    </ResponseField>
+    <ResponseField name="dependencies" type="object">
+      Details about blocking dependencies
+      
+      <Expandable title="Dependency Details">
+        <ResponseField name="activeSubscriptions" type="array">
+          List of active billing subscriptions
+        </ResponseField>
+        <ResponseField name="runningWorkflows" type="array">
+          List of currently executing workflows
+        </ResponseField>
+        <ResponseField name="pendingInvitations" type="array">
+          List of pending user invitations
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X DELETE "https://api.tolstoy.com/v1/organizations/org_123456?confirm=DELETE&backup=true" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```javascript JavaScript
+const deletionResponse = await fetch('/api/v1/organizations/org_123456?confirm=DELETE&backup=true', {
+  method: 'DELETE',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+if (deletionResponse.ok) {
+  const result = await deletionResponse.json();
+  console.log('Deletion initiated:', result.deletionId);
+  
+  if (result.backupInfo) {
+    console.log('Backup available:', result.backupInfo.downloadUrl);
+  }
+} else {
+  const error = await deletionResponse.json();
+  console.error('Deletion failed:', error.message);
+}
+```
+
+```python Python
+import requests
+
+response = requests.delete(
+    "https://api.tolstoy.com/v1/organizations/org_123456",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    },
+    params={
+        "confirm": "DELETE",
+        "backup": True
+    }
+)
+
+if response.status_code == 202:
+    result = response.json()
+    print(f"Deletion initiated: {result['deletionId']}")
+    
+    if 'backupInfo' in result:
+        backup_url = result['backupInfo']['downloadUrl']
+        print(f"Backup available: {backup_url}")
+else:
+    error = response.json()
+    print(f"Deletion failed: {error['message']}")
+```
+
+</CodeGroup>
+
+## Deletion Process
+
+The organization deletion follows these steps:
+
+1. **Validation**: Verify user permissions and resolve dependencies
+2. **Backup Creation**: Generate backup if requested
+3. **Data Export**: Export critical data for compliance
+4. **Resource Cleanup**: Delete workflows, executions, and connections
+5. **User Removal**: Remove users from organization (users remain in system)
+6. **Billing Cancellation**: Cancel subscriptions and process final billing
+7. **Final Cleanup**: Remove organization record and associated metadata
+
+## Pre-Deletion Checklist
+
+Before deleting an organization, ensure:
+
+- [ ] All active workflows are stopped
+- [ ] Important data is exported or backed up
+- [ ] Users are notified of the deletion
+- [ ] Billing subscriptions are reviewed
+- [ ] API integrations are updated to remove organization references
+
+## Data Retention
+
+After deletion:
+- **Immediate**: Organization becomes inaccessible
+- **7 Days**: Backup files remain downloadable
+- **30 Days**: Audit logs retained for compliance
+- **90 Days**: Anonymized usage data retained for analytics
+
+## Webhook Events
+
+The deletion process triggers several webhook events:
+- `organization.deletion_started` - When deletion begins
+- `organization.backup_created` - When backup is completed (if requested)
+- `organization.deletion_completed` - When deletion finishes
+- `organization.deletion_failed` - If deletion encounters errors
+
+## Recovery Options
+
+Once deleted, an organization cannot be recovered. However:
+- Users remain in the system and can join new organizations
+- Backups (if created) contain exportable data
+- Some anonymized analytics data is retained
+
+## Related Endpoints
+
+- [Create Organization](/api/endpoints/organizations/create-organization) - Create new organization
+- [Update Organization](/api/endpoints/organizations/update-organization) - Update organization settings
+- [Get Organization](/api/endpoints/organizations/get-organization) - Retrieve organization details
+- [List Organizations](/api/endpoints/organizations/list-organizations) - List all organizations

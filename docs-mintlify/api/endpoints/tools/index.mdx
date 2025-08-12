@@ -1,0 +1,221 @@
+---
+title: "Tools Overview"
+description: "API endpoints for managing external tool integrations and authentication"
+---
+
+# Tools API
+
+Tools in Tolstoy represent external API services that you want to integrate with. Each tool defines connection details, authentication methods, and serves as the foundation for creating actions.
+
+## What are Tools?
+
+Tools provide:
+- **Base URL Configuration**: The root URL for all API calls to the external service
+- **Authentication Setup**: How to authenticate with the external API (API keys, OAuth, etc.)
+- **Connection Management**: Secure storage of credentials and connection details
+- **Action Foundation**: The basis for creating reusable actions that call the external API
+
+<CardGroup cols={2}>
+  <Card title="Create Tool" icon="plus" href="/api/endpoints/tools/create-tool">
+    Add a new external API integration
+  </Card>
+  <Card title="List Tools" icon="list" href="/api/endpoints/tools/list-tools">
+    Browse all configured tools
+  </Card>
+  <Card title="Get Tool" icon="eye" href="/api/endpoints/tools/get-tool">
+    View tool configuration and status
+  </Card>
+  <Card title="Update Tool" icon="edit" href="/api/endpoints/tools/update-tool">
+    Modify tool settings and authentication
+  </Card>
+</CardGroup>
+
+## Authentication Methods
+
+Tools support various authentication methods:
+
+<Tabs>
+  <Tab title="API Key">
+    Simple API key authentication in headers or query parameters
+    ```json
+    {
+      "authType": "api_key",
+      "authConfig": {
+        "keyLocation": "header",
+        "keyName": "X-API-Key"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Bearer Token">
+    Bearer token authentication in Authorization header
+    ```json
+    {
+      "authType": "bearer_token",
+      "authConfig": {
+        "tokenPrefix": "Bearer"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="OAuth 2.0">
+    OAuth 2.0 flow for user authorization
+    ```json
+    {
+      "authType": "oauth2",
+      "authConfig": {
+        "grantType": "authorization_code",
+        "authUrl": "https://api.service.com/oauth/authorize",
+        "tokenUrl": "https://api.service.com/oauth/token"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Basic Auth">
+    Username and password authentication
+    ```json
+    {
+      "authType": "basic_auth",
+      "authConfig": {
+        "usernameField": "username",
+        "passwordField": "password"
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Common Tool Integrations
+
+<AccordionGroup>
+  <Accordion title="Stripe Payment Processing">
+    ```json
+    {
+      "name": "Stripe API",
+      "baseUrl": "https://api.stripe.com/v1",
+      "authType": "bearer_token",
+      "authConfig": {
+        "tokenPrefix": "Bearer"
+      },
+      "description": "Stripe payment processing and subscription management"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="SendGrid Email">
+    ```json
+    {
+      "name": "SendGrid API",
+      "baseUrl": "https://api.sendgrid.com/v3",
+      "authType": "api_key",
+      "authConfig": {
+        "keyLocation": "header",
+        "keyName": "Authorization",
+        "keyPrefix": "Bearer"
+      },
+      "description": "Email delivery and marketing automation"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Slack Integration">
+    ```json
+    {
+      "name": "Slack API",
+      "baseUrl": "https://slack.com/api",
+      "authType": "bearer_token",
+      "authConfig": {
+        "tokenPrefix": "Bearer"
+      },
+      "description": "Slack messaging and workspace automation"
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="HubSpot CRM">
+    ```json
+    {
+      "name": "HubSpot API", 
+      "baseUrl": "https://api.hubapi.com",
+      "authType": "api_key",
+      "authConfig": {
+        "keyLocation": "query",
+        "keyName": "hapikey"
+      },
+      "description": "CRM and marketing automation"
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Tool States
+
+Tools can be in different states:
+
+- **Active**: Ready for use in actions and workflows
+- **Inactive**: Temporarily disabled, actions won't execute
+- **Testing**: Under development, only accessible to creators
+- **Error**: Connection issues or authentication failures
+
+## Security Features
+
+<CardGroup cols={2}>
+  <Card title="Credential Encryption" icon="shield">
+    All authentication credentials are encrypted at rest using AES-256
+  </Card>
+  <Card title="Secret Management" icon="key">
+    API keys and tokens are stored separately from configuration data
+  </Card>
+  <Card title="Access Control" icon="users">
+    Role-based access to tools and their credentials
+  </Card>
+  <Card title="Audit Logging" icon="scroll">
+    Complete audit trail of tool access and modifications
+  </Card>
+</CardGroup>
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Naming Conventions">
+    - Use clear, descriptive names (e.g., "Stripe Production API")
+    - Include environment when applicable (Production, Staging, Development)
+    - Avoid generic names like "API" or "Service"
+    - Be consistent across similar tools
+  </Accordion>
+  
+  <Accordion title="Security">
+    - Use separate tools for different environments
+    - Regularly rotate API keys and credentials  
+    - Implement least-privilege access for API keys
+    - Monitor tool usage and authentication failures
+  </Accordion>
+  
+  <Accordion title="Organization">
+    - Group related tools by service or function
+    - Document tool purposes and use cases
+    - Test tool connections after setup
+    - Keep tool configurations up to date
+  </Accordion>
+</AccordionGroup>
+
+## Related Resources
+
+<CardGroup cols={3}>
+  <Card title="Actions" icon="bolt" href="/api/endpoints/actions">
+    Create actions using your tools
+  </Card>
+  <Card title="Flows" icon="workflow" href="/api/endpoints/flows">
+    Build workflows with tool actions
+  </Card>
+  <Card title="Secrets" icon="key" href="/api/endpoints/tools/manage-secrets">
+    Manage tool authentication secrets
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="api-footer.mdx" />

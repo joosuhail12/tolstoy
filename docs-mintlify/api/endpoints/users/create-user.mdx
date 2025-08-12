@@ -1,0 +1,416 @@
+---
+title: "Create User"
+api: "POST /users"
+description: "Create a new user in the organization"
+---
+
+## Overview
+
+The Create User endpoint creates a new user account within your organization. This allows you to add team members, assign roles, and configure their profile information.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Request Body
+
+<ParamField body="email" type="string" required>
+  The user's email address (must be unique within the organization)
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  The user's full name
+</ParamField>
+
+<ParamField body="role" type="string" required>
+  User's role in the organization: "owner", "admin", "member", or "viewer"
+</ParamField>
+
+<ParamField body="profile" type="object">
+  Additional profile information for the user
+  
+  <Expandable title="Profile Object">
+    <ParamField body="department" type="string">
+      Department or team the user belongs to
+    </ParamField>
+    
+    <ParamField body="title" type="string">
+      Job title or position
+    </ParamField>
+    
+    <ParamField body="phone" type="string">
+      Phone number
+    </ParamField>
+    
+    <ParamField body="location" type="string">
+      Office location or timezone
+    </ParamField>
+    
+    <ParamField body="avatar" type="string">
+      URL to user's profile picture
+    </ParamField>
+    
+    <ParamField body="bio" type="string">
+      Short biography or description
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="sendInvite" type="boolean">
+  Whether to send an invitation email to the user (defaults to true)
+</ParamField>
+
+<ParamField body="permissions" type="object">
+  Specific permissions for the user
+  
+  <Expandable title="Permissions Object">
+    <ParamField body="canCreateWorkflows" type="boolean">
+      Permission to create new workflows
+    </ParamField>
+    
+    <ParamField body="canManageTools" type="boolean">
+      Permission to manage tool integrations
+    </ParamField>
+    
+    <ParamField body="canViewLogs" type="boolean">
+      Permission to view execution logs
+    </ParamField>
+    
+    <ParamField body="canManageUsers" type="boolean">
+      Permission to manage other users
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+**Status Code:** `201 Created`
+
+<ResponseField name="id" type="string">
+  Unique identifier for the created user
+</ResponseField>
+
+<ResponseField name="email" type="string">
+  The user's email address
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  The user's full name
+</ResponseField>
+
+<ResponseField name="role" type="string">
+  User's role in the organization
+</ResponseField>
+
+<ResponseField name="profile" type="object">
+  User's profile information
+</ResponseField>
+
+<ResponseField name="permissions" type="object">
+  User's permissions within the organization
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  User account status: "pending", "active", "inactive", "suspended"
+</ResponseField>
+
+<ResponseField name="invitationSent" type="boolean">
+  Whether an invitation email was sent
+</ResponseField>
+
+<ResponseField name="invitationExpires" type="string">
+  ISO timestamp when the invitation expires (if sent)
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO timestamp when the user was created
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO timestamp when the user was last updated
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid user data
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Field-specific validation errors
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - User with this email already exists
+  
+  <Expandable title="Email Conflict">
+    <ResponseField name="error" type="string">
+      "EMAIL_ALREADY_EXISTS"
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      "A user with this email address already exists in the organization"
+    </ResponseField>
+    <ResponseField name="existingUserId" type="string">
+      ID of the existing user with this email
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="403" type="object">
+  Forbidden - Insufficient permissions to create users
+</ResponseField>
+
+<ResponseField name="422" type="object">
+  Unprocessable Entity - User limit exceeded
+  
+  <Expandable title="Limit Exceeded">
+    <ResponseField name="error" type="string">
+      "USER_LIMIT_EXCEEDED"
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      "Organization has reached maximum user limit"
+    </ResponseField>
+    <ResponseField name="currentCount" type="number">
+      Current number of users
+    </ResponseField>
+    <ResponseField name="maxUsers" type="number">
+      Maximum allowed users for current plan
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "https://api.tolstoy.com/v1/users" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "jane.smith@example.com",
+    "name": "Jane Smith",
+    "role": "member",
+    "profile": {
+      "department": "Marketing",
+      "title": "Marketing Manager",
+      "phone": "+1-555-0123",
+      "location": "New York, NY"
+    },
+    "sendInvite": true,
+    "permissions": {
+      "canCreateWorkflows": true,
+      "canManageTools": false,
+      "canViewLogs": true,
+      "canManageUsers": false
+    }
+  }'
+```
+
+```javascript JavaScript
+const newUser = await fetch('/api/v1/users', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    email: 'jane.smith@example.com',
+    name: 'Jane Smith',
+    role: 'member',
+    profile: {
+      department: 'Marketing',
+      title: 'Marketing Manager',
+      phone: '+1-555-0123',
+      location: 'New York, NY'
+    },
+    sendInvite: true,
+    permissions: {
+      canCreateWorkflows: true,
+      canManageTools: false,
+      canViewLogs: true,
+      canManageUsers: false
+    }
+  })
+});
+
+if (newUser.ok) {
+  const userData = await newUser.json();
+  console.log('User created:', userData.id);
+  
+  if (userData.invitationSent) {
+    console.log('Invitation sent to:', userData.email);
+  }
+} else {
+  const error = await newUser.json();
+  console.error('User creation failed:', error.message);
+}
+```
+
+```python Python
+import requests
+
+user_data = {
+    "email": "jane.smith@example.com",
+    "name": "Jane Smith",
+    "role": "member",
+    "profile": {
+        "department": "Marketing",
+        "title": "Marketing Manager",
+        "phone": "+1-555-0123",
+        "location": "New York, NY"
+    },
+    "sendInvite": True,
+    "permissions": {
+        "canCreateWorkflows": True,
+        "canManageTools": False,
+        "canViewLogs": True,
+        "canManageUsers": False
+    }
+}
+
+response = requests.post(
+    "https://api.tolstoy.com/v1/users",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json=user_data
+)
+
+if response.status_code == 201:
+    user = response.json()
+    print(f"User created: {user['id']}")
+    
+    if user['invitationSent']:
+        print(f"Invitation sent to: {user['email']}")
+else:
+    error = response.json()
+    print(f"User creation failed: {error['message']}")
+```
+
+</CodeGroup>
+
+## User Roles
+
+Each role has different permissions within the organization:
+
+### Owner
+- Full administrative access
+- Can manage all users and organization settings
+- Can delete the organization
+- Cannot be demoted by other users
+
+### Admin
+- Can manage users (except owners)
+- Can modify organization settings
+- Full access to workflows and tools
+- Can view all execution logs
+
+### Member
+- Can create and manage own workflows
+- Can use tools (with proper authentication)
+- Can view own execution logs
+- Limited organization settings access
+
+### Viewer
+- Read-only access to workflows
+- Can view execution logs
+- Cannot create or modify workflows
+- No administrative access
+
+## Permission System
+
+Fine-grained permissions can be set for each user:
+
+```json
+{
+  "permissions": {
+    "canCreateWorkflows": true,    // Create new workflows
+    "canManageTools": false,       // Add/configure tools
+    "canViewLogs": true,           // Access execution logs
+    "canManageUsers": false,       // Manage other users
+    "canEditOrganization": false,  // Modify org settings
+    "canViewBilling": false,       // Access billing info
+    "canManageAPIKeys": false,     // Create/manage API keys
+    "canManageWebhooks": false     // Configure webhooks
+  }
+}
+```
+
+## Invitation Process
+
+When `sendInvite` is true:
+1. User receives invitation email
+2. Email contains activation link
+3. User clicks link to complete setup
+4. User creates password and activates account
+5. User status changes from "pending" to "active"
+
+## Bulk User Creation
+
+For bulk user operations, create multiple users sequentially:
+
+```javascript
+const users = [
+  { email: 'user1@example.com', name: 'User One', role: 'member' },
+  { email: 'user2@example.com', name: 'User Two', role: 'member' },
+  { email: 'user3@example.com', name: 'User Three', role: 'viewer' }
+];
+
+const createdUsers = [];
+for (const userData of users) {
+  const response = await fetch('/api/v1/users', {
+    method: 'POST',
+    headers: { /* headers */ },
+    body: JSON.stringify(userData)
+  });
+  
+  if (response.ok) {
+    const user = await response.json();
+    createdUsers.push(user);
+  }
+}
+```
+
+## User Limits by Plan
+
+Different plans have different user limits:
+
+| Plan | Max Users |
+|------|-----------|
+| Free | 2 |
+| Starter | 5 |
+| Professional | 25 |
+| Enterprise | Unlimited |
+
+## Related Endpoints
+
+- [List Users](/api/endpoints/users/list-users) - Get all organization users
+- [Get User](/api/endpoints/users/get-current-user) - Retrieve user details
+- [Update User](/api/endpoints/users/update-user) - Modify user information
+- [Delete User](/api/endpoints/users/delete-user) - Remove user from organization

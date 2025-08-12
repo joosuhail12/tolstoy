@@ -1,0 +1,700 @@
+---
+title: "Python SDK Quickstart"
+description: "Build your first Tolstoy workflow using the Python SDK"
+---
+
+# Python SDK Quickstart
+
+This quickstart guide will walk you through creating your first Tolstoy workflow using the Python SDK. We'll build a simple notification system that sends alerts when new users sign up.
+
+## Prerequisites
+
+- Python 3.8 or higher installed
+- Tolstoy API key and Organization ID
+- Basic familiarity with async/await in Python
+
+## Step 1: Install the SDK
+
+First, install the Tolstoy Python SDK:
+
+```bash
+pip install tolstoy-sdk
+```
+
+## Step 2: Set Up Your Environment
+
+Create a new Python file and set up your environment variables:
+
+```bash
+# Create project directory
+mkdir tolstoy-quickstart
+cd tolstoy-quickstart
+
+# Create environment file
+touch .env
+```
+
+Add your credentials to the `.env` file:
+
+```bash
+# .env
+TOLSTOY_API_KEY=your-api-key-here
+TOLSTOY_ORGANIZATION_ID=your-org-id-here
+```
+
+## Step 3: Initialize the Client
+
+Create a new Python file `quickstart.py`:
+
+```python
+# quickstart.py
+import asyncio
+import os
+from tolstoy import TolstoyClient
+
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
+
+# Initialize the Tolstoy client
+client = TolstoyClient(
+    api_key=os.getenv("TOLSTOY_API_KEY"),
+    organization_id=os.getenv("TOLSTOY_ORGANIZATION_ID")
+)
+
+async def main():
+    print("🚀 Tolstoy Python SDK Quickstart")
+    
+    # Test connection
+    try:
+        user = await client.users.get_current_user()
+        print(f"✅ Connected as: {user.email}")
+    except Exception as e:
+        print(f"❌ Connection failed: {e}")
+        return
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+Install python-dotenv to load environment variables:
+
+```bash
+pip install python-dotenv
+```
+
+Test your connection:
+
+```bash
+python quickstart.py
+```
+
+## Step 4: Create a Tool
+
+Let's create a tool to connect to a Slack webhook for notifications:
+
+```python
+# Add this to your main() function after the connection test
+
+async def create_slack_tool():
+    """Create a Slack webhook tool for notifications"""
+    print("\n📡 Creating Slack webhook tool...")
+    
+    try:
+        tool = await client.tools.create(
+            name="Slack Notifications",
+            base_url="https://hooks.slack.com/services",
+            category="notification",
+            auth_type="none",  # Webhook URL includes authentication
+            description="Send notifications to Slack channel"
+        )
+        print(f"✅ Created tool: {tool.name} (ID: {tool.id})")
+        return tool
+    except Exception as e:
+        print(f"❌ Failed to create tool: {e}")
+        return None
+
+# Update your main function
+async def main():
+    print("🚀 Tolstoy Python SDK Quickstart")
+    
+    # Test connection
+    try:
+        user = await client.users.get_current_user()
+        print(f"✅ Connected as: {user.email}")
+    except Exception as e:
+        print(f"❌ Connection failed: {e}")
+        return
+    
+    # Create Slack tool
+    slack_tool = await create_slack_tool()
+    if not slack_tool:
+        return
+```
+
+## Step 5: Create an Action
+
+Now let's create an action that sends a Slack notification:
+
+```python
+async def create_slack_notification_action(tool_id):
+    """Create an action to send Slack notifications"""
+    print("\n⚡ Creating Slack notification action...")
+    
+    try:
+        action = await client.actions.create(
+            name="Send Slack Notification",
+            tool_id=tool_id,
+            method="POST",
+            endpoint="/YOUR_WORKSPACE/YOUR_CHANNEL/YOUR_WEBHOOK_TOKEN",
+            description="Send a notification message to Slack",
+            input_schema=[
+                {
+                    "name": "text",
+                    "type": "string",
+                    "required": True,
+                    "description": "The message text to send"
+                },
+                {
+                    "name": "username",
+                    "type": "string",
+                    "required": False,
+                    "description": "Bot username",
+                    "default": "Tolstoy Bot"
+                }
+            ],
+            request_template={
+                "body": {
+                    "text": "{{ input.text }}",
+                    "username": "{{ input.username }}",
+                    "icon_emoji": ":robot_face:"
+                }
+            }
+        )
+        print(f"✅ Created action: {action.name} (ID: {action.id})")
+        return action
+    except Exception as e:
+        print(f"❌ Failed to create action: {e}")
+        return None
+
+# Update your main function
+async def main():
+    print("🚀 Tolstoy Python SDK Quickstart")
+    
+    # Test connection
+    try:
+        user = await client.users.get_current_user()
+        print(f"✅ Connected as: {user.email}")
+    except Exception as e:
+        print(f"❌ Connection failed: {e}")
+        return
+    
+    # Create Slack tool
+    slack_tool = await create_slack_tool()
+    if not slack_tool:
+        return
+    
+    # Create notification action
+    notification_action = await create_slack_notification_action(slack_tool.id)
+    if not notification_action:
+        return
+```
+
+## Step 6: Create a Workflow
+
+Let's create a complete workflow that processes user signups:
+
+```python
+async def create_user_signup_flow(notification_action_id):
+    """Create a workflow to handle user signups"""
+    print("\n🔄 Creating user signup workflow...")
+    
+    try:
+        flow = await client.flows.create(
+            name="User Signup Notification Flow",
+            description="Process new user signups and send notifications",
+            trigger={
+                "type": "webhook",
+                "config": {
+                    "method": "POST",
+                    "path": "/webhooks/user-signup",
+                    "authentication": {
+                        "type": "api_key",
+                        "header": "X-API-Key"
+                    }
+                }
+            },
+            steps=[
+                {
+                    "id": "validate_input",
+                    "name": "Validate User Data",
+                    "type": "condition",
+                    "condition": {
+                        "and": [
+                            {"!=": [{"var": "trigger.email"}, None]},
+                            {"!=": [{"var": "trigger.name"}, None]},
+                            {"regex": [{"var": "trigger.email"}, "^[^@]+@[^@]+\\.[^@]+$"]}
+                        ]
+                    },
+                    "on_false": {
+                        "action": "terminate",
+                        "message": "Invalid user data provided"
+                    }
+                },
+                {
+                    "id": "send_notification",
+                    "name": "Send Slack Notification",
+                    "type": "action",
+                    "action_id": notification_action_id,
+                    "input": {
+                        "text": "🎉 New user signup: {{ trigger.name }} ({{ trigger.email }})",
+                        "username": "Signup Bot"
+                    },
+                    "dependencies": ["validate_input"]
+                },
+                {
+                    "id": "log_success",
+                    "name": "Log Successful Processing",
+                    "type": "transform",
+                    "output": {
+                        "message": "User signup processed successfully",
+                        "user_email": "{{ trigger.email }}",
+                        "user_name": "{{ trigger.name }}",
+                        "processed_at": "{{ now }}"
+                    },
+                    "dependencies": ["send_notification"]
+                }
+            ],
+            "settings": {
+                "timeout": 60,  # 1 minute timeout
+                "retry_policy": {
+                    "max_retries": 3,
+                    "backoff_multiplier": 2
+                },
+                "error_handling": {
+                    "on_failure": "log_and_continue"
+                }
+            }
+        )
+        print(f"✅ Created flow: {flow.name} (ID: {flow.id})")
+        return flow
+    except Exception as e:
+        print(f"❌ Failed to create flow: {e}")
+        return None
+
+# Update your main function
+async def main():
+    print("🚀 Tolstoy Python SDK Quickstart")
+    
+    # Test connection
+    try:
+        user = await client.users.get_current_user()
+        print(f"✅ Connected as: {user.email}")
+    except Exception as e:
+        print(f"❌ Connection failed: {e}")
+        return
+    
+    # Create Slack tool
+    slack_tool = await create_slack_tool()
+    if not slack_tool:
+        return
+    
+    # Create notification action
+    notification_action = await create_slack_notification_action(slack_tool.id)
+    if not notification_action:
+        return
+    
+    # Create user signup flow
+    signup_flow = await create_user_signup_flow(notification_action.id)
+    if not signup_flow:
+        return
+```
+
+## Step 7: Test the Workflow
+
+Let's test our workflow by executing it manually:
+
+```python
+async def test_workflow(flow_id):
+    """Test the workflow with sample data"""
+    print("\n🧪 Testing the workflow...")
+    
+    try:
+        # Execute the flow with test data
+        execution = await client.flows.execute(
+            flow_id=flow_id,
+            input={
+                "email": "john.doe@example.com",
+                "name": "John Doe",
+                "signup_source": "website"
+            }
+        )
+        
+        print(f"✅ Flow execution started (ID: {execution.id})")
+        
+        # Wait for completion
+        result = await client.executions.wait_for_completion(
+            execution_id=execution.id,
+            timeout=30  # Wait up to 30 seconds
+        )
+        
+        if result.status == "success":
+            print("✅ Workflow completed successfully!")
+            print(f"📊 Output: {result.output}")
+        else:
+            print(f"❌ Workflow failed: {result.error}")
+            
+        return result
+    except Exception as e:
+        print(f"❌ Failed to execute workflow: {e}")
+        return None
+
+# Complete main function
+async def main():
+    print("🚀 Tolstoy Python SDK Quickstart")
+    
+    # Test connection
+    try:
+        user = await client.users.get_current_user()
+        print(f"✅ Connected as: {user.email}")
+    except Exception as e:
+        print(f"❌ Connection failed: {e}")
+        return
+    
+    # Create Slack tool
+    slack_tool = await create_slack_tool()
+    if not slack_tool:
+        return
+    
+    # Create notification action
+    notification_action = await create_slack_notification_action(slack_tool.id)
+    if not notification_action:
+        return
+    
+    # Create user signup flow
+    signup_flow = await create_user_signup_flow(notification_action.id)
+    if not signup_flow:
+        return
+    
+    # Test the workflow
+    await test_workflow(signup_flow.id)
+    
+    print("\n🎉 Quickstart completed successfully!")
+    print(f"📝 Your workflow is ready at: https://app.tolstoy.com/flows/{signup_flow.id}")
+```
+
+## Step 8: Handle Webhook Triggers
+
+For a production setup, you can handle incoming webhooks using a web framework like FastAPI:
+
+```python
+# webhook_server.py
+from fastapi import FastAPI, HTTPException, Header
+import asyncio
+from tolstoy import TolstoyClient
+import os
+
+app = FastAPI()
+
+# Initialize Tolstoy client
+client = TolstoyClient(
+    api_key=os.getenv("TOLSTOY_API_KEY"),
+    organization_id=os.getenv("TOLSTOY_ORGANIZATION_ID")
+)
+
+@app.post("/webhooks/user-signup")
+async def handle_user_signup(
+    user_data: dict,
+    x_api_key: str = Header(None)
+):
+    # Validate API key
+    if x_api_key != os.getenv("WEBHOOK_API_KEY"):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    
+    try:
+        # Execute your flow
+        execution = await client.flows.execute(
+            flow_id="your-flow-id-here",
+            input=user_data
+        )
+        
+        return {
+            "message": "User signup processed",
+            "execution_id": execution.id
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Run with: uvicorn webhook_server:app --reload
+```
+
+Install FastAPI and run the server:
+
+```bash
+pip install fastapi uvicorn
+uvicorn webhook_server:app --reload
+```
+
+## Complete Example
+
+Here's the complete `quickstart.py` file:
+
+<details>
+<summary>Complete quickstart.py</summary>
+
+```python
+import asyncio
+import os
+from tolstoy import TolstoyClient
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Initialize the Tolstoy client
+client = TolstoyClient(
+    api_key=os.getenv("TOLSTOY_API_KEY"),
+    organization_id=os.getenv("TOLSTOY_ORGANIZATION_ID")
+)
+
+async def create_slack_tool():
+    """Create a Slack webhook tool for notifications"""
+    print("\n📡 Creating Slack webhook tool...")
+    
+    try:
+        tool = await client.tools.create(
+            name="Slack Notifications",
+            base_url="https://hooks.slack.com/services",
+            category="notification",
+            auth_type="none",
+            description="Send notifications to Slack channel"
+        )
+        print(f"✅ Created tool: {tool.name} (ID: {tool.id})")
+        return tool
+    except Exception as e:
+        print(f"❌ Failed to create tool: {e}")
+        return None
+
+async def create_slack_notification_action(tool_id):
+    """Create an action to send Slack notifications"""
+    print("\n⚡ Creating Slack notification action...")
+    
+    try:
+        action = await client.actions.create(
+            name="Send Slack Notification",
+            tool_id=tool_id,
+            method="POST",
+            endpoint="/YOUR_WORKSPACE/YOUR_CHANNEL/YOUR_WEBHOOK_TOKEN",
+            description="Send a notification message to Slack",
+            input_schema=[
+                {
+                    "name": "text",
+                    "type": "string",
+                    "required": True,
+                    "description": "The message text to send"
+                },
+                {
+                    "name": "username",
+                    "type": "string",
+                    "required": False,
+                    "description": "Bot username",
+                    "default": "Tolstoy Bot"
+                }
+            ],
+            request_template={
+                "body": {
+                    "text": "{{ input.text }}",
+                    "username": "{{ input.username }}",
+                    "icon_emoji": ":robot_face:"
+                }
+            }
+        )
+        print(f"✅ Created action: {action.name} (ID: {action.id})")
+        return action
+    except Exception as e:
+        print(f"❌ Failed to create action: {e}")
+        return None
+
+async def create_user_signup_flow(notification_action_id):
+    """Create a workflow to handle user signups"""
+    print("\n🔄 Creating user signup workflow...")
+    
+    try:
+        flow = await client.flows.create(
+            name="User Signup Notification Flow",
+            description="Process new user signups and send notifications",
+            trigger={
+                "type": "webhook",
+                "config": {
+                    "method": "POST",
+                    "path": "/webhooks/user-signup",
+                    "authentication": {
+                        "type": "api_key",
+                        "header": "X-API-Key"
+                    }
+                }
+            },
+            steps=[
+                {
+                    "id": "validate_input",
+                    "name": "Validate User Data",
+                    "type": "condition",
+                    "condition": {
+                        "and": [
+                            {"!=": [{"var": "trigger.email"}, None]},
+                            {"!=": [{"var": "trigger.name"}, None]},
+                            {"regex": [{"var": "trigger.email"}, "^[^@]+@[^@]+\\.[^@]+$"]}
+                        ]
+                    },
+                    "on_false": {
+                        "action": "terminate",
+                        "message": "Invalid user data provided"
+                    }
+                },
+                {
+                    "id": "send_notification",
+                    "name": "Send Slack Notification",
+                    "type": "action",
+                    "action_id": notification_action_id,
+                    "input": {
+                        "text": "🎉 New user signup: {{ trigger.name }} ({{ trigger.email }})",
+                        "username": "Signup Bot"
+                    },
+                    "dependencies": ["validate_input"]
+                },
+                {
+                    "id": "log_success",
+                    "name": "Log Successful Processing",
+                    "type": "transform",
+                    "output": {
+                        "message": "User signup processed successfully",
+                        "user_email": "{{ trigger.email }}",
+                        "user_name": "{{ trigger.name }}",
+                        "processed_at": "{{ now }}"
+                    },
+                    "dependencies": ["send_notification"]
+                }
+            ],
+            "settings": {
+                "timeout": 60,
+                "retry_policy": {
+                    "max_retries": 3,
+                    "backoff_multiplier": 2
+                },
+                "error_handling": {
+                    "on_failure": "log_and_continue"
+                }
+            }
+        )
+        print(f"✅ Created flow: {flow.name} (ID: {flow.id})")
+        return flow
+    except Exception as e:
+        print(f"❌ Failed to create flow: {e}")
+        return None
+
+async def test_workflow(flow_id):
+    """Test the workflow with sample data"""
+    print("\n🧪 Testing the workflow...")
+    
+    try:
+        execution = await client.flows.execute(
+            flow_id=flow_id,
+            input={
+                "email": "john.doe@example.com",
+                "name": "John Doe",
+                "signup_source": "website"
+            }
+        )
+        
+        print(f"✅ Flow execution started (ID: {execution.id})")
+        
+        result = await client.executions.wait_for_completion(
+            execution_id=execution.id,
+            timeout=30
+        )
+        
+        if result.status == "success":
+            print("✅ Workflow completed successfully!")
+            print(f"📊 Output: {result.output}")
+        else:
+            print(f"❌ Workflow failed: {result.error}")
+            
+        return result
+    except Exception as e:
+        print(f"❌ Failed to execute workflow: {e}")
+        return None
+
+async def main():
+    print("🚀 Tolstoy Python SDK Quickstart")
+    
+    # Test connection
+    try:
+        user = await client.users.get_current_user()
+        print(f"✅ Connected as: {user.email}")
+    except Exception as e:
+        print(f"❌ Connection failed: {e}")
+        return
+    
+    # Create Slack tool
+    slack_tool = await create_slack_tool()
+    if not slack_tool:
+        return
+    
+    # Create notification action
+    notification_action = await create_slack_notification_action(slack_tool.id)
+    if not notification_action:
+        return
+    
+    # Create user signup flow
+    signup_flow = await create_user_signup_flow(notification_action.id)
+    if not signup_flow:
+        return
+    
+    # Test the workflow
+    await test_workflow(signup_flow.id)
+    
+    print("\n🎉 Quickstart completed successfully!")
+    print(f"📝 Your workflow is ready at: https://app.tolstoy.com/flows/{signup_flow.id}")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+</details>
+
+## Next Steps
+
+Congratulations! You've built your first Tolstoy workflow using the Python SDK. Here's what you can explore next:
+
+<CardGroup cols={2}>
+  <Card title="Advanced Examples" icon="code" href="/sdk/python/examples">
+    Explore complex workflows and patterns
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/index">
+    Complete API documentation
+  </Card>
+  <Card title="Error Handling" icon="shield-alt" href="/public/product/troubleshooting/overview">
+    Learn about error handling and debugging
+  </Card>
+  <Card title="Production Deployment" icon="rocket" href="/public/product/optimization/scaling">
+    Scale your workflows for production
+  </Card>
+</CardGroup>
+
+## Common Issues
+
+### Slack Webhook Setup
+
+To use the Slack integration, you'll need to:
+1. Create a Slack app at https://api.slack.com/apps
+2. Enable incoming webhooks
+3. Add webhook to your workspace
+4. Replace `YOUR_WORKSPACE/YOUR_CHANNEL/YOUR_WEBHOOK_TOKEN` with your actual webhook URL path
+
+### Environment Variables
+
+Make sure your `.env` file is in the same directory as your Python script and contains valid credentials.
+
+### Async/Await
+
+Remember that all SDK methods are async and must be awaited. Use `asyncio.run()` for the main execution.

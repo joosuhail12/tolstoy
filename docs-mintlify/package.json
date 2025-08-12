@@ -1,0 +1,45 @@
+{
+  "name": "tolstoy-documentation",
+  "version": "1.0.0",
+  "description": "Comprehensive documentation for the Tolstoy workflow automation platform",
+  "private": true,
+  "scripts": {
+    "dev": "mint dev",
+    "build": "echo 'Mintlify builds automatically on deploy'",
+    "deploy": "./scripts/deploy-docs.sh",
+    "validate": "node scripts/validate-docs.js",
+    "generate:api": "node scripts/generate-api-docs.js",
+    "generate:all": "npm run generate:api",
+    "check:links": "mint broken-links",
+    "check:structure": "node scripts/validate-docs.js check-structure",
+    "precommit": "npm run validate",
+    "postinstall": "echo 'Run npm run dev to start development server'"
+  },
+  "dependencies": {
+    "mint": "^4.0.0"
+  },
+  "devDependencies": {
+    "js-yaml": "^4.1.0",
+    "glob": "^10.3.0",
+    "chalk": "^4.1.2"
+  },
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=7.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/joosuhail12/tolstoy.git",
+    "directory": "docs"
+  },
+  "keywords": [
+    "documentation",
+    "api",
+    "workflows",
+    "automation",
+    "mintlify"
+  ],
+  "author": "Tolstoy Team",
+  "license": "MIT",
+  "homepage": "https://docs.tolstoy.getpullse.com"
+}

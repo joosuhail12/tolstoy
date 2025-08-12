@@ -1,0 +1,239 @@
+---
+title: "Get Organization"
+api: "GET /organizations/{id}"
+description: "Retrieve detailed information about a specific organization"
+---
+
+## Overview
+
+The Get Organization endpoint returns comprehensive details about a specific organization, including member information, usage statistics, and configuration settings.
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the organization
+</ParamField>
+
+## Response
+
+<ResponseField name="id" type="string">
+  Unique identifier for the organization
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the organization
+</ResponseField>
+
+<ResponseField name="slug" type="string">
+  URL-friendly slug for the organization
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Description of the organization
+</ResponseField>
+
+<ResponseField name="logo" type="string">
+  URL to the organization's logo
+</ResponseField>
+
+<ResponseField name="website" type="string">
+  Organization's website URL
+</ResponseField>
+
+<ResponseField name="plan" type="string">
+  Current subscription plan: `free`, `starter`, `professional`, `enterprise`
+</ResponseField>
+
+<ResponseField name="billingEmail" type="string">
+  Email address for billing communications
+</ResponseField>
+
+<ResponseField name="members" type="array">
+  Array of organization members
+  
+  <Expandable title="Member Object">
+    <ResponseField name="userId" type="string">
+      User's unique identifier
+    </ResponseField>
+    
+    <ResponseField name="email" type="string">
+      User's email address
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      User's full name
+    </ResponseField>
+    
+    <ResponseField name="role" type="string">
+      User's role: `owner`, `admin`, `member`, `viewer`
+    </ResponseField>
+    
+    <ResponseField name="joinedAt" type="string">
+      ISO 8601 timestamp when user joined
+    </ResponseField>
+    
+    <ResponseField name="lastActiveAt" type="string">
+      ISO 8601 timestamp of last activity
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="usage" type="object">
+  Current usage statistics
+  
+  <Expandable title="Usage Object">
+    <ResponseField name="flows" type="number">
+      Total number of flows
+    </ResponseField>
+    
+    <ResponseField name="actions" type="number">
+      Total number of actions
+    </ResponseField>
+    
+    <ResponseField name="executions" type="object">
+      Execution statistics
+      
+      <Expandable title="Execution Stats">
+        <ResponseField name="total" type="number">
+          Total executions this month
+        </ResponseField>
+        
+        <ResponseField name="successful" type="number">
+          Successful executions
+        </ResponseField>
+        
+        <ResponseField name="failed" type="number">
+          Failed executions
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="storage" type="object">
+      Storage usage in MB
+      
+      <Expandable title="Storage Stats">
+        <ResponseField name="used" type="number">
+          Storage used in MB
+        </ResponseField>
+        
+        <ResponseField name="limit" type="number">
+          Storage limit in MB
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="apiCalls" type="object">
+      API usage statistics
+      
+      <Expandable title="API Stats">
+        <ResponseField name="current" type="number">
+          API calls this hour
+        </ResponseField>
+        
+        <ResponseField name="limit" type="number">
+          Hourly API call limit
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="settings" type="object">
+  Organization settings
+  
+  <Expandable title="Settings Object">
+    <ResponseField name="allowPublicFlows" type="boolean">
+      Whether public flows are allowed
+    </ResponseField>
+    
+    <ResponseField name="requireMFA" type="boolean">
+      Whether MFA is required for all members
+    </ResponseField>
+    
+    <ResponseField name="apiRateLimit" type="number">
+      API rate limit per hour
+    </ResponseField>
+    
+    <ResponseField name="webhookUrl" type="string">
+      Default webhook URL for notifications
+    </ResponseField>
+    
+    <ResponseField name="allowedDomains" type="array">
+      List of allowed email domains for members
+    </ResponseField>
+    
+    <ResponseField name="ipWhitelist" type="array">
+      List of whitelisted IP addresses
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO 8601 timestamp when the organization was created
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO 8601 timestamp when the organization was last updated
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "id": "org_abc123",
+  "name": "Acme Corporation",
+  "slug": "acme-corp",
+  "description": "Leading provider of automation solutions",
+  "logo": "https://cdn.example.com/logos/acme.png",
+  "website": "https://acme-corp.com",
+  "plan": "professional",
+  "billingEmail": "billing@acme-corp.com",
+  "members": [
+    {
+      "userId": "user_123",
+      "email": "john@acme-corp.com",
+      "name": "John Doe",
+      "role": "owner",
+      "joinedAt": "2023-01-15T00:00:00Z",
+      "lastActiveAt": "2024-01-15T10:30:00Z"
+    },
+    {
+      "userId": "user_456",
+      "email": "jane@acme-corp.com",
+      "name": "Jane Smith",
+      "role": "admin",
+      "joinedAt": "2023-02-01T00:00:00Z",
+      "lastActiveAt": "2024-01-15T09:15:00Z"
+    }
+  ],
+  "usage": {
+    "flows": 45,
+    "actions": 120,
+    "executions": {
+      "total": 5420,
+      "successful": 5150,
+      "failed": 270
+    },
+    "storage": {
+      "used": 245.7,
+      "limit": 1000
+    },
+    "apiCalls": {
+      "current": 342,
+      "limit": 10000
+    }
+  },
+  "settings": {
+    "allowPublicFlows": false,
+    "requireMFA": true,
+    "apiRateLimit": 10000,
+    "webhookUrl": "https://acme-corp.com/webhooks/tolstoy",
+    "allowedDomains": ["acme-corp.com", "acme.io"],
+    "ipWhitelist": ["192.168.1.0/24", "10.0.0.0/8"]
+  },
+  "createdAt": "2023-01-15T00:00:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z"
+}
+```
+</ResponseExample>
+
+<Snippet file="api-footer.mdx" />

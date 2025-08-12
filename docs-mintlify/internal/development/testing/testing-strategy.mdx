@@ -1,0 +1,1723 @@
+---
+title: "Testing Strategy & Framework"
+description: "Comprehensive testing strategy, frameworks, and best practices for the Tolstoy platform"
+---
+
+# Testing Strategy & Framework
+
+## Overview
+
+This document outlines the comprehensive testing strategy for the Tolstoy platform, including unit testing, integration testing, end-to-end testing, and performance testing approaches.
+
+## Testing Philosophy
+
+### 1. Testing Pyramid
+
+```mermaid
+graph TD
+    A[Manual Testing] --> B[E2E Tests]
+    B --> C[Integration Tests] 
+    C --> D[Unit Tests]
+    
+    style A fill:#ff6b6b
+    style B fill:#ffd93d
+    style C fill:#6bcf7f
+    style D fill:#4ecdc4
+    
+    E[Most Expensive<br/>Slowest<br/>Fewer Tests] --> A
+    F[Least Expensive<br/>Fastest<br/>Most Tests] --> D
+```
+
+**Test Distribution Guidelines:**
+- **Unit Tests (70%):** Fast, isolated, testing individual functions/components
+- **Integration Tests (20%):** Testing component interactions and external dependencies  
+- **E2E Tests (10%):** Full user journey testing through UI and APIs
+- **Manual Testing:** Exploratory testing, usability, edge cases
+
+### 2. Testing Principles
+
+<CardGroup cols={2}>
+  <Card title="Fast Feedback" icon="bolt">
+    Tests should run quickly to provide immediate feedback during development
+  </Card>
+  <Card title="Reliable" icon="shield-check">
+    Tests should be deterministic and not flaky - same input always produces same output
+  </Card>
+  <Card title="Maintainable" icon="wrench">
+    Tests should be easy to read, understand, and modify as the code evolves
+  </Card>
+  <Card title="Independent" icon="cube">
+    Tests should not depend on each other and can run in any order
+  </Card>
+</CardGroup>
+
+## Unit Testing
+
+### 1. Jest Configuration
+
+<Tabs>
+  <Tab title="Jest Setup">
+    ```javascript
+    // jest.config.js
+    module.exports = {
+      preset: 'ts-jest',
+      testEnvironment: 'node',
+      roots: ['<rootDir>/src'],
+      testMatch: [
+        '**/__tests__/**/*.test.ts',
+        '**/?(*.)+(spec|test).ts'
+      ],
+      collectCoverageFrom: [
+        'src/**/*.{ts,js}',
+        '!src/**/*.d.ts',
+        '!src/types/**/*',
+        '!src/migrations/**/*',
+        '!src/scripts/**/*'
+      ],
+      coverageDirectory: 'coverage',
+      coverageReporters: [
+        'text',
+        'lcov',
+        'html'
+      ],
+      coverageThreshold: {
+        global: {
+          branches: 80,
+          functions: 80,
+          lines: 80,
+          statements: 80
+        }
+      },
+      setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
+      testTimeout: 10000,
+      maxWorkers: '50%',
+      verbose: true
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Test Setup">
+    ```typescript
+    // src/test/setup.ts
+    import 'reflect-metadata';
+    import { jest } from '@jest/globals';
+    
+    // Mock external dependencies
+    jest.mock('../services/external-api', () => ({
+      ExternalApiService: jest.fn().mockImplementation(() => ({
+        makeRequest: jest.fn(),
+        healthCheck: jest.fn().mockResolvedValue({ status: 'ok' })
+      }))
+    }));
+    
+    // Database test setup
+    import { DatabaseConnection } from '../database/connection';
+    import { getTestDatabase } from './test-database';
+    
+    let testDb: DatabaseConnection;
+    
+    beforeAll(async () => {
+      testDb = await getTestDatabase();
+      await testDb.migrate();
+    });
+    
+    afterAll(async () => {
+      await testDb.close();
+    });
+    
+    // Clean database between tests
+    afterEach(async () => {
+      await testDb.truncateAllTables();
+    });
+    
+    // Global test utilities
+    global.testDb = testDb;
+    global.createTestUser = async (overrides = {}) => {
+      return await testDb.users.create({
+        id: 'test-user-id',
+        email: 'test@example.com',
+        name: 'Test User',
+        organizationId: 'test-org-id',
+        ...overrides
+      });
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Test Utilities">
+    ```typescript
+    // src/test/test-utils.ts
+    import { faker } from '@faker-js/faker';
+    
+    // Test data factories
+    export const TestDataFactory = {
+      user: (overrides: Partial<User> = {}): User => ({
+        id: faker.string.uuid(),
+        email: faker.internet.email(),
+        name: faker.person.fullName(),
+        organizationId: faker.string.uuid(),
+        role: 'member',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...overrides
+      }),
+      
+      workflow: (overrides: Partial<Workflow> = {}): Workflow => ({
+        id: faker.string.uuid(),
+        name: faker.company.name(),
+        description: faker.lorem.sentence(),
+        organizationId: faker.string.uuid(),
+        definition: {
+          steps: [
+            {
+              id: 'step1',
+              type: 'action',
+              config: { url: 'https://api.example.com' }
+            }
+          ]
+        },
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        ...overrides
+      }),
+      
+      execution: (overrides: Partial<Execution> = {}): Execution => ({
+        id: faker.string.uuid(),
+        workflowId: faker.string.uuid(),
+        organizationId: faker.string.uuid(),
+        status: 'pending',
+        input: { data: 'test' },
+        output: null,
+        error: null,
+        startedAt: new Date(),
+        completedAt: null,
+        createdAt: new Date(),
+        ...overrides
+      })
+    };
+    
+    // Mock implementations
+    export const createMockRepository = <T>() => ({
+      findById: jest.fn(),
+      findMany: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      count: jest.fn()
+    });
+    
+    export const createMockLogger = () => ({
+      info: jest.fn(),
+      warn: jest.fn(),
+      error: jest.fn(),
+      debug: jest.fn()
+    });
+    
+    // Test database helper
+    export class TestDatabase {
+      constructor(private connection: DatabaseConnection) {}
+      
+      async seed(data: { users?: User[], workflows?: Workflow[] }) {
+        if (data.users) {
+          await Promise.all(data.users.map(user => 
+            this.connection.users.create(user)
+          ));
+        }
+        
+        if (data.workflows) {
+          await Promise.all(data.workflows.map(workflow => 
+            this.connection.workflows.create(workflow)
+          ));
+        }
+      }
+      
+      async truncateAllTables() {
+        const tables = ['executions', 'workflows', 'users', 'organizations'];
+        await Promise.all(tables.map(table => 
+          this.connection.query(`TRUNCATE TABLE ${table} CASCADE`)
+        ));
+      }
+    }
+    ```
+  </Tab>
+</Tabs>
+
+### 2. Unit Test Patterns
+
+<Tabs>
+  <Tab title="Service Layer Testing">
+    ```typescript
+    // src/services/__tests__/workflow-service.test.ts
+    import { WorkflowService } from '../workflow-service';
+    import { WorkflowRepository } from '../../repositories/workflow-repository';
+    import { TestDataFactory, createMockRepository, createMockLogger } from '../../test/test-utils';
+    
+    describe('WorkflowService', () => {
+      let workflowService: WorkflowService;
+      let mockRepository: jest.Mocked<WorkflowRepository>;
+      let mockLogger: ReturnType<typeof createMockLogger>;
+      
+      beforeEach(() => {
+        mockRepository = createMockRepository<Workflow>() as jest.Mocked<WorkflowRepository>;
+        mockLogger = createMockLogger();
+        
+        workflowService = new WorkflowService(mockRepository, mockLogger);
+      });
+      
+      describe('createWorkflow', () => {
+        it('should create a workflow successfully', async () => {
+          // Arrange
+          const createData = {
+            name: 'Test Workflow',
+            description: 'Test Description',
+            organizationId: 'org-123',
+            definition: { steps: [] }
+          };
+          
+          const expectedWorkflow = TestDataFactory.workflow(createData);
+          mockRepository.create.mockResolvedValue(expectedWorkflow);
+          
+          // Act
+          const result = await workflowService.createWorkflow(createData);
+          
+          // Assert
+          expect(result).toEqual(expectedWorkflow);
+          expect(mockRepository.create).toHaveBeenCalledWith(createData);
+          expect(mockLogger.info).toHaveBeenCalledWith(
+            'Workflow created',
+            { workflowId: expectedWorkflow.id, organizationId: createData.organizationId }
+          );
+        });
+        
+        it('should throw ValidationError for invalid workflow name', async () => {
+          // Arrange
+          const createData = {
+            name: '', // Invalid empty name
+            organizationId: 'org-123',
+            definition: { steps: [] }
+          };
+          
+          // Act & Assert
+          await expect(workflowService.createWorkflow(createData))
+            .rejects.toThrow('Workflow name cannot be empty');
+          
+          expect(mockRepository.create).not.toHaveBeenCalled();
+        });
+        
+        it('should handle repository errors gracefully', async () => {
+          // Arrange
+          const createData = {
+            name: 'Test Workflow',
+            organizationId: 'org-123',
+            definition: { steps: [] }
+          };
+          
+          const repositoryError = new Error('Database connection failed');
+          mockRepository.create.mockRejectedValue(repositoryError);
+          
+          // Act & Assert
+          await expect(workflowService.createWorkflow(createData))
+            .rejects.toThrow('Failed to create workflow');
+          
+          expect(mockLogger.error).toHaveBeenCalledWith(
+            'Failed to create workflow',
+            { error: repositoryError, createData }
+          );
+        });
+      });
+      
+      describe('executeWorkflow', () => {
+        it('should execute workflow with valid input', async () => {
+          // Arrange
+          const workflowId = 'workflow-123';
+          const input = { data: 'test' };
+          const workflow = TestDataFactory.workflow({ id: workflowId });
+          
+          mockRepository.findById.mockResolvedValue(workflow);
+          
+          const mockExecutionEngine = {
+            execute: jest.fn().mockResolvedValue({
+              id: 'execution-123',
+              status: 'completed',
+              output: { result: 'success' }
+            })
+          };
+          
+          // Inject mock execution engine
+          (workflowService as any).executionEngine = mockExecutionEngine;
+          
+          // Act
+          const result = await workflowService.executeWorkflow(workflowId, input);
+          
+          // Assert
+          expect(result.status).toBe('completed');
+          expect(result.output).toEqual({ result: 'success' });
+          expect(mockExecutionEngine.execute).toHaveBeenCalledWith(workflow, input);
+        });
+      });
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Repository Testing">
+    ```typescript
+    // src/repositories/__tests__/workflow-repository.test.ts
+    import { WorkflowRepository } from '../workflow-repository';
+    import { TestDatabase, TestDataFactory } from '../../test/test-utils';
+    
+    describe('WorkflowRepository', () => {
+      let repository: WorkflowRepository;
+      let testDb: TestDatabase;
+      
+      beforeAll(async () => {
+        testDb = new TestDatabase(global.testDb);
+      });
+      
+      beforeEach(() => {
+        repository = new WorkflowRepository(global.testDb);
+      });
+      
+      describe('create', () => {
+        it('should create a workflow in the database', async () => {
+          // Arrange
+          const workflowData = {
+            name: 'Test Workflow',
+            organizationId: 'org-123',
+            definition: { steps: [{ id: 'step1', type: 'action' }] },
+            createdBy: 'user-123'
+          };
+          
+          // Act
+          const result = await repository.create(workflowData);
+          
+          // Assert
+          expect(result).toMatchObject({
+            name: workflowData.name,
+            organizationId: workflowData.organizationId,
+            definition: workflowData.definition,
+            createdBy: workflowData.createdBy
+          });
+          expect(result.id).toBeDefined();
+          expect(result.createdAt).toBeInstanceOf(Date);
+          expect(result.updatedAt).toBeInstanceOf(Date);
+          
+          // Verify in database
+          const dbWorkflow = await global.testDb.workflows.findById(result.id);
+          expect(dbWorkflow).toBeTruthy();
+          expect(dbWorkflow.name).toBe(workflowData.name);
+        });
+        
+        it('should handle unique constraint violation', async () => {
+          // Arrange
+          const organizationId = 'org-123';
+          const workflowName = 'Unique Workflow';
+          
+          await repository.create({
+            name: workflowName,
+            organizationId,
+            definition: { steps: [] }
+          });
+          
+          // Act & Assert
+          await expect(repository.create({
+            name: workflowName,
+            organizationId,
+            definition: { steps: [] }
+          })).rejects.toThrow('Workflow with this name already exists');
+        });
+      });
+      
+      describe('findByOrganization', () => {
+        it('should return workflows for specific organization with pagination', async () => {
+          // Arrange
+          const organizationId = 'org-123';
+          const workflows = [
+            TestDataFactory.workflow({ organizationId, name: 'Workflow A' }),
+            TestDataFactory.workflow({ organizationId, name: 'Workflow B' }),
+            TestDataFactory.workflow({ organizationId: 'other-org', name: 'Other Workflow' })
+          ];
+          
+          await testDb.seed({ workflows });
+          
+          // Act
+          const result = await repository.findByOrganization(organizationId, {
+            page: 1,
+            limit: 10
+          });
+          
+          // Assert
+          expect(result.data).toHaveLength(2);
+          expect(result.data.every(w => w.organizationId === organizationId)).toBe(true);
+          expect(result.total).toBe(2);
+          expect(result.hasNext).toBe(false);
+        });
+        
+        it('should support search filtering', async () => {
+          // Arrange
+          const organizationId = 'org-123';
+          const workflows = [
+            TestDataFactory.workflow({ organizationId, name: 'User Onboarding' }),
+            TestDataFactory.workflow({ organizationId, name: 'Data Processing' }),
+            TestDataFactory.workflow({ organizationId, name: 'User Management' })
+          ];
+          
+          await testDb.seed({ workflows });
+          
+          // Act
+          const result = await repository.findByOrganization(organizationId, {
+            page: 1,
+            limit: 10,
+            search: 'user'
+          });
+          
+          // Assert
+          expect(result.data).toHaveLength(2);
+          expect(result.data.every(w => w.name.toLowerCase().includes('user'))).toBe(true);
+        });
+      });
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Controller Testing">
+    ```typescript
+    // src/controllers/__tests__/workflow-controller.test.ts
+    import request from 'supertest';
+    import { app } from '../../app';
+    import { WorkflowService } from '../../services/workflow-service';
+    import { TestDataFactory } from '../../test/test-utils';
+    
+    // Mock the service
+    jest.mock('../../services/workflow-service');
+    const MockWorkflowService = WorkflowService as jest.MockedClass<typeof WorkflowService>;
+    
+    describe('WorkflowController', () => {
+      let mockWorkflowService: jest.Mocked<WorkflowService>;
+      
+      beforeEach(() => {
+        mockWorkflowService = MockWorkflowService.prototype as jest.Mocked<WorkflowService>;
+        jest.clearAllMocks();
+      });
+      
+      describe('POST /api/v1/workflows', () => {
+        it('should create workflow with valid data', async () => {
+          // Arrange
+          const createData = {
+            name: 'Test Workflow',
+            description: 'Test Description',
+            definition: { steps: [] }
+          };
+          
+          const createdWorkflow = TestDataFactory.workflow(createData);
+          mockWorkflowService.createWorkflow.mockResolvedValue(createdWorkflow);
+          
+          // Act
+          const response = await request(app)
+            .post('/api/v1/workflows')
+            .set('Authorization', 'Bearer valid-token')
+            .send(createData)
+            .expect(201);
+          
+          // Assert
+          expect(response.body).toMatchObject({
+            success: true,
+            data: expect.objectContaining({
+              name: createData.name,
+              description: createData.description
+            })
+          });
+          
+          expect(mockWorkflowService.createWorkflow).toHaveBeenCalledWith(
+            expect.objectContaining(createData)
+          );
+        });
+        
+        it('should return 400 for invalid request data', async () => {
+          // Arrange
+          const invalidData = {
+            name: '', // Invalid empty name
+            definition: null // Invalid null definition
+          };
+          
+          // Act
+          const response = await request(app)
+            .post('/api/v1/workflows')
+            .set('Authorization', 'Bearer valid-token')
+            .send(invalidData)
+            .expect(400);
+          
+          // Assert
+          expect(response.body).toMatchObject({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'Request validation failed'
+            }
+          });
+          
+          expect(mockWorkflowService.createWorkflow).not.toHaveBeenCalled();
+        });
+        
+        it('should return 401 for unauthenticated request', async () => {
+          // Act
+          const response = await request(app)
+            .post('/api/v1/workflows')
+            .send({ name: 'Test', definition: { steps: [] } })
+            .expect(401);
+          
+          // Assert
+          expect(response.body).toMatchObject({
+            success: false,
+            error: {
+              code: 'UNAUTHORIZED',
+              message: 'Authentication required'
+            }
+          });
+        });
+        
+        it('should handle service errors gracefully', async () => {
+          // Arrange
+          const createData = {
+            name: 'Test Workflow',
+            definition: { steps: [] }
+          };
+          
+          mockWorkflowService.createWorkflow.mockRejectedValue(
+            new Error('Database connection failed')
+          );
+          
+          // Act
+          const response = await request(app)
+            .post('/api/v1/workflows')
+            .set('Authorization', 'Bearer valid-token')
+            .send(createData)
+            .expect(500);
+          
+          // Assert
+          expect(response.body).toMatchObject({
+            success: false,
+            error: {
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'An internal server error occurred'
+            }
+          });
+        });
+      });
+      
+      describe('GET /api/v1/workflows/:id/execute', () => {
+        it('should execute workflow with valid parameters', async () => {
+          // Arrange
+          const workflowId = 'workflow-123';
+          const input = { data: 'test' };
+          const execution = TestDataFactory.execution({
+            workflowId,
+            input,
+            status: 'completed'
+          });
+          
+          mockWorkflowService.executeWorkflow.mockResolvedValue(execution);
+          
+          // Act
+          const response = await request(app)
+            .post(`/api/v1/workflows/${workflowId}/execute`)
+            .set('Authorization', 'Bearer valid-token')
+            .send({ input })
+            .expect(200);
+          
+          // Assert
+          expect(response.body).toMatchObject({
+            success: true,
+            data: expect.objectContaining({
+              id: execution.id,
+              status: execution.status
+            })
+          });
+          
+          expect(mockWorkflowService.executeWorkflow).toHaveBeenCalledWith(
+            workflowId,
+            input
+          );
+        });
+      });
+    });
+    ```
+  </Tab>
+</Tabs>
+
+## Integration Testing
+
+### 1. API Integration Tests
+
+```typescript
+// src/test/integration/workflow-integration.test.ts
+import request from 'supertest';
+import { app } from '../../app';
+import { TestDatabase, TestDataFactory } from '../test-utils';
+
+describe('Workflow Integration Tests', () => {
+  let testDb: TestDatabase;
+  let authToken: string;
+  let organization: Organization;
+  let user: User;
+
+  beforeAll(async () => {
+    testDb = new TestDatabase(global.testDb);
+  });
+
+  beforeEach(async () => {
+    // Setup test data
+    organization = TestDataFactory.organization();
+    user = TestDataFactory.user({ organizationId: organization.id });
+    
+    await testDb.seed({
+      organizations: [organization],
+      users: [user]
+    });
+
+    // Generate auth token
+    authToken = generateTestToken(user);
+  });
+
+  describe('Workflow CRUD Operations', () => {
+    it('should create, read, update, and delete workflow', async () => {
+      // Create workflow
+      const createData = {
+        name: 'Integration Test Workflow',
+        description: 'Test Description',
+        definition: {
+          steps: [
+            {
+              id: 'step1',
+              type: 'http_request',
+              config: {
+                url: 'https://api.example.com/test',
+                method: 'GET'
+              }
+            }
+          ]
+        }
+      };
+
+      const createResponse = await request(app)
+        .post(`/api/v1/organizations/${organization.id}/workflows`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(createData)
+        .expect(201);
+
+      const workflowId = createResponse.body.data.id;
+      expect(createResponse.body.data).toMatchObject(createData);
+
+      // Read workflow
+      const getResponse = await request(app)
+        .get(`/api/v1/organizations/${organization.id}/workflows/${workflowId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(getResponse.body.data).toMatchObject(createData);
+
+      // Update workflow
+      const updateData = {
+        name: 'Updated Workflow Name',
+        description: 'Updated Description'
+      };
+
+      const updateResponse = await request(app)
+        .put(`/api/v1/organizations/${organization.id}/workflows/${workflowId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(updateData)
+        .expect(200);
+
+      expect(updateResponse.body.data.name).toBe(updateData.name);
+      expect(updateResponse.body.data.description).toBe(updateData.description);
+
+      // Delete workflow
+      await request(app)
+        .delete(`/api/v1/organizations/${organization.id}/workflows/${workflowId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(204);
+
+      // Verify deletion
+      await request(app)
+        .get(`/api/v1/organizations/${organization.id}/workflows/${workflowId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(404);
+    });
+  });
+
+  describe('Workflow Execution Integration', () => {
+    it('should execute workflow end-to-end', async () => {
+      // Setup external API mock
+      const mockServer = setupMockServer();
+      mockServer.get('/test', (req, res) => {
+        res.json({ message: 'Success', timestamp: new Date().toISOString() });
+      });
+
+      // Create workflow
+      const workflow = TestDataFactory.workflow({
+        organizationId: organization.id,
+        definition: {
+          steps: [
+            {
+              id: 'http_step',
+              type: 'http_request',
+              config: {
+                url: `${mockServer.url}/test`,
+                method: 'GET'
+              }
+            }
+          ]
+        }
+      });
+
+      await testDb.seed({ workflows: [workflow] });
+
+      // Execute workflow
+      const executeResponse = await request(app)
+        .post(`/api/v1/organizations/${organization.id}/workflows/${workflow.id}/execute`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({
+          input: { testData: 'integration test' }
+        })
+        .expect(200);
+
+      const executionId = executeResponse.body.data.id;
+
+      // Wait for execution to complete
+      await waitForExecutionCompletion(executionId);
+
+      // Verify execution result
+      const executionResponse = await request(app)
+        .get(`/api/v1/organizations/${organization.id}/executions/${executionId}`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .expect(200);
+
+      expect(executionResponse.body.data.status).toBe('completed');
+      expect(executionResponse.body.data.output).toMatchObject({
+        http_step: {
+          message: 'Success',
+          timestamp: expect.any(String)
+        }
+      });
+
+      mockServer.close();
+    });
+  });
+});
+
+// Helper functions
+function setupMockServer() {
+  const express = require('express');
+  const app = express();
+  app.use(express.json());
+  
+  const server = app.listen(0);
+  const port = server.address().port;
+  
+  return {
+    url: `http://localhost:${port}`,
+    get: app.get.bind(app),
+    post: app.post.bind(app),
+    close: () => server.close()
+  };
+}
+
+async function waitForExecutionCompletion(executionId: string): Promise<void> {
+  const maxAttempts = 30;
+  const delay = 1000;
+
+  for (let i = 0; i < maxAttempts; i++) {
+    const execution = await global.testDb.executions.findById(executionId);
+    if (execution && ['completed', 'failed'].includes(execution.status)) {
+      return;
+    }
+    await new Promise(resolve => setTimeout(resolve, delay));
+  }
+  
+  throw new Error(`Execution ${executionId} did not complete within timeout`);
+}
+```
+
+### 2. Database Integration Tests
+
+```typescript
+// src/test/integration/database-integration.test.ts
+import { DatabaseConnection } from '../../database/connection';
+import { TestDataFactory } from '../test-utils';
+
+describe('Database Integration Tests', () => {
+  let db: DatabaseConnection;
+
+  beforeAll(async () => {
+    db = global.testDb;
+  });
+
+  describe('Transaction Handling', () => {
+    it('should rollback transaction on error', async () => {
+      const organization = TestDataFactory.organization();
+      
+      await expect(db.transaction(async (trx) => {
+        // Create organization
+        await trx.organizations.create(organization);
+        
+        // Verify it was created
+        const created = await trx.organizations.findById(organization.id);
+        expect(created).toBeTruthy();
+        
+        // Force an error to trigger rollback
+        throw new Error('Test error');
+      })).rejects.toThrow('Test error');
+
+      // Verify rollback - organization should not exist
+      const afterRollback = await db.organizations.findById(organization.id);
+      expect(afterRollback).toBeNull();
+    });
+
+    it('should commit transaction on success', async () => {
+      const organization = TestDataFactory.organization();
+      const user = TestDataFactory.user({ organizationId: organization.id });
+
+      await db.transaction(async (trx) => {
+        await trx.organizations.create(organization);
+        await trx.users.create(user);
+      });
+
+      // Verify both records were committed
+      const savedOrg = await db.organizations.findById(organization.id);
+      const savedUser = await db.users.findById(user.id);
+      
+      expect(savedOrg).toBeTruthy();
+      expect(savedUser).toBeTruthy();
+      expect(savedUser.organizationId).toBe(organization.id);
+    });
+  });
+
+  describe('Connection Pool Behavior', () => {
+    it('should handle concurrent operations', async () => {
+      const organizations = Array.from({ length: 10 }, () => 
+        TestDataFactory.organization()
+      );
+
+      // Execute concurrent operations
+      const promises = organizations.map(org => 
+        db.organizations.create(org)
+      );
+
+      const results = await Promise.all(promises);
+
+      // Verify all organizations were created
+      expect(results).toHaveLength(10);
+      
+      for (const result of results) {
+        expect(result.id).toBeDefined();
+        
+        const saved = await db.organizations.findById(result.id);
+        expect(saved).toBeTruthy();
+      }
+    });
+  });
+
+  describe('Query Performance', () => {
+    it('should execute queries within performance thresholds', async () => {
+      // Create test data
+      const organizations = Array.from({ length: 100 }, () =>
+        TestDataFactory.organization()
+      );
+      
+      await Promise.all(organizations.map(org => 
+        db.organizations.create(org)
+      ));
+
+      // Test query performance
+      const startTime = Date.now();
+      
+      const results = await db.organizations.findMany({
+        limit: 50,
+        orderBy: { createdAt: 'desc' }
+      });
+      
+      const queryTime = Date.now() - startTime;
+
+      expect(results).toHaveLength(50);
+      expect(queryTime).toBeLessThan(100); // Should complete in < 100ms
+    });
+  });
+});
+```
+
+## End-to-End Testing
+
+### 1. Playwright E2E Tests
+
+<Tabs>
+  <Tab title="E2E Test Setup">
+    ```typescript
+    // playwright.config.ts
+    import { defineConfig, devices } from '@playwright/test';
+
+    export default defineConfig({
+      testDir: './e2e',
+      fullyParallel: true,
+      forbidOnly: !!process.env.CI,
+      retries: process.env.CI ? 2 : 0,
+      workers: process.env.CI ? 1 : undefined,
+      reporter: [
+        ['html'],
+        ['json', { outputFile: 'test-results/results.json' }],
+        ['junit', { outputFile: 'test-results/results.xml' }]
+      ],
+      use: {
+        baseURL: process.env.E2E_BASE_URL || 'http://localhost:3000',
+        trace: 'on-first-retry',
+        screenshot: 'only-on-failure',
+        video: 'retain-on-failure'
+      },
+      projects: [
+        {
+          name: 'chromium',
+          use: { ...devices['Desktop Chrome'] }
+        },
+        {
+          name: 'firefox', 
+          use: { ...devices['Desktop Firefox'] }
+        },
+        {
+          name: 'webkit',
+          use: { ...devices['Desktop Safari'] }
+        }
+      ],
+      webServer: {
+        command: 'npm run dev',
+        port: 3000,
+        reuseExistingServer: !process.env.CI
+      }
+    });
+    ```
+  </Tab>
+  
+  <Tab title="Page Object Model">
+    ```typescript
+    // e2e/pages/workflow-page.ts
+    import { Page, Locator, expect } from '@playwright/test';
+
+    export class WorkflowPage {
+      readonly page: Page;
+      readonly createButton: Locator;
+      readonly workflowNameInput: Locator;
+      readonly workflowDescriptionInput: Locator;
+      readonly saveButton: Locator;
+      readonly workflowList: Locator;
+      readonly executeButton: Locator;
+      readonly executionStatus: Locator;
+
+      constructor(page: Page) {
+        this.page = page;
+        this.createButton = page.getByTestId('create-workflow-button');
+        this.workflowNameInput = page.getByTestId('workflow-name-input');
+        this.workflowDescriptionInput = page.getByTestId('workflow-description-input');
+        this.saveButton = page.getByTestId('save-workflow-button');
+        this.workflowList = page.getByTestId('workflow-list');
+        this.executeButton = page.getByTestId('execute-workflow-button');
+        this.executionStatus = page.getByTestId('execution-status');
+      }
+
+      async goto() {
+        await this.page.goto('/workflows');
+        await expect(this.page).toHaveTitle(/Workflows/);
+      }
+
+      async createWorkflow(name: string, description?: string) {
+        await this.createButton.click();
+        await this.workflowNameInput.fill(name);
+        
+        if (description) {
+          await this.workflowDescriptionInput.fill(description);
+        }
+
+        // Add a simple step
+        await this.page.getByTestId('add-step-button').click();
+        await this.page.getByTestId('step-type-select').selectOption('http_request');
+        await this.page.getByTestId('step-url-input').fill('https://httpbin.org/get');
+        
+        await this.saveButton.click();
+        
+        // Wait for success message
+        await expect(this.page.getByText('Workflow created successfully')).toBeVisible();
+      }
+
+      async executeWorkflow(workflowName: string) {
+        // Find workflow in list and click execute
+        const workflowRow = this.workflowList.filter({ hasText: workflowName });
+        await workflowRow.getByTestId('execute-button').click();
+        
+        // Confirm execution
+        await this.page.getByTestId('confirm-execute-button').click();
+        
+        // Wait for execution to start
+        await expect(this.executionStatus).toHaveText('Running');
+      }
+
+      async waitForExecutionCompletion() {
+        // Wait for execution to complete (max 30 seconds)
+        await expect(this.executionStatus).toHaveText('Completed', { timeout: 30000 });
+      }
+
+      async getExecutionResult() {
+        await this.page.getByTestId('execution-details-button').click();
+        const result = await this.page.getByTestId('execution-output').textContent();
+        return JSON.parse(result || '{}');
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="E2E Test Cases">
+    ```typescript
+    // e2e/workflow-management.spec.ts
+    import { test, expect } from '@playwright/test';
+    import { LoginPage } from './pages/login-page';
+    import { WorkflowPage } from './pages/workflow-page';
+
+    test.describe('Workflow Management', () => {
+      let loginPage: LoginPage;
+      let workflowPage: WorkflowPage;
+
+      test.beforeEach(async ({ page }) => {
+        loginPage = new LoginPage(page);
+        workflowPage = new WorkflowPage(page);
+        
+        // Login before each test
+        await loginPage.goto();
+        await loginPage.login('test@example.com', 'password123');
+        await expect(page).toHaveURL('/dashboard');
+      });
+
+      test('should create and execute a workflow', async ({ page }) => {
+        // Navigate to workflows page
+        await workflowPage.goto();
+
+        // Create a new workflow
+        const workflowName = `Test Workflow ${Date.now()}`;
+        await workflowPage.createWorkflow(workflowName, 'E2E Test Workflow');
+
+        // Verify workflow appears in list
+        await expect(workflowPage.workflowList).toContainText(workflowName);
+
+        // Execute the workflow
+        await workflowPage.executeWorkflow(workflowName);
+        await workflowPage.waitForExecutionCompletion();
+
+        // Verify execution result
+        const result = await workflowPage.getExecutionResult();
+        expect(result).toHaveProperty('url', 'https://httpbin.org/get');
+        expect(result).toHaveProperty('headers');
+      });
+
+      test('should handle workflow validation errors', async ({ page }) => {
+        await workflowPage.goto();
+        await workflowPage.createButton.click();
+        
+        // Try to save without name
+        await workflowPage.saveButton.click();
+        
+        // Should show validation error
+        await expect(page.getByText('Workflow name is required')).toBeVisible();
+        
+        // Form should not be submitted
+        await expect(page).toHaveURL('/workflows/create');
+      });
+
+      test('should support workflow search and filtering', async ({ page }) => {
+        await workflowPage.goto();
+
+        // Create multiple workflows for testing
+        const workflows = [
+          'Email Notification Workflow',
+          'Data Processing Workflow', 
+          'User Onboarding Workflow'
+        ];
+
+        for (const name of workflows) {
+          await workflowPage.createWorkflow(name);
+          await page.goBack();
+        }
+
+        // Test search functionality
+        const searchInput = page.getByTestId('workflow-search-input');
+        await searchInput.fill('Email');
+        
+        await expect(workflowPage.workflowList).toContainText('Email Notification Workflow');
+        await expect(workflowPage.workflowList).not.toContainText('Data Processing Workflow');
+
+        // Clear search
+        await searchInput.clear();
+        
+        // All workflows should be visible again
+        for (const name of workflows) {
+          await expect(workflowPage.workflowList).toContainText(name);
+        }
+      });
+    });
+
+    test.describe('Workflow Execution Edge Cases', () => {
+      test('should handle external API failures gracefully', async ({ page }) => {
+        const workflowPage = new WorkflowPage(page);
+        
+        // Login
+        const loginPage = new LoginPage(page);
+        await loginPage.goto();
+        await loginPage.login('test@example.com', 'password123');
+
+        await workflowPage.goto();
+
+        // Create workflow with failing API
+        await workflowPage.createButton.click();
+        await workflowPage.workflowNameInput.fill('Failing API Workflow');
+        
+        await page.getByTestId('add-step-button').click();
+        await page.getByTestId('step-type-select').selectOption('http_request');
+        await page.getByTestId('step-url-input').fill('https://httpbin.org/status/500');
+        
+        await workflowPage.saveButton.click();
+
+        // Execute workflow
+        await workflowPage.executeWorkflow('Failing API Workflow');
+        
+        // Wait for execution to complete with error
+        await expect(workflowPage.executionStatus).toHaveText('Failed', { timeout: 30000 });
+        
+        // Verify error details are shown
+        await page.getByTestId('execution-details-button').click();
+        await expect(page.getByText('HTTP 500')).toBeVisible();
+      });
+
+      test('should handle network timeouts', async ({ page }) => {
+        // Mock slow network conditions
+        await page.route('**/*', route => {
+          setTimeout(() => route.continue(), 1000);
+        });
+
+        const workflowPage = new WorkflowPage(page);
+        const loginPage = new LoginPage(page);
+        
+        await loginPage.goto();
+        await loginPage.login('test@example.com', 'password123');
+        
+        // Test should still work with network delays
+        await workflowPage.goto();
+        await expect(workflowPage.createButton).toBeVisible({ timeout: 10000 });
+      });
+    });
+    ```
+  </Tab>
+</Tabs>
+
+### 2. API E2E Tests
+
+```typescript
+// e2e/api/workflow-api.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Workflow API E2E Tests', () => {
+  let apiContext: any;
+  let authToken: string;
+
+  test.beforeAll(async ({ playwright }) => {
+    // Create API context
+    apiContext = await playwright.request.newContext({
+      baseURL: process.env.API_BASE_URL || 'http://localhost:3001'
+    });
+
+    // Login and get auth token
+    const loginResponse = await apiContext.post('/auth/login', {
+      data: {
+        email: 'test@example.com',
+        password: 'password123'
+      }
+    });
+
+    const loginData = await loginResponse.json();
+    authToken = loginData.data.token;
+  });
+
+  test.afterAll(async () => {
+    await apiContext.dispose();
+  });
+
+  test('should handle complete workflow lifecycle via API', async () => {
+    // Create workflow
+    const createResponse = await apiContext.post('/api/v1/workflows', {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      },
+      data: {
+        name: 'API E2E Test Workflow',
+        description: 'Created via E2E API test',
+        definition: {
+          steps: [
+            {
+              id: 'test_step',
+              type: 'http_request',
+              config: {
+                url: 'https://httpbin.org/json',
+                method: 'GET'
+              }
+            }
+          ]
+        }
+      }
+    });
+
+    expect(createResponse.ok()).toBeTruthy();
+    const workflow = await createResponse.json();
+    const workflowId = workflow.data.id;
+
+    // Execute workflow
+    const executeResponse = await apiContext.post(`/api/v1/workflows/${workflowId}/execute`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      },
+      data: {
+        input: { test: 'data' }
+      }
+    });
+
+    expect(executeResponse.ok()).toBeTruthy();
+    const execution = await executeResponse.json();
+    const executionId = execution.data.id;
+
+    // Poll execution status
+    let executionComplete = false;
+    let attempts = 0;
+    const maxAttempts = 30;
+
+    while (!executionComplete && attempts < maxAttempts) {
+      const statusResponse = await apiContext.get(`/api/v1/executions/${executionId}`, {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+
+      const status = await statusResponse.json();
+      
+      if (status.data.status === 'completed') {
+        executionComplete = true;
+        expect(status.data.output).toHaveProperty('test_step');
+      } else if (status.data.status === 'failed') {
+        throw new Error(`Execution failed: ${JSON.stringify(status.data.error)}`);
+      }
+
+      attempts++;
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    }
+
+    expect(executionComplete).toBeTruthy();
+
+    // Clean up - delete workflow
+    const deleteResponse = await apiContext.delete(`/api/v1/workflows/${workflowId}`, {
+      headers: {
+        'Authorization': `Bearer ${authToken}`
+      }
+    });
+
+    expect(deleteResponse.status()).toBe(204);
+  });
+});
+```
+
+## Performance Testing
+
+### 1. Load Testing with Artillery
+
+```yaml
+# artillery-config.yml
+config:
+  target: 'https://api.tolstoy.dev'
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: 'Warm up'
+    - duration: 300
+      arrivalRate: 10
+      rampTo: 50
+      name: 'Ramp up load'
+    - duration: 600
+      arrivalRate: 50
+      name: 'Sustained load'
+  defaults:
+    headers:
+      Authorization: 'Bearer {{ $processEnvironment.AUTH_TOKEN }}'
+      Content-Type: 'application/json'
+
+scenarios:
+  - name: 'Workflow CRUD Operations'
+    weight: 70
+    flow:
+      - post:
+          url: '/api/v1/workflows'
+          json:
+            name: 'Load Test Workflow {{ $randomString() }}'
+            definition:
+              steps:
+                - id: 'step1'
+                  type: 'delay'
+                  config:
+                    duration: 100
+          capture:
+            - json: '$.data.id'
+              as: 'workflowId'
+      
+      - get:
+          url: '/api/v1/workflows/{{ workflowId }}'
+      
+      - put:
+          url: '/api/v1/workflows/{{ workflowId }}'
+          json:
+            name: 'Updated Load Test Workflow {{ $randomString() }}'
+      
+      - delete:
+          url: '/api/v1/workflows/{{ workflowId }}'
+
+  - name: 'Workflow Execution'
+    weight: 30
+    flow:
+      - post:
+          url: '/api/v1/workflows/{{ $processEnvironment.TEST_WORKFLOW_ID }}/execute'
+          json:
+            input:
+              loadTest: true
+              timestamp: '{{ $timestamp }}'
+          capture:
+            - json: '$.data.id'
+              as: 'executionId'
+      
+      - loop:
+          - get:
+              url: '/api/v1/executions/{{ executionId }}'
+              capture:
+                - json: '$.data.status'
+                  as: 'status'
+        while: '{{ status !== "completed" && status !== "failed" }}'
+        count: 30
+        delay: 1000
+
+# Performance expectations
+expect:
+  - statusCode: 200
+  - contentType: json
+  - responseTime: 500  # 95th percentile should be under 500ms
+```
+
+### 2. Performance Test Automation
+
+```typescript
+// src/test/performance/api-performance.test.ts
+import { performance } from 'perf_hooks';
+import request from 'supertest';
+import { app } from '../../app';
+
+describe('API Performance Tests', () => {
+  const performanceThresholds = {
+    p50: 100,   // 50th percentile < 100ms
+    p95: 500,   // 95th percentile < 500ms  
+    p99: 1000   // 99th percentile < 1000ms
+  };
+
+  async function measureEndpointPerformance(
+    endpoint: string, 
+    method: 'get' | 'post' | 'put' | 'delete' = 'get',
+    iterations: number = 100
+  ) {
+    const responseTimes: number[] = [];
+
+    for (let i = 0; i < iterations; i++) {
+      const start = performance.now();
+      
+      let response;
+      switch (method) {
+        case 'get':
+          response = await request(app).get(endpoint);
+          break;
+        case 'post':
+          response = await request(app).post(endpoint).send({});
+          break;
+        default:
+          throw new Error(`Unsupported method: ${method}`);
+      }
+
+      const end = performance.now();
+      responseTimes.push(end - start);
+
+      expect(response.status).toBeLessThan(500); // No server errors
+    }
+
+    // Calculate percentiles
+    responseTimes.sort((a, b) => a - b);
+    
+    const p50 = responseTimes[Math.floor(iterations * 0.5)];
+    const p95 = responseTimes[Math.floor(iterations * 0.95)];
+    const p99 = responseTimes[Math.floor(iterations * 0.99)];
+
+    return { p50, p95, p99, responseTimes };
+  }
+
+  test('GET /api/v1/workflows should meet performance requirements', async () => {
+    const metrics = await measureEndpointPerformance('/api/v1/workflows', 'get', 100);
+    
+    expect(metrics.p50).toBeLessThan(performanceThresholds.p50);
+    expect(metrics.p95).toBeLessThan(performanceThresholds.p95);
+    expect(metrics.p99).toBeLessThan(performanceThresholds.p99);
+  });
+
+  test('POST /api/v1/workflows should handle concurrent requests', async () => {
+    const concurrency = 10;
+    const requestsPerWorker = 10;
+    
+    const workers = Array.from({ length: concurrency }, async (_, i) => {
+      const responseTimes: number[] = [];
+      
+      for (let j = 0; j < requestsPerWorker; j++) {
+        const start = performance.now();
+        
+        const response = await request(app)
+          .post('/api/v1/workflows')
+          .send({
+            name: `Concurrent Test Workflow ${i}-${j}`,
+            definition: { steps: [] }
+          });
+
+        const end = performance.now();
+        responseTimes.push(end - start);
+
+        expect(response.status).toBe(201);
+      }
+
+      return responseTimes;
+    });
+
+    const results = await Promise.all(workers);
+    const allResponseTimes = results.flat().sort((a, b) => a - b);
+    
+    const p95 = allResponseTimes[Math.floor(allResponseTimes.length * 0.95)];
+    expect(p95).toBeLessThan(performanceThresholds.p95);
+  });
+
+  test('Database queries should be optimized', async () => {
+    // Test with larger dataset
+    const testData = Array.from({ length: 1000 }, (_, i) => ({
+      name: `Performance Test Workflow ${i}`,
+      definition: { steps: [] }
+    }));
+
+    // Create test data
+    await Promise.all(testData.slice(0, 100).map(data =>
+      request(app).post('/api/v1/workflows').send(data)
+    ));
+
+    // Test pagination performance
+    const start = performance.now();
+    const response = await request(app)
+      .get('/api/v1/workflows?page=1&limit=20&search=Performance');
+    const end = performance.now();
+
+    expect(response.status).toBe(200);
+    expect(end - start).toBeLessThan(100); // Should be very fast with proper indexing
+  });
+});
+```
+
+## Test Automation & CI/CD
+
+### 1. GitHub Actions Workflow
+
+```yaml
+# .github/workflows/test.yml
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+env:
+  NODE_VERSION: '18'
+  DATABASE_URL: postgresql://test:test@localhost:5432/tolstoy_test
+  REDIS_URL: redis://localhost:6379
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_USER: test
+          POSTGRES_DB: tolstoy_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:6
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run database migrations
+        run: npm run migrate:test
+        
+      - name: Run unit tests
+        run: npm test -- --coverage --watchAll=false
+        
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          fail_ci_if_error: true
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: test
+          POSTGRES_USER: test
+          POSTGRES_DB: tolstoy_test
+        ports:
+          - 5432:5432
+          
+      redis:
+        image: redis:6
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run integration tests
+        run: npm run test:integration
+        
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: integration-test-results
+          path: test-results/
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Install Playwright
+        run: npx playwright install --with-deps
+        
+      - name: Start application
+        run: |
+          npm run build
+          npm run start &
+          npx wait-on http://localhost:3000
+          
+      - name: Run E2E tests
+        run: npx playwright test
+        
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: playwright-report
+          path: playwright-report/
+
+  performance-tests:
+    runs-on: ubuntu-latest
+    needs: e2e-tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          
+      - name: Install Artillery
+        run: npm install -g artillery
+        
+      - name: Run performance tests
+        run: |
+          npm run start &
+          npx wait-on http://localhost:3000
+          artillery run artillery-config.yml --output performance-results.json
+          
+      - name: Generate performance report
+        run: artillery report performance-results.json
+        
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: |
+            performance-results.json
+            performance-results.html
+
+  quality-gate:
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, e2e-tests]
+    
+    steps:
+      - name: Quality Gate Check
+        run: echo "All tests passed successfully!"
+```
+
+---
+
+<Note>
+This testing strategy provides comprehensive coverage across all layers of the application. Regular review and updating of test cases ensures that the testing remains effective as the application evolves.
+</Note>

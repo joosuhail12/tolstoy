@@ -1,0 +1,766 @@
+---
+title: "Go SDK Installation"
+description: "Installation and setup guide for the Tolstoy Go SDK"
+---
+
+# Installing the Go SDK
+
+The Tolstoy Go SDK is compatible with Go 1.19+ and follows standard Go module conventions.
+
+## System Requirements
+
+- **Go**: 1.19 or higher
+- **Operating System**: Windows, macOS, Linux
+- **Architecture**: amd64, arm64
+
+## Installation
+
+### Using Go Modules (Recommended)
+
+Initialize a new Go module and add the Tolstoy SDK:
+
+```bash
+# Create new project
+mkdir tolstoy-project
+cd tolstoy-project
+
+# Initialize Go module
+go mod init your-project-name
+
+# Add Tolstoy SDK
+go get github.com/tolstoy/go-sdk@latest
+```
+
+### Add to Existing Project
+
+Add the SDK to your existing Go project:
+
+```bash
+go get github.com/tolstoy/go-sdk@latest
+```
+
+### Specific Version
+
+Install a specific version of the SDK:
+
+```bash
+# Install specific version
+go get github.com/tolstoy/go-sdk@v1.2.0
+
+# Install latest pre-release
+go get github.com/tolstoy/go-sdk@latest
+```
+
+## Verification
+
+Create a simple test file to verify installation:
+
+```go
+// main.go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "os"
+
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+func main() {
+    // Test SDK import
+    client, err := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:         os.Getenv("TOLSTOY_API_KEY"),
+        OrganizationID: os.Getenv("TOLSTOY_ORGANIZATION_ID"),
+    })
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer client.Close()
+
+    fmt.Println("✅ Tolstoy Go SDK installed successfully!")
+    
+    // Test API connection (if credentials are available)
+    if os.Getenv("TOLSTOY_API_KEY") != "" {
+        ctx := context.Background()
+        user, err := client.Users.GetCurrent(ctx)
+        if err != nil {
+            log.Printf("❌ Connection test failed: %v", err)
+            return
+        }
+        fmt.Printf("✅ Connected as: %s\n", user.Email)
+    }
+}
+```
+
+Set your environment variables and test:
+
+```bash
+export TOLSTOY_API_KEY="your-api-key"
+export TOLSTOY_ORGANIZATION_ID="your-org-id"
+
+go run main.go
+```
+
+## Configuration
+
+### Environment Variables
+
+The SDK supports automatic configuration via environment variables:
+
+```bash
+# Required
+export TOLSTOY_API_KEY="your-api-key-here"
+export TOLSTOY_ORGANIZATION_ID="your-org-id-here"
+
+# Optional
+export TOLSTOY_BASE_URL="https://api.tolstoy.com"
+export TOLSTOY_TIMEOUT="30s"
+export TOLSTOY_MAX_RETRIES="3"
+export TOLSTOY_DEBUG="false"
+```
+
+Create a `.env` file for local development:
+
+```bash
+# .env
+TOLSTOY_API_KEY=your-api-key-here
+TOLSTOY_ORGANIZATION_ID=your-org-id-here
+TOLSTOY_BASE_URL=https://api.tolstoy.com
+TOLSTOY_TIMEOUT=30s
+TOLSTOY_MAX_RETRIES=3
+TOLSTOY_DEBUG=true
+```
+
+Load environment variables in your application:
+
+```go
+package main
+
+import (
+    "github.com/joho/godotenv"
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+func main() {
+    // Load .env file
+    err := godotenv.Load()
+    if err != nil {
+        log.Printf("Warning: .env file not found")
+    }
+
+    // Client will automatically use environment variables
+    client, err := tolstoy.NewClientFromEnv()
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer client.Close()
+}
+```
+
+Add godotenv dependency:
+
+```bash
+go get github.com/joho/godotenv
+```
+
+### Configuration File
+
+Create a YAML configuration file:
+
+```yaml
+# tolstoy.yaml
+api_key: your-api-key-here
+organization_id: your-org-id-here
+base_url: https://api.tolstoy.com
+timeout: 30s
+max_retries: 3
+debug: false
+user_agent: "MyApp/1.0"
+
+# HTTP client settings
+http:
+  max_idle_conns: 100
+  max_idle_conns_per_host: 10
+  idle_conn_timeout: 90s
+  tls_handshake_timeout: 10s
+  expect_continue_timeout: 1s
+```
+
+Load configuration from file:
+
+```go
+package main
+
+import (
+    "io/ioutil"
+    "time"
+
+    "gopkg.in/yaml.v3"
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+type Config struct {
+    APIKey         string `yaml:"api_key"`
+    OrganizationID string `yaml:"organization_id"`
+    BaseURL        string `yaml:"base_url"`
+    Timeout        string `yaml:"timeout"`
+    MaxRetries     int    `yaml:"max_retries"`
+    Debug          bool   `yaml:"debug"`
+    UserAgent      string `yaml:"user_agent"`
+    HTTP           struct {
+        MaxIdleConns       int    `yaml:"max_idle_conns"`
+        MaxIdleConnsPerHost int   `yaml:"max_idle_conns_per_host"`
+        IdleConnTimeout    string `yaml:"idle_conn_timeout"`
+    } `yaml:"http"`
+}
+
+func main() {
+    // Read configuration file
+    data, err := ioutil.ReadFile("tolstoy.yaml")
+    if err != nil {
+        log.Fatalf("Failed to read config file: %v", err)
+    }
+
+    var config Config
+    err = yaml.Unmarshal(data, &config)
+    if err != nil {
+        log.Fatalf("Failed to parse config file: %v", err)
+    }
+
+    // Parse duration strings
+    timeout, err := time.ParseDuration(config.Timeout)
+    if err != nil {
+        log.Fatalf("Invalid timeout format: %v", err)
+    }
+
+    idleTimeout, err := time.ParseDuration(config.HTTP.IdleConnTimeout)
+    if err != nil {
+        log.Fatalf("Invalid idle timeout format: %v", err)
+    }
+
+    // Create client with file configuration
+    client, err := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:              config.APIKey,
+        OrganizationID:      config.OrganizationID,
+        BaseURL:             config.BaseURL,
+        Timeout:             timeout,
+        MaxRetries:          config.MaxRetries,
+        Debug:               config.Debug,
+        UserAgent:           config.UserAgent,
+        MaxIdleConns:        config.HTTP.MaxIdleConns,
+        MaxIdleConnsPerHost: config.HTTP.MaxIdleConnsPerHost,
+        IdleConnTimeout:     idleTimeout,
+    })
+    if err != nil {
+        log.Fatalf("Failed to create client: %v", err)
+    }
+    defer client.Close()
+}
+```
+
+Add YAML dependency:
+
+```bash
+go get gopkg.in/yaml.v3
+```
+
+## IDE Setup
+
+### VS Code
+
+Install the Go extension and configure your `settings.json`:
+
+```json
+{
+    "go.toolsManagement.autoUpdate": true,
+    "go.useLanguageServer": true,
+    "go.lintTool": "golangci-lint",
+    "go.formatTool": "goimports",
+    "go.lintOnSave": "package",
+    "go.vetOnSave": "package",
+    "go.buildOnSave": "package",
+    "go.testOnSave": false,
+    "go.coverOnSave": false,
+    "gopls": {
+        "experimentalWorkspaceModule": true,
+        "completeUnimported": true,
+        "usePlaceholders": true,
+        "deepCompletion": true
+    }
+}
+```
+
+### GoLand/IntelliJ
+
+1. Enable Go modules support in **Settings → Go → Go Modules**
+2. Configure code style in **Settings → Editor → Code Style → Go**
+3. Enable inspections in **Settings → Editor → Inspections → Go**
+
+### Vim/Neovim
+
+Install vim-go plugin:
+
+```vim
+" .vimrc or init.vim
+Plug 'fatih/vim-go', { 'do': ':GoUpdateBinaries' }
+
+" Go configuration
+let g:go_fmt_command = "goimports"
+let g:go_auto_type_info = 1
+let g:go_auto_sameids = 1
+let g:go_highlight_types = 1
+let g:go_highlight_fields = 1
+let g:go_highlight_functions = 1
+let g:go_highlight_function_calls = 1
+let g:go_highlight_operators = 1
+let g:go_highlight_extra_types = 1
+```
+
+## Development Tools
+
+### Install Useful Go Tools
+
+```bash
+# Code formatting and imports
+go install golang.org/x/tools/cmd/goimports@latest
+
+# Linter
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+
+# Testing tools
+go install gotest.tools/gotestsum@latest
+
+# Dependency management
+go install golang.org/x/mod/cmd/modvendor@latest
+
+# Documentation
+go install golang.org/x/tools/cmd/godoc@latest
+```
+
+### Makefile Setup
+
+Create a `Makefile` for common tasks:
+
+```makefile
+# Makefile
+.PHONY: build test lint fmt clean deps
+
+# Build the application
+build:
+	go build -o bin/app ./cmd/...
+
+# Run tests
+test:
+	gotestsum --format testname
+
+# Run tests with coverage
+test-coverage:
+	go test -race -coverprofile=coverage.out -covermode=atomic ./...
+	go tool cover -html=coverage.out -o coverage.html
+
+# Lint code
+lint:
+	golangci-lint run
+
+# Format code
+fmt:
+	goimports -w .
+	go fmt ./...
+
+# Clean build artifacts
+clean:
+	rm -rf bin/
+	rm -f coverage.out coverage.html
+
+# Download dependencies
+deps:
+	go mod download
+	go mod tidy
+
+# Update dependencies
+update-deps:
+	go get -u ./...
+	go mod tidy
+
+# Run the application
+run:
+	go run ./cmd/...
+
+# Install development tools
+install-tools:
+	go install golang.org/x/tools/cmd/goimports@latest
+	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+	go install gotest.tools/gotestsum@latest
+```
+
+### GoLangCI-Lint Configuration
+
+Create `.golangci.yml` for linting configuration:
+
+```yaml
+# .golangci.yml
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - gofmt
+    - goimports
+    - govet
+    - gosimple
+    - staticcheck
+    - ineffassign
+    - misspell
+    - unconvert
+    - unused
+    - errcheck
+    - bodyclose
+    - contextcheck
+    - exportloopref
+    - gocognit
+    - gocritic
+    - gocyclo
+    - godox
+    - gofumpt
+    - gosec
+    - nestif
+    - nilerr
+    - nolintlint
+    - prealloc
+    - predeclared
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - tparallel
+    - unparam
+    - whitespace
+
+linters-settings:
+  gocyclo:
+    min-complexity: 15
+  gocognit:
+    min-complexity: 20
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - performance
+      - style
+      - experimental
+  revive:
+    rules:
+      - name: exported
+        arguments: [checkPrivateReceivers]
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - gosec
+        - dupl
+```
+
+## Testing Setup
+
+### Unit Tests
+
+Create test files with the `_test.go` suffix:
+
+```go
+// client_test.go
+package main
+
+import (
+    "context"
+    "testing"
+    "time"
+
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+func TestClientCreation(t *testing.T) {
+    tests := []struct {
+        name        string
+        config      *tolstoy.Config
+        expectError bool
+    }{
+        {
+            name: "valid config",
+            config: &tolstoy.Config{
+                APIKey:         "test-key",
+                OrganizationID: "test-org",
+            },
+            expectError: false,
+        },
+        {
+            name: "missing API key",
+            config: &tolstoy.Config{
+                OrganizationID: "test-org",
+            },
+            expectError: true,
+        },
+        {
+            name: "missing organization ID",
+            config: &tolstoy.Config{
+                APIKey: "test-key",
+            },
+            expectError: true,
+        },
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            client, err := tolstoy.NewClient(tt.config)
+            
+            if tt.expectError {
+                assert.Error(t, err)
+                assert.Nil(t, client)
+            } else {
+                assert.NoError(t, err)
+                assert.NotNil(t, client)
+                if client != nil {
+                    client.Close()
+                }
+            }
+        })
+    }
+}
+
+func TestClientTimeout(t *testing.T) {
+    client, err := tolstoy.NewClient(&tolstoy.Config{
+        APIKey:         "test-key",
+        OrganizationID: "test-org",
+        Timeout:        1 * time.Millisecond, // Very short timeout
+    })
+    require.NoError(t, err)
+    defer client.Close()
+
+    ctx := context.Background()
+    
+    // This should timeout
+    _, err = client.Tools.List(ctx, &tolstoy.ListToolsRequest{})
+    assert.Error(t, err)
+    assert.Contains(t, err.Error(), "timeout")
+}
+```
+
+Add testing dependencies:
+
+```bash
+go get github.com/stretchr/testify@latest
+```
+
+### Integration Tests
+
+Create integration tests that use environment variables:
+
+```go
+// integration_test.go
+//go:build integration
+// +build integration
+
+package main
+
+import (
+    "context"
+    "os"
+    "testing"
+
+    "github.com/stretchr/testify/require"
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+func TestIntegration(t *testing.T) {
+    // Skip if no credentials provided
+    if os.Getenv("TOLSTOY_API_KEY") == "" {
+        t.Skip("Skipping integration tests: TOLSTOY_API_KEY not set")
+    }
+
+    client, err := tolstoy.NewClientFromEnv()
+    require.NoError(t, err)
+    defer client.Close()
+
+    ctx := context.Background()
+
+    t.Run("list tools", func(t *testing.T) {
+        tools, err := client.Tools.List(ctx, &tolstoy.ListToolsRequest{
+            Limit: 10,
+        })
+        require.NoError(t, err)
+        require.NotNil(t, tools)
+    })
+}
+```
+
+Run tests:
+
+```bash
+# Unit tests only
+go test ./...
+
+# Include integration tests
+go test -tags=integration ./...
+
+# With coverage
+go test -race -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### Module Resolution Issues
+
+**Problem**: `cannot find module` errors
+
+**Solution**: Ensure Go modules are enabled:
+
+```bash
+export GO111MODULE=on
+go mod init your-project-name
+go get github.com/tolstoy/go-sdk
+```
+
+#### Certificate Issues
+
+**Problem**: TLS certificate verification errors
+
+**Solution**: Update your certificates or configure custom transport:
+
+```go
+import (
+    "crypto/tls"
+    "net/http"
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+// For development only - not recommended for production
+transport := &http.Transport{
+    TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+}
+
+client, err := tolstoy.NewClient(&tolstoy.Config{
+    APIKey:         "your-key",
+    OrganizationID: "your-org",
+    HTTPClient: &http.Client{
+        Transport: transport,
+    },
+})
+```
+
+#### Proxy Configuration
+
+**Problem**: Requests failing due to corporate proxy
+
+**Solution**: Configure proxy settings:
+
+```go
+import (
+    "net/http"
+    "net/url"
+    "github.com/tolstoy/go-sdk/tolstoy"
+)
+
+proxyURL, err := url.Parse("http://proxy.company.com:8080")
+if err != nil {
+    log.Fatal(err)
+}
+
+transport := &http.Transport{
+    Proxy: http.ProxyURL(proxyURL),
+}
+
+client, err := tolstoy.NewClient(&tolstoy.Config{
+    APIKey:         "your-key",
+    OrganizationID: "your-org",
+    HTTPClient: &http.Client{
+        Transport: transport,
+    },
+})
+```
+
+#### Memory Issues with Large Responses
+
+**Problem**: High memory usage with large API responses
+
+**Solution**: Use streaming or pagination:
+
+```go
+// Use pagination for large datasets
+req := &tolstoy.ListToolsRequest{
+    Limit: 50, // Smaller page size
+}
+
+for {
+    response, err := client.Tools.List(ctx, req)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // Process current page
+    for _, tool := range response.Data {
+        // Process tool
+    }
+    
+    // Check for more pages
+    if !response.HasMore {
+        break
+    }
+    
+    req.Cursor = response.NextCursor
+}
+```
+
+### Performance Optimization
+
+#### Connection Pooling
+
+```go
+client, err := tolstoy.NewClient(&tolstoy.Config{
+    APIKey:              "your-key",
+    OrganizationID:      "your-org",
+    MaxIdleConns:        100,        // Increase connection pool
+    MaxIdleConnsPerHost: 20,         // Per-host connections
+    IdleConnTimeout:     2 * time.Minute,
+})
+```
+
+#### Request Timeouts
+
+```go
+// Configure appropriate timeouts
+client, err := tolstoy.NewClient(&tolstoy.Config{
+    APIKey:         "your-key", 
+    OrganizationID: "your-org",
+    Timeout:        30 * time.Second, // Overall timeout
+})
+
+// Use context timeouts for specific operations
+ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+defer cancel()
+
+result, err := client.Actions.Execute(ctx, actionID, inputData)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start Tutorial" icon="play" href="/sdk/go/quickstart">
+    Build your first workflow with Go
+  </Card>
+  <Card title="Examples & Patterns" icon="code" href="/sdk/go/examples">
+    Real-world examples and Go patterns
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/index">
+    Complete API documentation
+  </Card>
+  <Card title="Python SDK" icon="python" href="/sdk/python/index">
+    Alternative SDK for Python developers
+  </Card>
+</CardGroup>

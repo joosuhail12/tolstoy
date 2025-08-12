@@ -1,0 +1,591 @@
+---
+title: "Quick Start"
+description: "Get started with the Tolstoy TypeScript SDK in minutes"
+---
+
+# Quick Start
+
+Get up and running with the Tolstoy TypeScript SDK in just a few minutes. This guide will walk you through creating your first workflow integration.
+
+## Prerequisites
+
+- [Node.js 16+](https://nodejs.org/) installed
+- A Tolstoy account with API access
+- Basic familiarity with TypeScript/JavaScript
+
+## 1. Installation
+
+Install the SDK in your project:
+
+```bash
+npm install @tolstoy/sdk
+```
+
+## 2. Get Your Credentials
+
+You'll need two pieces of information from your Tolstoy dashboard:
+
+1. **API Key**: Found in Settings → API Keys
+2. **Organization ID**: Found in Settings → Organization
+
+<Warning>
+  Keep your API key secure and never expose it in client-side code. Use environment variables for production applications.
+</Warning>
+
+## 3. Create Your First Client
+
+Create a new file `index.ts` and set up your client:
+
+```typescript
+// index.ts
+import { TolstoyClient } from '@tolstoy/sdk';
+
+// Initialize the client
+const client = new TolstoyClient({
+  apiKey: 'your_api_key_here',
+  organizationId: 'org_your_org_id'
+});
+
+console.log('Tolstoy client initialized successfully!');
+```
+
+## 4. Execute Your First Workflow
+
+Let's execute a simple workflow:
+
+```typescript
+// index.ts
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const client = new TolstoyClient({
+  apiKey: 'your_api_key_here',
+  organizationId: 'org_your_org_id'
+});
+
+async function executeWorkflow() {
+  try {
+    // List available flows
+    const flows = await client.flows.list();
+    console.log(`Found ${flows.length} flows:`);
+    flows.forEach(flow => {
+      console.log(`- ${flow.name} (${flow.id})`);
+    });
+    
+    // Execute a workflow (replace with your flow ID)
+    if (flows.length > 0) {
+      const firstFlow = flows[0];
+      console.log(`\nExecuting flow: ${firstFlow.name}`);
+      
+      const execution = await client.flows.execute(firstFlow.id, {
+        message: 'Hello from TypeScript SDK!',
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log('\n✅ Workflow execution started!');
+      console.log(`Execution ID: ${execution.id}`);
+      console.log(`Status: ${execution.status}`);
+    }
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+  }
+}
+
+executeWorkflow();
+```
+
+Run your script:
+
+```bash
+# If using TypeScript directly
+npx tsx index.ts
+
+# Or compile and run
+npx tsc index.ts
+node index.js
+```
+
+## 5. Wait for Completion
+
+Modify your script to wait for the workflow to complete:
+
+```typescript
+async function executeAndWait() {
+  try {
+    const flows = await client.flows.list();
+    if (flows.length === 0) {
+      console.log('No flows found. Create a flow in your Tolstoy dashboard first.');
+      return;
+    }
+    
+    const flow = flows[0];
+    console.log(`Executing flow: ${flow.name}`);
+    
+    // Execute and wait for completion
+    const execution = await client.flows.execute(
+      flow.id,
+      { message: 'Hello World!' },
+      { 
+        wait: true,    // Wait for completion
+        timeout: 60000 // 60 second timeout
+      }
+    );
+    
+    console.log('\n✅ Workflow completed!');
+    console.log(`Status: ${execution.status}`);
+    console.log(`Duration: ${execution.duration}ms`);
+    
+    if (execution.output) {
+      console.log('Output:', execution.output);
+    }
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+  }
+}
+
+executeAndWait();
+```
+
+## 6. Stream Real-time Progress
+
+For long-running workflows, stream progress in real-time:
+
+```typescript
+async function executeWithProgress() {
+  try {
+    const flows = await client.flows.list();
+    const flow = flows[0];
+    
+    console.log(`Starting flow: ${flow.name}`);
+    
+    // Start execution
+    const execution = await client.flows.execute(flow.id, {
+      data: 'test data'
+    });
+    
+    console.log(`Execution started: ${execution.id}`);
+    
+    // Stream progress updates
+    const stream = client.executions.stream(execution.id);
+    
+    stream.on('step_started', (step) => {
+      console.log(`🏃 Step started: ${step.name}`);
+    });
+    
+    stream.on('step_completed', (step) => {
+      console.log(`✅ Step completed: ${step.name} (${step.duration}ms)`);
+    });
+    
+    stream.on('step_failed', (step) => {
+      console.log(`❌ Step failed: ${step.name} - ${step.error}`);
+    });
+    
+    stream.on('completed', (result) => {
+      console.log('🎉 Execution completed successfully!');
+      console.log('Final result:', result);
+    });
+    
+    stream.on('failed', (error) => {
+      console.log('💥 Execution failed:', error);
+    });
+    
+    stream.on('error', (error) => {
+      console.error('Stream error:', error);
+    });
+    
+  } catch (error) {
+    console.error('❌ Error:', error.message);
+  }
+}
+
+executeWithProgress();
+```
+
+## 7. Environment Configuration
+
+For production applications, use environment variables:
+
+```bash
+# .env
+TOLSTOY_API_KEY=your_actual_api_key
+TOLSTOY_ORG_ID=your_organization_id
+NODE_ENV=production
+```
+
+```typescript
+// config.ts
+import 'dotenv/config';
+
+export const config = {
+  tolstoy: {
+    apiKey: process.env.TOLSTOY_API_KEY!,
+    organizationId: process.env.TOLSTOY_ORG_ID!,
+  },
+  isDevelopment: process.env.NODE_ENV === 'development'
+};
+
+if (!config.tolstoy.apiKey || !config.tolstoy.organizationId) {
+  throw new Error('Missing required Tolstoy configuration');
+}
+```
+
+```typescript
+// app.ts
+import { TolstoyClient } from '@tolstoy/sdk';
+import { config } from './config';
+
+const client = new TolstoyClient({
+  apiKey: config.tolstoy.apiKey,
+  organizationId: config.tolstoy.organizationId,
+  // More verbose logging in development
+  logger: {
+    level: config.isDevelopment ? 'debug' : 'info'
+  }
+});
+```
+
+## 8. Error Handling
+
+Implement proper error handling:
+
+```typescript
+import { 
+  TolstoyClient, 
+  TolstoyError, 
+  AuthenticationError, 
+  ValidationError 
+} from '@tolstoy/sdk';
+
+async function robustExecution(flowId: string, input: any) {
+  try {
+    const execution = await client.flows.execute(flowId, input, {
+      wait: true,
+      timeout: 300000 // 5 minutes
+    });
+    
+    if (execution.status === 'completed') {
+      console.log('✅ Success:', execution.output);
+      return execution.output;
+    } else {
+      throw new Error(`Execution failed with status: ${execution.status}`);
+    }
+    
+  } catch (error) {
+    if (error instanceof AuthenticationError) {
+      console.error('🔒 Authentication failed. Check your API key.');
+    } else if (error instanceof ValidationError) {
+      console.error('📝 Input validation failed:', error.details);
+    } else if (error instanceof TolstoyError) {
+      console.error('🔧 Tolstoy API error:', error.message);
+    } else {
+      console.error('💥 Unexpected error:', error.message);
+    }
+    throw error;
+  }
+}
+```
+
+## 9. TypeScript Types
+
+Take advantage of full TypeScript support:
+
+```typescript
+import { TolstoyClient, Flow, Execution } from '@tolstoy/sdk';
+
+// Define your input types
+interface CustomerData {
+  id: string;
+  email: string;
+  name: string;
+}
+
+interface OrderData {
+  orderId: string;
+  customer: CustomerData;
+  amount: number;
+  currency: string;
+}
+
+// Type-safe workflow execution
+async function processOrder(orderData: OrderData): Promise<{ success: boolean; orderId: string }> {
+  const execution = await client.flows.execute(
+    'flow_process_order',
+    orderData,
+    { wait: true }
+  );
+  
+  if (execution.status === 'completed') {
+    return execution.output as { success: boolean; orderId: string };
+  } else {
+    throw new Error('Order processing failed');
+  }
+}
+
+// Usage with type safety
+const result = await processOrder({
+  orderId: 'ord_123',
+  customer: {
+    id: 'cust_456',
+    email: 'customer@example.com',
+    name: 'John Doe'
+  },
+  amount: 9999, // $99.99 in cents
+  currency: 'usd'
+});
+
+console.log('Order processed:', result.orderId);
+```
+
+## 10. Complete Example
+
+Here's a complete example that demonstrates common patterns:
+
+```typescript
+// complete-example.ts
+import { TolstoyClient, TolstoyError } from '@tolstoy/sdk';
+import 'dotenv/config';
+
+class WorkflowService {
+  private client: TolstoyClient;
+  
+  constructor() {
+    this.client = new TolstoyClient({
+      apiKey: process.env.TOLSTOY_API_KEY!,
+      organizationId: process.env.TOLSTOY_ORG_ID!,
+      timeout: 30000,
+      retries: 3
+    });
+  }
+  
+  async listFlows() {
+    try {
+      const flows = await this.client.flows.list();
+      console.log('📋 Available flows:');
+      flows.forEach((flow, index) => {
+        console.log(`  ${index + 1}. ${flow.name} (${flow.id})`);
+        console.log(`     Status: ${flow.status}`);
+        console.log(`     Steps: ${flow.steps.length}`);
+        console.log('');
+      });
+      return flows;
+    } catch (error) {
+      console.error('Failed to list flows:', error.message);
+      throw error;
+    }
+  }
+  
+  async executeFlow(flowId: string, input: any) {
+    try {
+      console.log(`🚀 Starting execution of flow: ${flowId}`);
+      console.log(`📥 Input:`, JSON.stringify(input, null, 2));
+      
+      const execution = await this.client.flows.execute(flowId, input);
+      
+      console.log(`✨ Execution started: ${execution.id}`);
+      console.log(`📊 Status: ${execution.status}`);
+      
+      // Monitor progress
+      if (execution.status === 'running') {
+        await this.monitorExecution(execution.id);
+      }
+      
+      return execution;
+    } catch (error) {
+      console.error(`❌ Failed to execute flow ${flowId}:`, error.message);
+      throw error;
+    }
+  }
+  
+  private async monitorExecution(executionId: string) {
+    const stream = this.client.executions.stream(executionId);
+    
+    return new Promise<void>((resolve, reject) => {
+      stream.on('step_started', (step) => {
+        console.log(`  🏃 ${step.name}`);
+      });
+      
+      stream.on('step_completed', (step) => {
+        console.log(`  ✅ ${step.name} (${step.duration}ms)`);
+      });
+      
+      stream.on('step_failed', (step) => {
+        console.log(`  ❌ ${step.name}: ${step.error}`);
+      });
+      
+      stream.on('completed', (result) => {
+        console.log('🎉 Execution completed!');
+        console.log('📤 Output:', JSON.stringify(result, null, 2));
+        resolve();
+      });
+      
+      stream.on('failed', (error) => {
+        console.log('💥 Execution failed:', error);
+        reject(new Error(error.message));
+      });
+      
+      stream.on('error', (error) => {
+        console.error('Stream error:', error);
+        reject(error);
+      });
+    });
+  }
+}
+
+// Usage
+async function main() {
+  const service = new WorkflowService();
+  
+  try {
+    // List available flows
+    const flows = await service.listFlows();
+    
+    if (flows.length === 0) {
+      console.log('No flows found. Create some flows in your Tolstoy dashboard first.');
+      return;
+    }
+    
+    // Execute the first flow with sample data
+    await service.executeFlow(flows[0].id, {
+      message: 'Hello from TypeScript!',
+      timestamp: new Date().toISOString(),
+      user: {
+        id: 'user_123',
+        name: 'Test User'
+      }
+    });
+    
+  } catch (error) {
+    console.error('Application error:', error.message);
+    process.exit(1);
+  }
+}
+
+// Run the example
+main();
+```
+
+Run the complete example:
+
+```bash
+# Install dependencies
+npm install @tolstoy/sdk dotenv tsx
+
+# Create .env file with your credentials
+echo "TOLSTOY_API_KEY=your_key" > .env
+echo "TOLSTOY_ORG_ID=your_org" >> .env
+
+# Run the example
+npx tsx complete-example.ts
+```
+
+## Common Use Cases
+
+### API Integration Workflow
+
+```typescript
+// Trigger a workflow when receiving an API request
+app.post('/api/process-order', async (req, res) => {
+  try {
+    const orderData = req.body;
+    
+    const execution = await client.flows.execute(
+      'flow_process_order',
+      orderData
+    );
+    
+    res.json({
+      success: true,
+      executionId: execution.id,
+      message: 'Order processing started'
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+```
+
+### Scheduled Workflows
+
+```typescript
+// Run workflows on a schedule
+import cron from 'node-cron';
+
+// Run daily at 2 AM
+cron.schedule('0 2 * * *', async () => {
+  console.log('Running daily sync...');
+  
+  try {
+    await client.flows.execute('flow_daily_sync', {
+      date: new Date().toISOString(),
+      type: 'daily'
+    });
+  } catch (error) {
+    console.error('Daily sync failed:', error);
+  }
+});
+```
+
+### Event-Driven Workflows
+
+```typescript
+// Execute workflows based on events
+class EventHandler {
+  constructor(private client: TolstoyClient) {}
+  
+  async handleUserSignup(userData: any) {
+    return this.client.flows.execute('flow_user_onboarding', {
+      user: userData,
+      source: 'signup',
+      timestamp: new Date().toISOString()
+    });
+  }
+  
+  async handlePaymentSuccess(paymentData: any) {
+    return this.client.flows.execute('flow_payment_processing', {
+      payment: paymentData,
+      action: 'success'
+    });
+  }
+  
+  async handleOrderCancellation(orderData: any) {
+    return this.client.flows.execute('flow_order_cancellation', {
+      order: orderData,
+      reason: 'user_requested'
+    });
+  }
+}
+```
+
+## Next Steps
+
+Now that you have the basics working:
+
+<CardGroup cols={2}>
+  <Card title="Explore the API" icon="code" href="/api/index">
+    Dive deeper into all available methods and options
+  </Card>
+  <Card title="Build Tools" icon="wrench" href="/public/product/tools/overview">
+    Learn how to integrate external APIs and services
+  </Card>
+  <Card title="Create Workflows" icon="workflow" href="/public/product/flows/overview">
+    Build more complex multi-step workflows
+  </Card>
+  <Card title="Best Practices" icon="star" href="#best-practices">
+    Learn recommended patterns and practices
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+If you run into issues:
+
+- Check the [API Reference](/api/index) for detailed method documentation
+- Review [Common Issues](/sdk/typescript/installation#troubleshooting) in the installation guide
+- Join our [Discord community](https://discord.gg/tolstoy) for help
+- Contact [support@tolstoy.com](mailto:support@tolstoy.com) for technical support
+
+---
+
+<Snippet file="sdk-footer.mdx" />

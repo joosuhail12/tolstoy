@@ -1,0 +1,434 @@
+---
+title: "Python SDK Installation"
+description: "Installation and setup guide for the Tolstoy Python SDK"
+---
+
+# Installing the Python SDK
+
+The Tolstoy Python SDK is available on PyPI and supports Python 3.8+.
+
+## System Requirements
+
+- **Python**: 3.8 or higher
+- **Operating System**: Windows, macOS, Linux
+- **Dependencies**: `aiohttp`, `pydantic`, `typing-extensions`
+
+## Installation Methods
+
+### Using pip (Recommended)
+
+```bash
+pip install tolstoy-sdk
+```
+
+### Using conda
+
+```bash
+conda install -c conda-forge tolstoy-sdk
+```
+
+### Using Poetry
+
+```bash
+poetry add tolstoy-sdk
+```
+
+### Development Installation
+
+For contributing to the SDK or accessing unreleased features:
+
+```bash
+# Clone the repository
+git clone https://github.com/tolstoy/python-sdk.git
+cd python-sdk
+
+# Install in development mode
+pip install -e ".[dev]"
+```
+
+## Optional Dependencies
+
+The SDK includes optional dependencies for specific use cases:
+
+### All Optional Dependencies
+
+```bash
+pip install tolstoy-sdk[all]
+```
+
+### Development Dependencies
+
+```bash
+pip install tolstoy-sdk[dev]
+```
+
+Includes:
+- `pytest` - Testing framework
+- `pytest-asyncio` - Async testing support
+- `black` - Code formatting
+- `mypy` - Type checking
+- `coverage` - Code coverage
+
+### Performance Dependencies
+
+```bash
+pip install tolstoy-sdk[performance]
+```
+
+Includes:
+- `ujson` - Faster JSON parsing
+- `cchardet` - Character encoding detection
+- `aiodns` - Async DNS resolution
+
+### Validation Dependencies
+
+```bash
+pip install tolstoy-sdk[validation]
+```
+
+Includes:
+- `jsonschema` - JSON schema validation
+- `pydantic[email]` - Email validation
+
+## Environment Setup
+
+### Virtual Environment (Recommended)
+
+```bash
+# Create virtual environment
+python -m venv tolstoy-env
+
+# Activate virtual environment
+# On Windows:
+tolstoy-env\Scripts\activate
+# On macOS/Linux:
+source tolstoy-env/bin/activate
+
+# Install SDK
+pip install tolstoy-sdk
+```
+
+### Using pyenv
+
+```bash
+# Install Python version
+pyenv install 3.11.0
+pyenv local 3.11.0
+
+# Create virtual environment
+python -m venv .venv
+source .venv/bin/activate
+
+# Install SDK
+pip install tolstoy-sdk
+```
+
+## Configuration
+
+### API Credentials
+
+Before using the SDK, you'll need to obtain your API credentials from the Tolstoy dashboard.
+
+#### Environment Variables (Recommended)
+
+Create a `.env` file in your project root:
+
+```bash
+# .env
+TOLSTOY_API_KEY=your-api-key-here
+TOLSTOY_ORGANIZATION_ID=your-org-id-here
+TOLSTOY_BASE_URL=https://api.tolstoy.com  # Optional
+TOLSTOY_DEBUG=false                       # Optional
+```
+
+#### Configuration File
+
+Create a `tolstoy.yaml` configuration file:
+
+```yaml
+# tolstoy.yaml
+api_key: your-api-key-here
+organization_id: your-org-id-here
+base_url: https://api.tolstoy.com  # Optional
+timeout: 30                        # Request timeout in seconds
+max_retries: 3                     # Maximum retry attempts
+debug: false                       # Enable debug logging
+```
+
+#### Programmatic Configuration
+
+```python
+from tolstoy import TolstoyClient
+
+# Direct configuration
+client = TolstoyClient(
+    api_key="your-api-key-here",
+    organization_id="your-org-id-here",
+    base_url="https://api.tolstoy.com",  # Optional
+    timeout=30.0,                        # Optional
+    max_retries=3,                       # Optional
+    debug=False                          # Optional
+)
+```
+
+## Verification
+
+Verify your installation by running a simple test:
+
+```python
+# test_installation.py
+import asyncio
+from tolstoy import TolstoyClient
+
+async def test_connection():
+    client = TolstoyClient(
+        api_key="your-api-key",
+        organization_id="your-org-id"
+    )
+    
+    try:
+        # Test API connection
+        user = await client.users.get_current_user()
+        print(f"✅ Connection successful! User: {user.email}")
+        return True
+    except Exception as e:
+        print(f"❌ Connection failed: {e}")
+        return False
+
+# Run the test
+if __name__ == "__main__":
+    asyncio.run(test_connection())
+```
+
+Run the test:
+
+```bash
+python test_installation.py
+```
+
+## IDE Setup
+
+### VS Code
+
+Install the Python extension and add the following to your `settings.json`:
+
+```json
+{
+    "python.analysis.extraPaths": [
+        "./venv/lib/python3.11/site-packages"
+    ],
+    "python.analysis.typeCheckingMode": "strict",
+    "python.linting.mypyEnabled": true,
+    "python.formatting.provider": "black"
+}
+```
+
+### PyCharm
+
+1. Go to **File → Settings → Project → Python Interpreter**
+2. Select your virtual environment
+3. Enable type checking in **Settings → Editor → Inspections → Python**
+
+### Jupyter Notebook
+
+Install Jupyter support:
+
+```bash
+pip install tolstoy-sdk jupyter ipykernel
+
+# Add kernel to Jupyter
+python -m ipykernel install --user --name tolstoy-env --display-name "Tolstoy Environment"
+```
+
+Example notebook usage:
+
+```python
+# Jupyter cell 1
+import asyncio
+from tolstoy import TolstoyClient
+
+# Jupyter cell 2
+client = TolstoyClient(
+    api_key="your-api-key",
+    organization_id="your-org-id"
+)
+
+# Jupyter cell 3
+# For Jupyter, use asyncio.create_task for async operations
+async def list_tools():
+    tools = await client.tools.list()
+    return tools
+
+tools = await list_tools()
+print(f"Found {len(tools.data)} tools")
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### ImportError: No module named 'tolstoy'
+
+**Solution**: Ensure the SDK is installed in the correct environment:
+
+```bash
+# Check if installed
+pip list | grep tolstoy-sdk
+
+# If not found, install:
+pip install tolstoy-sdk
+```
+
+#### SSL Certificate Verification Failed
+
+**Solution**: Update certificates or disable SSL verification (not recommended for production):
+
+```python
+import ssl
+from tolstoy import TolstoyClient
+
+# Option 1: Update certificates (recommended)
+# pip install --upgrade certifi
+
+# Option 2: Disable SSL verification (development only)
+client = TolstoyClient(
+    api_key="your-key",
+    organization_id="your-org",
+    ssl=False  # Only for development
+)
+```
+
+#### Async/Await Issues
+
+**Solution**: Ensure you're using proper async context:
+
+```python
+# ❌ Wrong - running async code without event loop
+result = client.tools.list()  # This will fail
+
+# ✅ Correct - using asyncio
+import asyncio
+
+async def main():
+    result = await client.tools.list()
+    return result
+
+asyncio.run(main())
+
+# ✅ Alternative - using asyncio.get_event_loop()
+loop = asyncio.get_event_loop()
+result = loop.run_until_complete(client.tools.list())
+```
+
+#### Type Checking Issues
+
+**Solution**: Install type stubs and configure mypy:
+
+```bash
+pip install types-aiohttp types-requests mypy
+```
+
+Create `mypy.ini`:
+
+```ini
+[mypy]
+python_version = 3.8
+disallow_untyped_defs = True
+disallow_incomplete_defs = True
+check_untyped_defs = True
+no_implicit_optional = True
+warn_redundant_casts = True
+warn_unused_ignores = True
+```
+
+### Performance Optimization
+
+#### Use Connection Pooling
+
+```python
+import aiohttp
+from tolstoy import TolstoyClient
+
+async def main():
+    # Create custom session with connection pooling
+    connector = aiohttp.TCPConnector(
+        limit=100,  # Total connection limit
+        limit_per_host=10,  # Per-host connection limit
+        keepalive_timeout=30,
+        enable_cleanup_closed=True
+    )
+    
+    async with aiohttp.ClientSession(connector=connector) as session:
+        client = TolstoyClient(
+            api_key="your-key",
+            organization_id="your-org",
+            session=session  # Use custom session
+        )
+        
+        # Your API calls here
+        result = await client.tools.list()
+
+asyncio.run(main())
+```
+
+#### Batch Operations
+
+```python
+import asyncio
+from tolstoy import TolstoyClient
+
+async def batch_execute_actions(client, action_data_list):
+    # Execute multiple actions concurrently
+    tasks = []
+    
+    for action_id, input_data in action_data_list:
+        task = client.actions.execute(action_id=action_id, input=input_data)
+        tasks.append(task)
+    
+    # Wait for all executions to complete
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+    
+    # Process results
+    successful = []
+    failed = []
+    
+    for result in results:
+        if isinstance(result, Exception):
+            failed.append(result)
+        else:
+            successful.append(result)
+    
+    return successful, failed
+
+# Usage
+async def main():
+    client = TolstoyClient(api_key="key", organization_id="org")
+    
+    action_data = [
+        ("action_1", {"param": "value1"}),
+        ("action_2", {"param": "value2"}),
+        ("action_3", {"param": "value3"}),
+    ]
+    
+    successful, failed = await batch_execute_actions(client, action_data)
+    print(f"Successful: {len(successful)}, Failed: {len(failed)}")
+
+asyncio.run(main())
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start Guide" icon="play" href="/sdk/python/quickstart">
+    Build your first workflow with Python
+  </Card>
+  <Card title="Examples & Recipes" icon="code" href="/sdk/python/examples">
+    Real-world examples and best practices
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/index">
+    Complete API documentation
+  </Card>
+  <Card title="TypeScript SDK" icon="code" href="/sdk/typescript/index">
+    Alternative SDK for JavaScript/TypeScript
+  </Card>
+</CardGroup>

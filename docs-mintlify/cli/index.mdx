@@ -1,0 +1,457 @@
+---
+title: "CLI Overview"
+description: "Command-line interface for managing Tolstoy workflows, actions, and integrations"
+---
+
+# Tolstoy CLI
+
+The Tolstoy CLI is a powerful command-line tool that allows you to manage your workflows, actions, tools, and integrations directly from your terminal. Perfect for automation, CI/CD pipelines, and developer workflows.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Workflow Management" icon="workflow">
+    Create, execute, and monitor workflows from the command line
+  </Card>
+  <Card title="Action Operations" icon="bolt">
+    Build and test actions with interactive parameter input
+  </Card>
+  <Card title="Tool Integration" icon="plug">
+    Configure external API tools and manage authentication
+  </Card>
+  <Card title="CI/CD Ready" icon="rocket">
+    Perfect for automated deployments and continuous integration
+  </Card>
+</CardGroup>
+
+## Quick Start
+
+<Steps>
+  <Step title="Install the CLI">
+    ```bash
+    # Using npm
+    npm install -g @tolstoy/cli
+    
+    # Using yarn
+    yarn global add @tolstoy/cli
+    
+    # Using brew (macOS)
+    brew install tolstoy-cli
+    ```
+  </Step>
+  
+  <Step title="Authenticate">
+    ```bash
+    tolstoy auth login
+    ```
+    
+    This will open your browser for authentication or prompt for API credentials.
+  </Step>
+  
+  <Step title="Set Your Organization">
+    ```bash
+    tolstoy org select
+    ```
+    
+    Choose which organization to work with for all subsequent commands.
+  </Step>
+  
+  <Step title="Verify Installation">
+    ```bash
+    tolstoy --version
+    tolstoy org list
+    ```
+  </Step>
+</Steps>
+
+## Command Structure
+
+The CLI follows a hierarchical command structure:
+
+```bash
+tolstoy <resource> <action> [options]
+```
+
+### Main Resources
+
+<Tabs>
+  <Tab title="Organizations">
+    Manage organization settings and memberships
+    ```bash
+    tolstoy org list           # List organizations
+    tolstoy org select         # Switch organization
+    tolstoy org invite         # Invite team members
+    ```
+  </Tab>
+  
+  <Tab title="Tools">
+    Configure external API integrations
+    ```bash
+    tolstoy tools list         # List configured tools
+    tolstoy tools create       # Add new tool
+    tolstoy tools test         # Test tool connection
+    ```
+  </Tab>
+  
+  <Tab title="Actions">
+    Create and manage reusable API operations
+    ```bash
+    tolstoy actions list       # List actions
+    tolstoy actions create     # Create new action
+    tolstoy actions execute    # Run action with parameters
+    ```
+  </Tab>
+  
+  <Tab title="Flows">
+    Build and execute complex workflows
+    ```bash
+    tolstoy flows list         # List workflows
+    tolstoy flows create       # Create new workflow
+    tolstoy flows execute      # Execute workflow
+    ```
+  </Tab>
+</Tabs>
+
+## Global Options
+
+Available for all commands:
+
+<ParamField name="--org-id" type="string">
+  Override the default organization ID
+</ParamField>
+
+<ParamField name="--output" type="string" default="table">
+  Output format: `table`, `json`, `yaml`, `csv`
+</ParamField>
+
+<ParamField name="--verbose" type="boolean">
+  Enable verbose logging for debugging
+</ParamField>
+
+<ParamField name="--no-color" type="boolean">
+  Disable colored output
+</ParamField>
+
+<ParamField name="--config" type="string">
+  Path to custom configuration file
+</ParamField>
+
+## Configuration
+
+The CLI stores configuration in `~/.tolstoy/config.yaml`:
+
+```yaml
+# Default organization and user settings
+default_org_id: "org_abc123def456"
+default_user_id: "user_xyz789abc"
+
+# Output preferences
+output_format: "table"
+colored_output: true
+
+# API settings
+api_base_url: "https://tolstoy.getpullse.com"
+timeout: 30
+
+# Authentication
+auth_type: "oauth"
+auth_token_file: "~/.tolstoy/token"
+```
+
+## Environment Variables
+
+Override configuration with environment variables:
+
+```bash
+export TOLSTOY_ORG_ID="org_abc123def456"
+export TOLSTOY_USER_ID="user_xyz789abc"
+export TOLSTOY_API_URL="https://tolstoy.getpullse.com"
+export TOLSTOY_TOKEN="your-api-token"
+export TOLSTOY_OUTPUT="json"
+```
+
+## Interactive Mode
+
+Many commands support interactive mode for easier parameter input:
+
+<CodeGroup>
+```bash Interactive Action Creation
+tolstoy actions create --interactive
+
+? Action Name: Create Stripe Customer
+? Tool: Stripe API (tool_stripe_123)
+? HTTP Method: POST
+? Endpoint: /customers
+? Add parameter: email (string, required)
+? Add parameter: name (string, required)
+? Add parameter: phone (string, optional)
+? Add more parameters? No
+✓ Action created successfully: act_def456ghi789
+```
+
+```bash Interactive Workflow Execution
+tolstoy flows execute customer-onboarding --interactive
+
+? Customer Email: john@company.com
+? Customer Name: John Doe
+? Send Welcome Email? Yes
+? Notification Channel: #general
+
+🚀 Executing workflow: customer-onboarding
+⏳ Step 1/3: Create customer record... ✓
+⏳ Step 2/3: Send welcome email... ✓
+⏳ Step 3/3: Post to Slack... ✓
+✅ Workflow completed successfully in 2.3s
+```
+</CodeGroup>
+
+## Batch Operations
+
+Process multiple items efficiently:
+
+```bash
+# Execute multiple actions from a file
+tolstoy actions execute --batch actions.json
+
+# Create multiple tools from configuration
+tolstoy tools create --from-file tools-config.yaml
+
+# Execute workflow for multiple inputs
+tolstoy flows execute onboarding --batch customers.csv
+```
+
+## Output Formats
+
+Choose the output format that works best for your use case:
+
+<Tabs>
+  <Tab title="Table (Default)">
+    Human-readable table format
+    ```bash
+    tolstoy actions list
+    
+    ┌─────────────────────┬──────────────────────┬────────┬─────────────┐
+    │ ID                  │ Name                 │ Method │ Tool        │
+    ├─────────────────────┼──────────────────────┼────────┼─────────────┤
+    │ act_def456ghi789    │ Create Stripe Cust.  │ POST   │ Stripe API  │
+    │ act_abc123def456    │ Send Email           │ POST   │ SendGrid    │
+    │ act_ghi789jkl012    │ Post to Slack        │ POST   │ Slack API   │
+    └─────────────────────┴──────────────────────┴────────┴─────────────┘
+    ```
+  </Tab>
+  
+  <Tab title="JSON">
+    Machine-readable JSON format
+    ```bash
+    tolstoy actions list --output json
+    
+    [
+      {
+        "id": "act_def456ghi789",
+        "name": "Create Stripe Customer",
+        "method": "POST",
+        "toolName": "Stripe API",
+        "status": "active"
+      }
+    ]
+    ```
+  </Tab>
+  
+  <Tab title="YAML">
+    Human and machine-readable YAML
+    ```bash
+    tolstoy actions get act_123 --output yaml
+    
+    id: act_def456ghi789
+    name: Create Stripe Customer
+    method: POST
+    endpoint: /customers
+    tool:
+      id: tool_stripe_123
+      name: Stripe API
+    ```
+  </Tab>
+  
+  <Tab title="CSV">
+    Spreadsheet-compatible CSV format
+    ```bash
+    tolstoy actions list --output csv
+    
+    id,name,method,tool,status
+    act_def456ghi789,Create Stripe Customer,POST,Stripe API,active
+    act_abc123def456,Send Email,POST,SendGrid,active
+    ```
+  </Tab>
+</Tabs>
+
+## Scripting and Automation
+
+The CLI is designed for automation and scripting:
+
+<CodeGroup>
+```bash Deployment Script
+#!/bin/bash
+set -e
+
+echo "🚀 Deploying Tolstoy workflows..."
+
+# Set organization context
+tolstoy org select production
+
+# Update tools with new API keys
+tolstoy tools update stripe --secret-file ./secrets/stripe.key
+
+# Deploy updated actions
+tolstoy actions create --from-file ./actions/
+tolstoy actions test --all
+
+# Update workflows
+tolstoy flows update --from-file ./workflows/
+
+echo "✅ Deployment completed successfully"
+```
+
+```bash CI/CD Integration
+name: Deploy Workflows
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Install Tolstoy CLI
+        run: npm install -g @tolstoy/cli
+        
+      - name: Authenticate
+        run: tolstoy auth login --token ${{ secrets.TOLSTOY_TOKEN }}
+        
+      - name: Deploy
+        run: |
+          tolstoy org select production
+          tolstoy actions deploy --from-file ./actions/
+          tolstoy flows deploy --from-file ./workflows/
+```
+</CodeGroup>
+
+## Error Handling and Debugging
+
+<AccordionGroup>
+  <Accordion title="Verbose Logging">
+    Enable detailed logging for troubleshooting:
+    ```bash
+    tolstoy actions create --verbose
+    
+    [DEBUG] Loading configuration from ~/.tolstoy/config.yaml
+    [DEBUG] Using organization: org_abc123def456
+    [DEBUG] Making request: POST /actions
+    [DEBUG] Request headers: x-org-id, x-user-id, authorization
+    [DEBUG] Response: 201 Created
+    [INFO] Action created successfully: act_def456ghi789
+    ```
+  </Accordion>
+  
+  <Accordion title="Error Codes">
+    The CLI uses standard exit codes:
+    - `0`: Success
+    - `1`: General error
+    - `2`: Invalid usage/arguments
+    - `3`: Authentication error
+    - `4`: Permission denied
+    - `5`: Resource not found
+  </Accordion>
+  
+  <Accordion title="Common Issues">
+    **Authentication Errors**
+    ```bash
+    # Re-authenticate
+    tolstoy auth logout
+    tolstoy auth login
+    
+    # Check token validity
+    tolstoy auth verify
+    ```
+    
+    **Network Issues**
+    ```bash
+    # Test connectivity
+    tolstoy health check
+    
+    # Use custom API URL
+    tolstoy --api-url https://custom.tolstoy.com actions list
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Advanced Features
+
+<CardGroup cols={2}>
+  <Card title="Templating" icon="template">
+    Use templates for consistent resource creation
+  </Card>
+  <Card title="Hooks" icon="hook">
+    Execute custom scripts before/after commands
+  </Card>
+  <Card title="Plugins" icon="puzzle">
+    Extend functionality with community plugins
+  </Card>
+  <Card title="Shell Completion" icon="terminal">
+    Auto-completion for bash, zsh, and fish
+  </Card>
+</CardGroup>
+
+## Shell Completion
+
+Enable auto-completion for your shell:
+
+<Tabs>
+  <Tab title="Bash">
+    ```bash
+    # Add to ~/.bashrc
+    eval "$(tolstoy completion bash)"
+    
+    # Or install globally
+    tolstoy completion bash > /etc/bash_completion.d/tolstoy
+    ```
+  </Tab>
+  
+  <Tab title="Zsh">
+    ```bash
+    # Add to ~/.zshrc
+    eval "$(tolstoy completion zsh)"
+    
+    # Or for Oh My Zsh
+    tolstoy completion zsh > ~/.oh-my-zsh/completions/_tolstoy
+    ```
+  </Tab>
+  
+  <Tab title="Fish">
+    ```bash
+    tolstoy completion fish > ~/.config/fish/completions/tolstoy.fish
+    ```
+  </Tab>
+</Tabs>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/cli/installation">
+    Install and configure the Tolstoy CLI
+  </Card>
+  <Card title="Authentication" icon="key" href="/cli/authentication">
+    Set up CLI authentication
+  </Card>
+  <Card title="Command Reference" icon="book" href="/cli/commands/init/init">
+    Complete list of all CLI commands
+  </Card>
+  <Card title="Configuration" icon="gear" href="/cli/configuration">
+    Advanced CLI configuration options
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="cli-footer.mdx" />

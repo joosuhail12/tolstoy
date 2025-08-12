@@ -1,0 +1,734 @@
+---
+title: "tolstoy flows execute"
+description: "Execute workflow flows with custom input data and monitor execution"
+---
+
+# tolstoy flows execute
+
+Execute workflow flows programmatically with custom input data, monitor execution progress, and retrieve results.
+
+## Usage
+
+```bash
+tolstoy flows execute [OPTIONS] <FLOW_ID>
+```
+
+## Description
+
+The `tolstoy flows execute` command allows you to trigger workflow executions from the command line, providing input data and monitoring the execution process in real-time.
+
+## Basic Usage
+
+```bash
+# Execute flow with inline input
+tolstoy flows execute flow_payment_123 \
+  --input '{"customer_id": "cust_456", "amount": 100}'
+
+# Execute flow with input from file
+tolstoy flows execute flow_order_process \
+  --input-file ./order_data.json
+
+# Execute and wait for completion
+tolstoy flows execute flow_data_sync \
+  --input '{"source": "crm", "target": "warehouse"}' \
+  --wait
+```
+
+## Arguments
+
+<ParamField path="FLOW_ID" type="string" required>
+  ID or name of the flow to execute
+  
+  ```bash
+  tolstoy flows execute flow_payment_processing
+  ```
+</ParamField>
+
+## Options
+
+<ParamField path="--input, -i" type="string">
+  JSON input data for the flow execution
+  
+  ```bash
+  tolstoy flows execute flow_123 --input '{"user_id": "123", "action": "create"}'
+  ```
+</ParamField>
+
+<ParamField path="--input-file, -f" type="string">
+  Path to file containing input JSON data
+  
+  ```bash
+  tolstoy flows execute flow_123 --input-file ./execution_data.json
+  ```
+</ParamField>
+
+<ParamField path="--wait, -w" type="boolean">
+  Wait for execution to complete before returning
+  
+  ```bash
+  tolstoy flows execute flow_123 --input '{}' --wait
+  ```
+</ParamField>
+
+<ParamField path="--timeout" type="number">
+  Maximum time to wait for completion (seconds)
+  
+  **Default**: `300`
+  
+  ```bash
+  tolstoy flows execute flow_123 --wait --timeout 600
+  ```
+</ParamField>
+
+<ParamField path="--watch" type="boolean">
+  Stream execution progress in real-time
+  
+  ```bash
+  tolstoy flows execute flow_123 --input '{}' --watch
+  ```
+</ParamField>
+
+<ParamField path="--output, -o" type="string">
+  Output format for execution results
+  
+  **Options**: `json`, `yaml`, `table`  
+  **Default**: `json`
+  
+  ```bash
+  tolstoy flows execute flow_123 --output table
+  ```
+</ParamField>
+
+<ParamField path="--async" type="boolean">
+  Execute asynchronously and return immediately
+  
+  ```bash
+  tolstoy flows execute flow_123 --input '{}' --async
+  ```
+</ParamField>
+
+<ParamField path="--dry-run" type="boolean">
+  Validate input and flow configuration without executing
+  
+  ```bash
+  tolstoy flows execute flow_123 --input '{}' --dry-run
+  ```
+</ParamField>
+
+<ParamField path="--env" type="string">
+  Environment-specific variables file
+  
+  ```bash
+  tolstoy flows execute flow_123 --env ./prod.env
+  ```
+</ParamField>
+
+<ParamField path="--tags" type="string">
+  Comma-separated tags for execution tracking
+  
+  ```bash
+  tolstoy flows execute flow_123 --tags "manual,testing,v2"
+  ```
+</ParamField>
+
+<ParamField path="--priority" type="string">
+  Execution priority level
+  
+  **Options**: `low`, `normal`, `high`, `urgent`  
+  **Default**: `normal`
+  
+  ```bash
+  tolstoy flows execute flow_123 --priority high
+  ```
+</ParamField>
+
+## Execution Modes
+
+### Synchronous Execution (Default)
+
+```bash
+# Execute and return when started
+tolstoy flows execute flow_notification_send \
+  --input '{"user_id": "123", "message": "Welcome!"}'
+
+# Output:
+# {
+#   "execution_id": "exec_abc123",
+#   "flow_id": "flow_notification_send",
+#   "status": "running",
+#   "started_at": "2023-12-01T10:30:00Z"
+# }
+```
+
+### Wait for Completion
+
+```bash
+# Execute and wait for completion
+tolstoy flows execute flow_data_processing \
+  --input '{"dataset": "customers", "operation": "cleanup"}' \
+  --wait
+
+# Output:
+# {
+#   "execution_id": "exec_def456",
+#   "flow_id": "flow_data_processing",
+#   "status": "completed",
+#   "started_at": "2023-12-01T10:30:00Z",
+#   "completed_at": "2023-12-01T10:32:15Z",
+#   "result": {
+#     "records_processed": 1500,
+#     "records_cleaned": 142,
+#     "execution_time": "2m15s"
+#   }
+# }
+```
+
+### Watch Mode (Real-time Streaming)
+
+```bash
+# Stream execution progress
+tolstoy flows execute flow_batch_import \
+  --input '{"source": "s3://data-bucket/import.csv"}' \
+  --watch
+
+# Output:
+# ↓ Starting execution...
+# ✓ Step 1: Download file (completed in 5s)
+# ⟳ Step 2: Validate data (running...)
+# ✓ Step 2: Validate data (completed in 12s) - 1000 records validated
+# ⟳ Step 3: Transform data (running...)
+# ✓ Step 3: Transform data (completed in 8s)
+# ⟳ Step 4: Upload to database (running...)
+# ✓ Step 4: Upload to database (completed in 15s) - 1000 records inserted
+# ✓ Flow completed successfully in 40s
+```
+
+### Asynchronous Execution
+
+```bash
+# Execute asynchronously
+tolstoy flows execute flow_long_running_task \
+  --input '{"task_type": "full_sync"}' \
+  --async
+
+# Output:
+# {
+#   "execution_id": "exec_ghi789",
+#   "status": "queued",
+#   "message": "Execution queued successfully"
+# }
+
+# Check status later
+tolstoy executions show exec_ghi789
+```
+
+## Input Data Formats
+
+### Inline JSON
+
+```bash
+# Simple object
+tolstoy flows execute flow_123 --input '{"key": "value", "number": 42}'
+
+# Complex nested data
+tolstoy flows execute flow_order \
+  --input '{
+    "customer": {
+      "id": "cust_123",
+      "email": "user@example.com"
+    },
+    "items": [
+      {"sku": "ITEM001", "quantity": 2, "price": 29.99},
+      {"sku": "ITEM002", "quantity": 1, "price": 15.00}
+    ],
+    "shipping": {
+      "method": "standard",
+      "address": "123 Main St, City, State 12345"
+    }
+  }'
+```
+
+### Input from File
+
+```bash
+# Create input file
+cat > order_input.json << EOF
+{
+  "order_id": "ord_123456",
+  "customer_id": "cust_789",
+  "items": [
+    {"product_id": "prod_001", "quantity": 2},
+    {"product_id": "prod_002", "quantity": 1}
+  ],
+  "payment_method": "card",
+  "shipping_address": {
+    "street": "456 Oak Avenue",
+    "city": "Springfield",
+    "state": "IL",
+    "zip": "62701"
+  }
+}
+EOF
+
+# Execute with file input
+tolstoy flows execute flow_process_order --input-file order_input.json --wait
+```
+
+### Environment Variables in Input
+
+```bash
+# Using environment variables
+export CUSTOMER_ID="cust_production_123"
+export API_VERSION="v2"
+
+tolstoy flows execute flow_api_sync \
+  --input '{
+    "customer_id": "'$CUSTOMER_ID'",
+    "api_version": "'$API_VERSION'",
+    "sync_mode": "incremental"
+  }'
+```
+
+## Output Formats
+
+<Tabs>
+  <Tab title="JSON Output (Default)">
+    ```bash
+    tolstoy flows execute flow_123 --input '{}' --wait --output json
+    ```
+    
+    ```json
+    {
+      "execution_id": "exec_abc123",
+      "flow_id": "flow_123",
+      "status": "completed",
+      "started_at": "2023-12-01T10:30:00Z",
+      "completed_at": "2023-12-01T10:32:15Z",
+      "duration": "2m15s",
+      "steps_completed": 5,
+      "steps_total": 5,
+      "result": {
+        "success": true,
+        "data": {
+          "processed_records": 150,
+          "output_file": "s3://bucket/output.csv"
+        }
+      },
+      "metadata": {
+        "triggered_by": "cli",
+        "execution_node": "worker-01"
+      }
+    }
+    ```
+  </Tab>
+  
+  <Tab title="Table Output">
+    ```bash
+    tolstoy flows execute flow_123 --input '{}' --wait --output table
+    ```
+    
+    ```
+    ┌─────────────────┬────────────────────────────┐
+    │ Field           │ Value                      │
+    ├─────────────────┼────────────────────────────┤
+    │ Execution ID    │ exec_abc123                │
+    │ Flow ID         │ flow_123                   │
+    │ Status          │ ✓ Completed                │
+    │ Duration        │ 2m 15s                     │
+    │ Steps           │ 5/5 completed              │
+    │ Records         │ 150 processed              │
+    │ Output          │ s3://bucket/output.csv     │
+    └─────────────────┴────────────────────────────┘
+    ```
+  </Tab>
+  
+  <Tab title="YAML Output">
+    ```bash
+    tolstoy flows execute flow_123 --input '{}' --wait --output yaml
+    ```
+    
+    ```yaml
+    execution_id: exec_abc123
+    flow_id: flow_123
+    status: completed
+    started_at: '2023-12-01T10:30:00Z'
+    completed_at: '2023-12-01T10:32:15Z'
+    duration: 2m15s
+    steps_completed: 5
+    steps_total: 5
+    result:
+      success: true
+      data:
+        processed_records: 150
+        output_file: s3://bucket/output.csv
+    ```
+  </Tab>
+</Tabs>
+
+## Execution Monitoring
+
+### Real-time Progress Tracking
+
+```bash
+# Watch execution with detailed progress
+tolstoy flows execute flow_data_pipeline \
+  --input '{"source": "database", "target": "warehouse"}' \
+  --watch \
+  --timeout 1800
+
+# Progress output:
+# [10:30:00] ↓ Execution started (exec_xyz789)
+# [10:30:05] ⟳ extract_data: Connecting to source database...
+# [10:30:10] ✓ extract_data: Extracted 50,000 records (5s)
+# [10:30:15] ⟳ transform_data: Applying transformations...
+# [10:30:45] ✓ transform_data: Transformed 50,000 records (30s)
+# [10:30:50] ⟳ load_data: Loading to data warehouse...
+# [10:32:15] ✓ load_data: Loaded 50,000 records (1m25s)
+# [10:32:20] ✓ Execution completed successfully (1m50s total)
+```
+
+### Execution Status Checking
+
+```bash
+# Get execution status
+EXEC_ID=$(tolstoy flows execute flow_123 --input '{}' --async | jq -r '.execution_id')
+tolstoy executions show $EXEC_ID
+
+# Poll for completion
+while true; do
+  STATUS=$(tolstoy executions show $EXEC_ID --output json | jq -r '.status')
+  echo "Status: $STATUS"
+  if [[ "$STATUS" == "completed" || "$STATUS" == "failed" ]]; then
+    break
+  fi
+  sleep 5
+done
+```
+
+## Advanced Features
+
+### Environment-Specific Executions
+
+```bash
+# Production environment variables
+cat > prod.env << EOF
+DATABASE_URL=postgresql://prod-server/db
+API_ENDPOINT=https://api.production.com
+SLACK_WEBHOOK=https://hooks.slack.com/prod
+EOF
+
+# Execute with environment
+tolstoy flows execute flow_deploy_app \
+  --input '{"version": "v2.1.0", "environment": "production"}' \
+  --env ./prod.env \
+  --priority high \
+  --tags "deployment,production,v2.1.0"
+```
+
+### Conditional Execution
+
+```bash
+# Execute only if conditions are met
+tolstoy flows execute flow_maintenance \
+  --input '{"check_prerequisites": true}' \
+  --dry-run
+
+# If dry run succeeds, execute for real
+if [ $? -eq 0 ]; then
+  tolstoy flows execute flow_maintenance \
+    --input '{"execute_maintenance": true}' \
+    --wait
+fi
+```
+
+### Batch Execution
+
+```bash
+# Execute multiple flows in sequence
+FLOWS=("flow_sync_customers" "flow_sync_orders" "flow_generate_reports")
+
+for flow in "${FLOWS[@]}"; do
+  echo "Executing $flow..."
+  tolstoy flows execute "$flow" \
+    --input '{"batch_mode": true}' \
+    --wait \
+    --timeout 900
+  
+  if [ $? -ne 0 ]; then
+    echo "Flow $flow failed, stopping batch execution"
+    exit 1
+  fi
+done
+
+echo "All flows completed successfully"
+```
+
+## Scripting and Automation
+
+### Bash Integration
+
+```bash
+#!/bin/bash
+
+# Daily data processing script
+set -e
+
+DATE=$(date +"%Y-%m-%d")
+LOG_FILE="/var/log/tolstoy/daily-process-${DATE}.log"
+
+echo "Starting daily processing for $DATE" | tee -a "$LOG_FILE"
+
+# Execute data extraction
+echo "Step 1: Data extraction" | tee -a "$LOG_FILE"
+EXEC_RESULT=$(tolstoy flows execute flow_daily_extract \
+  --input "{\"date\": \"$DATE\", \"source\": \"all\"}" \
+  --wait \
+  --timeout 3600 \
+  --output json)
+
+if [[ $(echo "$EXEC_RESULT" | jq -r '.status') != "completed" ]]; then
+  echo "Data extraction failed" | tee -a "$LOG_FILE"
+  exit 1
+fi
+
+RECORDS_EXTRACTED=$(echo "$EXEC_RESULT" | jq -r '.result.records_count')
+echo "Extracted $RECORDS_EXTRACTED records" | tee -a "$LOG_FILE"
+
+# Execute data processing
+echo "Step 2: Data processing" | tee -a "$LOG_FILE"
+tolstoy flows execute flow_daily_process \
+  --input "{\"date\": \"$DATE\", \"records_count\": $RECORDS_EXTRACTED}" \
+  --wait \
+  --output table | tee -a "$LOG_FILE"
+
+echo "Daily processing completed successfully" | tee -a "$LOG_FILE"
+```
+
+### Python Integration
+
+```python
+#!/usr/bin/env python3
+
+import subprocess
+import json
+import time
+import logging
+from datetime import datetime
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+def execute_flow(flow_id, input_data, wait=True, timeout=300):
+    """Execute a Tolstoy flow and return the result"""
+    
+    cmd = [
+        'tolstoy', 'flows', 'execute', flow_id,
+        '--input', json.dumps(input_data),
+        '--output', 'json'
+    ]
+    
+    if wait:
+        cmd.extend(['--wait', '--timeout', str(timeout)])
+    
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return json.loads(result.stdout)
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Flow execution failed: {e.stderr}")
+        raise
+
+def main():
+    # Configuration
+    flows_to_execute = [
+        {
+            'id': 'flow_customer_sync',
+            'input': {'sync_type': 'incremental', 'batch_size': 1000},
+            'timeout': 900
+        },
+        {
+            'id': 'flow_order_processing', 
+            'input': {'process_pending': True, 'notify': True},
+            'timeout': 600
+        },
+        {
+            'id': 'flow_report_generation',
+            'input': {'report_type': 'daily', 'date': datetime.now().isoformat()},
+            'timeout': 1200
+        }
+    ]
+    
+    results = []
+    
+    for flow_config in flows_to_execute:
+        logger.info(f"Executing flow: {flow_config['id']}")
+        
+        start_time = time.time()
+        
+        try:
+            result = execute_flow(
+                flow_config['id'],
+                flow_config['input'],
+                wait=True,
+                timeout=flow_config['timeout']
+            )
+            
+            execution_time = time.time() - start_time
+            
+            logger.info(
+                f"Flow {flow_config['id']} completed in {execution_time:.1f}s: "
+                f"{result.get('status', 'unknown')}"
+            )
+            
+            results.append({
+                'flow_id': flow_config['id'],
+                'execution_id': result.get('execution_id'),
+                'status': result.get('status'),
+                'duration': execution_time,
+                'result': result.get('result')
+            })
+            
+        except Exception as e:
+            logger.error(f"Flow {flow_config['id']} failed: {e}")
+            results.append({
+                'flow_id': flow_config['id'],
+                'status': 'failed',
+                'error': str(e)
+            })
+    
+    # Summary report
+    successful = len([r for r in results if r.get('status') == 'completed'])
+    total = len(results)
+    
+    logger.info(f"Batch execution completed: {successful}/{total} flows successful")
+    
+    # Save results
+    with open(f'execution_results_{datetime.now().strftime("%Y%m%d_%H%M%S")}.json', 'w') as f:
+        json.dump(results, f, indent=2)
+
+if __name__ == '__main__':
+    main()
+```
+
+## Error Handling and Debugging
+
+### Dry Run Validation
+
+```bash
+# Validate flow and input without executing
+tolstoy flows execute flow_critical_process \
+  --input '{"mode": "production", "destructive": true}' \
+  --dry-run
+
+# Output:
+# ✓ Flow validation passed
+# ✓ Input schema validation passed  
+# ✓ All required tools are available
+# ✓ No execution conflicts detected
+# ⚠ Warning: Flow contains destructive operations
+# ✓ Ready for execution
+```
+
+### Debug Mode
+
+```bash
+# Execute with debug information
+tolstoy flows execute flow_debug_test \
+  --input '{"debug": true}' \
+  --watch \
+  --debug
+
+# Shows detailed execution information:
+# [DEBUG] Resolving flow dependencies...
+# [DEBUG] Validating input against schema...
+# [DEBUG] Starting step 1: api_call_action
+# [DEBUG] Making HTTP request: POST https://api.example.com/data
+# [DEBUG] Request headers: {"Authorization": "Bearer ***", "Content-Type": "application/json"}
+# [DEBUG] Request body: {"data": "processed"}
+# [DEBUG] Response status: 200
+# [DEBUG] Response time: 245ms
+```
+
+### Common Issues and Solutions
+
+<AccordionGroup>
+  <Accordion title="Flow Not Found">
+    **Error**: `flow not found: flow_123`
+    
+    **Solutions**:
+    ```bash
+    # List available flows
+    tolstoy flows list
+    
+    # Search for flow by name
+    tolstoy flows list --search "payment"
+    
+    # Use exact flow ID
+    tolstoy flows show flow_payment_processing_v2
+    ```
+  </Accordion>
+  
+  <Accordion title="Input Validation Failed">
+    **Error**: `input validation failed: field 'amount' is required`
+    
+    **Solutions**:
+    ```bash
+    # Check flow input schema
+    tolstoy flows show flow_123 --show-input-schema
+    
+    # Validate input separately
+    tolstoy flows validate flow_123 --input '{"amount": 100}'
+    
+    # Use dry run to test
+    tolstoy flows execute flow_123 --input '{"corrected": "input"}' --dry-run
+    ```
+  </Accordion>
+  
+  <Accordion title="Execution Timeout">
+    **Error**: `execution timeout after 300 seconds`
+    
+    **Solutions**:
+    ```bash
+    # Increase timeout
+    tolstoy flows execute flow_123 --wait --timeout 1800
+    
+    # Use async execution for long-running flows
+    tolstoy flows execute flow_123 --async
+    
+    # Check execution status separately
+    tolstoy executions list --status running
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="flows list" icon="list">
+    ```bash
+    tolstoy flows list
+    ```
+    List all available flows
+  </Card>
+  <Card title="flows show" icon="eye">
+    ```bash
+    tolstoy flows show flow_123
+    ```
+    View flow details and configuration
+  </Card>
+  <Card title="executions list" icon="history">
+    ```bash
+    tolstoy executions list
+    ```
+    View execution history
+  </Card>
+  <Card title="executions show" icon="search">
+    ```bash
+    tolstoy executions show exec_123
+    ```
+    View specific execution details
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="cli-footer.mdx" />

@@ -1,0 +1,137 @@
+---
+title: "List Execution Logs"
+api: "GET /execution-logs"
+description: "Retrieve a paginated list of execution logs for actions and flows"
+---
+
+## Overview
+
+The List Execution Logs endpoint returns a paginated list of all execution logs in your organization. This includes logs from both action and flow executions.
+
+## Query Parameters
+
+<ParamField query="page" type="number" default="1">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="limit" type="number" default="20">
+  Number of items per page (max: 100)
+</ParamField>
+
+<ParamField query="type" type="string">
+  Filter logs by type: `action` or `flow`
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter logs by execution status: `success`, `failure`, `running`, `cancelled`
+</ParamField>
+
+<ParamField query="startDate" type="string">
+  ISO 8601 date string to filter logs from this date
+</ParamField>
+
+<ParamField query="endDate" type="string">
+  ISO 8601 date string to filter logs until this date
+</ParamField>
+
+## Response
+
+<ResponseField name="logs" type="array">
+  Array of execution log objects
+  
+  <Expandable title="Log Object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the execution log
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Type of execution: `action` or `flow`
+    </ResponseField>
+    
+    <ResponseField name="executionId" type="string">
+      ID of the associated execution
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Execution status: `success`, `failure`, `running`, `cancelled`
+    </ResponseField>
+    
+    <ResponseField name="startTime" type="string">
+      ISO 8601 timestamp when execution started
+    </ResponseField>
+    
+    <ResponseField name="endTime" type="string">
+      ISO 8601 timestamp when execution completed
+    </ResponseField>
+    
+    <ResponseField name="duration" type="number">
+      Execution duration in milliseconds
+    </ResponseField>
+    
+    <ResponseField name="error" type="object">
+      Error details if execution failed
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination metadata
+  
+  <Expandable title="Pagination Object">
+    <ResponseField name="page" type="number">
+      Current page number
+    </ResponseField>
+    
+    <ResponseField name="limit" type="number">
+      Items per page
+    </ResponseField>
+    
+    <ResponseField name="total" type="number">
+      Total number of items
+    </ResponseField>
+    
+    <ResponseField name="totalPages" type="number">
+      Total number of pages
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseExample>
+```json
+{
+  "logs": [
+    {
+      "id": "log_abc123",
+      "type": "flow",
+      "executionId": "exec_xyz789",
+      "status": "success",
+      "startTime": "2024-01-15T10:30:00Z",
+      "endTime": "2024-01-15T10:30:45Z",
+      "duration": 45000,
+      "error": null
+    },
+    {
+      "id": "log_def456",
+      "type": "action",
+      "executionId": "exec_uvw456",
+      "status": "failure",
+      "startTime": "2024-01-15T09:15:00Z",
+      "endTime": "2024-01-15T09:15:10Z",
+      "duration": 10000,
+      "error": {
+        "message": "Connection timeout",
+        "code": "TIMEOUT_ERROR"
+      }
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 150,
+    "totalPages": 8
+  }
+}
+```
+</ResponseExample>
+
+<Snippet file="api-footer.mdx" />

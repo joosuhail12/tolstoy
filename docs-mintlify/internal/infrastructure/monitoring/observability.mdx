@@ -1,0 +1,2140 @@
+---
+title: "Monitoring & Observability"
+description: "Comprehensive monitoring, logging, and observability setup for the Tolstoy platform using Prometheus, Grafana, Jaeger, and ELK stack"
+---
+
+# Monitoring & Observability
+
+## Overview
+
+The Tolstoy platform implements a comprehensive observability stack that provides deep insights into application performance, infrastructure health, and user experience. This guide covers the complete monitoring architecture, configuration, and operational procedures.
+
+## Observability Architecture
+
+```mermaid
+graph TB
+    subgraph "Data Collection"
+        APP[Application Pods]
+        INFRA[Infrastructure Metrics]
+        LOGS[Application Logs]
+        TRACES[Distributed Traces]
+    end
+    
+    subgraph "Metrics Collection"
+        PROM[Prometheus Server]
+        THANOS[Thanos (Long-term Storage)]
+        AM[AlertManager]
+    end
+    
+    subgraph "Log Processing"
+        FLUENTD[Fluentd]
+        ES[Elasticsearch]
+        KIBANA[Kibana]
+    end
+    
+    subgraph "Tracing"
+        JAEGER[Jaeger]
+        OTEL[OpenTelemetry Collector]
+    end
+    
+    subgraph "Visualization & Alerting"
+        GRAFANA[Grafana]
+        SLACK[Slack Notifications]
+        PD[PagerDuty]
+        EMAIL[Email Alerts]
+    end
+    
+    subgraph "External Monitoring"
+        DATADOG[Datadog]
+        UPTIME[Uptime Monitoring]
+        SYNTHETICS[Synthetic Tests]
+    end
+    
+    APP --> PROM
+    APP --> FLUENTD
+    APP --> OTEL
+    INFRA --> PROM
+    
+    PROM --> THANOS
+    PROM --> AM
+    PROM --> GRAFANA
+    
+    FLUENTD --> ES
+    ES --> KIBANA
+    
+    OTEL --> JAEGER
+    TRACES --> OTEL
+    
+    AM --> SLACK
+    AM --> PD
+    AM --> EMAIL
+    
+    GRAFANA --> DATADOG
+    
+    style PROM fill:#ff6b6b
+    style GRAFANA fill:#4ecdc4
+    style JAEGER fill:#45b7d1
+    style ES fill:#96ceb4
+```
+
+## Metrics Collection (Prometheus)
+
+### 1. Prometheus Configuration
+
+<Tabs>
+  <Tab title="Server Configuration">
+    ```yaml
+    # prometheus-config.yaml
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: prometheus-config
+      namespace: monitoring
+    data:
+      prometheus.yml: |
+        global:
+          scrape_interval: 15s
+          evaluation_interval: 15s
+          external_labels:
+            cluster: 'tolstoy-production'
+            region: 'us-west-2'
+            environment: 'production'
+        
+        # Rule files
+        rule_files:
+          - "/etc/prometheus/rules/*.yml"
+        
+        # Alerting configuration
+        alerting:
+          alertmanagers:
+          - static_configs:
+            - targets:
+              - alertmanager:9093
+        
+        # Scrape configurations
+        scrape_configs:
+        # Prometheus self-monitoring
+        - job_name: 'prometheus'
+          static_configs:
+          - targets: ['localhost:9090']
+          scrape_interval: 30s
+          metrics_path: /metrics
+        
+        # Kubernetes API server
+        - job_name: 'kubernetes-apiservers'
+          kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+              - default
+          scheme: https
+          tls_config:
+            ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+            insecure_skip_verify: true
+          bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          relabel_configs:
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_service_name, __meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: default;kubernetes;https
+        
+        # Kubernetes nodes
+        - job_name: 'kubernetes-nodes'
+          kubernetes_sd_configs:
+          - role: node
+          scheme: https
+          tls_config:
+            ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+            insecure_skip_verify: true
+          bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+          relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/${1}/proxy/metrics
+        
+        # Kubernetes pods
+        - job_name: 'kubernetes-pods'
+          kubernetes_sd_configs:
+          - role: pod
+          relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+        
+        # Tolstoy API service
+        - job_name: 'tolstoy-api'
+          kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+              - tolstoy-prod
+          relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: tolstoy-api-service
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: metrics
+          - source_labels: [__meta_kubernetes_service_label_app]
+            target_label: app
+          - source_labels: [__meta_kubernetes_service_label_version]
+            target_label: version
+          - source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          scrape_interval: 10s
+          metrics_path: /metrics
+        
+        # Tolstoy Workflow Engine
+        - job_name: 'tolstoy-workflow'
+          kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+              - tolstoy-prod
+          relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: tolstoy-workflow-service
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: metrics
+          scrape_interval: 15s
+        
+        # Node Exporter
+        - job_name: 'node-exporter'
+          kubernetes_sd_configs:
+          - role: endpoints
+            namespaces:
+              names:
+              - monitoring
+          relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            action: keep
+            regex: node-exporter
+          - source_labels: [__meta_kubernetes_endpoint_port_name]
+            action: keep
+            regex: metrics
+        
+        # kube-state-metrics
+        - job_name: 'kube-state-metrics'
+          static_configs:
+          - targets: ['kube-state-metrics:8080']
+          scrape_interval: 30s
+        
+        # AWS CloudWatch metrics via cloudwatch-exporter
+        - job_name: 'cloudwatch-exporter'
+          ec2_sd_configs:
+          - region: us-west-2
+            port: 9106
+            filters:
+            - name: tag:monitoring
+              values: ['cloudwatch-exporter']
+          relabel_configs:
+          - source_labels: [__meta_ec2_instance_id]
+            target_label: instance_id
+          - source_labels: [__meta_ec2_availability_zone]
+            target_label: availability_zone
+          scrape_interval: 60s
+        
+        # External services monitoring
+        - job_name: 'blackbox-exporter'
+          metrics_path: /probe
+          params:
+            module: [http_2xx]
+          static_configs:
+          - targets:
+            - https://api.tolstoy.dev/health
+            - https://app.tolstoy.dev
+            - https://docs.tolstoy.dev
+          relabel_configs:
+          - source_labels: [__address__]
+            target_label: __param_target
+          - source_labels: [__param_target]
+            target_label: instance
+          - target_label: __address__
+            replacement: blackbox-exporter:9115
+        
+        # Database monitoring (if using prometheus postgres exporter)
+        - job_name: 'postgres-exporter'
+          static_configs:
+          - targets: ['postgres-exporter:9187']
+          scrape_interval: 30s
+        
+        # Redis monitoring
+        - job_name: 'redis-exporter'
+          static_configs:
+          - targets: ['redis-exporter:9121']
+          scrape_interval: 30s
+        
+        # Remote write configuration for long-term storage
+        remote_write:
+        - url: "http://thanos-receive:19291/api/v1/receive"
+          queue_config:
+            max_samples_per_send: 10000
+            max_shards: 200
+            capacity: 20000
+    ```
+  </Tab>
+  
+  <Tab title="Alerting Rules">
+    ```yaml
+    # prometheus-rules.yaml
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: prometheus-rules
+      namespace: monitoring
+    data:
+      application.yml: |
+        groups:
+        - name: tolstoy-application
+          rules:
+          # API Service Alerts
+          - alert: HighErrorRate
+            expr: |
+              (
+                sum(rate(http_requests_total{job="tolstoy-api",status=~"5.."}[5m])) /
+                sum(rate(http_requests_total{job="tolstoy-api"}[5m]))
+              ) > 0.05
+            for: 2m
+            labels:
+              severity: critical
+              service: api
+            annotations:
+              summary: "High error rate detected"
+              description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+              runbook_url: "https://docs.tolstoy.dev/internal/operations/runbooks/incident-response"
+          
+          - alert: HighLatency
+            expr: |
+              histogram_quantile(0.95, 
+                sum(rate(http_request_duration_seconds_bucket{job="tolstoy-api"}[5m])) by (le)
+              ) > 1.0
+            for: 3m
+            labels:
+              severity: warning
+              service: api
+            annotations:
+              summary: "High API latency detected"
+              description: "95th percentile latency is {{ $value }}s"
+          
+          - alert: LowThroughput
+            expr: |
+              sum(rate(http_requests_total{job="tolstoy-api"}[5m])) < 10
+            for: 5m
+            labels:
+              severity: warning
+              service: api
+            annotations:
+              summary: "Low API throughput"
+              description: "Request rate is {{ $value }} requests/second"
+          
+          # Workflow Engine Alerts
+          - alert: WorkflowQueueBacklog
+            expr: |
+              aws_sqs_approximate_number_of_messages_average{queue_name="tolstoy-workflow-processing"} > 1000
+            for: 5m
+            labels:
+              severity: warning
+              service: workflow
+            annotations:
+              summary: "Workflow queue backlog building up"
+              description: "{{ $value }} messages in processing queue"
+          
+          - alert: WorkflowProcessingStalled
+            expr: |
+              increase(workflow_executions_completed_total[10m]) == 0 and 
+              aws_sqs_approximate_number_of_messages_average{queue_name="tolstoy-workflow-processing"} > 0
+            for: 5m
+            labels:
+              severity: critical
+              service: workflow
+            annotations:
+              summary: "Workflow processing appears stalled"
+              description: "No workflows completed in the last 10 minutes despite queue backlog"
+          
+          - alert: HighWorkflowFailureRate
+            expr: |
+              (
+                sum(rate(workflow_executions_failed_total[5m])) /
+                sum(rate(workflow_executions_total[5m]))
+              ) > 0.1
+            for: 3m
+            labels:
+              severity: warning
+              service: workflow
+            annotations:
+              summary: "High workflow failure rate"
+              description: "{{ $value | humanizePercentage }} of workflows are failing"
+          
+          # Database Alerts
+          - alert: DatabaseConnectionsHigh
+            expr: |
+              pg_stat_activity_count / pg_settings_max_connections * 100 > 85
+            for: 2m
+            labels:
+              severity: warning
+              service: database
+            annotations:
+              summary: "Database connections running high"
+              description: "{{ $value }}% of max connections in use"
+          
+          - alert: DatabaseSlowQueries
+            expr: |
+              pg_stat_activity_max_tx_duration > 300
+            for: 1m
+            labels:
+              severity: critical
+              service: database
+            annotations:
+              summary: "Long running database queries detected"
+              description: "Query running for {{ $value }}s"
+          
+          - alert: DatabaseReplicationLag
+            expr: |
+              pg_stat_replication_lag > 30
+            for: 5m
+            labels:
+              severity: warning
+              service: database
+            annotations:
+              summary: "Database replication lag high"
+              description: "Replication lag is {{ $value }}s"
+      
+      infrastructure.yml: |
+        groups:
+        - name: tolstoy-infrastructure
+          rules:
+          # Kubernetes Cluster Alerts
+          - alert: NodeNotReady
+            expr: |
+              kube_node_status_condition{condition="Ready",status="true"} == 0
+            for: 5m
+            labels:
+              severity: critical
+              component: kubernetes
+            annotations:
+              summary: "Kubernetes node not ready"
+              description: "Node {{ $labels.node }} has been not ready for more than 5 minutes"
+          
+          - alert: PodCrashLooping
+            expr: |
+              rate(kube_pod_container_status_restarts_total[15m]) * 60 * 15 > 0
+            for: 5m
+            labels:
+              severity: warning
+              component: kubernetes
+            annotations:
+              summary: "Pod is crash looping"
+              description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) is restarting {{ $value }} times / 15 minutes"
+          
+          - alert: PodNotScheduled
+            expr: |
+              kube_pod_status_phase{phase="Pending"} == 1
+            for: 10m
+            labels:
+              severity: warning
+              component: kubernetes
+            annotations:
+              summary: "Pod cannot be scheduled"
+              description: "Pod {{ $labels.namespace }}/{{ $labels.pod }} cannot be scheduled for more than 10 minutes"
+          
+          # Resource Usage Alerts
+          - alert: HighCPUUsage
+            expr: |
+              100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+            for: 10m
+            labels:
+              severity: warning
+              component: infrastructure
+            annotations:
+              summary: "High CPU usage detected"
+              description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+          
+          - alert: HighMemoryUsage
+            expr: |
+              (
+                node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes
+              ) / node_memory_MemTotal_bytes * 100 > 90
+            for: 5m
+            labels:
+              severity: critical
+              component: infrastructure
+            annotations:
+              summary: "High memory usage detected"
+              description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+          
+          - alert: DiskSpaceLow
+            expr: |
+              (
+                node_filesystem_avail_bytes{fstype!="tmpfs"} / 
+                node_filesystem_size_bytes{fstype!="tmpfs"}
+              ) * 100 < 10
+            for: 5m
+            labels:
+              severity: critical
+              component: infrastructure
+            annotations:
+              summary: "Low disk space"
+              description: "Disk usage is {{ $value }}% on {{ $labels.instance }} mount {{ $labels.mountpoint }}"
+          
+          # Service Discovery Alerts
+          - alert: PrometheusTargetDown
+            expr: |
+              up == 0
+            for: 5m
+            labels:
+              severity: warning
+              component: monitoring
+            annotations:
+              summary: "Prometheus target down"
+              description: "{{ $labels.job }} target {{ $labels.instance }} is down"
+    ```
+  </Tab>
+  
+  <Tab title="Deployment">
+    ```yaml
+    # prometheus-deployment.yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: prometheus-server
+      namespace: monitoring
+      labels:
+        app: prometheus
+        component: server
+    spec:
+      replicas: 2  # HA setup
+      selector:
+        matchLabels:
+          app: prometheus
+          component: server
+      template:
+        metadata:
+          labels:
+            app: prometheus
+            component: server
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            fsGroup: 65534
+          
+          serviceAccountName: prometheus-server
+          
+          # Anti-affinity to spread across nodes
+          affinity:
+            podAntiAffinity:
+              preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                      - prometheus
+                  topologyKey: kubernetes.io/hostname
+          
+          containers:
+          - name: prometheus
+            image: prom/prometheus:v2.45.0
+            args:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.path=/prometheus/'
+            - '--storage.tsdb.retention.time=7d'  # Short retention, using Thanos for long-term
+            - '--storage.tsdb.retention.size=50GB'
+            - '--web.console.libraries=/etc/prometheus/console_libraries'
+            - '--web.console.templates=/etc/prometheus/consoles'
+            - '--web.enable-lifecycle'
+            - '--web.enable-admin-api'
+            - '--web.external-url=https://prometheus.tolstoy.dev'
+            - '--storage.tsdb.wal-compression'
+            - '--log.level=info'
+            
+            ports:
+            - containerPort: 9090
+              name: web
+              protocol: TCP
+            
+            resources:
+              requests:
+                cpu: 500m
+                memory: 2Gi
+                ephemeral-storage: 1Gi
+              limits:
+                cpu: 2000m
+                memory: 8Gi
+                ephemeral-storage: 10Gi
+            
+            readinessProbe:
+              httpGet:
+                path: /-/ready
+                port: 9090
+              initialDelaySeconds: 30
+              timeoutSeconds: 10
+              periodSeconds: 10
+              successThreshold: 1
+              failureThreshold: 3
+            
+            livenessProbe:
+              httpGet:
+                path: /-/healthy
+                port: 9090
+              initialDelaySeconds: 60
+              timeoutSeconds: 10
+              periodSeconds: 30
+              successThreshold: 1
+              failureThreshold: 3
+            
+            volumeMounts:
+            - name: config-volume
+              mountPath: /etc/prometheus
+            - name: rules-volume
+              mountPath: /etc/prometheus/rules
+            - name: storage-volume
+              mountPath: /prometheus
+          
+          volumes:
+          - name: config-volume
+            configMap:
+              name: prometheus-config
+          - name: rules-volume
+            configMap:
+              name: prometheus-rules
+          - name: storage-volume
+            persistentVolumeClaim:
+              claimName: prometheus-storage
+    
+    ---
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: prometheus-storage
+      namespace: monitoring
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 100Gi
+      storageClassName: gp3-encrypted
+    
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: prometheus-server
+      namespace: monitoring
+      labels:
+        app: prometheus
+        component: server
+    spec:
+      type: ClusterIP
+      ports:
+      - port: 9090
+        targetPort: 9090
+        protocol: TCP
+        name: web
+      selector:
+        app: prometheus
+        component: server
+    ```
+  </Tab>
+</Tabs>
+
+### 2. Application Metrics Implementation
+
+<Tabs>
+  <Tab title="Node.js Metrics (API Service)">
+    ```javascript
+    // metrics/prometheus.js
+    const promClient = require('prom-client');
+    const express = require('express');
+    const { createProxyMiddleware } = require('http-proxy-middleware');
+    
+    // Create a Registry
+    const register = new promClient.Registry();
+    
+    // Add default metrics
+    promClient.collectDefaultMetrics({
+      register,
+      prefix: 'tolstoy_api_',
+      gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5], // Adjusted for Node.js GC
+    });
+    
+    // Custom business metrics
+    const httpRequestsTotal = new promClient.Counter({
+      name: 'http_requests_total',
+      help: 'Total number of HTTP requests',
+      labelNames: ['method', 'route', 'status_code'],
+      registers: [register],
+    });
+    
+    const httpRequestDuration = new promClient.Histogram({
+      name: 'http_request_duration_seconds',
+      help: 'HTTP request duration in seconds',
+      labelNames: ['method', 'route', 'status_code'],
+      buckets: [0.01, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0],
+      registers: [register],
+    });
+    
+    const activeConnections = new promClient.Gauge({
+      name: 'active_connections',
+      help: 'Number of active connections',
+      registers: [register],
+    });
+    
+    const databaseConnectionPool = new promClient.Gauge({
+      name: 'database_connections_active',
+      help: 'Number of active database connections',
+      registers: [register],
+    });
+    
+    const databaseQueryDuration = new promClient.Histogram({
+      name: 'database_query_duration_seconds',
+      help: 'Database query duration in seconds',
+      labelNames: ['operation', 'table'],
+      buckets: [0.001, 0.01, 0.1, 0.5, 1.0, 2.0, 5.0],
+      registers: [register],
+    });
+    
+    const workflowExecutions = new promClient.Counter({
+      name: 'workflow_executions_total',
+      help: 'Total workflow executions',
+      labelNames: ['status', 'workflow_type'],
+      registers: [register],
+    });
+    
+    const workflowExecutionDuration = new promClient.Histogram({
+      name: 'workflow_execution_duration_seconds',
+      help: 'Workflow execution duration in seconds',
+      labelNames: ['workflow_type', 'status'],
+      buckets: [1, 5, 10, 30, 60, 300, 600, 1800], // Workflow-specific buckets
+      registers: [register],
+    });
+    
+    const cacheOperations = new promClient.Counter({
+      name: 'cache_operations_total',
+      help: 'Total cache operations',
+      labelNames: ['operation', 'cache_name', 'result'],
+      registers: [register],
+    });
+    
+    const queueSize = new promClient.Gauge({
+      name: 'queue_size',
+      help: 'Current queue size',
+      labelNames: ['queue_name'],
+      registers: [register],
+    });
+    
+    // Business metrics
+    const usersOnline = new promClient.Gauge({
+      name: 'users_online_total',
+      help: 'Number of currently online users',
+      registers: [register],
+    });
+    
+    const apiKeysActive = new promClient.Gauge({
+      name: 'api_keys_active_total',
+      help: 'Number of active API keys',
+      registers: [register],
+    });
+    
+    // Error tracking
+    const errorsByType = new promClient.Counter({
+      name: 'errors_total',
+      help: 'Total errors by type',
+      labelNames: ['error_type', 'service'],
+      registers: [register],
+    });
+    
+    // Middleware for HTTP metrics
+    const metricsMiddleware = (req, res, next) => {
+      const start = Date.now();
+      
+      // Track active connections
+      activeConnections.inc();
+      
+      res.on('finish', () => {
+        const duration = (Date.now() - start) / 1000;
+        const route = req.route ? req.route.path : req.path;
+        const method = req.method;
+        const statusCode = res.statusCode.toString();
+        
+        // Record metrics
+        httpRequestsTotal.inc({ method, route, status_code: statusCode });
+        httpRequestDuration.observe({ method, route, status_code: statusCode }, duration);
+        
+        // Track active connections
+        activeConnections.dec();
+      });
+      
+      next();
+    };
+    
+    // Database metrics helper
+    const trackDatabaseQuery = (operation, table) => {
+      const end = databaseQueryDuration.startTimer({ operation, table });
+      
+      return {
+        end: (error = null) => {
+          end();
+          if (error) {
+            errorsByType.inc({ error_type: 'database_error', service: 'api' });
+          }
+        }
+      };
+    };
+    
+    // Workflow metrics helper
+    const trackWorkflowExecution = (workflowType) => {
+      const start = Date.now();
+      
+      return {
+        finish: (status) => {
+          const duration = (Date.now() - start) / 1000;
+          workflowExecutions.inc({ status, workflow_type: workflowType });
+          workflowExecutionDuration.observe({ workflow_type: workflowType, status }, duration);
+        }
+      };
+    };
+    
+    // Cache metrics helper
+    const trackCacheOperation = (operation, cacheName, result) => {
+      cacheOperations.inc({ operation, cache_name: cacheName, result });
+    };
+    
+    // Periodic metrics collection
+    const collectPeriodicMetrics = () => {
+      // Database connection pool metrics
+      if (global.dbPool) {
+        databaseConnectionPool.set(global.dbPool.totalCount || 0);
+      }
+      
+      // Queue size metrics (example with Bull queues)
+      if (global.queues) {
+        Object.entries(global.queues).forEach(async ([queueName, queue]) => {
+          try {
+            const waiting = await queue.waiting();
+            const active = await queue.active();
+            const delayed = await queue.delayed();
+            
+            queueSize.set({ queue_name: `${queueName}_waiting` }, waiting.length);
+            queueSize.set({ queue_name: `${queueName}_active` }, active.length);
+            queueSize.set({ queue_name: `${queueName}_delayed` }, delayed.length);
+          } catch (error) {
+            console.error(`Error collecting queue metrics for ${queueName}:`, error);
+          }
+        });
+      }
+      
+      // Custom business metrics
+      collectBusinessMetrics();
+    };
+    
+    const collectBusinessMetrics = async () => {
+      try {
+        // Example: Count online users from Redis
+        if (global.redis) {
+          const onlineCount = await global.redis.scard('users:online');
+          usersOnline.set(onlineCount);
+        }
+        
+        // Example: Count active API keys from database
+        if (global.db) {
+          const result = await global.db.query('SELECT COUNT(*) as count FROM api_keys WHERE active = true');
+          apiKeysActive.set(parseInt(result.rows[0].count));
+        }
+      } catch (error) {
+        console.error('Error collecting business metrics:', error);
+        errorsByType.inc({ error_type: 'metrics_collection_error', service: 'api' });
+      }
+    };
+    
+    // Start periodic collection
+    setInterval(collectPeriodicMetrics, 30000); // Every 30 seconds
+    
+    // Metrics endpoint
+    const createMetricsApp = () => {
+      const app = express();
+      
+      app.get('/metrics', async (req, res) => {
+        try {
+          res.set('Content-Type', register.contentType);
+          const metrics = await register.metrics();
+          res.end(metrics);
+        } catch (error) {
+          console.error('Error generating metrics:', error);
+          res.status(500).end(error);
+        }
+      });
+      
+      app.get('/health', (req, res) => {
+        res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+      });
+      
+      return app;
+    };
+    
+    module.exports = {
+      register,
+      metricsMiddleware,
+      trackDatabaseQuery,
+      trackWorkflowExecution,
+      trackCacheOperation,
+      createMetricsApp,
+      metrics: {
+        httpRequestsTotal,
+        httpRequestDuration,
+        activeConnections,
+        databaseConnectionPool,
+        databaseQueryDuration,
+        workflowExecutions,
+        workflowExecutionDuration,
+        cacheOperations,
+        queueSize,
+        usersOnline,
+        apiKeysActive,
+        errorsByType,
+      },
+    };
+    ```
+  </Tab>
+  
+  <Tab title="Workflow Engine Metrics">
+    ```javascript
+    // workflow-engine/metrics.js
+    const promClient = require('prom-client');
+    
+    const register = new promClient.Registry();
+    
+    // Add default metrics with workflow-specific prefix
+    promClient.collectDefaultMetrics({
+      register,
+      prefix: 'tolstoy_workflow_engine_',
+    });
+    
+    // Workflow-specific metrics
+    const workflowExecutionsActive = new promClient.Gauge({
+      name: 'workflow_executions_active',
+      help: 'Number of currently executing workflows',
+      labelNames: ['workflow_type'],
+      registers: [register],
+    });
+    
+    const workflowExecutionsQueued = new promClient.Gauge({
+      name: 'workflow_executions_queued',
+      help: 'Number of queued workflow executions',
+      labelNames: ['priority'],
+      registers: [register],
+    });
+    
+    const workflowStepExecutions = new promClient.Counter({
+      name: 'workflow_step_executions_total',
+      help: 'Total workflow step executions',
+      labelNames: ['step_type', 'status'],
+      registers: [register],
+    });
+    
+    const workflowStepDuration = new promClient.Histogram({
+      name: 'workflow_step_duration_seconds',
+      help: 'Workflow step execution duration',
+      labelNames: ['step_type'],
+      buckets: [0.1, 0.5, 1, 2, 5, 10, 30, 60, 300],
+      registers: [register],
+    });
+    
+    const workflowRetries = new promClient.Counter({
+      name: 'workflow_retries_total',
+      help: 'Total workflow retries',
+      labelNames: ['workflow_type', 'retry_reason'],
+      registers: [register],
+    });
+    
+    const workflowMemoryUsage = new promClient.Gauge({
+      name: 'workflow_memory_usage_bytes',
+      help: 'Memory usage per workflow execution',
+      labelNames: ['workflow_id'],
+      registers: [register],
+    });
+    
+    const externalApiCalls = new promClient.Counter({
+      name: 'external_api_calls_total',
+      help: 'Total external API calls',
+      labelNames: ['service', 'status'],
+      registers: [register],
+    });
+    
+    const externalApiDuration = new promClient.Histogram({
+      name: 'external_api_duration_seconds',
+      help: 'External API call duration',
+      labelNames: ['service'],
+      buckets: [0.1, 0.5, 1, 2, 5, 10, 30],
+      registers: [register],
+    });
+    
+    // Workflow execution tracker
+    class WorkflowExecutionTracker {
+      constructor(workflowId, workflowType) {
+        this.workflowId = workflowId;
+        this.workflowType = workflowType;
+        this.startTime = Date.now();
+        this.stepTrackers = new Map();
+        
+        // Increment active executions
+        workflowExecutionsActive.inc({ workflow_type: workflowType });
+      }
+      
+      startStep(stepId, stepType) {
+        const tracker = {
+          startTime: Date.now(),
+          stepType,
+        };
+        
+        this.stepTrackers.set(stepId, tracker);
+        return tracker;
+      }
+      
+      finishStep(stepId, status = 'success', error = null) {
+        const tracker = this.stepTrackers.get(stepId);
+        if (!tracker) return;
+        
+        const duration = (Date.now() - tracker.startTime) / 1000;
+        
+        workflowStepExecutions.inc({ step_type: tracker.stepType, status });
+        workflowStepDuration.observe({ step_type: tracker.stepType }, duration);
+        
+        if (error) {
+          console.error(`Step ${stepId} failed:`, error);
+        }
+        
+        this.stepTrackers.delete(stepId);
+      }
+      
+      recordRetry(reason) {
+        workflowRetries.inc({ workflow_type: this.workflowType, retry_reason: reason });
+      }
+      
+      updateMemoryUsage(bytes) {
+        workflowMemoryUsage.set({ workflow_id: this.workflowId }, bytes);
+      }
+      
+      finish(status = 'success') {
+        // Decrement active executions
+        workflowExecutionsActive.dec({ workflow_type: this.workflowType });
+        
+        // Clean up memory tracking
+        workflowMemoryUsage.remove({ workflow_id: this.workflowId });
+      }
+    }
+    
+    // External API call tracker
+    const trackExternalApiCall = (serviceName) => {
+      const start = Date.now();
+      
+      return {
+        finish: (status = 'success') => {
+          const duration = (Date.now() - start) / 1000;
+          externalApiCalls.inc({ service: serviceName, status });
+          externalApiDuration.observe({ service: serviceName }, duration);
+        }
+      };
+    };
+    
+    // Queue monitoring
+    const updateQueueMetrics = async (queues) => {
+      for (const [queueName, queue] of Object.entries(queues)) {
+        try {
+          const waiting = await queue.getWaiting();
+          const active = await queue.getActive();
+          const delayed = await queue.getDelayed();
+          
+          // Determine priority from queue name or configuration
+          let priority = 'normal';
+          if (queueName.includes('high-priority')) {
+            priority = 'high';
+          } else if (queueName.includes('low-priority')) {
+            priority = 'low';
+          }
+          
+          workflowExecutionsQueued.set({ priority }, waiting.length + delayed.length);
+        } catch (error) {
+          console.error(`Error updating queue metrics for ${queueName}:`, error);
+        }
+      }
+    };
+    
+    module.exports = {
+      register,
+      WorkflowExecutionTracker,
+      trackExternalApiCall,
+      updateQueueMetrics,
+      metrics: {
+        workflowExecutionsActive,
+        workflowExecutionsQueued,
+        workflowStepExecutions,
+        workflowStepDuration,
+        workflowRetries,
+        workflowMemoryUsage,
+        externalApiCalls,
+        externalApiDuration,
+      },
+    };
+    ```
+  </Tab>
+</Tabs>
+
+### 3. Thanos for Long-term Storage
+
+<Tabs>
+  <Tab title="Thanos Sidecar">
+    ```yaml
+    # thanos-sidecar.yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: prometheus-server-thanos
+      namespace: monitoring
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: prometheus-thanos
+      template:
+        metadata:
+          labels:
+            app: prometheus-thanos
+        spec:
+          containers:
+          - name: prometheus
+            image: prom/prometheus:v2.45.0
+            args:
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.path=/prometheus/'
+            - '--storage.tsdb.retention.time=2d'  # Short retention with Thanos
+            - '--storage.tsdb.min-block-duration=2h'
+            - '--storage.tsdb.max-block-duration=2h'
+            - '--web.enable-lifecycle'
+            - '--storage.tsdb.wal-compression'
+            - '--web.external-url=https://prometheus.tolstoy.dev'
+            ports:
+            - containerPort: 9090
+              name: web
+            volumeMounts:
+            - name: config-volume
+              mountPath: /etc/prometheus
+            - name: storage-volume
+              mountPath: /prometheus
+            resources:
+              requests:
+                cpu: 500m
+                memory: 2Gi
+              limits:
+                cpu: 2000m
+                memory: 8Gi
+          
+          - name: thanos-sidecar
+            image: thanosio/thanos:v0.32.0
+            args:
+            - sidecar
+            - --prometheus.url=http://127.0.0.1:9090
+            - --grpc-address=0.0.0.0:10901
+            - --http-address=0.0.0.0:10902
+            - --tsdb.path=/prometheus
+            - --objstore.config-file=/etc/thanos/objstore.yml
+            - --log.level=info
+            ports:
+            - containerPort: 10901
+              name: grpc
+            - containerPort: 10902
+              name: http
+            volumeMounts:
+            - name: storage-volume
+              mountPath: /prometheus
+            - name: objstore-config
+              mountPath: /etc/thanos
+            resources:
+              requests:
+                cpu: 100m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 1Gi
+          
+          volumes:
+          - name: config-volume
+            configMap:
+              name: prometheus-config
+          - name: storage-volume
+            persistentVolumeClaim:
+              claimName: prometheus-storage
+          - name: objstore-config
+            secret:
+              secretName: thanos-objstore-config
+    
+    ---
+    apiVersion: v1
+    kind: Secret
+    metadata:
+      name: thanos-objstore-config
+      namespace: monitoring
+    type: Opaque
+    stringData:
+      objstore.yml: |
+        type: s3
+        config:
+          bucket: "tolstoy-metrics-longterm-storage"
+          endpoint: "s3.us-west-2.amazonaws.com"
+          region: "us-west-2"
+          access_key: ""  # Use IRSA instead
+          secret_key: ""  # Use IRSA instead
+          insecure: false
+          signature_version2: false
+          encrypt_sse: true
+          put_user_metadata:
+            "X-Amz-Acl": "bucket-owner-full-control"
+          http_config:
+            idle_conn_timeout: 90s
+            response_header_timeout: 2m
+          trace:
+            enable: false
+    ```
+  </Tab>
+  
+  <Tab title="Thanos Query">
+    ```yaml
+    # thanos-query.yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: thanos-query
+      namespace: monitoring
+      labels:
+        app: thanos-query
+    spec:
+      replicas: 2
+      selector:
+        matchLabels:
+          app: thanos-query
+      template:
+        metadata:
+          labels:
+            app: thanos-query
+        spec:
+          containers:
+          - name: thanos-query
+            image: thanosio/thanos:v0.32.0
+            args:
+            - query
+            - --log.level=info
+            - --grpc-address=0.0.0.0:10901
+            - --http-address=0.0.0.0:9090
+            - --query.replica-label=prometheus_replica
+            - --query.replica-label=cluster
+            - --store=prometheus-server-thanos:10901  # Sidecar
+            - --store=thanos-store:10901               # Store gateway
+            - --store=thanos-ruler:10901               # Ruler
+            - --query.timeout=5m
+            - --query.max-concurrent=20
+            - --query.lookback-delta=15m
+            - --web.external-prefix=/thanos
+            ports:
+            - containerPort: 9090
+              name: http
+            - containerPort: 10901
+              name: grpc
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                cpu: 1000m
+                memory: 2Gi
+            livenessProbe:
+              httpGet:
+                path: /-/healthy
+                port: 9090
+              initialDelaySeconds: 30
+              timeoutSeconds: 10
+            readinessProbe:
+              httpGet:
+                path: /-/ready
+                port: 9090
+              initialDelaySeconds: 15
+              timeoutSeconds: 10
+    
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: thanos-query
+      namespace: monitoring
+      labels:
+        app: thanos-query
+    spec:
+      ports:
+      - port: 9090
+        targetPort: 9090
+        name: http
+      - port: 10901
+        targetPort: 10901
+        name: grpc
+      selector:
+        app: thanos-query
+    ```
+  </Tab>
+  
+  <Tab title="Thanos Store Gateway">
+    ```yaml
+    # thanos-store.yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: thanos-store
+      namespace: monitoring
+      labels:
+        app: thanos-store
+    spec:
+      replicas: 2
+      selector:
+        matchLabels:
+          app: thanos-store
+      template:
+        metadata:
+          labels:
+            app: thanos-store
+        spec:
+          containers:
+          - name: thanos-store
+            image: thanosio/thanos:v0.32.0
+            args:
+            - store
+            - --log.level=info
+            - --grpc-address=0.0.0.0:10901
+            - --http-address=0.0.0.0:10902
+            - --data-dir=/var/thanos/store
+            - --objstore.config-file=/etc/thanos/objstore.yml
+            - --sync-block-duration=3m
+            - --block-sync-concurrency=20
+            - --min-time=-2w  # Serve data from 2 weeks ago
+            - --max-time=-1h  # Up to 1 hour ago (avoid overlap with sidecar)
+            - --index-cache-size=2GB
+            - --chunk-pool-size=2GB
+            ports:
+            - containerPort: 10901
+              name: grpc
+            - containerPort: 10902
+              name: http
+            volumeMounts:
+            - name: objstore-config
+              mountPath: /etc/thanos
+            - name: data-volume
+              mountPath: /var/thanos/store
+            resources:
+              requests:
+                cpu: 500m
+                memory: 2Gi
+                ephemeral-storage: 1Gi
+              limits:
+                cpu: 1000m
+                memory: 8Gi
+                ephemeral-storage: 10Gi
+            livenessProbe:
+              httpGet:
+                path: /-/healthy
+                port: 10902
+              initialDelaySeconds: 30
+            readinessProbe:
+              httpGet:
+                path: /-/ready
+                port: 10902
+              initialDelaySeconds: 15
+          volumes:
+          - name: objstore-config
+            secret:
+              secretName: thanos-objstore-config
+          - name: data-volume
+            emptyDir:
+              sizeLimit: 20Gi
+    
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: thanos-store
+      namespace: monitoring
+      labels:
+        app: thanos-store
+    spec:
+      ports:
+      - port: 10901
+        targetPort: 10901
+        name: grpc
+      - port: 10902
+        targetPort: 10902
+        name: http
+      selector:
+        app: thanos-store
+    ```
+  </Tab>
+</Tabs>
+
+## Distributed Tracing (Jaeger)
+
+### 1. Jaeger Deployment
+
+<Tabs>
+  <Tab title="All-in-One Deployment">
+    ```yaml
+    # jaeger-all-in-one.yaml
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: jaeger
+      namespace: monitoring
+      labels:
+        app: jaeger
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: jaeger
+      template:
+        metadata:
+          labels:
+            app: jaeger
+        spec:
+          containers:
+          - name: jaeger
+            image: jaegertracing/all-in-one:1.48
+            ports:
+            - containerPort: 16686
+              name: query
+            - containerPort: 14268
+              name: collector
+            - containerPort: 6831
+              protocol: UDP
+              name: agent-compact
+            - containerPort: 6832
+              protocol: UDP
+              name: agent-binary
+            - containerPort: 5778
+              name: agent-http
+            - containerPort: 14250
+              name: grpc
+            env:
+            - name: COLLECTOR_OTLP_ENABLED
+              value: "true"
+            - name: SPAN_STORAGE_TYPE
+              value: "elasticsearch"
+            - name: ES_SERVER_URLS
+              value: "http://elasticsearch:9200"
+            - name: ES_INDEX_PREFIX
+              value: "jaeger"
+            - name: QUERY_BASE_PATH
+              value: "/jaeger"
+            resources:
+              requests:
+                cpu: 200m
+                memory: 512Mi
+              limits:
+                cpu: 1000m
+                memory: 2Gi
+            readinessProbe:
+              httpGet:
+                path: /
+                port: 16686
+              initialDelaySeconds: 5
+    
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: jaeger-query
+      namespace: monitoring
+      labels:
+        app: jaeger
+    spec:
+      ports:
+      - port: 16686
+        targetPort: 16686
+        name: query
+      selector:
+        app: jaeger
+    
+    ---
+    apiVersion: v1
+    kind: Service
+    metadata:
+      name: jaeger-collector
+      namespace: monitoring
+      labels:
+        app: jaeger
+    spec:
+      ports:
+      - port: 14268
+        targetPort: 14268
+        name: collector
+      - port: 14250
+        targetPort: 14250
+        name: grpc
+      - port: 6831
+        protocol: UDP
+        targetPort: 6831
+        name: agent-compact
+      - port: 6832
+        protocol: UDP
+        targetPort: 6832
+        name: agent-binary
+      - port: 5778
+        targetPort: 5778
+        name: agent-http
+      selector:
+        app: jaeger
+    ```
+  </Tab>
+  
+  <Tab title="Production Deployment">
+    ```yaml
+    # jaeger-production.yaml
+    # Elasticsearch for storage
+    apiVersion: apps/v1
+    kind: StatefulSet
+    metadata:
+      name: elasticsearch
+      namespace: monitoring
+    spec:
+      serviceName: elasticsearch
+      replicas: 3
+      selector:
+        matchLabels:
+          app: elasticsearch
+      template:
+        metadata:
+          labels:
+            app: elasticsearch
+        spec:
+          containers:
+          - name: elasticsearch
+            image: docker.elastic.co/elasticsearch/elasticsearch:8.9.0
+            env:
+            - name: discovery.type
+              value: single-node
+            - name: ES_JAVA_OPTS
+              value: "-Xms2g -Xmx2g"
+            - name: xpack.security.enabled
+              value: "false"
+            - name: xpack.monitoring.enabled
+              value: "false"
+            ports:
+            - containerPort: 9200
+              name: http
+            - containerPort: 9300
+              name: transport
+            volumeMounts:
+            - name: data
+              mountPath: /usr/share/elasticsearch/data
+            resources:
+              requests:
+                cpu: 1000m
+                memory: 4Gi
+              limits:
+                cpu: 2000m
+                memory: 8Gi
+      volumeClaimTemplates:
+      - metadata:
+          name: data
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 100Gi
+          storageClassName: gp3-encrypted
+    
+    ---
+    # Jaeger Collector
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: jaeger-collector
+      namespace: monitoring
+    spec:
+      replicas: 3
+      selector:
+        matchLabels:
+          app: jaeger-collector
+      template:
+        metadata:
+          labels:
+            app: jaeger-collector
+        spec:
+          containers:
+          - name: jaeger-collector
+            image: jaegertracing/jaeger-collector:1.48
+            args:
+            - --config-file=/conf/collector.yaml
+            ports:
+            - containerPort: 14268
+              name: http
+            - containerPort: 14250
+              name: grpc
+            - containerPort: 9411
+              name: zipkin
+            volumeMounts:
+            - name: config
+              mountPath: /conf
+            resources:
+              requests:
+                cpu: 500m
+                memory: 1Gi
+              limits:
+                cpu: 1000m
+                memory: 2Gi
+          volumes:
+          - name: config
+            configMap:
+              name: jaeger-collector-config
+    
+    ---
+    # Jaeger Query Service
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: jaeger-query
+      namespace: monitoring
+    spec:
+      replicas: 2
+      selector:
+        matchLabels:
+          app: jaeger-query
+      template:
+        metadata:
+          labels:
+            app: jaeger-query
+        spec:
+          containers:
+          - name: jaeger-query
+            image: jaegertracing/jaeger-query:1.48
+            args:
+            - --config-file=/conf/query.yaml
+            ports:
+            - containerPort: 16686
+              name: query
+            - containerPort: 16687
+              name: admin
+            volumeMounts:
+            - name: config
+              mountPath: /conf
+            resources:
+              requests:
+                cpu: 300m
+                memory: 512Mi
+              limits:
+                cpu: 1000m
+                memory: 2Gi
+          volumes:
+          - name: config
+            configMap:
+              name: jaeger-query-config
+    
+    ---
+    # Configuration ConfigMaps
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: jaeger-collector-config
+      namespace: monitoring
+    data:
+      collector.yaml: |
+        collector:
+          zipkin:
+            host-port: ":9411"
+          otlp:
+            grpc:
+              host-port: ":14250"
+            http:
+              host-port: ":14268"
+        
+        storage:
+          type: elasticsearch
+          elasticsearch:
+            server-urls: http://elasticsearch:9200
+            index-prefix: jaeger
+            num-shards: 5
+            num-replicas: 1
+            bulk:
+              size: 5000000
+              workers: 4
+              flush-interval: 200ms
+        
+        processors:
+          batch:
+            timeout: 1s
+            send-batch-size: 1024
+    
+    ---
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: jaeger-query-config
+      namespace: monitoring
+    data:
+      query.yaml: |
+        storage:
+          type: elasticsearch
+          elasticsearch:
+            server-urls: http://elasticsearch:9200
+            index-prefix: jaeger
+            max-doc-count: 10000
+        
+        query:
+          base-path: /jaeger
+          static-files: /go/jaeger-ui/
+          ui-config: /conf/ui.json
+      
+      ui.json: |
+        {
+          "monitor": {
+            "menuEnabled": true
+          },
+          "dependencies": {
+            "menuEnabled": true
+          },
+          "archiveEnabled": true,
+          "tracking": {
+            "gaID": "UA-000000-2",
+            "trackErrors": true
+          }
+        }
+    ```
+  </Tab>
+</Tabs>
+
+### 2. OpenTelemetry Instrumentation
+
+<Tabs>
+  <Tab title="Node.js Instrumentation">
+    ```javascript
+    // tracing/tracer.js
+    const { NodeSDK } = require('@opentelemetry/sdk-node');
+    const { Resource } = require('@opentelemetry/resources');
+    const { SemanticResourceAttributes } = require('@opentelemetry/semantic-conventions');
+    const { JaegerExporter } = require('@opentelemetry/exporter-jaeger');
+    const { OTLPTraceExporter } = require('@opentelemetry/exporter-otlp-http');
+    const { PrometheusExporter } = require('@opentelemetry/exporter-prometheus');
+    const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
+    const { PeriodicExportingMetricReader } = require('@opentelemetry/sdk-metrics');
+    
+    // Custom instrumentations
+    const { HttpInstrumentation } = require('@opentelemetry/instrumentation-http');
+    const { ExpressInstrumentation } = require('@opentelemetry/instrumentation-express');
+    const { PgInstrumentation } = require('@opentelemetry/instrumentation-pg');
+    const { RedisInstrumentation } = require('@opentelemetry/instrumentation-redis');
+    const { PinoInstrumentation } = require('@opentelemetry/instrumentation-pino');
+    
+    // Initialize tracing
+    const init = () => {
+      const serviceName = process.env.SERVICE_NAME || 'tolstoy-api';
+      const serviceVersion = process.env.SERVICE_VERSION || '1.0.0';
+      const environment = process.env.NODE_ENV || 'development';
+      
+      // Trace exporter configuration
+      const traceExporter = process.env.JAEGER_ENDPOINT
+        ? new JaegerExporter({
+            endpoint: process.env.JAEGER_ENDPOINT,
+            headers: {},
+          })
+        : new OTLPTraceExporter({
+            url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT || 'http://jaeger-collector:14268/api/traces',
+          });
+      
+      // Metrics exporter
+      const metricsExporter = new PrometheusExporter({
+        port: parseInt(process.env.PROMETHEUS_PORT || '9090'),
+        endpoint: '/metrics',
+      });
+      
+      // SDK configuration
+      const sdk = new NodeSDK({
+        resource: new Resource({
+          [SemanticResourceAttributes.SERVICE_NAME]: serviceName,
+          [SemanticResourceAttributes.SERVICE_VERSION]: serviceVersion,
+          [SemanticResourceAttributes.DEPLOYMENT_ENVIRONMENT]: environment,
+          [SemanticResourceAttributes.SERVICE_INSTANCE_ID]: process.env.HOSTNAME || require('os').hostname(),
+        }),
+        
+        traceExporter,
+        
+        metricReader: new PeriodicExportingMetricReader({
+          exporter: metricsExporter,
+          exportIntervalMillis: 30000,
+        }),
+        
+        instrumentations: [
+          getNodeAutoInstrumentations({
+            '@opentelemetry/instrumentation-fs': {
+              enabled: false, // Disable to reduce noise
+            },
+            '@opentelemetry/instrumentation-dns': {
+              enabled: false, // Disable to reduce noise
+            },
+          }),
+          
+          // Custom HTTP instrumentation
+          new HttpInstrumentation({
+            applyCustomAttributesOnSpan: (span, request, response) => {
+              span.setAttributes({
+                'http.request.size': request.headers['content-length'] || 0,
+                'http.response.size': response.headers['content-length'] || 0,
+              });
+            },
+            ignoreincomingPaths: [
+              '/health',
+              '/metrics',
+              '/favicon.ico',
+            ],
+          }),
+          
+          // Express instrumentation
+          new ExpressInstrumentation({
+            ignoreincomingPaths: [
+              '/health',
+              '/metrics',
+              '/favicon.ico',
+            ],
+          }),
+          
+          // Database instrumentation
+          new PgInstrumentation({
+            enhancedDatabaseReporting: true,
+          }),
+          
+          // Redis instrumentation
+          new RedisInstrumentation({
+            dbStatementSerializer: (cmdName, cmdArgs) => {
+              return `${cmdName} ${cmdArgs.slice(0, 2).join(' ')}`;  // Limit args for privacy
+            },
+          }),
+          
+          // Logging instrumentation
+          new PinoInstrumentation({
+            logHook: (span, record) => {
+              record['trace_id'] = span.spanContext().traceId;
+              record['span_id'] = span.spanContext().spanId;
+            },
+          }),
+        ],
+      });
+      
+      // Error handling
+      process.on('SIGTERM', () => {
+        sdk.shutdown()
+          .then(() => console.log('Tracing terminated'))
+          .catch((error) => console.log('Error terminating tracing', error))
+          .finally(() => process.exit(0));
+      });
+      
+      // Initialize SDK
+      sdk.start();
+      
+      console.log(`Tracing initialized for service: ${serviceName}`);
+      
+      return sdk;
+    };
+    
+    module.exports = { init };
+    ```
+  </Tab>
+  
+  <Tab title="Custom Spans">
+    ```javascript
+    // tracing/custom-spans.js
+    const { trace, context, SpanStatusCode, SpanKind } = require('@opentelemetry/api');
+    const { SemanticAttributes } = require('@opentelemetry/semantic-conventions');
+    
+    const tracer = trace.getTracer('tolstoy-custom-spans', '1.0.0');
+    
+    // Workflow execution tracing
+    class WorkflowTracer {
+      constructor(workflowId, workflowType, userId = null) {
+        this.workflowId = workflowId;
+        this.workflowType = workflowType;
+        this.userId = userId;
+        this.rootSpan = null;
+        this.stepSpans = new Map();
+      }
+      
+      startWorkflowExecution(input) {
+        this.rootSpan = tracer.startSpan('workflow.execution', {
+          kind: SpanKind.SERVER,
+          attributes: {
+            'workflow.id': this.workflowId,
+            'workflow.type': this.workflowType,
+            'workflow.input.size': JSON.stringify(input).length,
+            'user.id': this.userId,
+          },
+        });
+        
+        return context.setSpan(context.active(), this.rootSpan);
+      }
+      
+      startStep(stepId, stepType, stepConfig = {}) {
+        if (!this.rootSpan) {
+          throw new Error('Workflow execution not started');
+        }
+        
+        const stepSpan = tracer.startSpan(`workflow.step.${stepType}`, {
+          parent: this.rootSpan,
+          kind: SpanKind.INTERNAL,
+          attributes: {
+            'workflow.step.id': stepId,
+            'workflow.step.type': stepType,
+            'workflow.step.config': JSON.stringify(stepConfig),
+          },
+        });
+        
+        this.stepSpans.set(stepId, stepSpan);
+        return context.setSpan(context.active(), stepSpan);
+      }
+      
+      finishStep(stepId, result = null, error = null) {
+        const stepSpan = this.stepSpans.get(stepId);
+        if (!stepSpan) return;
+        
+        if (error) {
+          stepSpan.recordException(error);
+          stepSpan.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+          stepSpan.setAttributes({
+            'workflow.step.error': error.message,
+            'workflow.step.error.type': error.constructor.name,
+          });
+        } else {
+          stepSpan.setStatus({ code: SpanStatusCode.OK });
+          if (result) {
+            stepSpan.setAttributes({
+              'workflow.step.result.size': JSON.stringify(result).length,
+            });
+          }
+        }
+        
+        stepSpan.end();
+        this.stepSpans.delete(stepId);
+      }
+      
+      finishWorkflowExecution(result = null, error = null) {
+        if (!this.rootSpan) return;
+        
+        if (error) {
+          this.rootSpan.recordException(error);
+          this.rootSpan.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+        } else {
+          this.rootSpan.setStatus({ code: SpanStatusCode.OK });
+          if (result) {
+            this.rootSpan.setAttributes({
+              'workflow.result.size': JSON.stringify(result).length,
+            });
+          }
+        }
+        
+        // End any remaining step spans
+        for (const [stepId, stepSpan] of this.stepSpans) {
+          stepSpan.setStatus({ code: SpanStatusCode.ERROR, message: 'Workflow terminated' });
+          stepSpan.end();
+        }
+        
+        this.rootSpan.end();
+      }
+    }
+    
+    // Database query tracing
+    const traceDbQuery = async (operation, table, query, params = []) => {
+      const span = tracer.startSpan('db.query', {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          [SemanticAttributes.DB_SYSTEM]: 'postgresql',
+          [SemanticAttributes.DB_OPERATION]: operation,
+          [SemanticAttributes.DB_SQL_TABLE]: table,
+          [SemanticAttributes.DB_STATEMENT]: query.substring(0, 1000), // Limit query length
+          'db.params.count': params.length,
+        },
+      });
+      
+      try {
+        const startTime = Date.now();
+        const result = await executeQuery(query, params); // Your DB execution logic
+        const duration = Date.now() - startTime;
+        
+        span.setAttributes({
+          'db.duration_ms': duration,
+          'db.rows_affected': result.rowCount || 0,
+        });
+        
+        span.setStatus({ code: SpanStatusCode.OK });
+        return result;
+      } catch (error) {
+        span.recordException(error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+        throw error;
+      } finally {
+        span.end();
+      }
+    };
+    
+    // External API call tracing
+    const traceExternalApiCall = async (service, method, url, options = {}) => {
+      const span = tracer.startSpan(`external.api.${service}`, {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          [SemanticAttributes.HTTP_METHOD]: method,
+          [SemanticAttributes.HTTP_URL]: url,
+          'external.service': service,
+          'http.request.size': options.body ? JSON.stringify(options.body).length : 0,
+        },
+      });
+      
+      try {
+        const startTime = Date.now();
+        const response = await makeHttpRequest(method, url, options); // Your HTTP client logic
+        const duration = Date.now() - startTime;
+        
+        span.setAttributes({
+          [SemanticAttributes.HTTP_STATUS_CODE]: response.status,
+          'http.response.size': response.headers['content-length'] || 0,
+          'http.duration_ms': duration,
+        });
+        
+        if (response.status >= 400) {
+          span.setStatus({ code: SpanStatusCode.ERROR, message: `HTTP ${response.status}` });
+        } else {
+          span.setStatus({ code: SpanStatusCode.OK });
+        }
+        
+        return response;
+      } catch (error) {
+        span.recordException(error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+        throw error;
+      } finally {
+        span.end();
+      }
+    };
+    
+    // Cache operation tracing
+    const traceCacheOperation = async (operation, key, ttl = null, value = null) => {
+      const span = tracer.startSpan(`cache.${operation}`, {
+        kind: SpanKind.CLIENT,
+        attributes: {
+          'cache.operation': operation,
+          'cache.key': key,
+          'cache.ttl': ttl,
+        },
+      });
+      
+      try {
+        const startTime = Date.now();
+        let result;
+        
+        switch (operation) {
+          case 'get':
+            result = await cacheClient.get(key);
+            span.setAttributes({
+              'cache.hit': result !== null,
+              'cache.value.size': result ? JSON.stringify(result).length : 0,
+            });
+            break;
+          case 'set':
+            result = await cacheClient.set(key, value, ttl);
+            span.setAttributes({
+              'cache.value.size': JSON.stringify(value).length,
+            });
+            break;
+          case 'del':
+            result = await cacheClient.del(key);
+            break;
+          default:
+            throw new Error(`Unknown cache operation: ${operation}`);
+        }
+        
+        const duration = Date.now() - startTime;
+        span.setAttributes({ 'cache.duration_ms': duration });
+        span.setStatus({ code: SpanStatusCode.OK });
+        
+        return result;
+      } catch (error) {
+        span.recordException(error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+        throw error;
+      } finally {
+        span.end();
+      }
+    };
+    
+    // Message queue tracing
+    const traceQueueOperation = async (operation, queueName, messageId = null, payload = null) => {
+      const span = tracer.startSpan(`queue.${operation}`, {
+        kind: operation === 'send' ? SpanKind.PRODUCER : SpanKind.CONSUMER,
+        attributes: {
+          'messaging.system': 'sqs',
+          'messaging.destination': queueName,
+          'messaging.operation': operation,
+          'messaging.message_id': messageId,
+        },
+      });
+      
+      if (payload) {
+        span.setAttributes({
+          'messaging.message_payload_size_bytes': JSON.stringify(payload).length,
+        });
+      }
+      
+      try {
+        const result = await queueClient[operation](queueName, payload || messageId);
+        span.setStatus({ code: SpanStatusCode.OK });
+        return result;
+      } catch (error) {
+        span.recordException(error);
+        span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
+        throw error;
+      } finally {
+        span.end();
+      }
+    };
+    
+    module.exports = {
+      WorkflowTracer,
+      traceDbQuery,
+      traceExternalApiCall,
+      traceCacheOperation,
+      traceQueueOperation,
+    };
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+<Note>
+This monitoring and observability setup provides comprehensive visibility into the Tolstoy platform's performance and health. Regular review and optimization of metrics, alerts, and tracing configuration ensures continued effectiveness as the system evolves.
+</Note>

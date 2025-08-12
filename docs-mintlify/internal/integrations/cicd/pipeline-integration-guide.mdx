@@ -1,0 +1,1174 @@
+---
+title: "CI/CD Pipeline Integration Guide"
+description: "Comprehensive guide for setting up CI/CD pipelines with GitHub Actions, AWS, and deployment automation"
+---
+
+# CI/CD Pipeline Integration Guide
+
+## Overview
+
+The Tolstoy platform uses a comprehensive CI/CD pipeline built with GitHub Actions, AWS services, and automated deployment strategies. This guide covers the complete setup and configuration for continuous integration and deployment.
+
+## Pipeline Architecture
+
+```mermaid
+graph TB
+    subgraph "Source Control"
+        GH[GitHub Repository]
+        BR[Feature Branch]
+        PR[Pull Request]
+        MAIN[Main Branch]
+    end
+    
+    subgraph "CI Pipeline"
+        BUILD[Build & Test]
+        LINT[Lint & Format]
+        SECURITY[Security Scan]
+        DOCKER[Docker Build]
+    end
+    
+    subgraph "CD Pipeline"
+        STAGING[Deploy Staging]
+        PROD[Deploy Production]
+        ROLLBACK[Rollback]
+    end
+    
+    subgraph "Infrastructure"
+        ECR[AWS ECR]
+        EKS[AWS EKS]
+        RDS[AWS RDS]
+        S3[AWS S3]
+    end
+    
+    BR --> PR
+    PR --> BUILD
+    BUILD --> LINT
+    LINT --> SECURITY
+    SECURITY --> DOCKER
+    DOCKER --> ECR
+    
+    MAIN --> STAGING
+    STAGING --> PROD
+    
+    STAGING --> EKS
+    PROD --> EKS
+    EKS --> RDS
+    EKS --> S3
+```
+
+## GitHub Actions Workflows
+
+### Main CI/CD Workflow
+
+```yaml
+# .github/workflows/ci-cd.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  release:
+    types: [published]
+
+env:
+  NODE_VERSION: '18'
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: tolstoy-app
+  EKS_CLUSTER_NAME: tolstoy-production
+
+jobs:
+  # Pre-checks job
+  pre-checks:
+    runs-on: ubuntu-latest
+    outputs:
+      should-deploy: ${{ steps.changes.outputs.should-deploy }}
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Check for changes
+        id: changes
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            should-deploy:
+              - 'src/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'Dockerfile'
+              - 'k8s/**'
+      
+      - name: Generate version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            echo "version=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          else
+            echo "version=sha-$(echo ${{ github.sha }} | cut -c1-8)" >> $GITHUB_OUTPUT
+          fi
+
+  # Code quality and testing
+  test:
+    runs-on: ubuntu-latest
+    needs: pre-checks
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: tolstoy_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run linter
+        run: npm run lint
+      
+      - name: Run type checking
+        run: npm run type-check
+      
+      - name: Run unit tests
+        run: npm run test:unit
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tolstoy_test
+          REDIS_URL: redis://localhost:6379
+      
+      - name: Run integration tests
+        run: npm run test:integration
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/tolstoy_test
+          REDIS_URL: redis://localhost:6379
+      
+      - name: Upload test coverage
+        uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./coverage/lcov.info
+
+  # Security scanning
+  security:
+    runs-on: ubuntu-latest
+    needs: pre-checks
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run Snyk security scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=medium
+      
+      - name: Run Semgrep security scan
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/secrets
+            p/owasp-top-ten
+      
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+      
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Build and push Docker image
+  build:
+    runs-on: ubuntu-latest
+    needs: [pre-checks, test, security]
+    if: needs.pre-checks.outputs.should-deploy == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      
+      - name: Build Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ needs.pre-checks.outputs.version }}
+        run: |
+          docker build \
+            --target production \
+            --build-arg NODE_ENV=production \
+            --build-arg BUILD_VERSION=${{ needs.pre-checks.outputs.version }} \
+            --build-arg BUILD_COMMIT=${{ github.sha }} \
+            --tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG \
+            --tag $ECR_REGISTRY/$ECR_REPOSITORY:latest \
+            .
+      
+      - name: Scan Docker image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ needs.pre-checks.outputs.version }}
+          format: 'sarif'
+          output: 'docker-trivy-results.sarif'
+      
+      - name: Push Docker image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ needs.pre-checks.outputs.version }}
+        run: |
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+
+  # Deploy to staging
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: [pre-checks, build]
+    if: github.ref == 'refs/heads/develop'
+    environment: staging
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+      
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name tolstoy-staging
+      
+      - name: Deploy to staging
+        env:
+          IMAGE_TAG: ${{ needs.pre-checks.outputs.version }}
+        run: |
+          # Update deployment image
+          kubectl set image deployment/tolstoy-app \
+            tolstoy-app=${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG \
+            --namespace=staging
+          
+          # Wait for rollout to complete
+          kubectl rollout status deployment/tolstoy-app --namespace=staging --timeout=300s
+      
+      - name: Run smoke tests
+        run: |
+          # Wait for service to be ready
+          sleep 30
+          
+          # Run basic health checks
+          curl -f https://staging-api.tolstoy.com/health || exit 1
+          curl -f https://staging-api.tolstoy.com/api/v1/health || exit 1
+      
+      - name: Notify deployment
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+
+  # Deploy to production
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [pre-checks, build]
+    if: github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+      
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+      
+      - name: Pre-deployment checks
+        run: |
+          # Check cluster health
+          kubectl get nodes
+          kubectl get pods --all-namespaces | grep -v Running | grep -v Completed || true
+          
+          # Check database connectivity
+          kubectl exec -it deployment/tolstoy-app -- npm run db:health-check
+      
+      - name: Create deployment backup
+        run: |
+          # Create database backup before deployment
+          kubectl create job db-backup-$(date +%s) \
+            --from=cronjob/database-backup \
+            --namespace=production
+      
+      - name: Blue-Green deployment
+        env:
+          IMAGE_TAG: ${{ needs.pre-checks.outputs.version }}
+        run: |
+          # Deploy to blue environment
+          kubectl patch deployment tolstoy-app-blue \
+            -p='{"spec":{"template":{"spec":{"containers":[{"name":"tolstoy-app","image":"${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG"}]}}}}' \
+            --namespace=production
+          
+          # Wait for blue deployment to be ready
+          kubectl rollout status deployment/tolstoy-app-blue --namespace=production --timeout=600s
+          
+          # Run health checks on blue environment
+          sleep 30
+          kubectl exec deployment/tolstoy-app-blue -- curl -f http://localhost:3000/health
+          
+          # Switch traffic to blue environment
+          kubectl patch service tolstoy-app-service \
+            -p='{"spec":{"selector":{"version":"blue"}}}' \
+            --namespace=production
+          
+          # Wait and verify
+          sleep 60
+          curl -f https://api.tolstoy.com/health
+          
+          # Update green environment for next deployment
+          kubectl patch deployment tolstoy-app-green \
+            -p='{"spec":{"template":{"spec":{"containers":[{"name":"tolstoy-app","image":"${{ secrets.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:$IMAGE_TAG"}]}}}}' \
+            --namespace=production
+      
+      - name: Post-deployment verification
+        run: |
+          # Run comprehensive health checks
+          npm run test:e2e:production
+          
+          # Check metrics and alerts
+          aws cloudwatch get-metric-statistics \
+            --namespace "Tolstoy/Application" \
+            --metric-name "APIRequests" \
+            --start-time $(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%S) \
+            --end-time $(date -u +%Y-%m-%dT%H:%M:%S) \
+            --period 300 \
+            --statistics Sum
+      
+      - name: Update deployment tracking
+        run: |
+          # Update deployment database
+          kubectl exec deployment/tolstoy-app-blue -- npm run deployment:record -- \
+            --version="${{ needs.pre-checks.outputs.version }}" \
+            --commit="${{ github.sha }}" \
+            --environment="production"
+      
+      - name: Notify deployment success
+        uses: 8398a7/action-slack@v3
+        with:
+          status: success
+          channel: '#deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          text: |
+            🚀 Production deployment successful!
+            Version: ${{ needs.pre-checks.outputs.version }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+
+  # Rollback job (manual trigger)
+  rollback:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment: production
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.28.0'
+      
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+      
+      - name: Rollback deployment
+        run: |
+          # Switch traffic back to green environment
+          kubectl patch service tolstoy-app-service \
+            -p='{"spec":{"selector":{"version":"green"}}}' \
+            --namespace=production
+          
+          # Verify rollback
+          sleep 30
+          curl -f https://api.tolstoy.com/health
+      
+      - name: Notify rollback
+        uses: 8398a7/action-slack@v3
+        with:
+          status: custom
+          channel: '#deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          custom_payload: |
+            {
+              text: "⚠️ Production rollback completed",
+              attachments: [{
+                color: "warning",
+                fields: [{
+                  title: "Environment",
+                  value: "Production",
+                  short: true
+                }, {
+                  title: "Triggered by",
+                  value: "${{ github.actor }}",
+                  short: true
+                }]
+              }]
+            }
+```
+
+### Database Migration Workflow
+
+```yaml
+# .github/workflows/migrations.yml
+name: Database Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      action:
+        description: 'Migration action'
+        required: true
+        default: 'migrate'
+        type: choice
+        options:
+          - migrate
+          - rollback
+      version:
+        description: 'Version to rollback to (if rollback)'
+        required: false
+        type: string
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
+      - name: Setup database connection
+        run: |
+          # Get database credentials from AWS Secrets Manager
+          DB_SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id "tolstoy/${{ github.event.inputs.environment }}/database" \
+            --query SecretString --output text)
+          
+          echo "DATABASE_URL=$(echo $DB_SECRET | jq -r .connection_string)" >> $GITHUB_ENV
+      
+      - name: Create database backup
+        if: github.event.inputs.action == 'migrate'
+        run: |
+          # Create pre-migration backup
+          npm run db:backup -- --label="pre-migration-$(date +%s)"
+      
+      - name: Run migrations
+        if: github.event.inputs.action == 'migrate'
+        run: |
+          npm run db:migrate
+      
+      - name: Rollback migration
+        if: github.event.inputs.action == 'rollback'
+        run: |
+          npm run db:rollback -- --version="${{ github.event.inputs.version }}"
+      
+      - name: Verify database integrity
+        run: |
+          npm run db:health-check
+          npm run db:verify-integrity
+      
+      - name: Notify migration result
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#database'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+```
+
+### Performance Testing Workflow
+
+```yaml
+# .github/workflows/performance.yml
+name: Performance Testing
+
+on:
+  schedule:
+    - cron: '0 2 * * *' # Daily at 2 AM
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+      duration:
+        description: 'Test duration (minutes)'
+        required: true
+        default: '10'
+        type: string
+
+jobs:
+  performance-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: |
+          npm ci
+          npm install -g artillery@latest
+      
+      - name: Configure test environment
+        run: |
+          ENV="${{ github.event.inputs.environment || 'staging' }}"
+          DURATION="${{ github.event.inputs.duration || '10' }}"
+          
+          if [ "$ENV" = "production" ]; then
+            echo "BASE_URL=https://api.tolstoy.com" >> $GITHUB_ENV
+          else
+            echo "BASE_URL=https://staging-api.tolstoy.com" >> $GITHUB_ENV
+          fi
+          
+          echo "TEST_DURATION=${DURATION}m" >> $GITHUB_ENV
+      
+      - name: Run load tests
+        run: |
+          # API endpoint load test
+          artillery run \
+            --target $BASE_URL \
+            --duration $TEST_DURATION \
+            --rate 10 \
+            tests/performance/api-load-test.yml \
+            --output api-results.json
+          
+          # Workflow execution test
+          artillery run \
+            --target $BASE_URL \
+            --duration $TEST_DURATION \
+            --rate 5 \
+            tests/performance/workflow-test.yml \
+            --output workflow-results.json
+      
+      - name: Generate reports
+        run: |
+          artillery report api-results.json --output api-report.html
+          artillery report workflow-results.json --output workflow-report.html
+      
+      - name: Analyze results
+        run: |
+          # Extract key metrics
+          API_P95=$(jq '.aggregate.latency.p95' api-results.json)
+          API_ERROR_RATE=$(jq '.aggregate.counters."http.codes.4xx" // 0 + .aggregate.counters."http.codes.5xx" // 0' api-results.json)
+          
+          WORKFLOW_P95=$(jq '.aggregate.latency.p95' workflow-results.json)
+          WORKFLOW_ERROR_RATE=$(jq '.aggregate.counters."http.codes.4xx" // 0 + .aggregate.counters."http.codes.5xx" // 0' workflow-results.json)
+          
+          echo "API_P95_LATENCY=$API_P95" >> $GITHUB_ENV
+          echo "API_ERROR_RATE=$API_ERROR_RATE" >> $GITHUB_ENV
+          echo "WORKFLOW_P95_LATENCY=$WORKFLOW_P95" >> $GITHUB_ENV
+          echo "WORKFLOW_ERROR_RATE=$WORKFLOW_ERROR_RATE" >> $GITHUB_ENV
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-test-results
+          path: |
+            api-results.json
+            workflow-results.json
+            api-report.html
+            workflow-report.html
+      
+      - name: Check performance thresholds
+        run: |
+          # Set performance thresholds
+          MAX_P95_LATENCY=1000  # 1 second
+          MAX_ERROR_RATE=1      # 1%
+          
+          if (( $(echo "$API_P95_LATENCY > $MAX_P95_LATENCY" | bc -l) )); then
+            echo "❌ API P95 latency exceeded threshold: $API_P95_LATENCY ms > $MAX_P95_LATENCY ms"
+            exit 1
+          fi
+          
+          if (( $(echo "$API_ERROR_RATE > $MAX_ERROR_RATE" | bc -l) )); then
+            echo "❌ API error rate exceeded threshold: $API_ERROR_RATE% > $MAX_ERROR_RATE%"
+            exit 1
+          fi
+          
+          echo "✅ All performance thresholds passed"
+      
+      - name: Report results
+        uses: 8398a7/action-slack@v3
+        if: always()
+        with:
+          status: custom
+          channel: '#performance'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          custom_payload: |
+            {
+              text: "Performance Test Results - ${{ github.event.inputs.environment || 'staging' }}",
+              attachments: [{
+                color: "${{ job.status == 'success' && 'good' || 'danger' }}",
+                fields: [{
+                  title: "API P95 Latency",
+                  value: "${{ env.API_P95_LATENCY }}ms",
+                  short: true
+                }, {
+                  title: "API Error Rate",
+                  value: "${{ env.API_ERROR_RATE }}%",
+                  short: true
+                }, {
+                  title: "Workflow P95 Latency",
+                  value: "${{ env.WORKFLOW_P95_LATENCY }}ms",
+                  short: true
+                }, {
+                  title: "Workflow Error Rate",
+                  value: "${{ env.WORKFLOW_ERROR_RATE }}%",
+                  short: true
+                }]
+              }]
+            }
+```
+
+## Deployment Scripts
+
+### Kubernetes Deployment Configuration
+
+```yaml
+# k8s/production/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tolstoy-app-blue
+  namespace: production
+  labels:
+    app: tolstoy-app
+    version: blue
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: tolstoy-app
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: tolstoy-app
+        version: blue
+    spec:
+      serviceAccountName: tolstoy-service-account
+      containers:
+      - name: tolstoy-app
+        image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/tolstoy-app:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3000"
+        - name: DB_SECRET_NAME
+          value: "tolstoy/production/database"
+        - name: REDIS_SECRET_NAME
+          value: "tolstoy/production/redis"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tolstoy-app-green
+  namespace: production
+  labels:
+    app: tolstoy-app
+    version: green
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: tolstoy-app
+      version: green
+  template:
+    metadata:
+      labels:
+        app: tolstoy-app
+        version: green
+    spec:
+      serviceAccountName: tolstoy-service-account
+      containers:
+      - name: tolstoy-app
+        image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/tolstoy-app:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3000"
+        - name: DB_SECRET_NAME
+          value: "tolstoy/production/database"
+        - name: REDIS_SECRET_NAME
+          value: "tolstoy/production/redis"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 2
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tolstoy-app-service
+  namespace: production
+  labels:
+    app: tolstoy-app
+spec:
+  selector:
+    app: tolstoy-app
+    version: blue  # Initially pointing to blue
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
+  type: ClusterIP
+```
+
+### Automated Rollback Script
+
+```bash
+#!/bin/bash
+# scripts/rollback.sh
+
+set -e
+
+# Configuration
+NAMESPACE=${NAMESPACE:-"production"}
+APP_NAME="tolstoy-app"
+KUBECTL_TIMEOUT="300s"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+log() {
+    echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')] $1${NC}"
+}
+
+warn() {
+    echo -e "${YELLOW}[$(date +'%Y-%m-%d %H:%M:%S')] WARNING: $1${NC}"
+}
+
+error() {
+    echo -e "${RED}[$(date +'%Y-%m-%d %H:%M:%S')] ERROR: $1${NC}"
+}
+
+# Function to get current active version
+get_current_version() {
+    kubectl get service ${APP_NAME}-service -n $NAMESPACE -o jsonpath='{.spec.selector.version}'
+}
+
+# Function to switch traffic
+switch_traffic() {
+    local target_version=$1
+    log "Switching traffic to $target_version environment..."
+    
+    kubectl patch service ${APP_NAME}-service \
+        -n $NAMESPACE \
+        -p "{\"spec\":{\"selector\":{\"version\":\"$target_version\"}}}"
+}
+
+# Function to verify deployment
+verify_deployment() {
+    local version=$1
+    log "Verifying $version deployment..."
+    
+    # Check if pods are ready
+    kubectl wait --for=condition=available \
+        deployment/${APP_NAME}-${version} \
+        -n $NAMESPACE \
+        --timeout=$KUBECTL_TIMEOUT
+    
+    # Health check
+    log "Running health checks..."
+    sleep 30
+    
+    # Get service endpoint
+    SERVICE_URL=$(kubectl get service ${APP_NAME}-service -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || echo "localhost")
+    
+    # Basic health check
+    if curl -f --max-time 10 "http://${SERVICE_URL}/health"; then
+        log "Health check passed"
+        return 0
+    else
+        error "Health check failed"
+        return 1
+    fi
+}
+
+# Main rollback function
+rollback() {
+    local current_version=$(get_current_version)
+    local target_version
+    
+    if [ "$current_version" = "blue" ]; then
+        target_version="green"
+    elif [ "$current_version" = "green" ]; then
+        target_version="blue"
+    else
+        error "Unknown current version: $current_version"
+        exit 1
+    fi
+    
+    log "Current active version: $current_version"
+    log "Rolling back to: $target_version"
+    
+    # Verify target deployment is available
+    if ! kubectl get deployment ${APP_NAME}-${target_version} -n $NAMESPACE &>/dev/null; then
+        error "Target deployment ${APP_NAME}-${target_version} not found"
+        exit 1
+    fi
+    
+    # Check if target deployment is healthy
+    if ! verify_deployment $target_version; then
+        error "Target deployment is not healthy, cannot rollback"
+        exit 1
+    fi
+    
+    # Create backup point
+    log "Creating rollback point..."
+    kubectl annotate deployment ${APP_NAME}-${current_version} \
+        -n $NAMESPACE \
+        rollback.tolstoy.com/timestamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+        rollback.tolstoy.com/reason="Manual rollback" \
+        --overwrite
+    
+    # Switch traffic
+    switch_traffic $target_version
+    
+    # Verify rollback
+    sleep 30
+    if verify_deployment $target_version; then
+        log "✅ Rollback completed successfully"
+        log "Active version is now: $target_version"
+        
+        # Send notification
+        if [ -n "$SLACK_WEBHOOK" ]; then
+            curl -X POST -H 'Content-type: application/json' \
+                --data "{\"text\":\"🔄 Production rollback completed. Active version: $target_version\"}" \
+                $SLACK_WEBHOOK
+        fi
+    else
+        error "Rollback verification failed"
+        
+        # Attempt to roll forward again
+        warn "Attempting to roll forward..."
+        switch_traffic $current_version
+        
+        if verify_deployment $current_version; then
+            warn "Rolled forward to previous version"
+        else
+            error "❌ Critical: Both versions failed health checks!"
+        fi
+        
+        exit 1
+    fi
+}
+
+# Check prerequisites
+if ! command -v kubectl &> /dev/null; then
+    error "kubectl is not installed"
+    exit 1
+fi
+
+if ! kubectl get namespace $NAMESPACE &>/dev/null; then
+    error "Namespace $NAMESPACE not found"
+    exit 1
+fi
+
+# Execute rollback
+rollback
+
+log "Rollback script completed"
+```
+
+## Monitoring and Alerting Integration
+
+### GitHub Actions Monitoring
+
+```yaml
+# .github/workflows/monitoring.yml
+name: CI/CD Monitoring
+
+on:
+  workflow_run:
+    workflows: ["CI/CD Pipeline"]
+    types: [completed]
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+      
+      - name: Record deployment metrics
+        run: |
+          # Record deployment success/failure
+          STATUS="${{ github.event.workflow_run.conclusion }}"
+          METRIC_VALUE=$([ "$STATUS" = "success" ] && echo 1 || echo 0)
+          
+          aws cloudwatch put-metric-data \
+            --namespace "Tolstoy/CI-CD" \
+            --metric-data \
+              MetricName=DeploymentSuccess,Value=$METRIC_VALUE,Unit=Count \
+              MetricName=DeploymentAttempts,Value=1,Unit=Count
+      
+      - name: Check deployment frequency
+        run: |
+          # Calculate deployment frequency
+          CURRENT_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          PAST_TIME=$(date -u -d '24 hours ago' +%Y-%m-%dT%H:%M:%SZ)
+          
+          DEPLOYMENT_COUNT=$(aws cloudwatch get-metric-statistics \
+            --namespace "Tolstoy/CI-CD" \
+            --metric-name "DeploymentAttempts" \
+            --start-time $PAST_TIME \
+            --end-time $CURRENT_TIME \
+            --period 86400 \
+            --statistics Sum \
+            --query 'Datapoints[0].Sum' \
+            --output text || echo 0)
+          
+          echo "Deployments in last 24h: $DEPLOYMENT_COUNT"
+          
+          # Alert if deployment frequency is too high
+          if [ "$DEPLOYMENT_COUNT" -gt 10 ]; then
+            echo "⚠️ High deployment frequency detected: $DEPLOYMENT_COUNT deployments"
+          fi
+```
+
+## Environment Configuration
+
+```bash
+# CI/CD Environment Variables
+
+# AWS Configuration
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=AKIA...
+AWS_SECRET_ACCESS_KEY=...
+ECR_REGISTRY=123456789012.dkr.ecr.us-east-1.amazonaws.com
+
+# Kubernetes Configuration
+EKS_CLUSTER_NAME=tolstoy-production
+KUBECTL_VERSION=v1.28.0
+
+# Application Configuration
+ECR_REPOSITORY=tolstoy-app
+DOCKER_BUILDKIT=1
+
+# Security Scanning
+SNYK_TOKEN=...
+TRIVY_CACHE_DIR=/tmp/trivy
+SEMGREP_APP_TOKEN=...
+
+# Notification Configuration
+SLACK_WEBHOOK=https://hooks.slack.com/...
+GITHUB_TOKEN=...
+
+# Testing Configuration
+CODECOV_TOKEN=...
+PERFORMANCE_TEST_DURATION=10m
+LOAD_TEST_RATE=10
+
+# Database Configuration
+DB_MIGRATION_TIMEOUT=300s
+DB_BACKUP_RETENTION=30d
+```
+
+---
+
+<Note>
+This CI/CD pipeline integration guide provides a complete setup for automated testing, building, and deployment with GitHub Actions. It includes security scanning, performance testing, blue-green deployments, and comprehensive monitoring for production-ready operations.
+</Note>

@@ -1,0 +1,540 @@
+---
+title: "tolstoy auth login"
+description: "Authenticate with Tolstoy and manage login sessions"
+---
+
+# tolstoy auth login
+
+Authenticate with the Tolstoy platform to access your organization's workflows, tools, and data.
+
+## Usage
+
+```bash
+tolstoy auth login [OPTIONS]
+```
+
+## Description
+
+The `tolstoy auth login` command initiates the authentication process with Tolstoy. It supports multiple authentication methods including browser-based OAuth, API tokens, and single sign-on (SSO) integrations.
+
+## Authentication Methods
+
+### Interactive Browser Login (Default)
+
+```bash
+# Launch browser for OAuth authentication
+tolstoy auth login
+
+# Specify organization during login
+tolstoy auth login --org "your-org-name"
+```
+
+**Process Flow**:
+1. Opens browser to Tolstoy login page
+2. Complete authentication (email/password, SSO, etc.)
+3. Browser redirects back with auth code
+4. CLI exchanges code for access token
+5. Token stored securely in local keychain
+
+### API Token Authentication
+
+```bash
+# Authenticate using API token
+tolstoy auth login --token "your-api-token"
+
+# Read token from file
+tolstoy auth login --token-file ~/.tolstoy-token
+
+# Read token from environment variable
+export TOLSTOY_AUTH_TOKEN="your-api-token"
+tolstoy auth login --use-env-token
+```
+
+### Service Account Authentication
+
+```bash
+# Authenticate using service account key
+tolstoy auth login --service-account-key service-account.json
+
+# Using service account ID and secret
+tolstoy auth login \
+  --service-account-id "sa_123456" \
+  --service-account-secret "secret_abcdef"
+```
+
+## Options
+
+<ParamField path="--org, -o" type="string">
+  Organization name or ID to authenticate with
+  
+  ```bash
+  tolstoy auth login --org "acme-corp"
+  ```
+</ParamField>
+
+<ParamField path="--token, -t" type="string">
+  API token for direct authentication
+  
+  ```bash
+  tolstoy auth login --token "tok_1234567890abcdef"
+  ```
+</ParamField>
+
+<ParamField path="--token-file" type="string">
+  Read API token from file
+  
+  ```bash
+  tolstoy auth login --token-file ~/.tolstoy/api-token
+  ```
+</ParamField>
+
+<ParamField path="--use-env-token" type="boolean">
+  Use token from TOLSTOY_AUTH_TOKEN environment variable
+  
+  ```bash
+  export TOLSTOY_AUTH_TOKEN="your-token"
+  tolstoy auth login --use-env-token
+  ```
+</ParamField>
+
+<ParamField path="--browser" type="string">
+  Specify browser for OAuth flow
+  
+  ```bash
+  tolstoy auth login --browser "chrome"
+  tolstoy auth login --browser "firefox"
+  ```
+</ParamField>
+
+<ParamField path="--no-browser" type="boolean">
+  Skip browser launch and show manual URL
+  
+  ```bash
+  tolstoy auth login --no-browser
+  ```
+</ParamField>
+
+<ParamField path="--profile, -p" type="string">
+  Save authentication to specific profile
+  
+  ```bash
+  tolstoy auth login --profile "production"
+  ```
+</ParamField>
+
+<ParamField path="--service-account-key" type="string">
+  Path to service account JSON key file
+  
+  ```bash
+  tolstoy auth login --service-account-key ./service-account.json
+  ```
+</ParamField>
+
+<ParamField path="--host" type="string">
+  Custom Tolstoy API host
+  
+  **Default**: `api.tolstoy.getpullse.com`
+  
+  ```bash
+  tolstoy auth login --host "custom-api.company.com"
+  ```
+</ParamField>
+
+<ParamField path="--port" type="number">
+  Local port for OAuth callback
+  
+  **Default**: `8080`
+  
+  ```bash
+  tolstoy auth login --port 9090
+  ```
+</ParamField>
+
+<ParamField path="--timeout" type="number">
+  Authentication timeout in seconds
+  
+  **Default**: `300`
+  
+  ```bash
+  tolstoy auth login --timeout 600
+  ```
+</ParamField>
+
+<ParamField path="--force, -f" type="boolean">
+  Force re-authentication even if already logged in
+  
+  ```bash
+  tolstoy auth login --force
+  ```
+</ParamField>
+
+## Examples
+
+### Basic Interactive Login
+
+```bash
+# Start interactive login process
+tolstoy auth login
+
+# Output:
+# Opening browser for authentication...
+# Listening for callback on http://localhost:8080
+# ✓ Authentication successful!
+# ✓ Logged in as john@acme.com
+# ✓ Active organization: Acme Corp (org_123456)
+```
+
+### Organization-Specific Login
+
+```bash
+# Login to specific organization
+tolstoy auth login --org "acme-corp"
+
+# Login with organization ID
+tolstoy auth login --org "org_123456"
+```
+
+### Profile-Based Authentication
+
+```bash
+# Create separate authentication profiles
+tolstoy auth login --profile "development" --org "acme-dev"
+tolstoy auth login --profile "production" --org "acme-prod"
+
+# Switch between profiles later
+tolstoy config profile use production
+```
+
+### Headless/CI Authentication
+
+```bash
+# For CI/CD environments without browser access
+tolstoy auth login --no-browser
+
+# Output:
+# Please visit the following URL to authenticate:
+# https://tolstoy.getpullse.com/auth/cli?code=ABC123
+# 
+# After authentication, you'll see a code. Enter it here:
+# Code: [waiting for input]
+```
+
+### API Token Authentication
+
+```bash
+# Direct token authentication
+tolstoy auth login --token "tok_1234567890abcdef"
+
+# From environment variable
+export TOLSTOY_AUTH_TOKEN="tok_1234567890abcdef"
+tolstoy auth login --use-env-token
+
+# From secure file
+echo "tok_1234567890abcdef" > ~/.tolstoy-token
+chmod 600 ~/.tolstoy-token
+tolstoy auth login --token-file ~/.tolstoy-token
+```
+
+### Service Account Login
+
+```bash
+# Using service account key file
+tolstoy auth login --service-account-key ./tolstoy-service-account.json
+
+# Using service account credentials directly
+tolstoy auth login \
+  --service-account-id "sa_production_123" \
+  --service-account-secret "secret_abcdef123456"
+```
+
+## Authentication Flow Details
+
+### OAuth 2.0 Flow
+
+<Steps>
+  <Step title="Initiate Authentication">
+    CLI generates auth URL and opens browser
+    ```
+    https://tolstoy.getpullse.com/auth/cli
+      ?client_id=cli
+      &response_type=code
+      &redirect_uri=http://localhost:8080/callback
+      &scope=read:org write:flows
+    ```
+  </Step>
+  
+  <Step title="User Authentication">
+    User completes login in browser:
+    - Email/password authentication
+    - SSO provider login (Google, Microsoft, etc.)
+    - Multi-factor authentication if enabled
+  </Step>
+  
+  <Step title="Authorization Code Exchange">
+    Browser redirects to CLI with authorization code:
+    ```
+    http://localhost:8080/callback?code=ABC123&state=xyz789
+    ```
+  </Step>
+  
+  <Step title="Token Request">
+    CLI exchanges authorization code for access token:
+    ```bash
+    POST /oauth/token
+    {
+      "grant_type": "authorization_code",
+      "code": "ABC123",
+      "client_id": "cli",
+      "redirect_uri": "http://localhost:8080/callback"
+    }
+    ```
+  </Step>
+  
+  <Step title="Token Storage">
+    Access token stored securely in system keychain or config file
+  </Step>
+</Steps>
+
+## Token Management
+
+### View Current Authentication
+
+```bash
+# Check authentication status
+tolstoy auth status
+
+# View detailed token information
+tolstoy auth whoami
+
+# List all authenticated profiles
+tolstoy auth list
+```
+
+### Token Security
+
+The CLI stores authentication tokens securely using:
+
+<Tabs>
+  <Tab title="macOS">
+    **Keychain Services** - Tokens stored in macOS Keychain
+    ```bash
+    # View stored tokens
+    security find-generic-password -s "tolstoy-cli" -a "$USER"
+    ```
+  </Tab>
+  
+  <Tab title="Linux">
+    **Secret Service API** - Integration with GNOME Keyring, KWallet
+    ```bash
+    # Fallback to encrypted file if no keyring available
+    ~/.tolstoy/credentials (encrypted)
+    ```
+  </Tab>
+  
+  <Tab title="Windows">
+    **Windows Credential Manager** - Native Windows credential storage
+    ```cmd
+    # View in Credential Manager
+    rundll32.exe keymgr.dll,KRShowKeyMgr
+    ```
+  </Tab>
+</Tabs>
+
+## SSO Integration
+
+### Supported SSO Providers
+
+<CardGroup cols={2}>
+  <Card title="Google Workspace" icon="google">
+    **Setup**: Configure Google OAuth app
+    ```bash
+    tolstoy auth login --sso google
+    ```
+  </Card>
+  <Card title="Microsoft Azure AD" icon="microsoft">
+    **Setup**: Configure Azure AD application
+    ```bash
+    tolstoy auth login --sso microsoft
+    ```
+  </Card>
+  <Card title="Okta" icon="shield-check">
+    **Setup**: Configure Okta SAML/OIDC
+    ```bash
+    tolstoy auth login --sso okta
+    ```
+  </Card>
+  <Card title="Auth0" icon="lock">
+    **Setup**: Configure Auth0 application
+    ```bash
+    tolstoy auth login --sso auth0
+    ```
+  </Card>
+</CardGroup>
+
+### Custom SSO Configuration
+
+```yaml
+# ~/.tolstoy/sso-config.yaml
+sso:
+  provider: "custom"
+  auth_url: "https://sso.company.com/auth"
+  token_url: "https://sso.company.com/token"
+  client_id: "tolstoy-cli"
+  scopes: ["openid", "profile", "email"]
+```
+
+```bash
+tolstoy auth login --sso-config ~/.tolstoy/sso-config.yaml
+```
+
+## Troubleshooting
+
+### Common Issues
+
+<AccordionGroup>
+  <Accordion title="Browser Not Opening">
+    **Symptoms**: Browser doesn't launch automatically
+    
+    **Solutions**:
+    ```bash
+    # Use manual URL approach
+    tolstoy auth login --no-browser
+    
+    # Specify different browser
+    tolstoy auth login --browser "firefox"
+    
+    # Check default browser settings
+    xdg-settings get default-web-browser  # Linux
+    ```
+  </Accordion>
+  
+  <Accordion title="Port Already in Use">
+    **Error**: `bind: address already in use`
+    
+    **Solutions**:
+    ```bash
+    # Use different port
+    tolstoy auth login --port 8081
+    
+    # Check what's using the port
+    lsof -i :8080  # macOS/Linux
+    netstat -an | findstr :8080  # Windows
+    ```
+  </Accordion>
+  
+  <Accordion title="Token Expired">
+    **Error**: `authentication token expired`
+    
+    **Solutions**:
+    ```bash
+    # Force re-authentication
+    tolstoy auth login --force
+    
+    # Check token status
+    tolstoy auth status
+    
+    # Clear stored credentials
+    tolstoy auth logout
+    tolstoy auth login
+    ```
+  </Accordion>
+  
+  <Accordion title="Organization Access Denied">
+    **Error**: `access denied to organization`
+    
+    **Solutions**:
+    ```bash
+    # List available organizations
+    tolstoy organizations list
+    
+    # Login to specific organization
+    tolstoy auth login --org "correct-org-name"
+    
+    # Contact admin to verify access
+    ```
+  </Accordion>
+</AccordionGroup>
+
+### Debug Authentication
+
+```bash
+# Enable debug logging
+tolstoy auth login --debug
+
+# View detailed logs
+export TOLSTOY_DEBUG=true
+tolstoy auth login
+
+# Check network connectivity
+curl -I https://api.tolstoy.getpullse.com/health
+```
+
+## Security Best Practices
+
+### Token Management
+
+1. **Use Environment Variables for CI/CD**:
+   ```bash
+   export TOLSTOY_AUTH_TOKEN="${{ secrets.TOLSTOY_TOKEN }}"
+   tolstoy auth login --use-env-token
+   ```
+
+2. **Rotate Tokens Regularly**:
+   ```bash
+   # Generate new token in dashboard, then
+   tolstoy auth login --token "new-token"
+   ```
+
+3. **Use Service Accounts for Automation**:
+   ```bash
+   tolstoy auth login --service-account-key service-account.json
+   ```
+
+4. **Limit Token Scopes**:
+   - Only grant necessary permissions
+   - Use separate tokens for different environments
+
+### Network Security
+
+```bash
+# Use custom CA certificates
+export TOLSTOY_CA_CERT="/path/to/ca-cert.pem"
+tolstoy auth login
+
+# Skip TLS verification (development only)
+export TOLSTOY_SKIP_TLS_VERIFY=true
+tolstoy auth login
+```
+
+## Related Commands
+
+<CardGroup cols={2}>
+  <Card title="auth logout" icon="arrow-right-from-bracket">
+    ```bash
+    tolstoy auth logout
+    ```
+    Sign out and clear stored credentials
+  </Card>
+  <Card title="auth status" icon="circle-info">
+    ```bash
+    tolstoy auth status
+    ```
+    Check current authentication status
+  </Card>
+  <Card title="auth whoami" icon="user">
+    ```bash
+    tolstoy auth whoami
+    ```
+    Display current user and organization
+  </Card>
+  <Card title="config profile" icon="user-group">
+    ```bash
+    tolstoy config profile list
+    ```
+    Manage authentication profiles
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="cli-footer.mdx" />

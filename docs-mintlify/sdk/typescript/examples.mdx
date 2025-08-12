@@ -1,0 +1,1058 @@
+---
+title: "TypeScript SDK Examples"
+description: "Real-world examples and code recipes using the Tolstoy TypeScript SDK"
+---
+
+# TypeScript SDK Examples
+
+This guide provides comprehensive examples and recipes for using the Tolstoy TypeScript SDK in real-world scenarios.
+
+## Installation and Setup
+
+```bash
+npm install @tolstoy/sdk
+# or
+yarn add @tolstoy/sdk
+```
+
+```typescript
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const client = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  organizationId: process.env.TOLSTOY_ORG_ID,
+  baseUrl: 'https://api.tolstoy.com', // optional
+  timeout: 30000, // optional, default 30s
+});
+```
+
+## Basic Operations
+
+### Creating and Managing Tools
+
+```typescript
+// Create a new tool
+const createTool = async () => {
+  try {
+    const tool = await client.tools.create({
+      name: 'Stripe Production',
+      baseUrl: 'https://api.stripe.com/v1',
+      category: 'payment',
+      authType: 'bearer_token',
+      authConfig: {
+        tokenPrefix: 'Bearer'
+      },
+      headers: {
+        'Stripe-Version': '2023-10-16'
+      }
+    });
+    
+    console.log('Tool created:', tool.id);
+    return tool;
+  } catch (error) {
+    console.error('Failed to create tool:', error.message);
+    throw error;
+  }
+};
+
+// Connect tool with credentials
+const connectTool = async (toolId: string, apiKey: string) => {
+  const connection = await client.tools.connect(toolId, {
+    credentials: {
+      token: apiKey
+    },
+    testConnection: true
+  });
+  
+  if (connection.status === 'connected') {
+    console.log('Tool connected successfully!');
+  } else {
+    throw new Error('Failed to connect tool');
+  }
+};
+
+// List all tools with filtering
+const listTools = async () => {
+  const tools = await client.tools.list({
+    status: 'connected',
+    category: 'payment',
+    limit: 50
+  });
+  
+  return tools.data;
+};
+```
+
+### Working with Actions
+
+```typescript
+// Create a comprehensive action
+const createPaymentAction = async (toolId: string) => {
+  const action = await client.actions.create({
+    name: 'Process Stripe Payment',
+    description: 'Process a payment using Stripe API',
+    toolId,
+    method: 'POST',
+    endpoint: '/payment_intents',
+    category: 'payment',
+    inputSchema: [
+      {
+        name: 'amount',
+        type: 'number',
+        required: true,
+        description: 'Amount in cents',
+        validation: {
+          minimum: 50,
+          maximum: 99999999
+        }
+      },
+      {
+        name: 'currency',
+        type: 'string',
+        required: true,
+        validation: {
+          enum: ['usd', 'eur', 'gbp'],
+          default: 'usd'
+        }
+      },
+      {
+        name: 'customer',
+        type: 'string',
+        required: false,
+        description: 'Customer ID'
+      },
+      {
+        name: 'description',
+        type: 'string',
+        required: false,
+        description: 'Payment description'
+      }
+    ],
+    requestTemplate: {
+      body: {
+        amount: '{{ input.amount }}',
+        currency: '{{ input.currency }}',
+        customer: '{{ input.customer }}',
+        description: '{{ input.description || "Payment via Tolstoy" }}',
+        automatic_payment_methods: {
+          enabled: true
+        },
+        metadata: {
+          source: 'tolstoy_automation',
+          created_at: '{{ now }}'
+        }
+      }
+    },
+    responseProcessing: {
+      successCondition: 'response.status >= 200 && response.status < 300',
+      outputMapping: {
+        paymentIntentId: 'response.body.id',
+        status: 'response.body.status',
+        amount: 'response.body.amount',
+        currency: 'response.body.currency',
+        clientSecret: 'response.body.client_secret'
+      },
+      errorMapping: {
+        400: 'invalid_request',
+        402: 'payment_required',
+        429: 'rate_limit_exceeded'
+      }
+    },
+    errorHandling: {
+      retry: {
+        maxAttempts: 3,
+        backoffMultiplier: 2,
+        initialDelay: 1000
+      },
+      onError: 'log_and_continue'
+    }
+  });
+  
+  return action;
+};
+
+// Execute action with error handling
+const executePaymentAction = async (actionId: string) => {
+  try {
+    const execution = await client.actions.execute(actionId, {
+      input: {
+        amount: 2000, // $20.00
+        currency: 'usd',
+        description: 'Premium subscription payment'
+      },
+      timeout: 30000
+    });
+    
+    // Wait for completion
+    const result = await client.executions.waitForCompletion(execution.id, {
+      timeout: 60000,
+      pollInterval: 1000
+    });
+    
+    if (result.status === 'success') {
+      console.log('Payment processed:', result.output.paymentIntentId);
+      return result.output;
+    } else {
+      throw new Error(`Payment failed: ${result.error?.message}`);
+    }
+  } catch (error) {
+    console.error('Payment execution failed:', error);
+    throw error;
+  }
+};
+```
+
+### Building Complex Flows
+
+```typescript
+// Create a comprehensive customer onboarding flow
+const createOnboardingFlow = async () => {
+  const flow = await client.flows.create({
+    name: 'Customer Onboarding Flow',
+    description: 'Complete customer onboarding with payments and notifications',
+    trigger: {
+      type: 'webhook',
+      config: {
+        method: 'POST',
+        path: '/webhooks/customer-signup',
+        authentication: {
+          type: 'signature',
+          secret: 'webhook_secret_key'
+        }
+      }
+    },
+    steps: [
+      {
+        id: 'validate_input',
+        name: 'Validate Customer Data',
+        type: 'condition',
+        condition: {
+          and: [
+            { '!=': [{ var: 'trigger.email' }, null] },
+            { '!=': [{ var: 'trigger.name' }, null] },
+            { regex: [{ var: 'trigger.email' }, '^[^@]+@[^@]+\.[^@]+$'] }
+          ]
+        },
+        onFalse: {
+          action: 'terminate',
+          message: 'Invalid input data provided'
+        }
+      },
+      {
+        id: 'create_customer',
+        name: 'Create Stripe Customer',
+        type: 'action',
+        actionId: 'act_create_stripe_customer',
+        input: {
+          email: '{{ trigger.email }}',
+          name: '{{ trigger.name }}',
+          metadata: {
+            source: 'website_signup',
+            signup_date: '{{ now }}'
+          }
+        },
+        dependencies: ['validate_input']
+      },
+      {
+        id: 'parallel_notifications',
+        name: 'Send Notifications',
+        type: 'parallel',
+        dependencies: ['create_customer'],
+        branches: [
+          {
+            name: 'welcome_email',
+            steps: [
+              {
+                id: 'send_welcome',
+                name: 'Send Welcome Email',
+                type: 'action',
+                actionId: 'act_sendgrid_email',
+                input: {
+                  to: '{{ trigger.email }}',
+                  templateId: 'welcome_email_v2',
+                  dynamicData: {
+                    customerName: '{{ trigger.name }}',
+                    customerId: '{{ steps.create_customer.output.id }}',
+                    loginUrl: 'https://app.example.com/login'
+                  }
+                }
+              }
+            ]
+          },
+          {
+            name: 'slack_notification',
+            steps: [
+              {
+                id: 'notify_team',
+                name: 'Notify Team in Slack',
+                type: 'action',
+                actionId: 'act_slack_message',
+                input: {
+                  channel: '#new-customers',
+                  text: 'New customer signed up!',
+                  blocks: [
+                    {
+                      type: 'section',
+                      text: {
+                        type: 'mrkdwn',
+                        text: '🎉 *New Customer Signup*\n*Name:* {{ trigger.name }}\n*Email:* {{ trigger.email }}'
+                      }
+                    },
+                    {
+                      type: 'actions',
+                      elements: [
+                        {
+                          type: 'button',
+                          text: {
+                            type: 'plain_text',
+                            text: 'View Profile'
+                          },
+                          url: 'https://dashboard.example.com/customers/{{ steps.create_customer.output.id }}'
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            name: 'crm_update',
+            steps: [
+              {
+                id: 'update_crm',
+                name: 'Update CRM Record',
+                type: 'action',
+                actionId: 'act_hubspot_contact',
+                input: {
+                  email: '{{ trigger.email }}',
+                  properties: {
+                    firstname: '{{ trigger.name | split(" ")[0] }}',
+                    lastname: '{{ trigger.name | split(" ")[1] }}',
+                    lifecyclestage: 'customer',
+                    stripe_customer_id: '{{ steps.create_customer.output.id }}'
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        waitStrategy: 'all'
+      },
+      {
+        id: 'setup_trial',
+        name: 'Setup Trial Subscription',
+        type: 'action',
+        actionId: 'act_create_subscription',
+        input: {
+          customer: '{{ steps.create_customer.output.id }}',
+          items: [
+            {
+              price: 'price_trial_plan',
+              quantity: 1
+            }
+          ],
+          trial_period_days: 14,
+          metadata: {
+            source: 'onboarding_flow'
+          }
+        },
+        dependencies: ['parallel_notifications'],
+        executeIf: {
+          '==': [{ var: 'trigger.plan' }, 'trial']
+        }
+      }
+    ],
+    settings: {
+      timeout: 300, // 5 minutes
+      retryPolicy: {
+        maxRetries: 3,
+        backoffMultiplier: 2
+      },
+      errorHandling: {
+        onFailure: 'notify_admin',
+        notificationChannels: ['email', 'slack']
+      }
+    }
+  });
+  
+  return flow;
+};
+
+// Execute flow and monitor progress
+const executeOnboardingFlow = async (flowId: string, customerData: any) => {
+  const execution = await client.flows.execute(flowId, {
+    input: customerData,
+    metadata: {
+      source: 'api_call',
+      timestamp: new Date().toISOString()
+    }
+  });
+  
+  console.log(`Flow execution started: ${execution.id}`);
+  
+  // Monitor execution progress
+  const result = await client.executions.waitForCompletion(execution.id, {
+    timeout: 300000, // 5 minutes
+    pollInterval: 2000,
+    onProgress: (status) => {
+      console.log(`Flow status: ${status.status} - ${status.completedSteps}/${status.totalSteps} steps`);
+    }
+  });
+  
+  return result;
+};
+```
+
+## Advanced Patterns
+
+### Error Handling and Retries
+
+```typescript
+// Advanced error handling with custom retry logic
+class TolstoyService {
+  private client: TolstoyClient;
+  
+  constructor(client: TolstoyClient) {
+    this.client = client;
+  }
+  
+  async executeWithRetry<T>(
+    operation: () => Promise<T>,
+    options: {
+      maxRetries?: number;
+      backoffMultiplier?: number;
+      retryCondition?: (error: any) => boolean;
+    } = {}
+  ): Promise<T> {
+    const {
+      maxRetries = 3,
+      backoffMultiplier = 2,
+      retryCondition = (error) => error.status >= 500 || error.code === 'NETWORK_ERROR'
+    } = options;
+    
+    let lastError: any;
+    let delay = 1000;
+    
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        
+        if (attempt === maxRetries || !retryCondition(error)) {
+          throw error;
+        }
+        
+        console.log(`Attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+        await this.sleep(delay);
+        delay *= backoffMultiplier;
+      }
+    }
+    
+    throw lastError;
+  }
+  
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+  
+  // Execute action with comprehensive error handling
+  async safeExecuteAction(actionId: string, input: any) {
+    return this.executeWithRetry(
+      () => this.client.actions.execute(actionId, { input }),
+      {
+        retryCondition: (error) => {
+          // Retry on server errors and rate limits
+          return error.status >= 500 || error.status === 429;
+        }
+      }
+    );
+  }
+}
+```
+
+### Batch Operations
+
+```typescript
+// Efficiently handle multiple operations
+class BatchProcessor {
+  private client: TolstoyClient;
+  private concurrencyLimit: number;
+  
+  constructor(client: TolstoyClient, concurrencyLimit = 5) {
+    this.client = client;
+    this.concurrencyLimit = concurrencyLimit;
+  }
+  
+  async processBatch<T, R>(
+    items: T[],
+    processor: (item: T) => Promise<R>,
+    options: {
+      onProgress?: (completed: number, total: number) => void;
+      onError?: (error: any, item: T) => void;
+    } = {}
+  ): Promise<R[]> {
+    const results: R[] = [];
+    const errors: Array<{ item: T; error: any }> = [];
+    
+    // Process items in chunks
+    for (let i = 0; i < items.length; i += this.concurrencyLimit) {
+      const chunk = items.slice(i, i + this.concurrencyLimit);
+      
+      const chunkPromises = chunk.map(async (item) => {
+        try {
+          const result = await processor(item);
+          results.push(result);
+          return result;
+        } catch (error) {
+          errors.push({ item, error });
+          options.onError?.(error, item);
+          return null;
+        }
+      });
+      
+      await Promise.allSettled(chunkPromises);
+      options.onProgress?.(Math.min(i + this.concurrencyLimit, items.length), items.length);
+    }
+    
+    if (errors.length > 0) {
+      console.warn(`${errors.length} items failed processing:`, errors);
+    }
+    
+    return results;
+  }
+  
+  // Bulk execute actions
+  async bulkExecuteActions(
+    executions: Array<{ actionId: string; input: any }>
+  ) {
+    return this.processBatch(
+      executions,
+      async ({ actionId, input }) => {
+        const execution = await this.client.actions.execute(actionId, { input });
+        return this.client.executions.waitForCompletion(execution.id);
+      },
+      {
+        onProgress: (completed, total) => {
+          console.log(`Processed ${completed}/${total} executions`);
+        },
+        onError: (error, { actionId }) => {
+          console.error(`Failed to execute action ${actionId}:`, error.message);
+        }
+      }
+    );
+  }
+}
+```
+
+### Real-time Monitoring
+
+```typescript
+// Monitor execution progress in real-time
+class ExecutionMonitor {
+  private client: TolstoyClient;
+  private activeMonitors = new Map<string, NodeJS.Timeout>();
+  
+  constructor(client: TolstoyClient) {
+    this.client = client;
+  }
+  
+  async monitorExecution(
+    executionId: string,
+    callbacks: {
+      onStatusChange?: (status: any) => void;
+      onStepComplete?: (step: any) => void;
+      onComplete?: (result: any) => void;
+      onError?: (error: any) => void;
+    } = {}
+  ) {
+    let lastStatus = null;
+    
+    const poll = async () => {
+      try {
+        const status = await this.client.executions.getStatus(executionId);
+        
+        // Check for status changes
+        if (status.status !== lastStatus) {
+          callbacks.onStatusChange?.(status);
+          lastStatus = status.status;
+        }
+        
+        // Check for completed steps
+        if (status.steps) {
+          status.steps
+            .filter((step: any) => step.status === 'completed')
+            .forEach((step: any) => callbacks.onStepComplete?.(step));
+        }
+        
+        // Handle completion
+        if (status.status === 'completed') {
+          callbacks.onComplete?.(status);
+          this.stopMonitoring(executionId);
+          return;
+        }
+        
+        // Handle errors
+        if (status.status === 'failed') {
+          callbacks.onError?.(status.error);
+          this.stopMonitoring(executionId);
+          return;
+        }
+        
+        // Schedule next poll
+        const timeout = setTimeout(poll, 2000);
+        this.activeMonitors.set(executionId, timeout);
+        
+      } catch (error) {
+        callbacks.onError?.(error);
+        this.stopMonitoring(executionId);
+      }
+    };
+    
+    // Start monitoring
+    await poll();
+  }
+  
+  stopMonitoring(executionId: string) {
+    const timeout = this.activeMonitors.get(executionId);
+    if (timeout) {
+      clearTimeout(timeout);
+      this.activeMonitors.delete(executionId);
+    }
+  }
+  
+  stopAllMonitoring() {
+    this.activeMonitors.forEach((timeout) => clearTimeout(timeout));
+    this.activeMonitors.clear();
+  }
+}
+```
+
+## Integration Recipes
+
+### E-commerce Order Processing
+
+```typescript
+// Complete e-commerce order processing workflow
+const createEcommerceOrderFlow = async () => {
+  const orderProcessor = new TolstoyService(client);
+  
+  // Process new order
+  const processOrder = async (orderData: any) => {
+    console.log('Processing order:', orderData.orderId);
+    
+    // Step 1: Validate order
+    const validation = await orderProcessor.safeExecuteAction('validate_order', {
+      orderId: orderData.orderId,
+      items: orderData.items,
+      customer: orderData.customer
+    });
+    
+    if (!validation.output.isValid) {
+      throw new Error(`Order validation failed: ${validation.output.errors}`);
+    }
+    
+    // Step 2: Process payment
+    const payment = await orderProcessor.safeExecuteAction('process_payment', {
+      amount: orderData.total,
+      currency: orderData.currency,
+      paymentMethod: orderData.paymentMethod,
+      customer: orderData.customer.stripeId
+    });
+    
+    // Step 3: Update inventory
+    const batchProcessor = new BatchProcessor(client);
+    await batchProcessor.processBatch(
+      orderData.items,
+      async (item) => {
+        return client.actions.execute('update_inventory', {
+          input: {
+            productId: item.productId,
+            quantity: -item.quantity,
+            orderId: orderData.orderId
+          }
+        });
+      }
+    );
+    
+    // Step 4: Send notifications
+    const notifications = await Promise.all([
+      // Customer confirmation
+      client.actions.execute('send_order_confirmation', {
+        input: {
+          to: orderData.customer.email,
+          orderDetails: orderData,
+          paymentId: payment.output.paymentIntentId
+        }
+      }),
+      // Internal notification
+      client.actions.execute('notify_fulfillment_team', {
+        input: {
+          orderId: orderData.orderId,
+          items: orderData.items,
+          shippingAddress: orderData.shippingAddress
+        }
+      })
+    ]);
+    
+    return {
+      orderId: orderData.orderId,
+      status: 'processed',
+      paymentId: payment.output.paymentIntentId,
+      notifications: notifications.map(n => n.id)
+    };
+  };
+  
+  return { processOrder };
+};
+```
+
+### Customer Support Automation
+
+```typescript
+// Automated customer support ticket routing
+const createSupportAutomation = async () => {
+  const supportFlow = await client.flows.create({
+    name: 'Support Ticket Automation',
+    description: 'Automatically route and prioritize support tickets',
+    trigger: {
+      type: 'webhook',
+      config: {
+        path: '/webhooks/support-ticket'
+      }
+    },
+    steps: [
+      {
+        id: 'classify_ticket',
+        name: 'Classify Ticket Priority',
+        type: 'action',
+        actionId: 'classify_support_ticket',
+        input: {
+          subject: '{{ trigger.subject }}',
+          content: '{{ trigger.content }}',
+          customerTier: '{{ trigger.customer.tier }}'
+        }
+      },
+      {
+        id: 'route_ticket',
+        name: 'Route to Appropriate Team',
+        type: 'condition',
+        condition: {
+          switch: [
+            {
+              case: { '==': [{ var: 'steps.classify_ticket.output.category' }, 'billing'] },
+              then: 'billing_team'
+            },
+            {
+              case: { '==': [{ var: 'steps.classify_ticket.output.category' }, 'technical'] },
+              then: 'technical_team'
+            },
+            {
+              case: { '>=': [{ var: 'steps.classify_ticket.output.priority' }, 8] },
+              then: 'escalation_team'
+            }
+          ],
+          default: 'general_support'
+        },
+        branches: {
+          billing_team: [
+            {
+              id: 'assign_billing',
+              name: 'Assign to Billing Team',
+              type: 'action',
+              actionId: 'assign_ticket',
+              input: {
+                ticketId: '{{ trigger.ticketId }}',
+                team: 'billing',
+                priority: '{{ steps.classify_ticket.output.priority }}'
+              }
+            }
+          ],
+          technical_team: [
+            {
+              id: 'assign_technical',
+              name: 'Assign to Technical Team',
+              type: 'action',
+              actionId: 'assign_ticket',
+              input: {
+                ticketId: '{{ trigger.ticketId }}',
+                team: 'technical',
+                priority: '{{ steps.classify_ticket.output.priority }}'
+              }
+            }
+          ],
+          escalation_team: [
+            {
+              id: 'escalate_urgent',
+              name: 'Escalate Urgent Ticket',
+              type: 'parallel',
+              branches: [
+                {
+                  name: 'assign_senior',
+                  steps: [
+                    {
+                      id: 'assign_senior_agent',
+                      name: 'Assign Senior Agent',
+                      type: 'action',
+                      actionId: 'assign_ticket',
+                      input: {
+                        ticketId: '{{ trigger.ticketId }}',
+                        team: 'senior_support',
+                        priority: 10
+                      }
+                    }
+                  ]
+                },
+                {
+                  name: 'notify_management',
+                  steps: [
+                    {
+                      id: 'alert_managers',
+                      name: 'Alert Management',
+                      type: 'action',
+                      actionId: 'send_slack_alert',
+                      input: {
+                        channel: '#support-escalations',
+                        message: '🚨 High priority ticket requires immediate attention',
+                        ticketUrl: 'https://support.example.com/tickets/{{ trigger.ticketId }}'
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      {
+        id: 'send_auto_response',
+        name: 'Send Auto-Response to Customer',
+        type: 'action',
+        actionId: 'send_customer_response',
+        input: {
+          to: '{{ trigger.customer.email }}',
+          ticketId: '{{ trigger.ticketId }}',
+          estimatedResponseTime: '{{ steps.classify_ticket.output.sla }}',
+          category: '{{ steps.classify_ticket.output.category }}'
+        },
+        dependencies: ['route_ticket']
+      }
+    ]
+  });
+  
+  return supportFlow;
+};
+```
+
+## Testing and Debugging
+
+### Unit Testing Actions
+
+```typescript
+import { TolstoyClient } from '@tolstoy/sdk';
+
+// Mock client for testing
+const createMockClient = () => {
+  return {
+    actions: {
+      execute: jest.fn(),
+      create: jest.fn(),
+      list: jest.fn()
+    },
+    flows: {
+      execute: jest.fn(),
+      create: jest.fn()
+    },
+    executions: {
+      waitForCompletion: jest.fn(),
+      getStatus: jest.fn()
+    }
+  } as unknown as TolstoyClient;
+};
+
+// Test action execution
+describe('Payment Processing', () => {
+  let mockClient: TolstoyClient;
+  
+  beforeEach(() => {
+    mockClient = createMockClient();
+  });
+  
+  test('should process payment successfully', async () => {
+    // Mock successful payment response
+    (mockClient.actions.execute as jest.Mock).mockResolvedValue({
+      id: 'exec_123',
+      status: 'running'
+    });
+    
+    (mockClient.executions.waitForCompletion as jest.Mock).mockResolvedValue({
+      id: 'exec_123',
+      status: 'success',
+      output: {
+        paymentIntentId: 'pi_123',
+        status: 'succeeded',
+        amount: 2000
+      }
+    });
+    
+    const service = new PaymentService(mockClient);
+    const result = await service.processPayment({
+      amount: 2000,
+      currency: 'usd',
+      customer: 'cus_123'
+    });
+    
+    expect(result.paymentIntentId).toBe('pi_123');
+    expect(result.status).toBe('succeeded');
+  });
+  
+  test('should handle payment failures', async () => {
+    // Mock payment failure
+    (mockClient.actions.execute as jest.Mock).mockResolvedValue({
+      id: 'exec_456',
+      status: 'running'
+    });
+    
+    (mockClient.executions.waitForCompletion as jest.Mock).mockResolvedValue({
+      id: 'exec_456',
+      status: 'failed',
+      error: {
+        type: 'card_declined',
+        message: 'Your card was declined.'
+      }
+    });
+    
+    const service = new PaymentService(mockClient);
+    
+    await expect(service.processPayment({
+      amount: 2000,
+      currency: 'usd',
+      customer: 'cus_123'
+    })).rejects.toThrow('Your card was declined.');
+  });
+});
+```
+
+### Environment-Specific Configuration
+
+```typescript
+// Environment configuration
+interface TolstoyConfig {
+  apiKey: string;
+  organizationId: string;
+  baseUrl: string;
+  environment: 'development' | 'staging' | 'production';
+  debug?: boolean;
+}
+
+class ConfigManager {
+  static getConfig(): TolstoyConfig {
+    const env = process.env.NODE_ENV || 'development';
+    
+    const configs: Record<string, Partial<TolstoyConfig>> = {
+      development: {
+        baseUrl: 'http://localhost:3000',
+        debug: true
+      },
+      staging: {
+        baseUrl: 'https://staging-api.tolstoy.com',
+        debug: true
+      },
+      production: {
+        baseUrl: 'https://api.tolstoy.com',
+        debug: false
+      }
+    };
+    
+    return {
+      apiKey: process.env.TOLSTOY_API_KEY!,
+      organizationId: process.env.TOLSTOY_ORG_ID!,
+      environment: env as any,
+      ...configs[env]
+    } as TolstoyConfig;
+  }
+  
+  static createClient(): TolstoyClient {
+    const config = this.getConfig();
+    
+    return new TolstoyClient({
+      apiKey: config.apiKey,
+      organizationId: config.organizationId,
+      baseUrl: config.baseUrl,
+      debug: config.debug,
+      // Add request interceptor for debugging
+      interceptors: config.debug ? {
+        request: (request) => {
+          console.log('Tolstoy Request:', request);
+          return request;
+        },
+        response: (response) => {
+          console.log('Tolstoy Response:', response);
+          return response;
+        }
+      } : undefined
+    });
+  }
+}
+
+// Usage
+const client = ConfigManager.createClient();
+```
+
+## Performance Optimization
+
+### Connection Pooling and Caching
+
+```typescript
+// Optimized client with connection pooling
+class OptimizedTolstoyClient {
+  private client: TolstoyClient;
+  private cache = new Map<string, { data: any; expires: number }>();
+  private cacheTTL = 5 * 60 * 1000; // 5 minutes
+  
+  constructor(config: any) {
+    this.client = new TolstoyClient({
+      ...config,
+      // Enable keep-alive for HTTP connections
+      keepAlive: true,
+      maxSockets: 20,
+      timeout: 30000
+    });
+  }
+  
+  async getCachedAction(actionId: string) {
+    const cacheKey = `action:${actionId}`;
+    const cached = this.cache.get(cacheKey);
+    
+    if (cached && cached.expires > Date.now()) {
+      return cached.data;
+    }
+    
+    const action = await this.client.actions.get(actionId);
+    
+    this.cache.set(cacheKey, {
+      data: action,
+      expires: Date.now() + this.cacheTTL
+    });
+    
+    return action;
+  }
+  
+  // Batch multiple API calls
+  async batchExecute(executions: Array<{ actionId: string; input: any }>) {
+    const promises = executions.map(async ({ actionId, input }) => {
+      const action = await this.getCachedAction(actionId);
+      return this.client.actions.execute(actionId, { input });
+    });
+    
+    return Promise.allSettled(promises);
+  }
+  
+  clearCache() {
+    this.cache.clear();
+  }
+}
+```
+
+This comprehensive example library provides real-world patterns and best practices for using the Tolstoy TypeScript SDK effectively in production applications.
