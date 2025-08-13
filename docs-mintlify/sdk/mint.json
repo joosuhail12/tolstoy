@@ -1,0 +1,31 @@
+{
+  "navigation": [
+    {
+      "group": "TypeScript SDK",
+      "pages": [
+        "sdk/typescript/index",
+        "sdk/typescript/installation",
+        "sdk/typescript/quickstart",
+        "sdk/typescript/examples"
+      ]
+    },
+    {
+      "group": "Python SDK",
+      "pages": [
+        "sdk/python/index",
+        "sdk/python/installation",
+        "sdk/python/quickstart",
+        "sdk/python/examples"
+      ]
+    },
+    {
+      "group": "Go SDK",
+      "pages": [
+        "sdk/go/index",
+        "sdk/go/installation",
+        "sdk/go/quickstart",
+        "sdk/go/examples"
+      ]
+    }
+  ]
+}

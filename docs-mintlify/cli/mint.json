@@ -1,0 +1,24 @@
+{
+  "navigation": [
+    {
+      "group": "Getting Started",
+      "pages": [
+        "cli/index",
+        "cli/installation",
+        "cli/configuration",
+        "cli/authentication"
+      ]
+    },
+    {
+      "group": "Commands",
+      "pages": [
+        "cli/commands/init/init",
+        "cli/commands/auth/login",
+        "cli/commands/organizations/list",
+        "cli/commands/tools/create",
+        "cli/commands/actions/create",
+        "cli/commands/flows/execute"
+      ]
+    }
+  ]
+}

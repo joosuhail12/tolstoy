@@ -1,0 +1,202 @@
+---
+title: "Welcome to Tolstoy"
+description: "The powerful workflow automation platform for modern teams"
+---
+
+<img
+  className="block dark:hidden"
+  src="/images/hero-light.png"
+  alt="Tolstoy Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="/images/hero-dark.png"
+  alt="Tolstoy Hero Dark"
+/>
+
+## What is Tolstoy?
+
+Tolstoy is a powerful workflow automation platform that enables teams to build, deploy, and manage complex automation workflows with ease. Whether you're automating business processes, integrating systems, or building custom workflows, Tolstoy provides the tools and infrastructure you need to succeed.
+
+<CardGroup cols={2}>
+  <Card
+    title="Quick Start"
+    icon="rocket"
+    href="/public/product/getting-started/installation"
+  >
+    Get up and running with Tolstoy in minutes
+  </Card>
+  <Card
+    title="API Reference"
+    icon="code"
+    href="/api"
+  >
+    Complete REST API documentation
+  </Card>
+  <Card
+    title="CLI Tools"
+    icon="terminal"
+    href="/cli"
+  >
+    Command-line interface for power users
+  </Card>
+  <Card
+    title="SDKs"
+    icon="puzzle"
+    href="/sdk/typescript"
+  >
+    Official SDKs for multiple languages
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<AccordionGroup>
+  <Accordion title="Visual Workflow Builder">
+    Build complex workflows using our intuitive drag-and-drop interface. Connect actions, add conditional logic, and create sophisticated automation without writing code.
+  </Accordion>
+  
+  <Accordion title="200+ Integrations">
+    Connect to your favorite tools and services with our extensive library of pre-built integrations. From CRM systems to payment processors, we've got you covered.
+  </Accordion>
+  
+  <Accordion title="Enterprise Security">
+    Built with security in mind. SOC 2 compliant, encrypted data transmission, role-based access control, and comprehensive audit logging.
+  </Accordion>
+  
+  <Accordion title="Real-time Monitoring">
+    Monitor your workflows in real-time with detailed execution logs, performance metrics, and alerting capabilities.
+  </Accordion>
+</AccordionGroup>
+
+## Popular Use Cases
+
+<CardGroup cols={3}>
+  <Card
+    title="Payment Processing"
+    icon="credit-card"
+    href="/public/product/use-cases/payment-automation"
+  >
+    Automate payment workflows and financial operations
+  </Card>
+  <Card
+    title="Customer Onboarding"
+    icon="user-plus"
+    href="/public/product/use-cases/customer-onboarding"
+  >
+    Streamline new customer registration and setup
+  </Card>
+  <Card
+    title="Data Synchronization"
+    icon="arrows-rotate"
+    href="/public/product/use-cases/data-synchronization"
+  >
+    Keep your systems in sync automatically
+  </Card>
+  <Card
+    title="Notification Systems"
+    icon="bell"
+    href="/public/product/use-cases/notification-systems"
+  >
+    Build intelligent notification and alerting systems
+  </Card>
+  <Card
+    title="E-commerce Automation"
+    icon="shopping-cart"
+    href="/public/product/use-cases/ecommerce-automation"
+  >
+    Automate order processing and inventory management
+  </Card>
+  <Card
+    title="CI/CD Pipelines"
+    icon="code-branch"
+    href="/public/product/use-cases/ci-cd-automation"
+  >
+    Integrate with your development workflow
+  </Card>
+</CardGroup>
+
+## Getting Started
+
+<Steps>
+  <Step title="Create Account">
+    Sign up for a free Tolstoy account at [tolstoy.getpullse.com](https://tolstoy.getpullse.com)
+  </Step>
+  <Step title="Install CLI">
+    Install the Tolstoy CLI tool to manage your workflows from the command line
+    ```bash
+    npm install -g @tolstoy/cli
+    ```
+  </Step>
+  <Step title="Create First Workflow">
+    Follow our [First Workflow Guide](/public/product/getting-started/first-workflow) to create your first automation
+  </Step>
+  <Step title="Deploy & Monitor">
+    Deploy your workflow and monitor its execution in real-time
+  </Step>
+</Steps>
+
+## Example Workflow
+
+Here's a simple example of creating a workflow that sends a Slack notification when a new user signs up:
+
+```javascript
+const workflow = {
+  name: "User Signup Notification",
+  trigger: {
+    type: "webhook",
+    path: "/user-signup"
+  },
+  actions: [
+    {
+      type: "slack",
+      channel: "#general",
+      message: "New user signed up: {{trigger.body.email}}"
+    }
+  ]
+};
+```
+
+## Community & Support
+
+<CardGroup cols={2}>
+  <Card
+    title="GitHub"
+    icon="github"
+    href="https://github.com/joosuhail12/tolstoy"
+  >
+    Contribute to our open-source projects
+  </Card>
+  <Card
+    title="Discord"
+    icon="discord"
+    href="https://discord.gg/tolstoy"
+  >
+    Join our community for help and discussions
+  </Card>
+  <Card
+    title="Support"
+    icon="life-ring"
+    href="mailto:support@tolstoy.com"
+  >
+    Get help from our support team
+  </Card>
+  <Card
+    title="Status Page"
+    icon="chart-line"
+    href="https://status.tolstoy.dev"
+  >
+    Check our service status and uptime
+  </Card>
+</CardGroup>
+
+## Pricing
+
+Tolstoy offers flexible pricing plans to fit your needs:
+
+- **Starter**: $29/month - Perfect for small teams and personal projects
+- **Professional**: $99/month - Great for growing businesses
+- **Team**: $299/month - Advanced features for larger teams  
+- **Enterprise**: Custom pricing - For large organizations with custom needs
+
+[View detailed pricing](/pricing) or [start your free trial](https://tolstoy.getpullse.com/signup) today.
