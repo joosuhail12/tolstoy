@@ -1,0 +1,100 @@
+---
+title: "List Action Versions"
+api: "GET /actions/{id}/versions"
+description: "Retrieve version history for a specific action"
+---
+
+## Overview
+
+The List Action Versions endpoint returns the version history for a specific action, allowing you to see changes over time and access previous versions.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the action
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="limit" type="number">
+  Maximum number of versions to return (defaults to 20)
+</ParamField>
+
+<ParamField query="includeDetails" type="boolean">
+  Whether to include detailed configuration for each version (defaults to false)
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="versions" type="array">
+  Array of action versions
+  
+  <Expandable title="Version Object">
+    <ResponseField name="version" type="number">
+      Version number
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string">
+      ISO timestamp when version was created
+    </ResponseField>
+    
+    <ResponseField name="createdBy" type="string">
+      User ID who created this version
+    </ResponseField>
+    
+    <ResponseField name="changes" type="string">
+      Description of changes in this version
+    </ResponseField>
+    
+    <ResponseField name="isCurrent" type="boolean">
+      Whether this is the current active version
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET "https://api.tolstoy.com/v1/actions/action_abc123/versions" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```javascript JavaScript
+const versions = await fetch('/api/v1/actions/action_abc123/versions', {
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+const versionData = await versions.json();
+console.log(`Found ${versionData.versions.length} versions`);
+```
+
+</CodeGroup>
+
+## Related Endpoints
+
+- [Get Action](/api/endpoints/actions/get-action) - Retrieve action details
+- [Update Action](/api/endpoints/actions/update-action) - Modify action configuration

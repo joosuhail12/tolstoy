@@ -1,218 +1,50 @@
 ---
-title: "Tools Overview"
-description: "API endpoints for managing external tool integrations and authentication"
+title: "Tools API"
+description: "Configure external API integrations and authentication"
 ---
 
 # Tools API
 
-Tools in Tolstoy represent external API services that you want to integrate with. Each tool defines connection details, authentication methods, and serves as the foundation for creating actions.
+Configure external API integrations and authentication
 
-## What are Tools?
-
-Tools provide:
-- **Base URL Configuration**: The root URL for all API calls to the external service
-- **Authentication Setup**: How to authenticate with the external API (API keys, OAuth, etc.)
-- **Connection Management**: Secure storage of credentials and connection details
-- **Action Foundation**: The basis for creating reusable actions that call the external API
+## Endpoints
 
 <CardGroup cols={2}>
-  <Card title="Create Tool" icon="plus" href="/api/endpoints/tools/create-tool">
-    Add a new external API integration
+  <Card title="Create Tool" icon="api" href="/api/endpoints/tools/toolscontroller_create">
+    Register a new external tool for use in workflows
   </Card>
-  <Card title="List Tools" icon="list" href="/api/endpoints/tools/list-tools">
-    Browse all configured tools
+  <Card title="List Tools" icon="api" href="/api/endpoints/tools/toolscontroller_findall">
+    Get all registered tools for the organization
   </Card>
-  <Card title="Get Tool" icon="eye" href="/api/endpoints/tools/get-tool">
-    View tool configuration and status
+  <Card title="Get Tool" icon="api" href="/api/endpoints/tools/toolscontroller_findone">
+    Get a specific tool by ID
   </Card>
-  <Card title="Update Tool" icon="edit" href="/api/endpoints/tools/update-tool">
-    Modify tool settings and authentication
+  <Card title="Update Tool" icon="api" href="/api/endpoints/tools/toolscontroller_update">
+    Update tool configuration
   </Card>
-</CardGroup>
-
-## Authentication Methods
-
-Tools support various authentication methods:
-
-<Tabs>
-  <Tab title="API Key">
-    Simple API key authentication in headers or query parameters
-    ```json
-    {
-      "authType": "api_key",
-      "authConfig": {
-        "keyLocation": "header",
-        "keyName": "X-API-Key"
-      }
-    }
-    ```
-  </Tab>
-  
-  <Tab title="Bearer Token">
-    Bearer token authentication in Authorization header
-    ```json
-    {
-      "authType": "bearer_token",
-      "authConfig": {
-        "tokenPrefix": "Bearer"
-      }
-    }
-    ```
-  </Tab>
-  
-  <Tab title="OAuth 2.0">
-    OAuth 2.0 flow for user authorization
-    ```json
-    {
-      "authType": "oauth2",
-      "authConfig": {
-        "grantType": "authorization_code",
-        "authUrl": "https://api.service.com/oauth/authorize",
-        "tokenUrl": "https://api.service.com/oauth/token"
-      }
-    }
-    ```
-  </Tab>
-  
-  <Tab title="Basic Auth">
-    Username and password authentication
-    ```json
-    {
-      "authType": "basic_auth",
-      "authConfig": {
-        "usernameField": "username",
-        "passwordField": "password"
-      }
-    }
-    ```
-  </Tab>
-</Tabs>
-
-## Common Tool Integrations
-
-<AccordionGroup>
-  <Accordion title="Stripe Payment Processing">
-    ```json
-    {
-      "name": "Stripe API",
-      "baseUrl": "https://api.stripe.com/v1",
-      "authType": "bearer_token",
-      "authConfig": {
-        "tokenPrefix": "Bearer"
-      },
-      "description": "Stripe payment processing and subscription management"
-    }
-    ```
-  </Accordion>
-  
-  <Accordion title="SendGrid Email">
-    ```json
-    {
-      "name": "SendGrid API",
-      "baseUrl": "https://api.sendgrid.com/v3",
-      "authType": "api_key",
-      "authConfig": {
-        "keyLocation": "header",
-        "keyName": "Authorization",
-        "keyPrefix": "Bearer"
-      },
-      "description": "Email delivery and marketing automation"
-    }
-    ```
-  </Accordion>
-  
-  <Accordion title="Slack Integration">
-    ```json
-    {
-      "name": "Slack API",
-      "baseUrl": "https://slack.com/api",
-      "authType": "bearer_token",
-      "authConfig": {
-        "tokenPrefix": "Bearer"
-      },
-      "description": "Slack messaging and workspace automation"
-    }
-    ```
-  </Accordion>
-  
-  <Accordion title="HubSpot CRM">
-    ```json
-    {
-      "name": "HubSpot API", 
-      "baseUrl": "https://api.hubapi.com",
-      "authType": "api_key",
-      "authConfig": {
-        "keyLocation": "query",
-        "keyName": "hapikey"
-      },
-      "description": "CRM and marketing automation"
-    }
-    ```
-  </Accordion>
-</AccordionGroup>
-
-## Tool States
-
-Tools can be in different states:
-
-- **Active**: Ready for use in actions and workflows
-- **Inactive**: Temporarily disabled, actions won't execute
-- **Testing**: Under development, only accessible to creators
-- **Error**: Connection issues or authentication failures
-
-## Security Features
-
-<CardGroup cols={2}>
-  <Card title="Credential Encryption" icon="shield">
-    All authentication credentials are encrypted at rest using AES-256
+  <Card title="Delete Tool" icon="api" href="/api/endpoints/tools/toolscontroller_remove">
+    Delete a tool permanently (will affect workflows using this tool)
   </Card>
-  <Card title="Secret Management" icon="key">
-    API keys and tokens are stored separately from configuration data
+  <Card title="Store Tool Credentials" icon="api" href="/api/endpoints/tools/toolsecretscontroller_storecredentials">
+    Securely store encrypted credentials for an external tool. These credentials will be used when the tool is executed in workflows.
   </Card>
-  <Card title="Access Control" icon="users">
-    Role-based access to tools and their credentials
+  <Card title="Get Tool Credentials" icon="api" href="/api/endpoints/tools/toolsecretscontroller_getcredentials">
+    Retrieve stored credentials for a tool. By default returns masked values for security. Use unmask=true to get actual values (use carefully).
   </Card>
-  <Card title="Audit Logging" icon="scroll">
-    Complete audit trail of tool access and modifications
+  <Card title="Delete Tool Credentials" icon="api" href="/api/endpoints/tools/toolsecretscontroller_deletecredentials">
+    Permanently delete stored credentials for a tool. This will affect any workflows that use this tool.
   </Card>
-</CardGroup>
-
-## Best Practices
-
-<AccordionGroup>
-  <Accordion title="Naming Conventions">
-    - Use clear, descriptive names (e.g., "Stripe Production API")
-    - Include environment when applicable (Production, Staging, Development)
-    - Avoid generic names like "API" or "Service"
-    - Be consistent across similar tools
-  </Accordion>
-  
-  <Accordion title="Security">
-    - Use separate tools for different environments
-    - Regularly rotate API keys and credentials  
-    - Implement least-privilege access for API keys
-    - Monitor tool usage and authentication failures
-  </Accordion>
-  
-  <Accordion title="Organization">
-    - Group related tools by service or function
-    - Document tool purposes and use cases
-    - Test tool connections after setup
-    - Keep tool configurations up to date
-  </Accordion>
-</AccordionGroup>
-
-## Related Resources
-
-<CardGroup cols={3}>
-  <Card title="Actions" icon="bolt" href="/api/endpoints/actions">
-    Create actions using your tools
+  <Card title="List Tools with Credentials" icon="api" href="/api/endpoints/tools/toolsecretslistcontroller_listtoolswithcredentials">
+    Get all tools in the organization with their credential status. Shows which tools have credentials stored and which ones need setup.
   </Card>
-  <Card title="Flows" icon="workflow" href="/api/endpoints/flows">
-    Build workflows with tool actions
+  <Card title="Create or update organization-level auth configuration for a tool" icon="api" href="/api/endpoints/tools/toolauthcontroller_upsert">
+    Configures authentication settings (API Key or OAuth2) for a specific tool within an organization. API Key auth requires headerName and headerValue. OAuth2 auth requires clientId, clientSecret, and accessToken. A default callback URL is automatically added for OAuth2 configurations.
   </Card>
-  <Card title="Secrets" icon="key" href="/api/endpoints/tools/manage-secrets">
-    Manage tool authentication secrets
+  <Card title="Fetch auth configuration(s) for a tool" icon="api" href="/api/endpoints/tools/toolauthcontroller_get">
+    Retrieves authentication configuration(s) for a specific tool within an organization. Use configName query parameter to get a specific configuration, or omit to list all configurations.
+  </Card>
+  <Card title="Delete auth configuration for a tool" icon="api" href="/api/endpoints/tools/toolauthcontroller_remove">
+    Removes authentication configuration(s) for a specific tool within an organization. Use configName query parameter to delete a specific configuration, or use deleteAll=true to delete all configurations.
   </Card>
 </CardGroup>
 

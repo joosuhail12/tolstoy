@@ -1,0 +1,752 @@
+---
+title: "Examples"
+description: "Practical examples and code samples for using Tolstoy across different languages and frameworks"
+---
+
+## Overview
+
+This section provides comprehensive examples for integrating and using Tolstoy in various programming languages, frameworks, and scenarios.
+
+## Quick Start Examples
+
+### JavaScript/TypeScript
+
+#### Basic Workflow Execution
+```javascript
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const client = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  orgId: process.env.TOLSTOY_ORG_ID
+});
+
+// Execute a workflow
+async function processOrder(orderData) {
+  try {
+    const execution = await client.workflows.execute('order-processor', {
+      order: orderData,
+      customer_id: orderData.customerId
+    });
+    
+    console.log('Workflow started:', execution.id);
+    
+    // Monitor execution
+    const result = await client.executions.waitForCompletion(execution.id);
+    console.log('Workflow completed:', result.status);
+    
+    return result.outputs;
+  } catch (error) {
+    console.error('Workflow failed:', error.message);
+    throw error;
+  }
+}
+```
+
+#### Real-time Execution Monitoring
+```javascript
+// Stream execution updates
+async function monitorExecution(executionId) {
+  const stream = client.executions.stream(executionId);
+  
+  stream.on('progress', (data) => {
+    console.log(`Progress: ${data.progress}%`);
+  });
+  
+  stream.on('step.completed', (data) => {
+    console.log(`Step completed: ${data.stepName}`);
+  });
+  
+  stream.on('completed', (data) => {
+    console.log('Execution completed successfully');
+    stream.close();
+  });
+  
+  stream.on('failed', (data) => {
+    console.error('Execution failed:', data.error.message);
+    stream.close();
+  });
+}
+```
+
+### Python
+
+#### Workflow Management
+```python
+from tolstoy import TolstoyClient
+import asyncio
+
+client = TolstoyClient(
+    api_key=os.getenv('TOLSTOY_API_KEY'),
+    org_id=os.getenv('TOLSTOY_ORG_ID')
+)
+
+async def create_and_execute_workflow():
+    # Create a new workflow
+    workflow = await client.workflows.create({
+        'name': 'data-processor',
+        'description': 'Process incoming data',
+        'steps': [
+            {
+                'name': 'validate_data',
+                'action': 'data-validator',
+                'inputs': {
+                    'data': '{{inputs.raw_data}}',
+                    'schema': '{{config.validation_schema}}'
+                }
+            },
+            {
+                'name': 'transform_data',
+                'action': 'data-transformer',
+                'inputs': {
+                    'data': '{{steps.validate_data.output}}',
+                    'rules': '{{config.transform_rules}}'
+                }
+            },
+            {
+                'name': 'store_data',
+                'action': 'database-insert',
+                'inputs': {
+                    'table': 'processed_data',
+                    'data': '{{steps.transform_data.output}}'
+                }
+            }
+        ]
+    })
+    
+    # Execute the workflow
+    execution = await client.workflows.execute(workflow.id, {
+        'raw_data': {'user_id': 123, 'action': 'purchase'},
+        'config': {
+            'validation_schema': 'user_action_schema',
+            'transform_rules': 'standard_transform'
+        }
+    })
+    
+    return execution
+
+# Run the async function
+execution = asyncio.run(create_and_execute_workflow())
+print(f"Execution started: {execution.id}")
+```
+
+#### Error Handling and Retries
+```python
+import time
+from tolstoy.exceptions import TolstoyError, ExecutionError
+
+async def robust_workflow_execution(workflow_id, inputs, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            execution = await client.workflows.execute(workflow_id, inputs)
+            
+            # Wait for completion with timeout
+            result = await client.executions.wait_for_completion(
+                execution.id, 
+                timeout=300  # 5 minutes
+            )
+            
+            if result.status == 'completed':
+                return result.outputs
+            elif result.status == 'failed':
+                raise ExecutionError(f"Workflow failed: {result.error}")
+                
+        except TolstoyError as e:
+            print(f"Attempt {attempt + 1} failed: {e}")
+            if attempt < max_retries - 1:
+                # Exponential backoff
+                wait_time = 2 ** attempt
+                print(f"Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                raise e
+```
+
+### Go
+
+#### Concurrent Workflow Processing
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "sync"
+    
+    "github.com/tolstoy/go-sdk"
+)
+
+func main() {
+    client := tolstoy.NewClient(&tolstoy.Config{
+        APIKey: os.Getenv("TOLSTOY_API_KEY"),
+        OrgID:  os.Getenv("TOLSTOY_ORG_ID"),
+    })
+    
+    // Process multiple orders concurrently
+    orders := []Order{
+        {ID: "order_1", CustomerID: "cust_123", Amount: 99.99},
+        {ID: "order_2", CustomerID: "cust_456", Amount: 149.99},
+        {ID: "order_3", CustomerID: "cust_789", Amount: 79.99},
+    }
+    
+    var wg sync.WaitGroup
+    results := make(chan ExecutionResult, len(orders))
+    
+    for _, order := range orders {
+        wg.Add(1)
+        go func(o Order) {
+            defer wg.Done()
+            result := processOrder(client, o)
+            results <- result
+        }(order)
+    }
+    
+    // Wait for all goroutines to complete
+    go func() {
+        wg.Wait()
+        close(results)
+    }()
+    
+    // Collect results
+    for result := range results {
+        if result.Error != nil {
+            log.Printf("Order %s failed: %v", result.OrderID, result.Error)
+        } else {
+            log.Printf("Order %s completed successfully", result.OrderID)
+        }
+    }
+}
+
+func processOrder(client *tolstoy.Client, order Order) ExecutionResult {
+    ctx := context.Background()
+    
+    execution, err := client.Workflows.Execute(ctx, "order-processor", map[string]interface{}{
+        "order_id":    order.ID,
+        "customer_id": order.CustomerID,
+        "amount":      order.Amount,
+    })
+    
+    if err != nil {
+        return ExecutionResult{OrderID: order.ID, Error: err}
+    }
+    
+    // Wait for completion
+    result, err := client.Executions.WaitForCompletion(ctx, execution.ID)
+    if err != nil {
+        return ExecutionResult{OrderID: order.ID, Error: err}
+    }
+    
+    return ExecutionResult{
+        OrderID:     order.ID,
+        ExecutionID: execution.ID,
+        Status:      result.Status,
+        Outputs:     result.Outputs,
+    }
+}
+```
+
+### PHP
+
+#### Laravel Integration
+```php
+<?php
+
+namespace App\Services;
+
+use Tolstoy\TolstoyClient;
+use Illuminate\Support\Facades\Log;
+
+class WorkflowService
+{
+    private $client;
+    
+    public function __construct()
+    {
+        $this->client = new TolstoyClient([
+            'api_key' => config('tolstoy.api_key'),
+            'org_id' => config('tolstoy.org_id'),
+        ]);
+    }
+    
+    public function processUserRegistration($userData)
+    {
+        try {
+            $execution = $this->client->workflows->execute('user-onboarding', [
+                'user' => $userData,
+                'send_welcome_email' => true,
+                'create_profile' => true,
+                'assign_default_permissions' => true
+            ]);
+            
+            Log::info('User onboarding workflow started', [
+                'user_id' => $userData['id'],
+                'execution_id' => $execution['id']
+            ]);
+            
+            return $execution;
+            
+        } catch (Exception $e) {
+            Log::error('Failed to start user onboarding workflow', [
+                'user_id' => $userData['id'],
+                'error' => $e->getMessage()
+            ]);
+            
+            throw $e;
+        }
+    }
+    
+    public function handleWebhook($payload)
+    {
+        $eventType = $payload['type'] ?? null;
+        $data = $payload['data'] ?? [];
+        
+        switch ($eventType) {
+            case 'workflow.completed':
+                $this->handleWorkflowCompleted($data);
+                break;
+                
+            case 'workflow.failed':
+                $this->handleWorkflowFailed($data);
+                break;
+                
+            default:
+                Log::warning('Unknown webhook event type', ['type' => $eventType]);
+        }
+    }
+    
+    private function handleWorkflowCompleted($data)
+    {
+        Log::info('Workflow completed successfully', [
+            'execution_id' => $data['executionId'],
+            'workflow_id' => $data['workflowId']
+        ]);
+        
+        // Update application state based on workflow completion
+        // e.g., mark user as onboarded, send notifications, etc.
+    }
+}
+```
+
+## Framework Integrations
+
+### React/Next.js
+
+#### Workflow Dashboard Component
+```jsx
+import React, { useState, useEffect } from 'react';
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const WorkflowDashboard = () => {
+  const [executions, setExecutions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  const client = new TolstoyClient({
+    apiKey: process.env.NEXT_PUBLIC_TOLSTOY_API_KEY,
+    orgId: process.env.NEXT_PUBLIC_TOLSTOY_ORG_ID
+  });
+  
+  useEffect(() => {
+    fetchExecutions();
+  }, []);
+  
+  const fetchExecutions = async () => {
+    try {
+      const response = await client.executions.list({
+        limit: 20,
+        status: 'running'
+      });
+      setExecutions(response.executions);
+    } catch (error) {
+      console.error('Failed to fetch executions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const executeWorkflow = async (workflowId, inputs) => {
+    try {
+      const execution = await client.workflows.execute(workflowId, inputs);
+      
+      // Add new execution to the list
+      setExecutions(prev => [execution, ...prev]);
+      
+      // Monitor execution progress
+      monitorExecution(execution.id);
+      
+    } catch (error) {
+      console.error('Failed to execute workflow:', error);
+    }
+  };
+  
+  const monitorExecution = (executionId) => {
+    const stream = client.executions.stream(executionId);
+    
+    stream.on('progress', (data) => {
+      setExecutions(prev => prev.map(exec => 
+        exec.id === executionId 
+          ? { ...exec, progress: data.progress }
+          : exec
+      ));
+    });
+    
+    stream.on('completed', (data) => {
+      setExecutions(prev => prev.map(exec => 
+        exec.id === executionId 
+          ? { ...exec, status: 'completed', completedAt: data.completedAt }
+          : exec
+      ));
+    });
+  };
+  
+  if (loading) return <div>Loading...</div>;
+  
+  return (
+    <div className="workflow-dashboard">
+      <h2>Active Workflows</h2>
+      <div className="execution-list">
+        {executions.map(execution => (
+          <ExecutionCard 
+            key={execution.id}
+            execution={execution}
+            onCancel={() => client.executions.cancel(execution.id)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const ExecutionCard = ({ execution, onCancel }) => (
+  <div className="execution-card">
+    <div className="execution-header">
+      <h3>{execution.workflowName}</h3>
+      <span className={`status ${execution.status}`}>
+        {execution.status}
+      </span>
+    </div>
+    
+    {execution.status === 'running' && (
+      <div className="progress-bar">
+        <div 
+          className="progress-fill"
+          style={{ width: `${execution.progress || 0}%` }}
+        />
+      </div>
+    )}
+    
+    <div className="execution-actions">
+      {execution.status === 'running' && (
+        <button onClick={onCancel} className="cancel-btn">
+          Cancel
+        </button>
+      )}
+    </div>
+  </div>
+);
+
+export default WorkflowDashboard;
+```
+
+### Express.js API
+
+#### Webhook Handler
+```javascript
+const express = require('express');
+const { TolstoyClient } = require('@tolstoy/sdk');
+const crypto = require('crypto');
+
+const app = express();
+const client = new TolstoyClient({
+  apiKey: process.env.TOLSTOY_API_KEY,
+  orgId: process.env.TOLSTOY_ORG_ID
+});
+
+// Middleware for webhook signature verification
+const verifyWebhookSignature = (req, res, next) => {
+  const signature = req.headers['x-webhook-signature'];
+  const payload = JSON.stringify(req.body);
+  const secret = process.env.TOLSTOY_WEBHOOK_SECRET;
+  
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+  
+  if (`sha256=${expectedSignature}` !== signature) {
+    return res.status(401).json({ error: 'Invalid signature' });
+  }
+  
+  next();
+};
+
+// Webhook endpoint
+app.post('/webhooks/tolstoy', 
+  express.raw({ type: 'application/json' }),
+  verifyWebhookSignature,
+  (req, res) => {
+    const event = JSON.parse(req.body);
+    
+    switch (event.type) {
+      case 'workflow.completed':
+        handleWorkflowCompleted(event.data);
+        break;
+        
+      case 'workflow.failed':
+        handleWorkflowFailed(event.data);
+        break;
+        
+      case 'step.completed':
+        handleStepCompleted(event.data);
+        break;
+        
+      default:
+        console.log(`Unhandled event type: ${event.type}`);
+    }
+    
+    res.status(200).json({ received: true });
+  }
+);
+
+async function handleWorkflowCompleted(data) {
+  console.log(`Workflow ${data.workflowName} completed successfully`);
+  
+  // Update database, send notifications, etc.
+  await updateOrderStatus(data.executionId, 'completed');
+  await sendCompletionNotification(data);
+}
+
+async function handleWorkflowFailed(data) {
+  console.error(`Workflow ${data.workflowName} failed:`, data.error);
+  
+  // Handle failure scenarios
+  await logError(data);
+  await notifySupport(data);
+  
+  // Potentially retry or execute fallback workflow
+  if (data.retryable) {
+    await retryWorkflow(data.workflowId, data.inputs);
+  }
+}
+
+// API endpoint to trigger workflows
+app.post('/api/workflows/:workflowId/execute', async (req, res) => {
+  try {
+    const { workflowId } = req.params;
+    const inputs = req.body;
+    
+    const execution = await client.workflows.execute(workflowId, inputs);
+    
+    res.json({
+      success: true,
+      executionId: execution.id,
+      status: execution.status
+    });
+    
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+app.listen(3000, () => {
+  console.log('Server running on port 3000');
+});
+```
+
+## Advanced Examples
+
+### Batch Processing
+```python
+import asyncio
+from tolstoy import TolstoyClient
+
+async def process_batch_data(data_batch, workflow_id):
+    client = TolstoyClient()
+    
+    # Process items in batches to avoid overwhelming the system
+    batch_size = 10
+    results = []
+    
+    for i in range(0, len(data_batch), batch_size):
+        batch = data_batch[i:i + batch_size]
+        
+        # Create tasks for concurrent execution
+        tasks = [
+            client.workflows.execute(workflow_id, {'item': item})
+            for item in batch
+        ]
+        
+        # Execute batch concurrently
+        batch_results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Handle results and errors
+        for j, result in enumerate(batch_results):
+            if isinstance(result, Exception):
+                print(f"Item {i + j} failed: {result}")
+            else:
+                results.append(result)
+        
+        # Add delay between batches
+        await asyncio.sleep(1)
+    
+    return results
+```
+
+### Custom Tool Integration
+```javascript
+// Custom tool for external API integration
+const customTool = {
+  name: 'custom-api-client',
+  auth: {
+    type: 'api_key',
+    header: 'X-API-Key'
+  },
+  actions: {
+    'fetch-data': {
+      method: 'GET',
+      url: '/api/v1/data/{id}',
+      parameters: {
+        id: { type: 'string', required: true }
+      }
+    },
+    'create-record': {
+      method: 'POST',
+      url: '/api/v1/records',
+      body: {
+        name: { type: 'string', required: true },
+        data: { type: 'object', required: true }
+      }
+    }
+  }
+};
+
+// Register custom tool
+await client.tools.create(customTool);
+
+// Use in workflow
+const workflow = {
+  name: 'custom-integration',
+  steps: [
+    {
+      name: 'fetch_external_data',
+      tool: 'custom-api-client',
+      action: 'fetch-data',
+      inputs: {
+        id: '{{inputs.record_id}}'
+      }
+    },
+    {
+      name: 'process_data',
+      action: 'data-transformer',
+      inputs: {
+        data: '{{steps.fetch_external_data.output}}'
+      }
+    }
+  ]
+};
+```
+
+## Testing Examples
+
+### Unit Testing
+```javascript
+const { TolstoyClient } = require('@tolstoy/sdk');
+const { MockTolstoyClient } = require('@tolstoy/sdk/testing');
+
+describe('Workflow Integration', () => {
+  let client;
+  
+  beforeEach(() => {
+    client = new MockTolstoyClient();
+  });
+  
+  test('should execute workflow successfully', async () => {
+    // Mock successful execution
+    client.mockExecutions.addResponse('workflow_123', {
+      id: 'exec_456',
+      status: 'completed',
+      outputs: { result: 'success' }
+    });
+    
+    const result = await executeOrderWorkflow(client, {
+      orderId: 'order_123',
+      customerId: 'cust_456'
+    });
+    
+    expect(result.outputs.result).toBe('success');
+    expect(client.workflows.execute).toHaveBeenCalledWith('workflow_123', {
+      orderId: 'order_123',
+      customerId: 'cust_456'
+    });
+  });
+  
+  test('should handle workflow failure', async () => {
+    // Mock failure
+    client.mockExecutions.addError('workflow_123', new Error('Payment failed'));
+    
+    await expect(executeOrderWorkflow(client, {
+      orderId: 'order_123',
+      customerId: 'cust_456'
+    })).rejects.toThrow('Payment failed');
+  });
+});
+```
+
+### Integration Testing
+```python
+import pytest
+from tolstoy.testing import TolstoyTestCase
+
+class TestPaymentWorkflow(TolstoyTestCase):
+    def setUp(self):
+        self.setup_test_environment()
+        
+    def test_successful_payment_flow(self):
+        # Create test data
+        order_data = {
+            'customer_id': 'test_customer',
+            'amount': 99.99,
+            'currency': 'USD'
+        }
+        
+        # Execute workflow
+        execution = self.client.workflows.execute('payment-processor', order_data)
+        
+        # Wait for completion
+        result = self.wait_for_completion(execution.id, timeout=30)
+        
+        # Assertions
+        self.assertEqual(result.status, 'completed')
+        self.assertIn('transaction_id', result.outputs)
+        self.assertEqual(result.outputs['status'], 'success')
+        
+    def test_payment_failure_handling(self):
+        # Mock payment failure
+        self.mock_tool_response('stripe', 'charge', {
+            'status': 'failed',
+            'error': 'card_declined'
+        })
+        
+        order_data = {
+            'customer_id': 'test_customer',
+            'amount': 99.99,
+            'currency': 'USD'
+        }
+        
+        execution = self.client.workflows.execute('payment-processor', order_data)
+        result = self.wait_for_completion(execution.id)
+        
+        # Should trigger error handling flow
+        self.assertEqual(result.status, 'completed')  # Workflow completes but payment fails
+        self.assertEqual(result.outputs['payment_status'], 'failed')
+        self.assertIn('error_message', result.outputs)
+```
+
+## Related Documentation
+
+- [SDK Documentation](/sdk/typescript/index) - Detailed SDK reference
+- [API Reference](/api/index) - Complete API documentation
+- [CLI Examples](/cli/examples) - Command-line interface examples
+- [Workflow Patterns](/public/product/flows/patterns) - Common workflow patterns

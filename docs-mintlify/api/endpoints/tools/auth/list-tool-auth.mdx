@@ -1,0 +1,418 @@
+---
+title: "List Tool Auth"
+api: "GET /tools/auth"
+description: "Retrieve authentication configurations for all tools"
+---
+
+## Overview
+
+The List Tool Auth endpoint returns all tool authentication configurations within your organization, providing visibility into which tools are configured for authentication and their current status.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="toolId" type="string">
+  Filter by specific tool ID
+</ParamField>
+
+<ParamField query="authType" type="string">
+  Filter by authentication type: "oauth2", "api_key", "basic_auth", "bearer_token"
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by authentication status: "configured", "pending", "error"
+</ParamField>
+
+<ParamField query="limit" type="number">
+  Maximum number of auth configs to return (1-100, defaults to 50)
+</ParamField>
+
+<ParamField query="offset" type="number">
+  Number of auth configs to skip for pagination (defaults to 0)
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="toolAuths" type="array">
+  Array of tool authentication configuration objects
+  
+  <Expandable title="Tool Auth Object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the auth configuration
+    </ResponseField>
+    
+    <ResponseField name="toolId" type="string">
+      ID of the associated tool
+    </ResponseField>
+    
+    <ResponseField name="toolName" type="string">
+      Name of the tool
+    </ResponseField>
+    
+    <ResponseField name="authType" type="string">
+      Type of authentication method
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Current authentication status
+    </ResponseField>
+    
+    <ResponseField name="isConfigured" type="boolean">
+      Whether authentication is properly configured
+    </ResponseField>
+    
+    <ResponseField name="lastValidated" type="string">
+      ISO timestamp when auth was last validated
+    </ResponseField>
+    
+    <ResponseField name="expiresAt" type="string">
+      ISO timestamp when auth expires (for OAuth tokens)
+    </ResponseField>
+    
+    <ResponseField name="scopes" type="array">
+      OAuth scopes granted (for OAuth2 auth)
+    </ResponseField>
+    
+    <ResponseField name="metadata" type="object">
+      Additional auth-specific metadata (sensitive values masked)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination information
+  
+  <Expandable title="Pagination Object">
+    <ResponseField name="total" type="number">
+      Total number of tool auth configurations
+    </ResponseField>
+    
+    <ResponseField name="count" type="number">
+      Number of configurations returned in this response
+    </ResponseField>
+    
+    <ResponseField name="offset" type="number">
+      Current offset value
+    </ResponseField>
+    
+    <ResponseField name="limit" type="number">
+      Current limit value
+    </ResponseField>
+    
+    <ResponseField name="hasMore" type="boolean">
+      Whether there are more configurations to fetch
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid query parameters
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET "https://api.tolstoy.com/v1/tools/auth" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```bash cURL Filtered
+curl -X GET "https://api.tolstoy.com/v1/tools/auth?authType=oauth2&status=configured" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```javascript JavaScript
+// List all tool auth configurations
+const toolAuths = await fetch('/api/v1/tools/auth', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+const authData = await toolAuths.json();
+console.log(`Found ${authData.pagination.total} tool auth configurations`);
+
+authData.toolAuths.forEach(auth => {
+  const status = auth.isConfigured ? '✅' : '❌';
+  console.log(`${status} ${auth.toolName} (${auth.authType})`);
+});
+
+// Filter by OAuth2 tools
+const oauthAuths = await fetch('/api/v1/tools/auth?authType=oauth2', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+const oauthData = await oauthAuths.json();
+oauthData.toolAuths.forEach(auth => {
+  const expiry = auth.expiresAt ? new Date(auth.expiresAt) : null;
+  const isExpired = expiry && expiry < new Date();
+  
+  console.log(`${auth.toolName}: ${isExpired ? 'Expired' : 'Valid'}`);
+  if (auth.scopes) {
+    console.log(`  Scopes: ${auth.scopes.join(', ')}`);
+  }
+});
+```
+
+```python Python
+import requests
+from datetime import datetime
+
+# List all tool auth configurations
+response = requests.get(
+    "https://api.tolstoy.com/v1/tools/auth",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    }
+)
+
+if response.status_code == 200:
+    data = response.json()
+    print(f"Total tool auth configurations: {data['pagination']['total']}")
+    
+    for auth in data['toolAuths']:
+        status = "✅" if auth['isConfigured'] else "❌"
+        print(f"{status} {auth['toolName']} ({auth['authType']})")
+        
+        # Check expiration for OAuth tokens
+        if auth.get('expiresAt'):
+            expires_at = datetime.fromisoformat(auth['expiresAt'].replace('Z', '+00:00'))
+            if expires_at < datetime.now(expires_at.tzinfo):
+                print(f"  ⚠️ Token expired on {expires_at.strftime('%Y-%m-%d %H:%M')}")
+
+# Filter by authentication status
+params = {
+    "status": "error",
+    "limit": 20
+}
+
+error_response = requests.get(
+    "https://api.tolstoy.com/v1/tools/auth",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    },
+    params=params
+)
+
+if error_response.status_code == 200:
+    error_data = error_response.json()
+    if error_data['toolAuths']:
+        print("Tools with authentication errors:")
+        for auth in error_data['toolAuths']:
+            print(f"  - {auth['toolName']}: {auth['status']}")
+```
+
+</CodeGroup>
+
+## Filtering and Monitoring
+
+### Authentication Status Overview
+```javascript
+async function getAuthStatusOverview(apiToken, orgId, userId) {
+  const response = await fetch('/api/v1/tools/auth', {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  const data = await response.json();
+  
+  const statusCounts = data.toolAuths.reduce((counts, auth) => {
+    counts[auth.status] = (counts[auth.status] || 0) + 1;
+    return counts;
+  }, {});
+  
+  const authTypeCounts = data.toolAuths.reduce((counts, auth) => {
+    counts[auth.authType] = (counts[auth.authType] || 0) + 1;
+    return counts;
+  }, {});
+  
+  return {
+    total: data.pagination.total,
+    configured: statusCounts.configured || 0,
+    pending: statusCounts.pending || 0,
+    errors: statusCounts.error || 0,
+    authTypes: authTypeCounts
+  };
+}
+
+// Usage
+const overview = await getAuthStatusOverview(apiToken, 'org_123456', 'user_789012');
+console.log(`Auth Status: ${overview.configured} configured, ${overview.errors} errors`);
+console.log('Auth Types:', overview.authTypes);
+```
+
+### Expiring OAuth Tokens
+```javascript
+async function findExpiringTokens(apiToken, orgId, userId, daysThreshold = 7) {
+  const response = await fetch('/api/v1/tools/auth?authType=oauth2', {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  const data = await response.json();
+  const threshold = new Date();
+  threshold.setDate(threshold.getDate() + daysThreshold);
+  
+  const expiringTokens = data.toolAuths.filter(auth => {
+    if (!auth.expiresAt) return false;
+    const expiryDate = new Date(auth.expiresAt);
+    return expiryDate <= threshold;
+  });
+  
+  return expiringTokens.map(auth => ({
+    toolName: auth.toolName,
+    toolId: auth.toolId,
+    expiresAt: auth.expiresAt,
+    daysUntilExpiry: Math.ceil((new Date(auth.expiresAt) - new Date()) / (1000 * 60 * 60 * 24))
+  }));
+}
+
+// Check for tokens expiring in the next 7 days
+const expiring = await findExpiringTokens(apiToken, 'org_123456', 'user_789012', 7);
+if (expiring.length > 0) {
+  console.log('OAuth tokens expiring soon:');
+  expiring.forEach(token => {
+    console.log(`- ${token.toolName}: ${token.daysUntilExpiry} days`);
+  });
+}
+```
+
+## Common Use Cases
+
+### Authentication Health Check
+```javascript
+async function performAuthHealthCheck(apiToken, orgId, userId) {
+  const response = await fetch('/api/v1/tools/auth', {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  const data = await response.json();
+  const healthReport = {
+    healthy: [],
+    warnings: [],
+    errors: []
+  };
+  
+  data.toolAuths.forEach(auth => {
+    if (auth.status === 'error') {
+      healthReport.errors.push({
+        tool: auth.toolName,
+        issue: 'Authentication error'
+      });
+    } else if (auth.status === 'pending') {
+      healthReport.warnings.push({
+        tool: auth.toolName,
+        issue: 'Authentication pending'
+      });
+    } else if (auth.expiresAt) {
+      const daysUntilExpiry = (new Date(auth.expiresAt) - new Date()) / (1000 * 60 * 60 * 24);
+      if (daysUntilExpiry < 7) {
+        healthReport.warnings.push({
+          tool: auth.toolName,
+          issue: `Token expires in ${Math.ceil(daysUntilExpiry)} days`
+        });
+      } else {
+        healthReport.healthy.push(auth.toolName);
+      }
+    } else {
+      healthReport.healthy.push(auth.toolName);
+    }
+  });
+  
+  return healthReport;
+}
+```
+
+### Audit Authentication Configurations
+```javascript
+async function auditAuthConfigurations(apiToken, orgId, userId) {
+  const response = await fetch('/api/v1/tools/auth', {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  const data = await response.json();
+  const audit = {
+    totalTools: data.pagination.total,
+    configured: 0,
+    needsAttention: [],
+    securityRecommendations: []
+  };
+  
+  data.toolAuths.forEach(auth => {
+    if (auth.isConfigured) {
+      audit.configured++;
+    } else {
+      audit.needsAttention.push(auth.toolName);
+    }
+    
+    // Check for security recommendations
+    if (auth.authType === 'api_key' && auth.lastValidated) {
+      const daysSinceValidation = (new Date() - new Date(auth.lastValidated)) / (1000 * 60 * 60 * 24);
+      if (daysSinceValidation > 30) {
+        audit.securityRecommendations.push({
+          tool: auth.toolName,
+          recommendation: 'Rotate API key (not validated in 30+ days)'
+        });
+      }
+    }
+  });
+  
+  return audit;
+}
+```
+
+## Related Endpoints
+
+- [Update Tool Auth](/api/endpoints/tools/auth/update-tool-auth) - Update authentication configuration
+- [Delete Tool Auth](/api/endpoints/tools/auth/delete-tool-auth) - Remove authentication configuration
+- [List Tools](/api/endpoints/tools/list-tools) - View all tools
+- [List Tool Secrets](/api/endpoints/tools/secrets/list-tool-secrets) - View stored credentials

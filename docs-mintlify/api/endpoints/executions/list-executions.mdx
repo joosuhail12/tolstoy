@@ -1,0 +1,363 @@
+---
+title: "List Executions"
+api: "GET /executions"
+description: "Retrieve a list of workflow executions"
+---
+
+## Overview
+
+The List Executions endpoint retrieves all workflow executions within your organization, with filtering and pagination options to help you find specific executions.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="limit" type="number">
+  Maximum number of executions to return (1-100, defaults to 20)
+</ParamField>
+
+<ParamField query="offset" type="number">
+  Number of executions to skip for pagination (defaults to 0)
+</ParamField>
+
+<ParamField query="workflowId" type="string">
+  Filter by specific workflow ID
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter by execution status: "pending", "running", "completed", "failed", "canceled"
+</ParamField>
+
+<ParamField query="triggeredBy" type="string">
+  Filter by user who triggered the execution
+</ParamField>
+
+<ParamField query="startedAfter" type="string">
+  Filter executions started after this ISO timestamp
+</ParamField>
+
+<ParamField query="startedBefore" type="string">
+  Filter executions started before this ISO timestamp
+</ParamField>
+
+<ParamField query="sort" type="string">
+  Sort order: "created", "updated", "duration", or "status" (defaults to "created")
+</ParamField>
+
+<ParamField query="order" type="string">
+  Sort direction: "asc" or "desc" (defaults to "desc")
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="executions" type="array">
+  Array of execution objects
+  
+  <Expandable title="Execution Object">
+    <ResponseField name="id" type="string">
+      Unique identifier for the execution
+    </ResponseField>
+    
+    <ResponseField name="workflowId" type="string">
+      ID of the workflow being executed
+    </ResponseField>
+    
+    <ResponseField name="workflowName" type="string">
+      Name of the workflow
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Current execution status
+    </ResponseField>
+    
+    <ResponseField name="startedAt" type="string">
+      ISO timestamp when execution started
+    </ResponseField>
+    
+    <ResponseField name="completedAt" type="string">
+      ISO timestamp when execution completed (null if still running)
+    </ResponseField>
+    
+    <ResponseField name="duration" type="number">
+      Execution duration in milliseconds (null if still running)
+    </ResponseField>
+    
+    <ResponseField name="triggeredBy" type="string">
+      User ID who triggered the execution
+    </ResponseField>
+    
+    <ResponseField name="progress" type="number">
+      Execution progress percentage (0-100)
+    </ResponseField>
+    
+    <ResponseField name="stepCount" type="object">
+      Step execution statistics
+      
+      <Expandable title="Step Count">
+        <ResponseField name="total" type="number">
+          Total number of steps
+        </ResponseField>
+        <ResponseField name="completed" type="number">
+          Number of completed steps
+        </ResponseField>
+        <ResponseField name="failed" type="number">
+          Number of failed steps
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination information
+  
+  <Expandable title="Pagination Object">
+    <ResponseField name="total" type="number">
+      Total number of executions available
+    </ResponseField>
+    
+    <ResponseField name="count" type="number">
+      Number of executions returned in this response
+    </ResponseField>
+    
+    <ResponseField name="offset" type="number">
+      Current offset value
+    </ResponseField>
+    
+    <ResponseField name="limit" type="number">
+      Current limit value
+    </ResponseField>
+    
+    <ResponseField name="hasMore" type="boolean">
+      Whether there are more executions to fetch
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="summary" type="object">
+  Execution statistics summary
+  
+  <Expandable title="Summary Object">
+    <ResponseField name="totalExecutions" type="number">
+      Total number of executions
+    </ResponseField>
+    
+    <ResponseField name="runningExecutions" type="number">
+      Number of currently running executions
+    </ResponseField>
+    
+    <ResponseField name="completedExecutions" type="number">
+      Number of completed executions
+    </ResponseField>
+    
+    <ResponseField name="failedExecutions" type="number">
+      Number of failed executions
+    </ResponseField>
+    
+    <ResponseField name="averageDuration" type="number">
+      Average execution duration in milliseconds
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid query parameters
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Parameter-specific validation errors
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL Basic
+curl -X GET "https://api.tolstoy.com/v1/executions" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```bash cURL Filtered
+curl -X GET "https://api.tolstoy.com/v1/executions?status=running&workflowId=workflow_123&limit=10" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```javascript JavaScript
+// Basic list
+const executions = await fetch('/api/v1/executions', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+const execData = await executions.json();
+console.log(`Found ${execData.summary.totalExecutions} total executions`);
+
+// Filtered list
+const runningExecutions = await fetch('/api/v1/executions?status=running&sort=created&order=desc', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+const runningData = await runningExecutions.json();
+runningData.executions.forEach(exec => {
+  console.log(`${exec.workflowName}: ${exec.progress}% complete`);
+});
+```
+
+```python Python
+import requests
+from datetime import datetime, timedelta
+
+# Basic list
+response = requests.get(
+    "https://api.tolstoy.com/v1/executions",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    }
+)
+
+if response.status_code == 200:
+    data = response.json()
+    print(f"Total executions: {data['summary']['totalExecutions']}")
+    print(f"Running: {data['summary']['runningExecutions']}")
+    print(f"Failed: {data['summary']['failedExecutions']}")
+
+# Filter executions from last 24 hours
+yesterday = (datetime.now() - timedelta(days=1)).isoformat()
+recent_response = requests.get(
+    "https://api.tolstoy.com/v1/executions",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    },
+    params={
+        "startedAfter": yesterday,
+        "sort": "created",
+        "order": "desc",
+        "limit": 50
+    }
+)
+
+if recent_response.status_code == 200:
+    recent_data = recent_response.json()
+    for exec in recent_data['executions']:
+        status_emoji = {"completed": "✅", "failed": "❌", "running": "🔄", "pending": "⏳"}
+        emoji = status_emoji.get(exec['status'], "❓")
+        print(f"{emoji} {exec['workflowName']} - {exec['status']}")
+```
+
+</CodeGroup>
+
+## Filtering Options
+
+### By Status
+- `pending` - Executions waiting to start
+- `running` - Currently executing workflows
+- `completed` - Successfully finished executions
+- `failed` - Executions that encountered errors
+- `canceled` - Manually canceled executions
+
+### By Time Range
+```javascript
+// Last 24 hours
+const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+const recentExecs = await fetch(`/api/v1/executions?startedAfter=${yesterday}`);
+
+// Specific date range
+const startDate = '2024-01-01T00:00:00Z';
+const endDate = '2024-01-31T23:59:59Z';
+const monthlyExecs = await fetch(`/api/v1/executions?startedAfter=${startDate}&startedBefore=${endDate}`);
+```
+
+### By Workflow
+```javascript
+// All executions for specific workflow
+const workflowExecs = await fetch('/api/v1/executions?workflowId=workflow_123');
+
+// Failed executions for specific workflow
+const failedExecs = await fetch('/api/v1/executions?workflowId=workflow_123&status=failed');
+```
+
+## Use Cases
+
+### Monitoring Dashboard
+```javascript
+// Get current system status
+const status = await fetch('/api/v1/executions?limit=1');
+const statusData = await status.json();
+const summary = statusData.summary;
+
+console.log(`System Status:
+Running: ${summary.runningExecutions}
+Avg Duration: ${Math.round(summary.averageDuration/1000)}s
+Success Rate: ${((summary.completedExecutions / summary.totalExecutions) * 100).toFixed(1)}%`);
+```
+
+### Execution History
+```javascript
+// Get execution history for a workflow
+const history = await fetch('/api/v1/executions?workflowId=workflow_123&sort=created&order=desc&limit=20');
+const historyData = await history.json();
+
+historyData.executions.forEach(exec => {
+  const duration = exec.duration ? `${Math.round(exec.duration/1000)}s` : 'Running';
+  console.log(`${exec.startedAt}: ${exec.status} (${duration})`);
+});
+```
+
+### Troubleshooting
+```javascript
+// Find recent failures
+const failures = await fetch('/api/v1/executions?status=failed&sort=created&order=desc&limit=10');
+const failureData = await failures.json();
+
+failureData.executions.forEach(exec => {
+  console.log(`Failed: ${exec.workflowName} at ${exec.startedAt}`);
+});
+```
+
+## Related Endpoints
+
+- [Get Execution](/api/endpoints/executions/get-execution) - Get specific execution details
+- [Cancel Execution](/api/endpoints/executions/cancel-execution) - Cancel running execution
+- [Retry Execution](/api/endpoints/executions/retry-execution) - Retry failed execution
+- [Stream Execution](/api/endpoints/executions/stream-execution) - Stream real-time updates

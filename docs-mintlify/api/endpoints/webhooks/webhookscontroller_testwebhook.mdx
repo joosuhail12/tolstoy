@@ -1,0 +1,69 @@
+---
+title: "Test Webhook"
+api: "POST /webhooks/{id}/test"
+description: "Send a test payload to verify webhook endpoint is working"
+---
+
+# Test Webhook
+
+Send a test payload to verify webhook endpoint is working
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID
+</ParamField>
+
+<ParamField path="id" type="string" required>
+  Webhook ID
+</ParamField>
+
+
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST "http://localhost:3000/webhooks/{id}/test" \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc" \
+  -d '{}'
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const result = await tolstoy.webhooks.webhookscontroller_testwebhook();
+console.log(result);
+```
+</CodeGroup>
+
+## Responses
+
+<ResponseExample>
+```json 202 
+{
+  "success": true,
+  "statusCode": 200,
+  "message": "Webhook test successful"
+}
+```
+</ResponseExample>
+
+### 404 Not Found
+
+Webhook not found
+
+---
+
+<Snippet file="api-footer.mdx" />

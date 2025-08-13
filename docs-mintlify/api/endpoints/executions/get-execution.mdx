@@ -1,0 +1,224 @@
+---
+title: "Get Execution"
+api: "GET /executions/{id}"
+description: "Retrieve details about a specific workflow execution"
+---
+
+## Overview
+
+The Get Execution endpoint retrieves comprehensive information about a specific workflow execution, including its current status, steps, outputs, and execution history.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the execution to retrieve
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="includeSteps" type="boolean">
+  Whether to include detailed step information (defaults to true)
+</ParamField>
+
+<ParamField query="includeLogs" type="boolean">
+  Whether to include execution logs (defaults to false)
+</ParamField>
+
+<ParamField query="includeOutputs" type="boolean">
+  Whether to include step outputs (defaults to true)
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="id" type="string">
+  Unique identifier for the execution
+</ResponseField>
+
+<ResponseField name="workflowId" type="string">
+  ID of the workflow being executed
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current execution status: "pending", "running", "completed", "failed", "canceled"
+</ResponseField>
+
+<ResponseField name="startedAt" type="string">
+  ISO timestamp when execution started
+</ResponseField>
+
+<ResponseField name="completedAt" type="string">
+  ISO timestamp when execution completed (null if still running)
+</ResponseField>
+
+<ResponseField name="duration" type="number">
+  Execution duration in milliseconds (null if still running)
+</ResponseField>
+
+<ResponseField name="triggeredBy" type="string">
+  User ID who triggered the execution
+</ResponseField>
+
+<ResponseField name="inputs" type="object">
+  Input data provided to the workflow
+</ResponseField>
+
+<ResponseField name="outputs" type="object">
+  Final outputs from the workflow (null if not completed)
+</ResponseField>
+
+<ResponseField name="error" type="object">
+  Error information if execution failed
+  
+  <Expandable title="Error Details">
+    <ResponseField name="message" type="string">
+      Error message
+    </ResponseField>
+    
+    <ResponseField name="code" type="string">
+      Error code
+    </ResponseField>
+    
+    <ResponseField name="step" type="string">
+      Step where error occurred
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="steps" type="array">
+  Array of execution steps (if includeSteps=true)
+  
+  <Expandable title="Step Object">
+    <ResponseField name="id" type="string">
+      Step identifier
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Step name
+    </ResponseField>
+    
+    <ResponseField name="status" type="string">
+      Step status
+    </ResponseField>
+    
+    <ResponseField name="startedAt" type="string">
+      Step start time
+    </ResponseField>
+    
+    <ResponseField name="completedAt" type="string">
+      Step completion time
+    </ResponseField>
+    
+    <ResponseField name="duration" type="number">
+      Step duration in milliseconds
+    </ResponseField>
+    
+    <ResponseField name="outputs" type="object">
+      Step outputs
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="metrics" type="object">
+  Execution performance metrics
+  
+  <Expandable title="Metrics">
+    <ResponseField name="totalSteps" type="number">
+      Total number of steps
+    </ResponseField>
+    
+    <ResponseField name="completedSteps" type="number">
+      Number of completed steps
+    </ResponseField>
+    
+    <ResponseField name="failedSteps" type="number">
+      Number of failed steps
+    </ResponseField>
+    
+    <ResponseField name="progress" type="number">
+      Execution progress percentage (0-100)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="404" type="object">
+  Not Found - Execution does not exist
+</ResponseField>
+
+<ResponseField name="403" type="object">
+  Forbidden - Insufficient permissions to view this execution
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET "https://api.tolstoy.com/v1/executions/exec_abc123?includeSteps=true&includeLogs=true" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```javascript JavaScript
+const execution = await fetch('/api/v1/executions/exec_abc123?includeSteps=true', {
+  method: 'GET',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+const execData = await execution.json();
+console.log(`Execution status: ${execData.status}`);
+console.log(`Progress: ${execData.metrics.progress}%`);
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    "https://api.tolstoy.com/v1/executions/exec_abc123",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    },
+    params={
+        "includeSteps": True,
+        "includeLogs": True
+    }
+)
+
+if response.status_code == 200:
+    execution = response.json()
+    print(f"Status: {execution['status']}")
+    print(f"Duration: {execution['duration']}ms")
+```
+
+</CodeGroup>
+
+## Related Endpoints
+
+- [List Executions](/api/endpoints/executions/list-executions) - List all executions
+- [Cancel Execution](/api/endpoints/executions/cancel-execution) - Cancel running execution
+- [Retry Execution](/api/endpoints/executions/retry-execution) - Retry failed execution
+- [Stream Execution](/api/endpoints/executions/stream-execution) - Stream real-time updates

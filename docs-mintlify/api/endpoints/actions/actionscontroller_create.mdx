@@ -1,0 +1,78 @@
+---
+title: "Create Action"
+api: "POST /actions"
+description: "Create a reusable action template for workflows. Actions define API calls that can be executed within workflow steps."
+---
+
+# Create Action
+
+Create a reusable action template for workflows. Actions define API calls that can be executed within workflow steps.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID
+</ParamField>
+
+
+
+
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST "http://localhost:3000/actions" \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc" \
+  -d '{}'
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const result = await tolstoy.actions.actionscontroller_create();
+console.log(result);
+```
+</CodeGroup>
+
+## Responses
+
+<ResponseExample>
+```json 201 Created
+{
+  "id": "action_abc123",
+  "name": "Send Slack Message",
+  "key": "slack_send_message",
+  "toolId": "tool_slack_123",
+  "method": "POST",
+  "endpoint": "/api/chat.postMessage",
+  "headers": {
+    "Content-Type": "application/json"
+  },
+  "inputSchema": [],
+  "executeIf": {},
+  "version": 1,
+  "createdAt": "2024-01-15T10:30:00.000Z",
+  "updatedAt": "2024-01-15T10:30:00.000Z"
+}
+```
+</ResponseExample>
+
+### 400 Bad Request
+
+Invalid action configuration
+
+---
+
+<Snippet file="api-footer.mdx" />

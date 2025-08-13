@@ -1,0 +1,508 @@
+---
+title: "Update Webhook"
+api: "PUT /webhooks/{id}"
+description: "Update webhook configuration and settings"
+---
+
+## Overview
+
+The Update Webhook endpoint allows you to modify an existing webhook's URL, event subscriptions, security settings, and other configuration options.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the webhook to update
+</ParamField>
+
+## Request Body
+
+<ParamField body="url" type="string">
+  The webhook endpoint URL (must be HTTPS in production)
+</ParamField>
+
+<ParamField body="events" type="array">
+  Array of event types to subscribe to
+  
+  <Expandable title="Available Events">
+    <ParamField body="workflow.started" type="string">
+      Workflow execution started
+    </ParamField>
+    <ParamField body="workflow.completed" type="string">
+      Workflow execution completed successfully
+    </ParamField>
+    <ParamField body="workflow.failed" type="string">
+      Workflow execution failed
+    </ParamField>
+    <ParamField body="workflow.canceled" type="string">
+      Workflow execution canceled
+    </ParamField>
+    <ParamField body="step.completed" type="string">
+      Individual step completed
+    </ParamField>
+    <ParamField body="step.failed" type="string">
+      Individual step failed
+    </ParamField>
+    <ParamField body="tool.connected" type="string">
+      Tool successfully connected
+    </ParamField>
+    <ParamField body="tool.disconnected" type="string">
+      Tool disconnected
+    </ParamField>
+    <ParamField body="organization.updated" type="string">
+      Organization settings changed
+    </ParamField>
+    <ParamField body="user.invited" type="string">
+      New user invited to organization
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="name" type="string">
+  Human-readable name for the webhook
+</ParamField>
+
+<ParamField body="description" type="string">
+  Description of the webhook's purpose
+</ParamField>
+
+<ParamField body="secret" type="string">
+  Secret key for webhook signature verification (will be hashed)
+</ParamField>
+
+<ParamField body="headers" type="object">
+  Additional HTTP headers to include in webhook requests
+</ParamField>
+
+<ParamField body="timeout" type="number">
+  Request timeout in seconds (1-30, defaults to 10)
+</ParamField>
+
+<ParamField body="retryPolicy" type="object">
+  Retry configuration for failed webhook deliveries
+  
+  <Expandable title="Retry Policy">
+    <ParamField body="enabled" type="boolean">
+      Whether to retry failed deliveries (defaults to true)
+    </ParamField>
+    <ParamField body="maxAttempts" type="number">
+      Maximum retry attempts (1-5, defaults to 3)
+    </ParamField>
+    <ParamField body="backoffMultiplier" type="number">
+      Exponential backoff multiplier (1-10, defaults to 2)
+    </ParamField>
+    <ParamField body="initialDelay" type="number">
+      Initial retry delay in seconds (1-300, defaults to 5)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="filters" type="object">
+  Event filtering configuration
+  
+  <Expandable title="Event Filters">
+    <ParamField body="workflowIds" type="array">
+      Only trigger for specific workflow IDs
+    </ParamField>
+    <ParamField body="userIds" type="array">
+      Only trigger for specific user IDs
+    </ParamField>
+    <ParamField body="tags" type="array">
+      Only trigger for events with specific tags
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="id" type="string">
+  Unique identifier for the webhook
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  The webhook endpoint URL
+</ResponseField>
+
+<ResponseField name="events" type="array">
+  Array of subscribed event types
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Webhook name
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Webhook description
+</ResponseField>
+
+<ResponseField name="enabled" type="boolean">
+  Whether the webhook is currently enabled
+</ResponseField>
+
+<ResponseField name="headers" type="object">
+  Additional headers (sensitive values masked)
+</ResponseField>
+
+<ResponseField name="timeout" type="number">
+  Request timeout in seconds
+</ResponseField>
+
+<ResponseField name="retryPolicy" type="object">
+  Retry configuration
+</ResponseField>
+
+<ResponseField name="filters" type="object">
+  Event filtering configuration
+</ResponseField>
+
+<ResponseField name="stats" type="object">
+  Delivery statistics
+  
+  <Expandable title="Statistics">
+    <ResponseField name="totalDeliveries" type="number">
+      Total delivery attempts
+    </ResponseField>
+    <ResponseField name="successfulDeliveries" type="number">
+      Successful deliveries
+    </ResponseField>
+    <ResponseField name="failedDeliveries" type="number">
+      Failed deliveries
+    </ResponseField>
+    <ResponseField name="lastDeliveryAt" type="string">
+      Last delivery attempt timestamp
+    </ResponseField>
+    <ResponseField name="lastSuccessAt" type="string">
+      Last successful delivery timestamp
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  ISO timestamp when webhook was created
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO timestamp when webhook was last updated
+</ResponseField>
+
+<ResponseField name="updatedBy" type="string">
+  User ID who last updated the webhook
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid webhook configuration
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Field-specific validation errors
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="404" type="object">
+  Not Found - Webhook does not exist
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - URL already exists for another webhook
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X PUT "https://api.tolstoy.com/v1/webhooks/webhook_abc123" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://api.myapp.com/webhooks/tolstoy-updated",
+    "events": [
+      "workflow.completed",
+      "workflow.failed",
+      "tool.connected"
+    ],
+    "name": "Updated Production Webhook",
+    "description": "Updated webhook for production notifications",
+    "timeout": 15,
+    "retryPolicy": {
+      "enabled": true,
+      "maxAttempts": 5,
+      "backoffMultiplier": 2.5,
+      "initialDelay": 3
+    },
+    "filters": {
+      "workflowIds": ["workflow_123", "workflow_456"],
+      "tags": ["production", "critical"]
+    },
+    "headers": {
+      "X-Source": "tolstoy-production",
+      "X-Environment": "prod"
+    }
+  }'
+```
+
+```javascript JavaScript
+const updatedWebhook = await fetch('/api/v1/webhooks/webhook_abc123', {
+  method: 'PUT',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    url: 'https://api.myapp.com/webhooks/tolstoy-updated',
+    events: [
+      'workflow.completed',
+      'workflow.failed',
+      'tool.connected'
+    ],
+    name: 'Updated Production Webhook',
+    description: 'Updated webhook for production notifications',
+    timeout: 15,
+    retryPolicy: {
+      enabled: true,
+      maxAttempts: 5,
+      backoffMultiplier: 2.5,
+      initialDelay: 3
+    },
+    filters: {
+      workflowIds: ['workflow_123', 'workflow_456'],
+      tags: ['production', 'critical']
+    },
+    headers: {
+      'X-Source': 'tolstoy-production',
+      'X-Environment': 'prod'
+    }
+  })
+});
+
+if (updatedWebhook.ok) {
+  const webhook = await updatedWebhook.json();
+  console.log('Webhook updated:', webhook.id);
+  console.log('Events:', webhook.events);
+} else {
+  const error = await updatedWebhook.json();
+  console.error('Update failed:', error.message);
+}
+```
+
+```python Python
+import requests
+
+webhook_data = {
+    "url": "https://api.myapp.com/webhooks/tolstoy-updated",
+    "events": [
+        "workflow.completed",
+        "workflow.failed",
+        "tool.connected"
+    ],
+    "name": "Updated Production Webhook",
+    "description": "Updated webhook for production notifications",
+    "timeout": 15,
+    "retryPolicy": {
+        "enabled": True,
+        "maxAttempts": 5,
+        "backoffMultiplier": 2.5,
+        "initialDelay": 3
+    },
+    "filters": {
+        "workflowIds": ["workflow_123", "workflow_456"],
+        "tags": ["production", "critical"]
+    },
+    "headers": {
+        "X-Source": "tolstoy-production",
+        "X-Environment": "prod"
+    }
+}
+
+response = requests.put(
+    "https://api.tolstoy.com/v1/webhooks/webhook_abc123",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json=webhook_data
+)
+
+if response.status_code == 200:
+    webhook = response.json()
+    print(f"Webhook updated: {webhook['id']}")
+    print(f"Events: {', '.join(webhook['events'])}")
+else:
+    error = response.json()
+    print(f"Update failed: {error['message']}")
+```
+
+</CodeGroup>
+
+## Common Update Scenarios
+
+### Change Webhook URL
+
+```javascript
+const updateUrl = await fetch('/api/v1/webhooks/webhook_abc123', {
+  method: 'PUT',
+  headers: { /* headers */ },
+  body: JSON.stringify({
+    url: 'https://new-domain.com/webhook-endpoint'
+  })
+});
+```
+
+### Update Event Subscriptions
+
+```javascript
+const updateEvents = await fetch('/api/v1/webhooks/webhook_abc123', {
+  method: 'PUT',
+  headers: { /* headers */ },
+  body: JSON.stringify({
+    events: [
+      'workflow.completed',
+      'workflow.failed',
+      'step.failed'  // Add step failure notifications
+    ]
+  })
+});
+```
+
+### Modify Retry Policy
+
+```javascript
+const updateRetry = await fetch('/api/v1/webhooks/webhook_abc123', {
+  method: 'PUT',
+  headers: { /* headers */ },
+  body: JSON.stringify({
+    retryPolicy: {
+      enabled: true,
+      maxAttempts: 3,  // Reduce retry attempts
+      backoffMultiplier: 1.5,  // Less aggressive backoff
+      initialDelay: 10  // Longer initial delay
+    }
+  })
+});
+```
+
+### Add Event Filtering
+
+```javascript
+const addFilters = await fetch('/api/v1/webhooks/webhook_abc123', {
+  method: 'PUT',
+  headers: { /* headers */ },
+  body: JSON.stringify({
+    filters: {
+      workflowIds: ['critical-workflow-1', 'critical-workflow-2'],
+      tags: ['production', 'high-priority']
+    }
+  })
+});
+```
+
+### Update Security Headers
+
+```javascript
+const updateHeaders = await fetch('/api/v1/webhooks/webhook_abc123', {
+  method: 'PUT',
+  headers: { /* headers */ },
+  body: JSON.stringify({
+    secret: 'new-secret-key-for-signatures',
+    headers: {
+      'X-API-Version': '2.0',
+      'X-Source': 'tolstoy-webhooks',
+      'Authorization': 'Bearer webhook-access-token'
+    }
+  })
+});
+```
+
+## Validation Rules
+
+### URL Requirements
+- Must be HTTPS in production environments
+- Must be accessible from Tolstoy's servers
+- Cannot be localhost or private IP addresses in production
+- Maximum length of 2048 characters
+
+### Event Validation
+- Must subscribe to at least one event
+- Maximum of 20 event subscriptions per webhook
+- Event types must be valid and supported
+
+### Retry Policy Limits
+- maxAttempts: 1-5 attempts
+- backoffMultiplier: 1.0-10.0
+- initialDelay: 1-300 seconds
+- Maximum total retry time: 1 hour
+
+## Testing Updated Webhooks
+
+After updating a webhook, test it to ensure it works correctly:
+
+```javascript
+// Update webhook
+const updateResponse = await fetch('/api/v1/webhooks/webhook_abc123', {
+  method: 'PUT',
+  headers: { /* headers */ },
+  body: JSON.stringify({ /* updates */ })
+});
+
+if (updateResponse.ok) {
+  // Test the updated webhook
+  const testResponse = await fetch('/api/v1/webhooks/webhook_abc123/test', {
+    method: 'POST',
+    headers: { /* headers */ },
+    body: JSON.stringify({
+      eventType: 'workflow.completed',
+      testData: { workflowId: 'test-workflow' }
+    })
+  });
+  
+  const testResult = await testResponse.json();
+  console.log('Test result:', testResult.success);
+}
+```
+
+## Webhook Versioning
+
+When making breaking changes to webhooks:
+
+1. **Graceful Migration**: Update gradually
+2. **Dual Endpoints**: Run old and new simultaneously  
+3. **Version Headers**: Include API version in headers
+4. **Monitoring**: Watch for delivery failures after updates
+
+## Related Endpoints
+
+- [Create Webhook](/api/endpoints/webhooks/create-webhook) - Create new webhook
+- [Test Webhook](/api/endpoints/webhooks/test-webhook) - Test webhook delivery
+- [Toggle Webhook](/api/endpoints/webhooks/toggle-webhook) - Enable/disable webhook
+- [Delete Webhook](/api/endpoints/webhooks/delete-webhook) - Remove webhook
+- [List Webhooks](/api/endpoints/webhooks/list-webhooks) - View all webhooks

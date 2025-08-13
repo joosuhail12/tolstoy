@@ -1,0 +1,122 @@
+---
+title: "tolstoy deploy"
+description: "Deploy workflows and configurations to your Tolstoy environment"
+---
+
+## Overview
+
+The `tolstoy deploy` command allows you to deploy local workflow definitions, actions, and configurations to your Tolstoy environment. This command supports both staging and production deployments.
+
+## Syntax
+
+```bash
+tolstoy deploy [options]
+```
+
+## Options
+
+<ParamField query="--env" type="string">
+  Target environment (staging, production). Defaults to staging.
+</ParamField>
+
+<ParamField query="--config" type="string">
+  Path to deployment configuration file. Defaults to `tolstoy.config.json`.
+</ParamField>
+
+<ParamField query="--dry-run" type="boolean">
+  Preview deployment without making changes.
+</ParamField>
+
+<ParamField query="--force" type="boolean">
+  Force deployment even if validation warnings exist.
+</ParamField>
+
+<ParamField query="--verbose" type="boolean">
+  Enable verbose logging output.
+</ParamField>
+
+## Examples
+
+### Basic Deployment
+
+Deploy to staging environment:
+
+```bash
+tolstoy deploy
+```
+
+### Production Deployment
+
+Deploy to production with confirmation:
+
+```bash
+tolstoy deploy --env production
+```
+
+### Dry Run
+
+Preview what would be deployed:
+
+```bash
+tolstoy deploy --dry-run --verbose
+```
+
+### Custom Configuration
+
+Deploy using a specific configuration file:
+
+```bash
+tolstoy deploy --config ./configs/production.json --env production
+```
+
+## Configuration File
+
+The deployment configuration file (`tolstoy.config.json`) defines what resources to deploy:
+
+```json
+{
+  "version": "1.0",
+  "environments": {
+    "staging": {
+      "apiUrl": "https://staging-api.tolstoy.com",
+      "orgId": "org_staging_123"
+    },
+    "production": {
+      "apiUrl": "https://api.tolstoy.com",
+      "orgId": "org_prod_456"
+    }
+  },
+  "deployment": {
+    "workflows": "./workflows/**/*.yml",
+    "actions": "./actions/**/*.yml",
+    "tools": "./tools/**/*.yml",
+    "secrets": "./secrets/**/*.enc"
+  },
+  "validation": {
+    "requireTests": true,
+    "allowWarnings": false
+  }
+}
+```
+
+## Deployment Process
+
+1. **Validation**: Validates all workflow definitions and configurations
+2. **Dependencies**: Checks tool dependencies and authentication
+3. **Backup**: Creates backup of current production state (production only)
+4. **Deploy**: Uploads and activates new configurations
+5. **Verification**: Runs post-deployment tests
+
+## Exit Codes
+
+- `0`: Deployment successful
+- `1`: Validation errors
+- `2`: Authentication failure
+- `3`: Network/API errors
+- `4`: Deployment conflicts
+
+## Related Commands
+
+- [`tolstoy validate`](/cli/commands/validate/validate) - Validate configurations before deployment
+- [`tolstoy init`](/cli/commands/init/init) - Initialize new project
+- [`tolstoy auth login`](/cli/commands/auth/login) - Authenticate with Tolstoy

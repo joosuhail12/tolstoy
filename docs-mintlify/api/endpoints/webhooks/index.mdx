@@ -1,0 +1,41 @@
+---
+title: "Webhooks API"
+description: "Configure webhook endpoints for event-driven automation"
+---
+
+# Webhooks API
+
+Configure webhook endpoints for event-driven automation
+
+## Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Create Webhook" icon="api" href="/api/endpoints/webhooks/webhookscontroller_create">
+    Create a new webhook to receive event notifications
+  </Card>
+  <Card title="List Webhooks" icon="api" href="/api/endpoints/webhooks/webhookscontroller_findall">
+    Get all webhooks for the organization, optionally filtered by event type
+  </Card>
+  <Card title="Get Valid Event Types" icon="api" href="/api/endpoints/webhooks/webhookscontroller_getvalideventtypes">
+    Get list of all valid event types that can be subscribed to via webhooks
+  </Card>
+  <Card title="Get Webhook" icon="api" href="/api/endpoints/webhooks/webhookscontroller_findone">
+    Get a specific webhook by ID
+  </Card>
+  <Card title="Update Webhook" icon="api" href="/api/endpoints/webhooks/webhookscontroller_update">
+    Update webhook configuration
+  </Card>
+  <Card title="Delete Webhook" icon="api" href="/api/endpoints/webhooks/webhookscontroller_remove">
+    Delete a webhook permanently
+  </Card>
+  <Card title="Toggle Webhook" icon="api" href="/api/endpoints/webhooks/webhookscontroller_toggle">
+    Enable or disable a webhook
+  </Card>
+  <Card title="Test Webhook" icon="api" href="/api/endpoints/webhooks/webhookscontroller_testwebhook">
+    Send a test payload to verify webhook endpoint is working
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="api-footer.mdx" />

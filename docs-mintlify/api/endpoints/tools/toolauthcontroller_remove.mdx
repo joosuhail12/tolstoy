@@ -1,0 +1,77 @@
+---
+title: "Delete auth configuration for a tool"
+api: "DELETE /tools/{toolId}/auth"
+description: "Removes authentication configuration(s) for a specific tool within an organization. Use configName query parameter to delete a specific configuration, or use deleteAll=true to delete all configurations."
+---
+
+# Delete auth configuration for a tool
+
+Removes authentication configuration(s) for a specific tool within an organization. Use configName query parameter to delete a specific configuration, or use deleteAll=true to delete all configurations.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID
+</ParamField>
+
+<ParamField header="X-Org-ID" type="string" required>
+  Organization identifier
+</ParamField>
+
+<ParamField path="toolId" type="string" required>
+  Unique identifier of the tool
+</ParamField>
+
+<ParamField query="configName" type="string">
+  Name of specific configuration to delete (optional)
+</ParamField>
+
+<ParamField query="deleteAll" type="boolean">
+  Delete all configurations for the tool (optional)
+</ParamField>
+
+
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X DELETE "http://localhost:3000/tools/{toolId}/auth" \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc" \
+  -d '{}'
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const result = await tolstoy.tools.toolauthcontroller_remove();
+console.log(result);
+```
+</CodeGroup>
+
+## Responses
+
+<ResponseExample>
+```json 200 OK
+null
+```
+</ResponseExample>
+
+### 404 Not Found
+
+Auth configuration not found for this tool and organization
+
+---
+
+<Snippet file="api-footer.mdx" />

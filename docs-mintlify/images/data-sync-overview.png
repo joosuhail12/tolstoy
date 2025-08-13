@@ -1,0 +1,92 @@
+<svg width="650" height="500" xmlns="http://www.w3.org/2000/svg">
+  <rect width="650" height="500" fill="#f5f5f5" stroke="#ccc" stroke-width="1"/>
+  <text x="325" y="25" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#333">Data Synchronization Architecture</text>
+  
+  <!-- Source Systems -->
+  <rect x="50" y="80" width="120" height="50" fill="#e3f2fd" stroke="#1976d2" stroke-width="2" rx="6"/>
+  <text x="110" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#1976d2">CRM System</text>
+  <text x="110" y="115" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#1976d2">Customer Data</text>
+  
+  <rect x="50" y="150" width="120" height="50" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="2" rx="6"/>
+  <text x="110" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#7b1fa2">E-commerce</text>
+  <text x="110" y="185" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#7b1fa2">Order Data</text>
+  
+  <rect x="50" y="220" width="120" height="50" fill="#e8f5e8" stroke="#388e3c" stroke-width="2" rx="6"/>
+  <text x="110" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#388e3c">Analytics DB</text>
+  <text x="110" y="255" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#388e3c">Historical Data</text>
+  
+  <!-- Data Processing Engine -->
+  <rect x="250" y="150" width="150" height="100" fill="#fff3e0" stroke="#f57c00" stroke-width="3" rx="10"/>
+  <text x="325" y="175" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#f57c00">Tolstoy Sync Engine</text>
+  <text x="325" y="195" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#f57c00">• Data Extraction</text>
+  <text x="325" y="210" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#f57c00">• Transformation</text>
+  <text x="325" y="225" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#f57c00">• Conflict Resolution</text>
+  <text x="325" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#f57c00">• Error Handling</text>
+  
+  <!-- Target Systems -->
+  <rect x="480" y="80" width="120" height="50" fill="#ffebee" stroke="#d32f2f" stroke-width="2" rx="6"/>
+  <text x="540" y="100" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#d32f2f">Data Warehouse</text>
+  <text x="540" y="115" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#d32f2f">Aggregated Views</text>
+  
+  <rect x="480" y="150" width="120" height="50" fill="#e8eaf6" stroke="#3f51b5" stroke-width="2" rx="6"/>
+  <text x="540" y="170" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#3f51b5">BI Dashboard</text>
+  <text x="540" y="185" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#3f51b5">Real-time Reports</text>
+  
+  <rect x="480" y="220" width="120" height="50" fill="#f1f8e9" stroke="#689f38" stroke-width="2" rx="6"/>
+  <text x="540" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#689f38">External APIs</text>
+  <text x="540" y="255" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#689f38">Third-party Services</text>
+  
+  <!-- Sync Schedule -->
+  <rect x="100" y="320" width="150" height="60" fill="#fce4ec" stroke="#ad1457" stroke-width="2" rx="6"/>
+  <text x="175" y="340" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ad1457">Sync Schedule</text>
+  <text x="175" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#ad1457">• Real-time triggers</text>
+  <text x="175" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#ad1457">• Scheduled batches</text>
+  
+  <!-- Data Quality -->
+  <rect x="300" y="320" width="150" height="60" fill="#e0f2f1" stroke="#00695c" stroke-width="2" rx="6"/>
+  <text x="375" y="340" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#00695c">Data Quality</text>
+  <text x="375" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#00695c">• Validation rules</text>
+  <text x="375" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#00695c">• Duplicate detection</text>
+  
+  <!-- Monitoring -->
+  <rect x="500" y="320" width="100" height="60" fill="#fff9c4" stroke="#f9a825" stroke-width="2" rx="6"/>
+  <text x="550" y="340" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#f9a825">Monitoring</text>
+  <text x="550" y="355" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#f9a825">• Sync status</text>
+  <text x="550" y="370" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#f9a825">• Error alerts</text>
+  
+  <!-- Data Flow Arrows -->
+  <path d="M 170 105 L 250 180" stroke="#1976d2" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 170 175 L 250 200" stroke="#7b1fa2" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 170 245 L 250 220" stroke="#388e3c" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <path d="M 400 180 L 480 105" stroke="#d32f2f" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 400 200 L 480 175" stroke="#3f51b5" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 400 220 L 480 245" stroke="#689f38" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <!-- Control Flow -->
+  <path d="M 175 320 L 250 250" stroke="#ad1457" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrowhead)"/>
+  <path d="M 375 320 L 325 250" stroke="#00695c" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#arrowhead)"/>
+  <path d="M 500 350 L 400 200" stroke="#f9a825" stroke-width="2" stroke-dasharray="3,3" marker-end="url(#arrowhead)"/>
+  
+  <!-- Sync Types -->
+  <rect x="50" y="420" width="80" height="30" fill="#c8e6c9" stroke="#4caf50" stroke-width="1" rx="3"/>
+  <text x="90" y="440" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#4caf50">Real-time</text>
+  
+  <rect x="150" y="420" width="80" height="30" fill="#fff3e0" stroke="#ff9800" stroke-width="1" rx="3"/>
+  <text x="190" y="440" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#ff9800">Batch</text>
+  
+  <rect x="250" y="420" width="80" height="30" fill="#e8eaf6" stroke="#673ab7" stroke-width="1" rx="3"/>
+  <text x="290" y="440" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#673ab7">CDC</text>
+  
+  <rect x="350" y="420" width="80" height="30" fill="#fce4ec" stroke="#e91e63" stroke-width="1" rx="3"/>
+  <text x="390" y="440" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#e91e63">API Polling</text>
+  
+  <!-- Legend -->
+  <text x="50" y="475" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#333">Sync Methods:</text>
+  
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#666"/>
+    </marker>
+  </defs>
+</svg>

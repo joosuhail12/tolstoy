@@ -1,0 +1,473 @@
+---
+title: "Delete Tool Auth"
+api: "DELETE /tools/auth/{id}"
+description: "Permanently remove authentication configuration for a tool"
+---
+
+## Overview
+
+The Delete Tool Auth endpoint permanently removes authentication configuration for a tool. This action cannot be undone and will immediately invalidate any workflows or actions that depend on this authentication.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the tool auth configuration to delete
+</ParamField>
+
+## Response
+
+**Status Code:** `204 No Content`
+
+Successfully deleted authentication configuration returns no content.
+
+## Error Responses
+
+<ResponseField name="404" type="object">
+  Not Found - Authentication configuration does not exist
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="403" type="object">
+  Forbidden - Insufficient permissions to delete this authentication configuration
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - Cannot delete authentication that is actively being used
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X DELETE "https://api.tolstoy.com/v1/tools/auth/auth_abc123" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```javascript JavaScript
+const deleteResponse = await fetch('/api/v1/tools/auth/auth_abc123', {
+  method: 'DELETE',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+if (deleteResponse.ok) {
+  console.log('Tool authentication deleted successfully');
+} else if (deleteResponse.status === 404) {
+  console.error('Authentication configuration not found');
+} else if (deleteResponse.status === 409) {
+  console.error('Cannot delete: authentication is actively being used');
+} else {
+  const error = await deleteResponse.json();
+  console.error('Delete failed:', error.message);
+}
+```
+
+```python Python
+import requests
+
+response = requests.delete(
+    "https://api.tolstoy.com/v1/tools/auth/auth_abc123",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    }
+)
+
+if response.status_code == 204:
+    print("Tool authentication deleted successfully")
+elif response.status_code == 404:
+    print("Authentication configuration not found")
+elif response.status_code == 409:
+    print("Cannot delete: authentication is actively being used")
+else:
+    error = response.json()
+    print(f"Delete failed: {error['message']}")
+```
+
+</CodeGroup>
+
+## Safe Deletion Process
+
+### Pre-deletion Validation
+```javascript
+async function validateAuthDeletion(authId, apiToken, orgId, userId) {
+  const issues = [];
+  
+  // Check if auth configuration exists
+  const authResponse = await fetch(`/api/v1/tools/auth/${authId}`, {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  if (!authResponse.ok) {
+    issues.push('Authentication configuration does not exist or access denied');
+    return issues;
+  }
+  
+  const authData = await authResponse.json();
+  
+  // Check for active workflows using this auth
+  const workflowsResponse = await fetch(`/api/v1/flows?toolId=${authData.toolId}`, {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  if (workflowsResponse.ok) {
+    const workflowsData = await workflowsResponse.json();
+    const activeWorkflows = workflowsData.flows?.filter(flow => flow.status === 'active') || [];
+    
+    if (activeWorkflows.length > 0) {
+      issues.push(`${activeWorkflows.length} active workflows depend on this authentication`);
+    }
+  }
+  
+  // Check for recent executions using this auth
+  const executionsResponse = await fetch(`/api/v1/executions?toolId=${authData.toolId}&limit=1`, {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  if (executionsResponse.ok) {
+    const executionsData = await executionsResponse.json();
+    if (executionsData.summary?.totalExecutions > 0) {
+      const recentExecution = executionsData.executions?.[0];
+      if (recentExecution) {
+        const hoursSinceLastExecution = (Date.now() - new Date(recentExecution.startedAt).getTime()) / (1000 * 60 * 60);
+        if (hoursSinceLastExecution < 24) {
+          issues.push('Tool was used in executions within the last 24 hours');
+        }
+      }
+    }
+  }
+  
+  return issues;
+}
+
+// Usage
+const issues = await validateAuthDeletion('auth_abc123', apiToken, 'org_123456', 'user_789012');
+
+if (issues.length > 0) {
+  console.warn('Deletion warnings:');
+  issues.forEach(issue => console.warn(`- ${issue}`));
+  
+  const confirmed = confirm('Are you sure you want to delete this authentication configuration?');
+  if (!confirmed) {
+    console.log('Deletion cancelled');
+    return;
+  }
+}
+
+// Proceed with deletion
+await fetch('/api/v1/tools/auth/auth_abc123', {
+  method: 'DELETE',
+  headers: { /* auth headers */ }
+});
+```
+
+### Backup Authentication Configuration
+```javascript
+async function backupAuthConfig(authId, apiToken, orgId, userId) {
+  const response = await fetch(`/api/v1/tools/auth/${authId}`, {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to retrieve auth configuration for backup');
+  }
+  
+  const authData = await response.json();
+  
+  // Create backup object (excluding sensitive credentials)
+  const backup = {
+    id: authData.id,
+    toolId: authData.toolId,
+    toolName: authData.toolName,
+    authType: authData.authType,
+    config: authData.config,
+    metadata: authData.metadata,
+    backedUpAt: new Date().toISOString(),
+    backedUpBy: userId
+  };
+  
+  // Store backup (this could be local storage, external backup service, etc.)
+  localStorage.setItem(`auth_backup_${authId}`, JSON.stringify(backup));
+  
+  return backup;
+}
+
+// Usage before deletion
+const backup = await backupAuthConfig('auth_abc123', apiToken, 'org_123456', 'user_789012');
+console.log('Auth configuration backed up:', backup.id);
+
+// Now safe to delete
+await fetch('/api/v1/tools/auth/auth_abc123', {
+  method: 'DELETE',
+  headers: { /* auth headers */ }
+});
+```
+
+## Bulk Deletion
+
+### Delete Multiple Auth Configurations
+```javascript
+async function deleteMultipleAuthConfigs(authIds, apiToken, orgId, userId) {
+  const results = [];
+  
+  for (const authId of authIds) {
+    try {
+      // Validate before deletion
+      const issues = await validateAuthDeletion(authId, apiToken, orgId, userId);
+      
+      if (issues.length > 0) {
+        results.push({
+          authId,
+          success: false,
+          skipped: true,
+          issues
+        });
+        continue;
+      }
+      
+      // Backup configuration
+      await backupAuthConfig(authId, apiToken, orgId, userId);
+      
+      // Delete the auth configuration
+      const response = await fetch(`/api/v1/tools/auth/${authId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'X-Org-ID': orgId,
+          'X-User-ID': userId
+        }
+      });
+      
+      results.push({
+        authId,
+        success: response.ok,
+        status: response.status
+      });
+      
+      // Add delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+    } catch (error) {
+      results.push({
+        authId,
+        success: false,
+        error: error.message
+      });
+    }
+  }
+  
+  return results;
+}
+
+// Usage
+const authIdsToDelete = ['auth_123', 'auth_456', 'auth_789'];
+const deletionResults = await deleteMultipleAuthConfigs(
+  authIdsToDelete, 
+  apiToken, 
+  'org_123456', 
+  'user_789012'
+);
+
+const successful = deletionResults.filter(r => r.success).length;
+const skipped = deletionResults.filter(r => r.skipped).length;
+const failed = deletionResults.filter(r => !r.success && !r.skipped).length;
+
+console.log(`Deletion summary: ${successful} deleted, ${skipped} skipped, ${failed} failed`);
+```
+
+## Impact Analysis
+
+### Analyze Deletion Impact
+```javascript
+async function analyzeDeleteionImpact(authId, apiToken, orgId, userId) {
+  const impact = {
+    affectedWorkflows: [],
+    affectedActions: [],
+    recentExecutions: 0,
+    recommendations: []
+  };
+  
+  // Get auth configuration
+  const authResponse = await fetch(`/api/v1/tools/auth/${authId}`, {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  if (!authResponse.ok) {
+    return impact;
+  }
+  
+  const authData = await authResponse.json();
+  
+  // Find workflows using this tool
+  const workflowsResponse = await fetch(`/api/v1/flows?toolId=${authData.toolId}`, {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  if (workflowsResponse.ok) {
+    const workflowsData = await workflowsResponse.json();
+    impact.affectedWorkflows = workflowsData.flows?.map(flow => ({
+      id: flow.id,
+      name: flow.name,
+      status: flow.status
+    })) || [];
+  }
+  
+  // Find actions using this tool
+  const actionsResponse = await fetch(`/api/v1/actions?toolId=${authData.toolId}`, {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  if (actionsResponse.ok) {
+    const actionsData = await actionsResponse.json();
+    impact.affectedActions = actionsData.actions?.map(action => ({
+      id: action.id,
+      name: action.name
+    })) || [];
+  }
+  
+  // Count recent executions
+  const executionsResponse = await fetch(`/api/v1/executions?toolId=${authData.toolId}&limit=100`, {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  if (executionsResponse.ok) {
+    const executionsData = await executionsResponse.json();
+    const last7Days = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    impact.recentExecutions = executionsData.executions?.filter(exec => 
+      new Date(exec.startedAt) > last7Days
+    ).length || 0;
+  }
+  
+  // Generate recommendations
+  if (impact.affectedWorkflows.length > 0) {
+    impact.recommendations.push('Update or disable affected workflows before deletion');
+  }
+  
+  if (impact.recentExecutions > 0) {
+    impact.recommendations.push('Consider the impact on recent workflow executions');
+  }
+  
+  if (authData.authType === 'oauth2' && authData.expiresAt) {
+    const daysUntilExpiry = (new Date(authData.expiresAt) - new Date()) / (1000 * 60 * 60 * 24);
+    if (daysUntilExpiry < 7) {
+      impact.recommendations.push('Auth token expires soon anyway - deletion may be appropriate');
+    }
+  }
+  
+  return impact;
+}
+```
+
+## Recovery Process
+
+### Restore From Backup
+```javascript
+async function restoreAuthFromBackup(authId, apiToken, orgId, userId) {
+  const backupKey = `auth_backup_${authId}`;
+  const backupData = localStorage.getItem(backupKey);
+  
+  if (!backupData) {
+    throw new Error('No backup found for this auth configuration');
+  }
+  
+  const backup = JSON.parse(backupData);
+  
+  // Note: This would recreate the auth config, but not the sensitive credentials
+  const restoreData = {
+    toolId: backup.toolId,
+    authType: backup.authType,
+    config: backup.config,
+    metadata: {
+      ...backup.metadata,
+      restoredAt: new Date().toISOString(),
+      restoredBy: userId,
+      originalId: backup.id
+    }
+  };
+  
+  const response = await fetch('/api/v1/tools/auth', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(restoreData)
+  });
+  
+  if (!response.ok) {
+    throw new Error('Failed to restore auth configuration');
+  }
+  
+  return response.json();
+}
+```
+
+## Related Endpoints
+
+- [List Tool Auth](/api/endpoints/tools/auth/list-tool-auth) - View all authentication configurations
+- [Update Tool Auth](/api/endpoints/tools/auth/update-tool-auth) - Modify authentication configuration
+- [List Tools](/api/endpoints/tools/list-tools) - View all tools
+- [Delete Tool](/api/endpoints/tools/delete-tool) - Remove tool entirely

@@ -1,0 +1,243 @@
+---
+title: "Rate Limiting"
+description: "Understanding API rate limits and how to handle them effectively"
+---
+
+## Overview
+
+The Tolstoy API implements rate limiting to ensure fair usage and maintain service quality for all users. Rate limits are applied per organization and are designed to accommodate typical usage patterns while preventing abuse.
+
+## Rate Limit Tiers
+
+### Free Tier
+- **API Requests**: 1,000 requests per hour
+- **Workflow Executions**: 100 executions per day
+- **Webhook Deliveries**: 500 deliveries per day
+
+### Pro Tier
+- **API Requests**: 10,000 requests per hour
+- **Workflow Executions**: 1,000 executions per day
+- **Webhook Deliveries**: 5,000 deliveries per day
+
+### Enterprise Tier
+- **API Requests**: 100,000 requests per hour
+- **Workflow Executions**: Unlimited
+- **Webhook Deliveries**: Unlimited
+- **Custom limits available**
+
+## Rate Limit Headers
+
+All API responses include rate limit information in the headers:
+
+```http
+X-RateLimit-Limit: 10000
+X-RateLimit-Remaining: 9999
+X-RateLimit-Reset: 1640995200
+X-RateLimit-Resource: api-requests
+```
+
+### Header Descriptions
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum number of requests allowed in the current window |
+| `X-RateLimit-Remaining` | Number of requests remaining in the current window |
+| `X-RateLimit-Reset` | Unix timestamp when the rate limit window resets |
+| `X-RateLimit-Resource` | The resource being rate limited (api-requests, executions, webhooks) |
+
+## Rate Limit Exceeded Response
+
+When you exceed a rate limit, the API returns a `429 Too Many Requests` status:
+
+```json
+{
+  "error": "rate_limit_exceeded",
+  "message": "API rate limit exceeded",
+  "details": {
+    "limit": 10000,
+    "remaining": 0,
+    "reset_at": "2023-01-01T12:00:00Z",
+    "resource": "api-requests"
+  },
+  "retry_after": 3600
+}
+```
+
+## Handling Rate Limits
+
+### 1. Exponential Backoff
+
+Implement exponential backoff when you receive a `429` response:
+
+```javascript
+async function makeApiRequest(url, options, retries = 3) {
+  try {
+    const response = await fetch(url, options);
+    
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('retry-after');
+      const delay = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, 4 - retries) * 1000;
+      
+      if (retries > 0) {
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return makeApiRequest(url, options, retries - 1);
+      }
+    }
+    
+    return response;
+  } catch (error) {
+    throw error;
+  }
+}
+```
+
+### 2. Monitor Rate Limit Headers
+
+Check remaining requests before making API calls:
+
+```python
+import requests
+import time
+
+def check_rate_limit(response):
+    remaining = int(response.headers.get('X-RateLimit-Remaining', 0))
+    reset_time = int(response.headers.get('X-RateLimit-Reset', 0))
+    
+    if remaining < 10:  # Less than 10 requests remaining
+        current_time = time.time()
+        sleep_time = max(0, reset_time - current_time + 1)
+        print(f"Rate limit low. Sleeping for {sleep_time} seconds")
+        time.sleep(sleep_time)
+
+response = requests.get('https://api.tolstoy.dev/workflows')
+check_rate_limit(response)
+```
+
+### 3. Batch Requests
+
+Use batch endpoints when available to reduce API calls:
+
+```bash
+# Instead of multiple individual requests
+curl https://api.tolstoy.dev/workflows/123
+curl https://api.tolstoy.dev/workflows/456
+curl https://api.tolstoy.dev/workflows/789
+
+# Use batch endpoint
+curl -X POST https://api.tolstoy.dev/workflows/batch \
+  -H "Content-Type: application/json" \
+  -d '{"ids": ["123", "456", "789"]}'
+```
+
+## Rate Limit Exemptions
+
+Certain operations have separate or no rate limits:
+
+### Webhook Deliveries
+- Incoming webhooks don't count against API rate limits
+- Outgoing webhook deliveries have separate limits
+
+### Health Checks
+- The `/health` endpoint is exempt from rate limiting
+- Use for service monitoring without affecting your quota
+
+### Emergency Operations
+- Execution cancellation requests have higher limits
+- Critical system operations may bypass standard limits
+
+## Best Practices
+
+### 1. Cache Responses
+Store frequently accessed data to reduce API calls:
+
+```javascript
+const cache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+async function getCachedWorkflow(id) {
+  const cacheKey = `workflow:${id}`;
+  const cached = cache.get(cacheKey);
+  
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  
+  const workflow = await fetchWorkflow(id);
+  cache.set(cacheKey, {
+    data: workflow,
+    timestamp: Date.now()
+  });
+  
+  return workflow;
+}
+```
+
+### 2. Use Webhooks
+Instead of polling for updates, use webhooks to receive real-time notifications:
+
+```bash
+# Create webhook for workflow completion
+curl -X POST https://api.tolstoy.dev/webhooks \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "https://myapp.com/webhooks/workflow-complete",
+    "events": ["workflow.completed", "workflow.failed"]
+  }'
+```
+
+### 3. Optimize Query Parameters
+Use filters and pagination to reduce response size:
+
+```bash
+# Get only active workflows, paginated
+curl "https://api.tolstoy.dev/workflows?status=active&limit=50&offset=0"
+```
+
+## Monitoring Usage
+
+### Rate Limit Dashboard
+Monitor your rate limit usage in the Tolstoy dashboard:
+- Real-time usage metrics
+- Historical usage patterns
+- Rate limit alerts and notifications
+
+### API Metrics Endpoint
+Programmatically check your current usage:
+
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://api.tolstoy.dev/metrics/rate-limits
+```
+
+**Response:**
+```json
+{
+  "current_window": {
+    "api_requests": {
+      "limit": 10000,
+      "used": 2547,
+      "remaining": 7453,
+      "reset_at": "2023-01-01T13:00:00Z"
+    },
+    "executions": {
+      "limit": 1000,
+      "used": 45,
+      "remaining": 955,
+      "reset_at": "2023-01-02T00:00:00Z"
+    }
+  },
+  "daily_usage": {
+    "executions": 45,
+    "webhook_deliveries": 123
+  }
+}
+```
+
+## Upgrading Limits
+
+Contact our sales team to discuss higher rate limits:
+- **Custom enterprise limits**
+- **Dedicated infrastructure**
+- **Priority support**
+
+Email: sales@tolstoy.dev or visit [pricing page](/pricing)

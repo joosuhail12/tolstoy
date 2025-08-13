@@ -1,0 +1,50 @@
+---
+title: "Actions API"
+description: "Create and manage reusable API operations"
+---
+
+# Actions API
+
+Create and manage reusable API operations
+
+## Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Create Action" icon="api" href="/api/endpoints/actions/actionscontroller_create">
+    Create a reusable action template for workflows. Actions define API calls that can be executed within workflow steps.
+  </Card>
+  <Card title="List Actions" icon="api" href="/api/endpoints/actions/actionscontroller_findall">
+    Get all reusable action templates for the organization
+  </Card>
+  <Card title="Get Action" icon="api" href="/api/endpoints/actions/actionscontroller_findone">
+    Get a specific action template by ID
+  </Card>
+  <Card title="Update Action" icon="api" href="/api/endpoints/actions/actionscontroller_update">
+    Update an action template configuration
+  </Card>
+  <Card title="Delete Action" icon="api" href="/api/endpoints/actions/actionscontroller_remove">
+    Delete an action template permanently. This will affect any workflows that use this action.
+  </Card>
+  <Card title="Execute a single Action by ID" icon="api" href="/api/endpoints/actions/actionscontroller_execute">
+    Execute a standalone action with provided inputs. This endpoint allows you to run individual actions outside of workflow contexts.
+  </Card>
+  <Card title="List Action Executions" icon="api" href="/api/endpoints/actions/actionscontroller_listexecutions">
+    Get a list of all action executions for the organization
+  </Card>
+  <Card title="List Executions for Specific Action" icon="api" href="/api/endpoints/actions/actionscontroller_listactionexecutions">
+    Get execution history for a specific action
+  </Card>
+  <Card title="Get Execution Status" icon="api" href="/api/endpoints/actions/actionscontroller_getexecutionstatus">
+    Get detailed status of a specific action execution
+  </Card>
+  <Card title="Cancel Execution" icon="api" href="/api/endpoints/actions/actionscontroller_cancelexecution">
+    Cancel a pending or running action execution
+  </Card>
+  <Card title="Retry Execution" icon="api" href="/api/endpoints/actions/actionscontroller_retryexecution">
+    Retry a failed or cancelled action execution
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="api-footer.mdx" />

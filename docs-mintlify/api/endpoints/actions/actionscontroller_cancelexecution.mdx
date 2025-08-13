@@ -1,0 +1,67 @@
+---
+title: "Cancel Execution"
+api: "POST /actions/executions/{executionId}/cancel"
+description: "Cancel a pending or running action execution"
+---
+
+# Cancel Execution
+
+Cancel a pending or running action execution
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID
+</ParamField>
+
+<ParamField path="executionId" type="string" required>
+  Execution ID
+</ParamField>
+
+
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST "http://localhost:3000/actions/executions/{executionId}/cancel" \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc" \
+  -d '{}'
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const result = await tolstoy.actions.actionscontroller_cancelexecution();
+console.log(result);
+```
+</CodeGroup>
+
+## Responses
+
+### 204 No Content
+
+Execution cancelled successfully
+
+### 400 Bad Request
+
+Cannot cancel execution in current status
+
+### 404 Not Found
+
+Execution not found
+
+---
+
+<Snippet file="api-footer.mdx" />

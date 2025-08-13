@@ -1,23 +1,12 @@
 {
-  "timestamp": "2025-08-12T10:07:23.740Z",
+  "timestamp": "2025-08-12T18:07:49.061Z",
   "summary": {
-    "filesChecked": 116,
-    "errors": 10,
-    "warnings": 232,
-    "brokenLinks": 129
+    "filesChecked": 207,
+    "errors": 0,
+    "warnings": 292,
+    "brokenLinks": 125
   },
-  "errors": [
-    "DEPLOYMENT-SUMMARY.md: Missing required frontmatter field: title",
-    "DEPLOYMENT-SUMMARY.md: Missing required frontmatter field: description",
-    "snippets/sdk-footer.mdx: Missing required frontmatter field: title",
-    "snippets/sdk-footer.mdx: Missing required frontmatter field: description",
-    "snippets/feedback-footer.mdx: Missing required frontmatter field: title",
-    "snippets/feedback-footer.mdx: Missing required frontmatter field: description",
-    "snippets/cli-footer.mdx: Missing required frontmatter field: title",
-    "snippets/cli-footer.mdx: Missing required frontmatter field: description",
-    "snippets/api-footer.mdx: Missing required frontmatter field: title",
-    "snippets/api-footer.mdx: Missing required frontmatter field: description"
-  ],
+  "errors": [],
   "warnings": [
     "README.md: Possible unclosed components (4 open, 5 close)",
     "DEPLOYMENT-SUMMARY.md: Contains placeholder content: \"placeholder\"",
@@ -73,6 +62,7 @@
     "internal/architecture/data-layer.mdx: Long line in code block (line 168): 133 chars",
     "public/product/webhooks/overview.mdx: Possible unclosed components (58 open, 62 close)",
     "public/product/webhooks/overview.mdx: Contains placeholder content: \"example.com\"",
+    "public/product/users/overview.mdx: Possible unclosed components (46 open, 50 close)",
     "public/product/use-cases/payment-automation.mdx: Possible unclosed components (34 open, 38 close)",
     "public/product/use-cases/notification-systems.mdx: Possible unclosed components (42 open, 47 close)",
     "public/product/use-cases/notification-systems.mdx: Long line in code block (line 31): 122 chars",
@@ -118,22 +108,15 @@
     "public/product/use-cases/ci-cd-automation.mdx: Unknown component: <500>",
     "public/product/use-cases/ci-cd-automation.mdx: Possible unclosed components (41 open, 45 close)",
     "public/product/use-cases/ci-cd-automation.mdx: Long line in code block (line 61): 121 chars",
-    "public/product/users/overview.mdx: Possible unclosed components (46 open, 50 close)",
-    "public/product/organizations/overview.mdx: Possible unclosed components (38 open, 42 close)",
     "public/product/tools/overview.mdx: Possible unclosed components (42 open, 46 close)",
     "public/product/tools/overview.mdx: Contains placeholder content: \"example.com\"",
+    "public/product/organizations/overview.mdx: Possible unclosed components (38 open, 42 close)",
     "public/product/integrations/overview.mdx: Possible unclosed components (122 open, 125 close)",
     "public/product/getting-started/installation.mdx: Possible unclosed components (26 open, 31 close)",
     "public/product/getting-started/first-workflow.mdx: Possible unclosed components (29 open, 33 close)",
     "public/product/getting-started/first-workflow.mdx: Contains placeholder content: \"example.com\"",
     "public/product/getting-started/basic-concepts.mdx: Possible unclosed components (27 open, 31 close)",
     "public/product/getting-started/authentication.mdx: Possible unclosed components (30 open, 34 close)",
-    "public/product/flows/patterns.mdx: Possible unclosed components (14 open, 16 close)",
-    "public/product/flows/patterns.mdx: Long line in code block (line 62): 134 chars",
-    "public/product/flows/overview.mdx: Possible unclosed components (70 open, 74 close)",
-    "public/product/flows/overview.mdx: Contains placeholder content: \"example.com\"",
-    "public/product/execution-logs/overview.mdx: Possible unclosed components (50 open, 53 close)",
-    "public/product/execution-logs/overview.mdx: Contains placeholder content: \"example.com\"",
     "public/product/tutorials/production-setup.mdx: Unknown component: <base64>",
     "public/product/tutorials/production-setup.mdx: Unknown component: <base64>",
     "public/product/tutorials/production-setup.mdx: Unknown component: <base64>",
@@ -153,7 +136,6 @@
     "public/product/tutorials/getting-started.mdx: Contains placeholder content: \"example.com\"",
     "public/product/tutorials/getting-started.mdx: Contains placeholder content: \"your-api-key-here\"",
     "public/product/tutorials/getting-started.mdx: Long line in code block (line 21): 135 chars",
-    "public/product/tutorials/advanced-patterns.mdx: Duplicate title detected: \"Advanced Workflow Patterns\"",
     "public/product/tutorials/advanced-patterns.mdx: Possible unclosed components (33 open, 37 close)",
     "public/product/tutorials/advanced-patterns.mdx: Contains placeholder content: \"example.com\"",
     "public/product/tutorials/advanced-patterns.mdx: Long line in code block (line 55): 143 chars",
@@ -163,43 +145,23 @@
     "public/product/tutorials/advanced-patterns.mdx: Long line in code block (line 130): 123 chars",
     "public/product/tutorials/advanced-patterns.mdx: Long line in code block (line 133): 147 chars",
     "public/product/tutorials/advanced-patterns.mdx: Long line in code block (line 183): 144 chars",
+    "public/product/flows/patterns.mdx: Duplicate title detected: \"Advanced Workflow Patterns\"",
+    "public/product/flows/patterns.mdx: Possible unclosed components (14 open, 16 close)",
+    "public/product/flows/patterns.mdx: Long line in code block (line 62): 134 chars",
+    "public/product/flows/overview.mdx: Possible unclosed components (70 open, 74 close)",
+    "public/product/flows/overview.mdx: Contains placeholder content: \"example.com\"",
+    "public/product/execution-logs/overview.mdx: Possible unclosed components (50 open, 53 close)",
+    "public/product/execution-logs/overview.mdx: Contains placeholder content: \"example.com\"",
+    "public/product/actions/overview.mdx: Possible unclosed components (47 open, 52 close)",
+    "public/product/actions/overview.mdx: Contains placeholder content: \"example.com\"",
+    "internal/operations/runbooks/incident-response.mdx: Long line in code block (line 9): 133 chars",
     "public/product/optimization/scaling.mdx: Possible unclosed components (72 open, 31 close)",
     "public/product/optimization/scaling.mdx: Long line in code block (line 33): 123 chars",
     "public/product/optimization/performance.mdx: Possible unclosed components (57 open, 34 close)",
-    "public/product/actions/overview.mdx: Possible unclosed components (47 open, 52 close)",
-    "public/product/actions/overview.mdx: Contains placeholder content: \"example.com\"",
-    "public/product/enterprise/rate-limiting.mdx: Possible unclosed components (45 open, 47 close)",
-    "public/product/enterprise/rate-limiting.mdx: Long line in code block (line 27): 159 chars",
-    "public/product/enterprise/advanced-auth.mdx: Possible unclosed components (60 open, 64 close)",
-    "public/product/troubleshooting/overview.mdx: Contains placeholder content: \"example.com\"",
-    "internal/integrations/external-services/service-integration-guide.mdx: Possible unclosed components (63 open, 9 close)",
-    "internal/integrations/external-services/service-integration-guide.mdx: Long line in code block (line 309): 127 chars",
-    "internal/integrations/database/database-connection-guide.mdx: Possible unclosed components (37 open, 1 close)",
-    "internal/integrations/database/database-connection-guide.mdx: Contains placeholder content: \"placeholder\"",
-    "internal/operations/runbooks/incident-response.mdx: Long line in code block (line 9): 133 chars",
-    "internal/development/guidelines/coding-standards.mdx: Possible unclosed components (50 open, 23 close)",
-    "internal/development/testing/testing-strategy.mdx: Possible unclosed components (32 open, 18 close)",
-    "internal/development/testing/testing-strategy.mdx: Contains placeholder content: \"example.com\"",
-    "internal/development/debugging/troubleshooting-guide.mdx: Unknown component: <node_internals>",
-    "internal/development/debugging/troubleshooting-guide.mdx: Possible unclosed components (53 open, 27 close)",
-    "internal/integrations/cicd/pipeline-integration-guide.mdx: Long line in code block (line 197): 126 chars",
-    "internal/integrations/cicd/pipeline-integration-guide.mdx: Long line in code block (line 314): 164 chars",
-    "internal/integrations/cicd/pipeline-integration-guide.mdx: Long line in code block (line 335): 164 chars",
-    "internal/integrations/cicd/pipeline-integration-guide.mdx: Long line in code block (line 83): 135 chars",
-    "internal/integrations/cicd/pipeline-integration-guide.mdx: Long line in code block (line 86): 145 chars",
-    "internal/integrations/cicd/pipeline-integration-guide.mdx: Long line in code block (line 61): 149 chars",
-    "internal/integrations/aws-services/aws-integration-guide.mdx: Possible unclosed components (47 open, 1 close)",
-    "internal/integrations/aws-services/aws-integration-guide.mdx: Long line in code block (line 84): 122 chars",
-    "internal/integrations/aws-services/aws-integration-guide.mdx: Long line in code block (line 162): 130 chars",
-    "internal/architecture/security/overview.mdx: Unknown component: <SOC2Report>",
-    "internal/architecture/security/overview.mdx: Possible unclosed components (49 open, 14 close)",
     "internal/infrastructure/scaling/auto-scaling.mdx: Long line in code block (line 43): 128 chars",
     "internal/infrastructure/scaling/auto-scaling.mdx: Long line in code block (line 30): 123 chars",
     "internal/infrastructure/monitoring/observability.mdx: Long line in code block (line 51): 126 chars",
     "internal/infrastructure/monitoring/observability.mdx: Long line in code block (line 150): 146 chars",
-    "internal/advanced/security/security-hardening.mdx: Possible unclosed components (41 open, 15 close)",
-    "internal/advanced/security/security-hardening.mdx: Long line in code block (line 81): 124 chars",
-    "internal/advanced/security/security-hardening.mdx: Long line in code block (line 47): 128 chars",
     "internal/infrastructure/deployment/production-deployment.mdx: Long line in code block (line 13): 127 chars",
     "internal/infrastructure/deployment/production-deployment.mdx: Long line in code block (line 27): 145 chars",
     "internal/infrastructure/deployment/production-deployment.mdx: Long line in code block (line 39): 125 chars",
@@ -211,6 +173,30 @@
     "internal/infrastructure/deployment/production-deployment.mdx: Long line in code block (line 27): 196 chars",
     "internal/infrastructure/deployment/production-deployment.mdx: Long line in code block (line 31): 121 chars",
     "internal/infrastructure/deployment/production-deployment.mdx: Long line in code block (line 23): 206 chars",
+    "public/product/troubleshooting/overview.mdx: Contains placeholder content: \"example.com\"",
+    "public/product/enterprise/rate-limiting.mdx: Possible unclosed components (45 open, 47 close)",
+    "public/product/enterprise/rate-limiting.mdx: Long line in code block (line 27): 159 chars",
+    "public/product/enterprise/advanced-auth.mdx: Possible unclosed components (60 open, 64 close)",
+    "internal/integrations/external-services/service-integration-guide.mdx: Possible unclosed components (63 open, 9 close)",
+    "internal/integrations/external-services/service-integration-guide.mdx: Long line in code block (line 309): 127 chars",
+    "internal/integrations/database/database-connection-guide.mdx: Possible unclosed components (37 open, 1 close)",
+    "internal/integrations/database/database-connection-guide.mdx: Contains placeholder content: \"placeholder\"",
+    "internal/integrations/cicd/pipeline-integration-guide.mdx: Long line in code block (line 197): 126 chars",
+    "internal/integrations/cicd/pipeline-integration-guide.mdx: Long line in code block (line 314): 164 chars",
+    "internal/integrations/cicd/pipeline-integration-guide.mdx: Long line in code block (line 335): 164 chars",
+    "internal/integrations/cicd/pipeline-integration-guide.mdx: Long line in code block (line 83): 135 chars",
+    "internal/integrations/cicd/pipeline-integration-guide.mdx: Long line in code block (line 86): 145 chars",
+    "internal/integrations/cicd/pipeline-integration-guide.mdx: Long line in code block (line 61): 149 chars",
+    "internal/integrations/aws-services/aws-integration-guide.mdx: Possible unclosed components (47 open, 1 close)",
+    "internal/integrations/aws-services/aws-integration-guide.mdx: Long line in code block (line 84): 122 chars",
+    "internal/integrations/aws-services/aws-integration-guide.mdx: Long line in code block (line 162): 130 chars",
+    "internal/development/debugging/troubleshooting-guide.mdx: Unknown component: <node_internals>",
+    "internal/development/debugging/troubleshooting-guide.mdx: Possible unclosed components (53 open, 27 close)",
+    "internal/development/testing/testing-strategy.mdx: Possible unclosed components (32 open, 18 close)",
+    "internal/development/testing/testing-strategy.mdx: Contains placeholder content: \"example.com\"",
+    "internal/development/guidelines/coding-standards.mdx: Possible unclosed components (50 open, 23 close)",
+    "internal/architecture/security/overview.mdx: Unknown component: <SOC2Report>",
+    "internal/architecture/security/overview.mdx: Possible unclosed components (49 open, 14 close)",
     "cli/commands/tools/create.mdx: Unknown component: <TOOL_NAME>",
     "cli/commands/tools/create.mdx: Possible unclosed components (19 open, 18 close)",
     "cli/commands/tools/create.mdx: Contains placeholder content: \"example.com\"",
@@ -221,31 +207,94 @@
     "cli/commands/actions/create.mdx: Unknown component: <ACTION_NAME>",
     "cli/commands/actions/create.mdx: Possible unclosed components (23 open, 22 close)",
     "cli/commands/actions/create.mdx: Long line in code block (line 6): 154 chars",
-    "internal/advanced/performance/performance-optimization.mdx: Possible unclosed components (85 open, 8 close)",
+    "internal/advanced/security/security-hardening.mdx: Possible unclosed components (41 open, 15 close)",
+    "internal/advanced/security/security-hardening.mdx: Long line in code block (line 81): 124 chars",
+    "internal/advanced/security/security-hardening.mdx: Long line in code block (line 47): 128 chars",
+    "api/endpoints/webhooks/webhookscontroller_findone.mdx: Contains placeholder content: \"example.com\"",
+    "api/endpoints/webhooks/webhookscontroller_create.mdx: Contains placeholder content: \"example.com\"",
+    "api/endpoints/webhooks/toggle-webhook.mdx: Duplicate title detected: \"Toggle Webhook\"",
+    "api/endpoints/webhooks/test-webhook.mdx: Duplicate title detected: \"Test Webhook\"",
+    "api/endpoints/webhooks/list-webhooks.mdx: Duplicate title detected: \"List Webhooks\"",
     "api/endpoints/webhooks/list-webhooks.mdx: Contains placeholder content: \"example.com\"",
+    "api/endpoints/webhooks/index.mdx: Possible unclosed components (1 open, 9 close)",
+    "api/endpoints/webhooks/create-webhook.mdx: Duplicate title detected: \"Create Webhook\"",
     "api/endpoints/webhooks/create-webhook.mdx: Contains placeholder content: \"example.com\"",
+    "api/endpoints/users/userscontroller_findone.mdx: Contains placeholder content: \"example.com\"",
+    "api/endpoints/users/userscontroller_create.mdx: Contains placeholder content: \"example.com\"",
     "api/endpoints/users/update-user.mdx: Contains placeholder content: \"example.com\"",
+    "api/endpoints/users/list-users.mdx: Duplicate title detected: \"List Users\"",
+    "api/endpoints/users/index.mdx: Possible unclosed components (1 open, 6 close)",
+    "api/endpoints/users/get-current-user.mdx: Duplicate title detected: \"Get User\"",
     "api/endpoints/users/get-current-user.mdx: Contains placeholder content: \"example.com\"",
+    "api/endpoints/users/delete-user.mdx: Duplicate title detected: \"Delete User\"",
+    "api/endpoints/users/delete-user.mdx: Long line in code block (line 2): 123 chars",
+    "api/endpoints/users/delete-user.mdx: Long line in code block (line 2): 125 chars",
+    "api/endpoints/users/delete-user.mdx: Long line in code block (line 23): 133 chars",
+    "api/endpoints/users/create-user.mdx: Duplicate title detected: \"Create User\"",
+    "api/endpoints/users/create-user.mdx: Contains placeholder content: \"example.com\"",
+    "api/endpoints/status/index.mdx: Possible unclosed components (1 open, 2 close)",
+    "api/endpoints/tools/toolscontroller_update.mdx: Duplicate title detected: \"Update Tool\"",
+    "api/endpoints/tools/toolauthcontroller_upsert.mdx: Title too long (65/60)",
+    "api/endpoints/tools/toolauthcontroller_upsert.mdx: Description too long (283/160)",
+    "api/endpoints/tools/toolauthcontroller_remove.mdx: Description too long (202/160)",
+    "api/endpoints/tools/toolauthcontroller_get.mdx: Description too long (185/160)",
+    "api/endpoints/tools/list-tools.mdx: Duplicate title detected: \"List Tools\"",
     "api/endpoints/tools/list-tools.mdx: Contains placeholder content: \"example.com\"",
-    "api/endpoints/tools/index.mdx: Duplicate title detected: \"Tools Overview\"",
-    "api/endpoints/tools/index.mdx: Possible unclosed components (21 open, 28 close)",
+    "api/endpoints/tools/index.mdx: Possible unclosed components (1 open, 13 close)",
+    "api/endpoints/tools/get-tool.mdx: Duplicate title detected: \"Get Tool\"",
     "api/endpoints/tools/get-tool.mdx: Long line in code block (line 5): 187 chars",
-    "api/endpoints/tools/connect-tool.mdx: Contains placeholder content: \"example.com\"",
-    "api/endpoints/organizations/list-organizations.mdx: Contains placeholder content: \"example.com\"",
+    "api/endpoints/tools/delete-tool.mdx: Duplicate title detected: \"Delete Tool\"",
+    "api/endpoints/tools/create-tool.mdx: Duplicate title detected: \"Create Tool\"",
+    "internal/advanced/performance/performance-optimization.mdx: Possible unclosed components (85 open, 8 close)",
+    "api/endpoints/misc/index.mdx: Possible unclosed components (1 open, 2 close)",
+    "api/endpoints/organizations/organizationscontroller_update.mdx: Duplicate title detected: \"Update Organization\"",
+    "api/endpoints/organizations/list-organizations.mdx: Duplicate title detected: \"List Organizations\"",
+    "api/endpoints/organizations/index.mdx: Possible unclosed components (1 open, 6 close)",
+    "api/endpoints/organizations/get-organization.mdx: Duplicate title detected: \"Get Organization\"",
     "api/endpoints/organizations/get-organization.mdx: Contains placeholder content: \"example.com\"",
+    "api/endpoints/organizations/delete-organization.mdx: Duplicate title detected: \"Delete Organization\"",
+    "api/endpoints/organizations/create-organization.mdx: Duplicate title detected: \"Create Organization\"",
+    "api/endpoints/health/index.mdx: Possible unclosed components (1 open, 2 close)",
+    "api/endpoints/health/health-check.mdx: Duplicate title detected: \"Health Check\"",
+    "api/endpoints/execution-logs/index.mdx: Possible unclosed components (1 open, 6 close)",
+    "api/endpoints/execution-logs/executionlogscontroller_update.mdx: Duplicate title detected: \"Update Execution Log\"",
+    "api/endpoints/execution-logs/executionlogscontroller_findone.mdx: Duplicate title detected: \"Get Execution Log\"",
+    "api/endpoints/execution-logs/executionlogscontroller_findall.mdx: Duplicate title detected: \"List Execution Logs\"",
+    "api/endpoints/execution-logs/delete-execution-log.mdx: Duplicate title detected: \"Delete Execution Log\"",
+    "api/endpoints/execution-logs/create-execution-log.mdx: Duplicate title detected: \"Create Execution Log\"",
+    "api/endpoints/flows/update-flow.mdx: Contains placeholder content: \"example.com\"",
+    "api/endpoints/flows/index.mdx: Possible unclosed components (1 open, 12 close)",
+    "api/endpoints/flows/get-flow.mdx: Contains placeholder content: \"example.com\"",
+    "api/endpoints/flows/flowscontroller_update.mdx: Duplicate title detected: \"Update Flow\"",
+    "api/endpoints/flows/flowscontroller_retryexecution.mdx: Duplicate title detected: \"Retry Execution\"",
+    "api/endpoints/flows/flowscontroller_findone.mdx: Duplicate title detected: \"Get Flow\"",
+    "api/endpoints/flows/flowscontroller_findall.mdx: Duplicate title detected: \"List Flows\"",
+    "api/endpoints/flows/flowscontroller_cancelexecution.mdx: Duplicate title detected: \"Cancel Execution\"",
+    "api/endpoints/flows/execute-flow.mdx: Duplicate title detected: \"Execute Flow\"",
+    "api/endpoints/flows/execute-flow.mdx: Possible unclosed components (58 open, 57 close)",
+    "api/endpoints/flows/execute-flow.mdx: Contains placeholder content: \"example.com\"",
+    "api/endpoints/flows/delete-flow.mdx: Duplicate title detected: \"Delete Flow\"",
+    "api/endpoints/flows/create-flow.mdx: Duplicate title detected: \"Create Flow\"",
+    "api/endpoints/flows/create-flow.mdx: Possible unclosed components (47 open, 46 close)",
+    "api/endpoints/detailed/index.mdx: Possible unclosed components (1 open, 2 close)",
+    "api/endpoints/version/index.mdx: Possible unclosed components (1 open, 2 close)",
+    "api/endpoints/auth/index.mdx: Possible unclosed components (1 open, 3 close)",
     "api/endpoints/actions/update-action.mdx: Possible unclosed components (53 open, 57 close)",
     "api/endpoints/actions/list-actions.mdx: Possible unclosed components (48 open, 52 close)",
+    "api/endpoints/actions/index.mdx: Possible unclosed components (1 open, 12 close)",
     "api/endpoints/actions/get-action.mdx: Possible unclosed components (60 open, 64 close)",
     "api/endpoints/actions/execute-action.mdx: Possible unclosed components (58 open, 62 close)",
     "api/endpoints/actions/execute-action.mdx: Contains placeholder content: \"example.com\"",
     "api/endpoints/actions/delete-action.mdx: Possible unclosed components (49 open, 53 close)",
     "api/endpoints/actions/create-action.mdx: Possible unclosed components (48 open, 52 close)",
-    "api/endpoints/flows/update-flow.mdx: Contains placeholder content: \"example.com\"",
-    "api/endpoints/flows/get-flow.mdx: Contains placeholder content: \"example.com\"",
-    "api/endpoints/flows/execute-flow.mdx: Unknown component: <30s>",
-    "api/endpoints/flows/execute-flow.mdx: Possible unclosed components (58 open, 57 close)",
-    "api/endpoints/flows/execute-flow.mdx: Contains placeholder content: \"example.com\"",
-    "api/endpoints/flows/create-flow.mdx: Possible unclosed components (47 open, 46 close)",
+    "api/endpoints/actions/actionscontroller_update.mdx: Duplicate title detected: \"Update Action\"",
+    "api/endpoints/actions/actionscontroller_retryexecution.mdx: Duplicate title detected: \"Retry Execution\"",
+    "api/endpoints/actions/actionscontroller_remove.mdx: Duplicate title detected: \"Delete Action\"",
+    "api/endpoints/actions/actionscontroller_getexecutionstatus.mdx: Duplicate title detected: \"Get Execution Status\"",
+    "api/endpoints/actions/actionscontroller_findone.mdx: Duplicate title detected: \"Get Action\"",
+    "api/endpoints/actions/actionscontroller_findall.mdx: Duplicate title detected: \"List Actions\"",
+    "api/endpoints/actions/actionscontroller_create.mdx: Duplicate title detected: \"Create Action\"",
+    "api/endpoints/actions/actionscontroller_cancelexecution.mdx: Duplicate title detected: \"Cancel Execution\"",
     "public/product/tools/auth-types/overview.mdx: Possible unclosed components (61 open, 64 close)",
     "public/product/flows/flow-steps/overview.mdx: Possible unclosed components (47 open, 50 close)",
     "public/product/flows/flow-steps/overview.mdx: Contains placeholder content: \"example.com\"",
@@ -335,11 +384,6 @@
     },
     {
       "file": "public/product/webhooks/overview.mdx",
-      "link": "/api/endpoints/webhooks",
-      "text": "/api/endpoints/webhooks"
-    },
-    {
-      "file": "public/product/webhooks/overview.mdx",
       "link": "/public/product/webhooks/security",
       "text": "/public/product/webhooks/security"
     },
@@ -354,9 +398,14 @@
       "text": "/public/product/webhooks/monitoring"
     },
     {
-      "file": "public/product/webhooks/overview.mdx",
-      "link": "/api/endpoints/webhooks",
-      "text": "/api/endpoints/webhooks"
+      "file": "public/product/users/overview.mdx",
+      "link": "/public/product/flows/collaboration",
+      "text": "/public/product/flows/collaboration"
+    },
+    {
+      "file": "public/product/users/overview.mdx",
+      "link": "/public/product/flows/collaboration",
+      "text": "/public/product/flows/collaboration"
     },
     {
       "file": "public/product/use-cases/payment-automation.mdx",
@@ -574,26 +623,6 @@
       "text": "/public/product/tutorials/integration-examples"
     },
     {
-      "file": "public/product/users/overview.mdx",
-      "link": "/public/product/flows/collaboration",
-      "text": "/public/product/flows/collaboration"
-    },
-    {
-      "file": "public/product/users/overview.mdx",
-      "link": "/api/endpoints/users",
-      "text": "/api/endpoints/users"
-    },
-    {
-      "file": "public/product/users/overview.mdx",
-      "link": "/public/product/flows/collaboration",
-      "text": "/public/product/flows/collaboration"
-    },
-    {
-      "file": "public/product/users/overview.mdx",
-      "link": "/api/endpoints/users",
-      "text": "/api/endpoints/users"
-    },
-    {
       "file": "public/product/tools/overview.mdx",
       "link": "/public/use-cases",
       "text": "/public/use-cases"
@@ -602,6 +631,16 @@
       "file": "public/product/tools/overview.mdx",
       "link": "/public/use-cases",
       "text": "/public/use-cases"
+    },
+    {
+      "file": "public/product/organizations/overview.mdx",
+      "link": "/public/product/users/user-management",
+      "text": "/public/product/users/user-management"
+    },
+    {
+      "file": "public/product/organizations/overview.mdx",
+      "link": "/public/product/users/user-management",
+      "text": "/public/product/users/user-management"
     },
     {
       "file": "public/product/getting-started/first-workflow.mdx",
@@ -644,19 +683,14 @@
       "text": "/public/product/flows/analytics"
     },
     {
-      "file": "public/product/organizations/overview.mdx",
-      "link": "/public/product/users/user-management",
-      "text": "/public/product/users/user-management"
+      "file": "public/product/flows/overview.mdx",
+      "link": "/public/product/flows/monitoring",
+      "text": "/public/product/flows/monitoring"
     },
     {
-      "file": "public/product/organizations/overview.mdx",
-      "link": "/public/product/users/user-management",
-      "text": "/public/product/users/user-management"
-    },
-    {
-      "file": "public/product/execution-logs/overview.mdx",
-      "link": "/api/endpoints/execution-logs",
-      "text": "/api/endpoints/execution-logs"
+      "file": "public/product/flows/overview.mdx",
+      "link": "/public/product/flows/monitoring",
+      "text": "/public/product/flows/monitoring"
     },
     {
       "file": "public/product/execution-logs/overview.mdx",
@@ -670,11 +704,6 @@
     },
     {
       "file": "public/product/execution-logs/overview.mdx",
-      "link": "/api/endpoints/execution-logs",
-      "text": "/api/endpoints/execution-logs"
-    },
-    {
-      "file": "public/product/execution-logs/overview.mdx",
       "link": "/internal/operations/monitoring",
       "text": "/internal/operations/monitoring"
     },
@@ -682,56 +711,6 @@
       "file": "public/product/execution-logs/overview.mdx",
       "link": "/internal/development/debugging",
       "text": "/internal/development/debugging"
-    },
-    {
-      "file": "public/product/flows/overview.mdx",
-      "link": "/public/product/flows/monitoring",
-      "text": "/public/product/flows/monitoring"
-    },
-    {
-      "file": "public/product/flows/overview.mdx",
-      "link": "/api/endpoints/flows",
-      "text": "/api/endpoints/flows"
-    },
-    {
-      "file": "public/product/flows/overview.mdx",
-      "link": "/public/product/flows/monitoring",
-      "text": "/public/product/flows/monitoring"
-    },
-    {
-      "file": "public/product/flows/overview.mdx",
-      "link": "/api/endpoints/flows",
-      "text": "/api/endpoints/flows"
-    },
-    {
-      "file": "public/product/actions/overview.mdx",
-      "link": "/public/product/actions/templates",
-      "text": "/public/product/actions/templates"
-    },
-    {
-      "file": "public/product/actions/overview.mdx",
-      "link": "/public/product/actions/error-handling",
-      "text": "/public/product/actions/error-handling"
-    },
-    {
-      "file": "public/product/actions/overview.mdx",
-      "link": "/api/endpoints/actions",
-      "text": "/api/endpoints/actions"
-    },
-    {
-      "file": "public/product/actions/overview.mdx",
-      "link": "/public/product/actions/templates",
-      "text": "/public/product/actions/templates"
-    },
-    {
-      "file": "public/product/actions/overview.mdx",
-      "link": "/public/product/actions/error-handling",
-      "text": "/public/product/actions/error-handling"
-    },
-    {
-      "file": "public/product/actions/overview.mdx",
-      "link": "/api/endpoints/actions",
-      "text": "/api/endpoints/actions"
     },
     {
       "file": "public/product/enterprise/rate-limiting.mdx",
@@ -739,24 +718,24 @@
       "text": "method"
     },
     {
-      "file": "cli/commands/init/init.mdx",
-      "link": "/cli/commands/deploy/deploy",
-      "text": "/cli/commands/deploy/deploy"
+      "file": "public/product/actions/overview.mdx",
+      "link": "/public/product/actions/templates",
+      "text": "/public/product/actions/templates"
     },
     {
-      "file": "cli/commands/init/init.mdx",
-      "link": "/cli/commands/validate/validate",
-      "text": "/cli/commands/validate/validate"
+      "file": "public/product/actions/overview.mdx",
+      "link": "/public/product/actions/error-handling",
+      "text": "/public/product/actions/error-handling"
     },
     {
-      "file": "cli/commands/init/init.mdx",
-      "link": "/cli/commands/deploy/deploy",
-      "text": "/cli/commands/deploy/deploy"
+      "file": "public/product/actions/overview.mdx",
+      "link": "/public/product/actions/templates",
+      "text": "/public/product/actions/templates"
     },
     {
-      "file": "cli/commands/init/init.mdx",
-      "link": "/cli/commands/validate/validate",
-      "text": "/cli/commands/validate/validate"
+      "file": "public/product/actions/overview.mdx",
+      "link": "/public/product/actions/error-handling",
+      "text": "/public/product/actions/error-handling"
     },
     {
       "file": "internal/infrastructure/monitoring/observability.mdx",
@@ -764,34 +743,59 @@
       "text": "operation"
     },
     {
-      "file": "api/endpoints/tools/index.mdx",
-      "link": "/api/endpoints/actions",
-      "text": "/api/endpoints/actions"
+      "file": "cli/commands/init/init.mdx",
+      "link": "/cli/commands/deploy/deploy",
+      "text": "/cli/commands/deploy/deploy"
     },
     {
-      "file": "api/endpoints/tools/index.mdx",
-      "link": "/api/endpoints/flows",
-      "text": "/api/endpoints/flows"
+      "file": "cli/commands/init/init.mdx",
+      "link": "/cli/commands/validate/validate",
+      "text": "/cli/commands/validate/validate"
     },
     {
-      "file": "api/endpoints/tools/index.mdx",
-      "link": "/api/endpoints/tools/manage-secrets",
-      "text": "/api/endpoints/tools/manage-secrets"
+      "file": "cli/commands/init/init.mdx",
+      "link": "/cli/commands/deploy/deploy",
+      "text": "/cli/commands/deploy/deploy"
     },
     {
-      "file": "api/endpoints/tools/index.mdx",
-      "link": "/api/endpoints/actions",
-      "text": "/api/endpoints/actions"
+      "file": "cli/commands/init/init.mdx",
+      "link": "/cli/commands/validate/validate",
+      "text": "/cli/commands/validate/validate"
     },
     {
-      "file": "api/endpoints/tools/index.mdx",
-      "link": "/api/endpoints/flows",
-      "text": "/api/endpoints/flows"
+      "file": "api/endpoints/webhooks/toggle-webhook.mdx",
+      "link": "/api/endpoints/webhooks/update-webhook",
+      "text": "Update Webhook"
     },
     {
-      "file": "api/endpoints/tools/index.mdx",
-      "link": "/api/endpoints/tools/manage-secrets",
-      "text": "/api/endpoints/tools/manage-secrets"
+      "file": "api/endpoints/webhooks/toggle-webhook.mdx",
+      "link": "/api/endpoints/webhooks/delete-webhook",
+      "text": "Delete Webhook"
+    },
+    {
+      "file": "api/endpoints/webhooks/test-webhook.mdx",
+      "link": "/api/endpoints/webhooks/update-webhook",
+      "text": "Update Webhook"
+    },
+    {
+      "file": "api/endpoints/executions/retry-execution.mdx",
+      "link": "/api/endpoints/executions/get-execution",
+      "text": "Get Execution Status"
+    },
+    {
+      "file": "api/endpoints/executions/retry-execution.mdx",
+      "link": "/api/endpoints/executions/list-executions",
+      "text": "List Executions"
+    },
+    {
+      "file": "api/endpoints/executions/cancel-execution.mdx",
+      "link": "/api/endpoints/executions/get-execution",
+      "text": "Get Execution Status"
+    },
+    {
+      "file": "api/endpoints/executions/cancel-execution.mdx",
+      "link": "/api/endpoints/executions/list-executions",
+      "text": "List Executions"
     },
     {
       "file": "api/endpoints/flows/execute-flow.mdx",
@@ -815,16 +819,6 @@
     },
     {
       "file": "api/endpoints/flows/execute-flow.mdx",
-      "link": "/api/endpoints/executions/cancel-execution",
-      "text": "Cancel Execution"
-    },
-    {
-      "file": "api/endpoints/flows/execute-flow.mdx",
-      "link": "/api/endpoints/executions/retry-execution",
-      "text": "Retry Execution"
-    },
-    {
-      "file": "api/endpoints/flows/execute-flow.mdx",
       "link": "/api/endpoints/executions/stream-execution",
       "text": "Stream Execution"
     },
@@ -897,6 +891,41 @@
       "file": "public/product/actions/http-methods/overview.mdx",
       "link": "/api/error-handling",
       "text": "/api/error-handling"
+    },
+    {
+      "file": "api/endpoints/tools/auth/create-tool-auth.mdx",
+      "link": "/api/endpoints/tools/auth/list-tool-auth",
+      "text": "List Tool Authentication"
+    },
+    {
+      "file": "api/endpoints/tools/auth/create-tool-auth.mdx",
+      "link": "/api/endpoints/tools/auth/update-tool-auth",
+      "text": "Update Tool Authentication"
+    },
+    {
+      "file": "api/endpoints/tools/auth/create-tool-auth.mdx",
+      "link": "/api/endpoints/tools/auth/delete-tool-auth",
+      "text": "Delete Tool Authentication"
+    },
+    {
+      "file": "api/endpoints/tools/secrets/create-tool-secret.mdx",
+      "link": "/api/endpoints/tools/secrets/list-tool-secrets",
+      "text": "List Tool Secrets"
+    },
+    {
+      "file": "api/endpoints/tools/secrets/create-tool-secret.mdx",
+      "link": "/api/endpoints/tools/secrets/get-tool-secret",
+      "text": "Get Tool Secret"
+    },
+    {
+      "file": "api/endpoints/tools/secrets/create-tool-secret.mdx",
+      "link": "/api/endpoints/tools/secrets/update-tool-secret",
+      "text": "Update Tool Secret"
+    },
+    {
+      "file": "api/endpoints/tools/secrets/create-tool-secret.mdx",
+      "link": "/api/endpoints/tools/secrets/delete-tool-secret",
+      "text": "Delete Tool Secret"
     }
   ]
 }

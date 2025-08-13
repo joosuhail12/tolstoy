@@ -1,0 +1,116 @@
+---
+title: "Audit Log"
+api: "GET /organizations/{id}/audit-log"
+description: "Retrieve audit log entries for organization activities"
+---
+
+## Overview
+
+The Audit Log endpoint provides access to detailed audit logs for organization activities, including user actions, configuration changes, and security events.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the organization
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="startDate" type="string">
+  Start date for audit log entries (ISO timestamp)
+</ParamField>
+
+<ParamField query="endDate" type="string">
+  End date for audit log entries (ISO timestamp)
+</ParamField>
+
+<ParamField query="userId" type="string">
+  Filter by specific user ID
+</ParamField>
+
+<ParamField query="action" type="string">
+  Filter by action type
+</ParamField>
+
+<ParamField query="limit" type="number">
+  Maximum number of entries to return (defaults to 100)
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="auditEntries" type="array">
+  Array of audit log entries
+  
+  <Expandable title="Audit Entry">
+    <ResponseField name="id" type="string">
+      Unique identifier for the audit entry
+    </ResponseField>
+    
+    <ResponseField name="timestamp" type="string">
+      ISO timestamp when the action occurred
+    </ResponseField>
+    
+    <ResponseField name="userId" type="string">
+      ID of the user who performed the action
+    </ResponseField>
+    
+    <ResponseField name="action" type="string">
+      Type of action performed
+    </ResponseField>
+    
+    <ResponseField name="resource" type="string">
+      Resource that was affected
+    </ResponseField>
+    
+    <ResponseField name="details" type="object">
+      Additional details about the action
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X GET "https://api.tolstoy.com/v1/organizations/org_123456/audit-log?limit=50" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```javascript JavaScript
+const auditLog = await fetch('/api/v1/organizations/org_123456/audit-log', {
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+const logData = await auditLog.json();
+console.log(`Found ${logData.auditEntries.length} audit entries`);
+```
+
+</CodeGroup>
+
+## Related Endpoints
+
+- [Get Organization](/api/endpoints/organizations/get-organization) - Retrieve organization details
+- [List Organizations](/api/endpoints/organizations/list-organizations) - View all organizations

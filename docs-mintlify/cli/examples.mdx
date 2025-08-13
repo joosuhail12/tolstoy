@@ -1,0 +1,481 @@
+---
+title: "CLI Examples"
+description: "Practical examples and recipes for using the Tolstoy CLI"
+---
+
+## Overview
+
+This guide provides practical examples and common workflows for using the Tolstoy CLI effectively in your automation projects.
+
+## Getting Started Examples
+
+### Project Initialization
+
+Create a new Tolstoy project:
+
+```bash
+# Initialize new project
+tolstoy init my-automation-project
+cd my-automation-project
+
+# Authenticate with your account
+tolstoy auth login
+
+# List available organizations
+tolstoy organizations list
+
+# Set default organization
+tolstoy config set org-id org_abc123
+```
+
+### First Workflow Deployment
+
+```bash
+# Validate your configurations
+tolstoy validate
+
+# Deploy to staging
+tolstoy deploy --env staging
+
+# Test the deployment
+tolstoy flows execute payment-workflow --input '{"amount": 100}'
+
+# Deploy to production
+tolstoy deploy --env production
+```
+
+## Workflow Management
+
+### Creating and Managing Workflows
+
+```bash
+# Create a new workflow from template
+tolstoy flows create payment-processor --template stripe-payment
+
+# List all workflows
+tolstoy flows list
+
+# Get workflow details
+tolstoy flows get payment-processor
+
+# Execute workflow with custom inputs
+tolstoy flows execute payment-processor \
+  --input '{"amount": 50.00, "currency": "USD", "customer": "cust_123"}'
+
+# Monitor workflow execution
+tolstoy flows status exec_abc123
+
+# Cancel running workflow
+tolstoy flows cancel exec_abc123
+```
+
+### Workflow Development Workflow
+
+```bash
+# Create feature branch for new workflow
+git checkout -b feature/subscription-workflow
+
+# Create workflow from template
+tolstoy flows create subscription-manager --template recurring-payment
+
+# Edit workflow definition
+vim workflows/subscription-manager.yml
+
+# Validate changes
+tolstoy validate --strict
+
+# Test locally (if supported)
+tolstoy flows test subscription-manager --mock-tools
+
+# Deploy to staging
+tolstoy deploy --env staging
+
+# Run integration tests
+tolstoy flows execute subscription-manager --input @test-data.json
+
+# Deploy to production
+tolstoy deploy --env production
+```
+
+## Tool Management
+
+### Setting Up Tool Integrations
+
+```bash
+# List available tools
+tolstoy tools list
+
+# Add a new tool
+tolstoy tools create stripe \
+  --type payment \
+  --auth-type oauth2 \
+  --config @stripe-config.json
+
+# Configure tool authentication
+tolstoy tools auth stripe \
+  --client-id sk_test_... \
+  --client-secret sk_secret_...
+
+# Test tool connection
+tolstoy tools test stripe
+
+# List configured tools
+tolstoy tools list --show-status
+```
+
+### Tool Configuration File Example
+
+```json
+// stripe-config.json
+{
+  "name": "Stripe Payment Processor",
+  "description": "Handle payments and subscriptions",
+  "baseUrl": "https://api.stripe.com",
+  "version": "2023-10-16",
+  "capabilities": [
+    "payments",
+    "subscriptions",
+    "customers"
+  ],
+  "webhooks": {
+    "events": [
+      "payment_intent.succeeded",
+      "subscription.created"
+    ]
+  }
+}
+```
+
+## Action Development
+
+### Creating Custom Actions
+
+```bash
+# Create new action
+tolstoy actions create send-notification \
+  --template webhook \
+  --method POST
+
+# Edit action configuration
+vim actions/send-notification.yml
+
+# Validate action
+tolstoy validate actions/send-notification.yml
+
+# Test action independently
+tolstoy actions execute send-notification \
+  --input '{"message": "Test notification", "channel": "slack"}'
+```
+
+### Action Configuration Example
+
+```yaml
+# actions/send-notification.yml
+name: send-notification
+description: Send notification to various channels
+version: 1.0
+
+parameters:
+  message:
+    type: string
+    required: true
+    description: Message to send
+  channel:
+    type: string
+    required: true
+    enum: [slack, email, webhook]
+    description: Notification channel
+
+implementation:
+  http:
+    method: POST
+    url: "{{tools.notification.baseUrl}}/send"
+    headers:
+      Authorization: "Bearer {{tools.notification.token}}"
+      Content-Type: application/json
+    body:
+      message: "{{inputs.message}}"
+      channel: "{{inputs.channel}}"
+      timestamp: "{{now()}}"
+
+outputs:
+  messageId:
+    type: string
+    description: Unique message identifier
+  deliveredAt:
+    type: timestamp
+    description: Delivery timestamp
+```
+
+## Environment Management
+
+### Multi-Environment Setup
+
+```bash
+# Configure staging environment
+tolstoy config set staging.api-url https://staging-api.tolstoy.com
+tolstoy config set staging.org-id org_staging_123
+
+# Configure production environment  
+tolstoy config set production.api-url https://api.tolstoy.com
+tolstoy config set production.org-id org_prod_456
+
+# Deploy to specific environment
+tolstoy deploy --env staging
+tolstoy deploy --env production
+
+# Switch default environment
+tolstoy config set default-env production
+```
+
+### Environment-Specific Configurations
+
+```json
+// tolstoy.config.json
+{
+  "environments": {
+    "development": {
+      "apiUrl": "http://localhost:3000",
+      "orgId": "org_dev_123",
+      "tools": {
+        "stripe": {
+          "useTestKeys": true
+        }
+      }
+    },
+    "staging": {
+      "apiUrl": "https://staging-api.tolstoy.com",
+      "orgId": "org_staging_456",
+      "deployment": {
+        "requireApproval": false
+      }
+    },
+    "production": {
+      "apiUrl": "https://api.tolstoy.com", 
+      "orgId": "org_prod_789",
+      "deployment": {
+        "requireApproval": true,
+        "backupBeforeDeploy": true
+      }
+    }
+  }
+}
+```
+
+## Monitoring and Debugging
+
+### Execution Monitoring
+
+```bash
+# List recent executions
+tolstoy executions list --limit 10
+
+# Get execution details
+tolstoy executions get exec_abc123
+
+# Stream execution logs
+tolstoy executions logs exec_abc123 --follow
+
+# Get execution metrics
+tolstoy executions metrics --workflow payment-processor --days 7
+```
+
+### Debugging Failed Workflows
+
+```bash
+# Find failed executions
+tolstoy executions list --status failed --limit 5
+
+# Get detailed error information
+tolstoy executions get exec_failed_123 --include-errors
+
+# Retry failed execution
+tolstoy executions retry exec_failed_123
+
+# Get execution logs with context
+tolstoy executions logs exec_failed_123 --context 10
+```
+
+## Automation and CI/CD
+
+### GitHub Actions Integration
+
+```yaml
+# .github/workflows/deploy.yml
+name: Deploy Tolstoy Workflows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          
+      - name: Install Tolstoy CLI
+        run: npm install -g @tolstoy/cli
+        
+      - name: Authenticate
+        env:
+          TOLSTOY_API_TOKEN: ${{ secrets.TOLSTOY_API_TOKEN }}
+        run: tolstoy auth login --token $TOLSTOY_API_TOKEN
+        
+      - name: Validate configurations
+        run: tolstoy validate --strict
+        
+      - name: Deploy to staging
+        if: github.event_name == 'pull_request'
+        run: tolstoy deploy --env staging
+        
+      - name: Deploy to production
+        if: github.ref == 'refs/heads/main'
+        run: tolstoy deploy --env production
+```
+
+### Automated Testing
+
+```bash
+# Run all workflow tests
+tolstoy test --all
+
+# Test specific workflow with various inputs
+tolstoy test payment-processor \
+  --input-file test-cases/payment-scenarios.json
+
+# Performance testing
+tolstoy test payment-processor \
+  --load-test \
+  --concurrent 10 \
+  --duration 60s
+```
+
+## Advanced Usage
+
+### Bulk Operations
+
+```bash
+# Bulk workflow deployment
+find workflows/ -name "*.yml" -exec tolstoy flows create --file {} \;
+
+# Batch tool configuration
+cat tools-list.txt | xargs -I {} tolstoy tools create {}
+
+# Mass execution for testing
+for i in {1..10}; do
+  tolstoy flows execute test-workflow --input "{\"id\": $i}"
+done
+```
+
+### Scripting and Automation
+
+```bash
+#!/bin/bash
+# deploy-all.sh - Deploy all workflows with validation
+
+set -e
+
+echo "Starting deployment process..."
+
+# Validate all configurations
+echo "Validating configurations..."
+tolstoy validate --strict
+
+# Deploy to staging first
+echo "Deploying to staging..."
+tolstoy deploy --env staging
+
+# Run smoke tests
+echo "Running smoke tests..."
+tolstoy test --smoke --env staging
+
+# Deploy to production if tests pass
+echo "Deploying to production..."
+tolstoy deploy --env production
+
+# Verify production deployment
+echo "Verifying production deployment..."
+tolstoy status --env production
+
+echo "Deployment completed successfully!"
+```
+
+## Best Practices
+
+### Project Structure
+
+```
+my-tolstoy-project/
+├── tolstoy.config.json
+├── workflows/
+│   ├── payment/
+│   │   ├── process-payment.yml
+│   │   └── refund-payment.yml
+│   └── notifications/
+│       └── send-alerts.yml
+├── actions/
+│   ├── http/
+│   │   └── api-call.yml
+│   └── data/
+│       └── transform.yml
+├── tools/
+│   ├── stripe.yml
+│   ├── sendgrid.yml
+│   └── database.yml
+├── tests/
+│   ├── unit/
+│   └── integration/
+└── scripts/
+    ├── deploy.sh
+    └── validate.sh
+```
+
+### Configuration Management
+
+```bash
+# Use environment variables for sensitive data
+export TOLSTOY_API_TOKEN="your_token_here"
+export TOLSTOY_ORG_ID="org_123456"
+
+# Store configuration in version control (excluding secrets)
+git add tolstoy.config.json workflows/ actions/ tools/
+git commit -m "Update workflow configurations"
+
+# Use separate config files for different environments
+tolstoy deploy --config configs/staging.json --env staging
+tolstoy deploy --config configs/production.json --env production
+```
+
+## Troubleshooting
+
+### Common Issues and Solutions
+
+```bash
+# Authentication issues
+tolstoy auth status
+tolstoy auth login --force
+
+# Network/API issues
+tolstoy config get api-url
+tolstoy status --verbose
+
+# Validation errors
+tolstoy validate --verbose --format json
+
+# Deployment conflicts
+tolstoy deploy --force --backup
+```
+
+## Related Documentation
+
+- [CLI Installation](/cli/installation) - Installing the Tolstoy CLI
+- [CLI Configuration](/cli/configuration) - Configuring the CLI
+- [Authentication](/cli/authentication) - Setting up authentication

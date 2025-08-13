@@ -1,0 +1,128 @@
+---
+title: "Restore Action"
+api: "POST /actions/{id}/restore"
+description: "Restore a previously deleted action"
+---
+
+## Overview
+
+The Restore Action endpoint allows you to restore a previously deleted action within your organization. This endpoint is useful for recovering accidentally deleted actions or restoring actions that were temporarily disabled.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the action to restore
+</ParamField>
+
+## Request Body
+
+<ParamField body="restoreReason" type="string">
+  Reason for restoring the action
+</ParamField>
+
+<ParamField body="newName" type="string">
+  New name for the restored action (optional)
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="id" type="string">
+  Unique identifier for the restored action
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Name of the restored action
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current status of the action
+</ResponseField>
+
+<ResponseField name="restoredAt" type="string">
+  ISO timestamp when action was restored
+</ResponseField>
+
+<ResponseField name="restoredBy" type="string">
+  User ID who restored the action
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST "https://api.tolstoy.com/v1/actions/action_abc123/restore" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "restoreReason": "Accidentally deleted",
+    "newName": "Restored Payment Action"
+  }'
+```
+
+```javascript JavaScript
+const restoreAction = await fetch('/api/v1/actions/action_abc123/restore', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    restoreReason: 'Needed for critical workflow',
+    newName: 'Critical Payment Action'
+  })
+});
+
+const restoredAction = await restoreAction.json();
+console.log('Action restored:', restoredAction.name);
+```
+
+```python Python
+import requests
+
+response = requests.post(
+    "https://api.tolstoy.com/v1/actions/action_abc123/restore",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json={
+        "restoreReason": "Recovery from backup",
+        "newName": "Recovered Action"
+    }
+)
+
+if response.status_code == 200:
+    action = response.json()
+    print(f"Action restored: {action['name']}")
+```
+
+</CodeGroup>
+
+## Related Endpoints
+
+- [Delete Action](/api/endpoints/actions/delete-action) - Delete an action
+- [List Actions](/api/endpoints/actions/list-actions) - View all actions
+- [Get Action](/api/endpoints/actions/get-action) - Retrieve action details

@@ -1,0 +1,576 @@
+---
+title: "Update Tool Auth"
+api: "PUT /tools/auth/{id}"
+description: "Update authentication configuration for a tool"
+---
+
+## Overview
+
+The Update Tool Auth endpoint allows you to modify authentication configurations for tools, including updating credentials, changing authentication types, and refreshing OAuth tokens.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the tool auth configuration to update
+</ParamField>
+
+## Request Body
+
+<ParamField body="authType" type="string">
+  Authentication type: "oauth2", "api_key", "basic_auth", "bearer_token"
+</ParamField>
+
+<ParamField body="credentials" type="object">
+  Authentication credentials (structure depends on authType)
+  
+  <Expandable title="OAuth2 Credentials">
+    <ParamField body="clientId" type="string">
+      OAuth2 client ID
+    </ParamField>
+    <ParamField body="clientSecret" type="string">
+      OAuth2 client secret
+    </ParamField>
+    <ParamField body="accessToken" type="string">
+      OAuth2 access token
+    </ParamField>
+    <ParamField body="refreshToken" type="string">
+      OAuth2 refresh token
+    </ParamField>
+    <ParamField body="scopes" type="array">
+      OAuth2 scopes
+    </ParamField>
+  </Expandable>
+  
+  <Expandable title="API Key Credentials">
+    <ParamField body="apiKey" type="string">
+      API key value
+    </ParamField>
+    <ParamField body="keyName" type="string">
+      API key header/parameter name
+    </ParamField>
+    <ParamField body="keyLocation" type="string">
+      Where to place the key: "header", "query", "body"
+    </ParamField>
+  </Expandable>
+  
+  <Expandable title="Basic Auth Credentials">
+    <ParamField body="username" type="string">
+      Basic auth username
+    </ParamField>
+    <ParamField body="password" type="string">
+      Basic auth password
+    </ParamField>
+  </Expandable>
+  
+  <Expandable title="Bearer Token Credentials">
+    <ParamField body="token" type="string">
+      Bearer token value
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="config" type="object">
+  Additional authentication configuration
+  
+  <Expandable title="Configuration Options">
+    <ParamField body="baseUrl" type="string">
+      Base URL for API requests
+    </ParamField>
+    <ParamField body="tokenUrl" type="string">
+      Token endpoint URL (for OAuth2)
+    </ParamField>
+    <ParamField body="authUrl" type="string">
+      Authorization URL (for OAuth2)
+    </ParamField>
+    <ParamField body="redirectUri" type="string">
+      OAuth2 redirect URI
+    </ParamField>
+    <ParamField body="headers" type="object">
+      Additional HTTP headers to include
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="metadata" type="object">
+  Additional metadata for the authentication configuration
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`
+
+<ResponseField name="id" type="string">
+  Unique identifier for the auth configuration
+</ResponseField>
+
+<ResponseField name="toolId" type="string">
+  ID of the associated tool
+</ResponseField>
+
+<ResponseField name="authType" type="string">
+  Type of authentication method
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Current authentication status
+</ResponseField>
+
+<ResponseField name="isConfigured" type="boolean">
+  Whether authentication is properly configured
+</ResponseField>
+
+<ResponseField name="lastValidated" type="string">
+  ISO timestamp when auth was last validated
+</ResponseField>
+
+<ResponseField name="expiresAt" type="string">
+  ISO timestamp when auth expires (for OAuth tokens)
+</ResponseField>
+
+<ResponseField name="scopes" type="array">
+  OAuth scopes granted (for OAuth2 auth)
+</ResponseField>
+
+<ResponseField name="updatedAt" type="string">
+  ISO timestamp when configuration was last updated
+</ResponseField>
+
+<ResponseField name="updatedBy" type="string">
+  User ID who last updated the configuration
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="400" type="object">
+  Bad Request - Invalid authentication configuration
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+    <ResponseField name="details" type="object">
+      Field-specific validation errors
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="404" type="object">
+  Not Found - Tool auth configuration does not exist
+</ResponseField>
+
+<ResponseField name="422" type="object">
+  Unprocessable Entity - Invalid credentials or authentication test failed
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL Update OAuth2
+curl -X PUT "https://api.tolstoy.com/v1/tools/auth/auth_abc123" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "credentials": {
+      "clientId": "new_client_id",
+      "clientSecret": "new_client_secret",
+      "scopes": ["read", "write", "admin"]
+    },
+    "config": {
+      "tokenUrl": "https://auth.example.com/oauth2/token",
+      "authUrl": "https://auth.example.com/oauth2/authorize"
+    }
+  }'
+```
+
+```bash cURL Update API Key
+curl -X PUT "https://api.tolstoy.com/v1/tools/auth/auth_abc123" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "authType": "api_key",
+    "credentials": {
+      "apiKey": "new_api_key_value",
+      "keyName": "X-API-Key",
+      "keyLocation": "header"
+    }
+  }'
+```
+
+```javascript JavaScript
+// Update OAuth2 configuration
+const updateOAuth = await fetch('/api/v1/tools/auth/auth_abc123', {
+  method: 'PUT',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    credentials: {
+      clientId: 'updated_client_id',
+      clientSecret: 'updated_client_secret',
+      scopes: ['read', 'write']
+    },
+    config: {
+      baseUrl: 'https://api.newtool.com',
+      tokenUrl: 'https://auth.newtool.com/token',
+      headers: {
+        'User-Agent': 'Tolstoy-Integration/1.0'
+      }
+    },
+    metadata: {
+      environment: 'production',
+      version: '2.0'
+    }
+  })
+});
+
+if (updateOAuth.ok) {
+  const authConfig = await updateOAuth.json();
+  console.log('Auth updated:', authConfig.id);
+  console.log('Status:', authConfig.status);
+} else {
+  const error = await updateOAuth.json();
+  console.error('Update failed:', error.message);
+}
+
+// Update API key with rotation
+const rotateApiKey = await fetch('/api/v1/tools/auth/auth_xyz789', {
+  method: 'PUT',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    credentials: {
+      apiKey: 'rotated_api_key_12345',
+      keyName: 'Authorization',
+      keyLocation: 'header'
+    },
+    metadata: {
+      rotatedAt: new Date().toISOString(),
+      rotatedBy: 'user_789012',
+      reason: 'scheduled_rotation'
+    }
+  })
+});
+```
+
+```python Python
+import requests
+
+# Update OAuth2 credentials
+oauth_update = {
+    "credentials": {
+        "clientId": "new_oauth_client_id",
+        "clientSecret": "new_oauth_client_secret",
+        "scopes": ["read", "write", "manage"]
+    },
+    "config": {
+        "baseUrl": "https://api.service.com",
+        "tokenUrl": "https://oauth.service.com/token",
+        "authUrl": "https://oauth.service.com/authorize",
+        "redirectUri": "https://tolstoy.com/oauth/callback"
+    }
+}
+
+response = requests.put(
+    "https://api.tolstoy.com/v1/tools/auth/auth_abc123",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json=oauth_update
+)
+
+if response.status_code == 200:
+    auth_config = response.json()
+    print(f"Auth updated: {auth_config['id']}")
+    print(f"Status: {auth_config['status']}")
+    if auth_config.get('expiresAt'):
+        print(f"Expires: {auth_config['expiresAt']}")
+else:
+    error = response.json()
+    print(f"Update failed: {error['message']}")
+
+# Update basic auth credentials
+basic_auth_update = {
+    "authType": "basic_auth",
+    "credentials": {
+        "username": "new_username",
+        "password": "new_secure_password"
+    },
+    "metadata": {
+        "updatedReason": "password_rotation",
+        "environment": "production"
+    }
+}
+
+basic_response = requests.put(
+    "https://api.tolstoy.com/v1/tools/auth/auth_def456",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012",
+        "Content-Type": "application/json"
+    },
+    json=basic_auth_update
+)
+```
+
+</CodeGroup>
+
+## Update Scenarios
+
+### OAuth Token Refresh
+```javascript
+async function refreshOAuthToken(authId, apiToken, orgId, userId) {
+  // First get current auth configuration
+  const currentAuth = await fetch(`/api/v1/tools/auth/${authId}`, {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  const authData = await currentAuth.json();
+  
+  if (authData.authType !== 'oauth2') {
+    throw new Error('Can only refresh OAuth2 tokens');
+  }
+  
+  // Use refresh token to get new access token
+  const tokenResponse = await fetch(authData.config.tokenUrl, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: authData.credentials.refreshToken,
+      client_id: authData.credentials.clientId,
+      client_secret: authData.credentials.clientSecret
+    })
+  });
+  
+  const tokenData = await tokenResponse.json();
+  
+  if (!tokenResponse.ok) {
+    throw new Error(`Token refresh failed: ${tokenData.error_description}`);
+  }
+  
+  // Update auth configuration with new tokens
+  const updateResponse = await fetch(`/api/v1/tools/auth/${authId}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      credentials: {
+        ...authData.credentials,
+        accessToken: tokenData.access_token,
+        refreshToken: tokenData.refresh_token || authData.credentials.refreshToken
+      },
+      metadata: {
+        ...authData.metadata,
+        tokenRefreshedAt: new Date().toISOString()
+      }
+    })
+  });
+  
+  return updateResponse.json();
+}
+```
+
+### Credential Rotation
+```javascript
+async function rotateApiKey(authId, newApiKey, apiToken, orgId, userId) {
+  // Update with new API key
+  const response = await fetch(`/api/v1/tools/auth/${authId}`, {
+    method: 'PUT',
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      credentials: {
+        apiKey: newApiKey,
+        keyName: 'X-API-Key',
+        keyLocation: 'header'
+      },
+      metadata: {
+        rotatedAt: new Date().toISOString(),
+        rotationReason: 'scheduled_security_rotation',
+        previousKeyHash: 'sha256:abc123...' // For audit purposes
+      }
+    })
+  });
+  
+  if (!response.ok) {
+    throw new Error('API key rotation failed');
+  }
+  
+  return response.json();
+}
+```
+
+### Batch Update Multiple Auth Configs
+```javascript
+async function batchUpdateAuthConfigs(updates, apiToken, orgId, userId) {
+  const results = [];
+  
+  for (const update of updates) {
+    try {
+      const response = await fetch(`/api/v1/tools/auth/${update.authId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'X-Org-ID': orgId,
+          'X-User-ID': userId,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(update.config)
+      });
+      
+      const result = await response.json();
+      results.push({
+        authId: update.authId,
+        success: response.ok,
+        data: result
+      });
+      
+      // Rate limiting delay
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+    } catch (error) {
+      results.push({
+        authId: update.authId,
+        success: false,
+        error: error.message
+      });
+    }
+  }
+  
+  return results;
+}
+
+// Usage
+const updates = [
+  {
+    authId: 'auth_123',
+    config: {
+      credentials: { apiKey: 'new_key_1' },
+      metadata: { rotatedAt: new Date().toISOString() }
+    }
+  },
+  {
+    authId: 'auth_456',
+    config: {
+      credentials: { apiKey: 'new_key_2' },
+      metadata: { rotatedAt: new Date().toISOString() }
+    }
+  }
+];
+
+const results = await batchUpdateAuthConfigs(updates, apiToken, 'org_123456', 'user_789012');
+console.log(`Updated ${results.filter(r => r.success).length}/${results.length} auth configs`);
+```
+
+## Configuration Validation
+
+### Pre-update Validation
+```javascript
+async function validateAuthUpdate(authId, updateConfig, apiToken, orgId, userId) {
+  const validationIssues = [];
+  
+  // Check if auth config exists
+  const currentAuth = await fetch(`/api/v1/tools/auth/${authId}`, {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  if (!currentAuth.ok) {
+    validationIssues.push('Auth configuration not found');
+    return validationIssues;
+  }
+  
+  const authData = await currentAuth.json();
+  
+  // Validate credentials based on auth type
+  if (updateConfig.credentials) {
+    switch (updateConfig.authType || authData.authType) {
+      case 'oauth2':
+        if (!updateConfig.credentials.clientId && !authData.credentials.clientId) {
+          validationIssues.push('OAuth2 client ID is required');
+        }
+        if (!updateConfig.credentials.clientSecret && !authData.credentials.clientSecret) {
+          validationIssues.push('OAuth2 client secret is required');
+        }
+        break;
+        
+      case 'api_key':
+        if (!updateConfig.credentials.apiKey) {
+          validationIssues.push('API key value is required');
+        }
+        if (!updateConfig.credentials.keyName) {
+          validationIssues.push('API key name is required');
+        }
+        break;
+        
+      case 'basic_auth':
+        if (!updateConfig.credentials.username) {
+          validationIssues.push('Username is required for basic auth');
+        }
+        if (!updateConfig.credentials.password) {
+          validationIssues.push('Password is required for basic auth');
+        }
+        break;
+    }
+  }
+  
+  return validationIssues;
+}
+```
+
+## Related Endpoints
+
+- [List Tool Auth](/api/endpoints/tools/auth/list-tool-auth) - View all authentication configurations
+- [Delete Tool Auth](/api/endpoints/tools/auth/delete-tool-auth) - Remove authentication configuration
+- [List Tools](/api/endpoints/tools/list-tools) - View all tools
+- [Update Tool](/api/endpoints/tools/update-tool) - Update tool configuration

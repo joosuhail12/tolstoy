@@ -1,0 +1,73 @@
+---
+title: "Create or update organization-level auth configuration for a tool"
+api: "POST /tools/{toolId}/auth"
+description: "Configures authentication settings (API Key or OAuth2) for a specific tool within an organization. API Key auth requires headerName and headerValue. OAuth2 auth requires clientId, clientSecret, and accessToken. A default callback URL is automatically added for OAuth2 configurations."
+---
+
+# Create or update organization-level auth configuration for a tool
+
+Configures authentication settings (API Key or OAuth2) for a specific tool within an organization. API Key auth requires headerName and headerValue. OAuth2 auth requires clientId, clientSecret, and accessToken. A default callback URL is automatically added for OAuth2 configurations.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID
+</ParamField>
+
+<ParamField header="X-Org-ID" type="string" required>
+  Organization identifier
+</ParamField>
+
+<ParamField path="toolId" type="string" required>
+  Unique identifier of the tool to configure
+</ParamField>
+
+
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X POST "http://localhost:3000/tools/{toolId}/auth" \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc" \
+  -d '{}'
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const result = await tolstoy.tools.toolauthcontroller_upsert();
+console.log(result);
+```
+</CodeGroup>
+
+## Responses
+
+<ResponseExample>
+```json 200 OK
+null
+```
+</ResponseExample>
+
+### 400 Bad Request
+
+Invalid request data or validation errors
+
+### 404 Not Found
+
+Tool not found or organization does not have access
+
+---
+
+<Snippet file="api-footer.mdx" />

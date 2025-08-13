@@ -1,0 +1,157 @@
+---
+title: "Authentication"
+description: "Complete guide to authenticating with the Tolstoy API"
+---
+
+## Overview
+
+The Tolstoy API uses **OAuth 2.0** for authentication, providing secure access to your workflows, tools, and organizational data. All API requests must include a valid access token.
+
+## Authentication Flow
+
+### 1. Register Your Application
+
+Before using the API, register your application to obtain your client credentials:
+
+```bash
+curl -X POST https://api.tolstoy.dev/oauth/applications \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "My Workflow App",
+    "redirect_uris": ["https://myapp.com/oauth/callback"],
+    "scopes": ["workflows:read", "workflows:write", "tools:read"]
+  }'
+```
+
+### 2. Authorization Code Flow
+
+Redirect users to the authorization endpoint:
+
+```
+https://api.tolstoy.dev/oauth/authorize?
+  response_type=code&
+  client_id=YOUR_CLIENT_ID&
+  redirect_uri=YOUR_REDIRECT_URI&
+  scope=workflows:read workflows:write&
+  state=random_state_string
+```
+
+### 3. Exchange Code for Token
+
+After user authorization, exchange the code for an access token:
+
+```bash
+curl -X POST https://api.tolstoy.dev/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=authorization_code" \
+  -d "client_id=YOUR_CLIENT_ID" \
+  -d "client_secret=YOUR_CLIENT_SECRET" \
+  -d "code=AUTHORIZATION_CODE" \
+  -d "redirect_uri=YOUR_REDIRECT_URI"
+```
+
+**Response:**
+```json
+{
+  "access_token": "tok_abc123...",
+  "token_type": "Bearer",
+  "expires_in": 3600,
+  "refresh_token": "ref_xyz789...",
+  "scope": "workflows:read workflows:write"
+}
+```
+
+## Using Access Tokens
+
+Include the access token in the `Authorization` header:
+
+```bash
+curl -H "Authorization: Bearer tok_abc123..." \
+  https://api.tolstoy.dev/workflows
+```
+
+## Token Refresh
+
+When your access token expires, use the refresh token:
+
+```bash
+curl -X POST https://api.tolstoy.dev/oauth/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "grant_type=refresh_token" \
+  -d "client_id=YOUR_CLIENT_ID" \
+  -d "client_secret=YOUR_CLIENT_SECRET" \
+  -d "refresh_token=ref_xyz789..."
+```
+
+## Scopes
+
+| Scope | Description |
+|-------|-------------|
+| `workflows:read` | Read workflow definitions and executions |
+| `workflows:write` | Create, update, and execute workflows |
+| `tools:read` | View available tools and their configurations |
+| `tools:write` | Manage tool configurations and credentials |
+| `webhooks:read` | View webhook configurations |
+| `webhooks:write` | Create and manage webhooks |
+| `organizations:read` | View organization details and members |
+| `organizations:write` | Manage organization settings and members |
+
+## Error Responses
+
+Authentication errors return appropriate HTTP status codes:
+
+### 401 Unauthorized
+```json
+{
+  "error": "invalid_token",
+  "error_description": "The access token provided is expired, revoked, malformed, or invalid."
+}
+```
+
+### 403 Forbidden
+```json
+{
+  "error": "insufficient_scope",
+  "error_description": "The request requires higher privileges than provided by the access token."
+}
+```
+
+## Security Best Practices
+
+1. **Store tokens securely** - Never expose tokens in client-side code
+2. **Use HTTPS only** - All API calls must use secure connections
+3. **Implement token rotation** - Regularly refresh access tokens
+4. **Validate redirect URIs** - Use exact match validation for security
+5. **Monitor token usage** - Track and audit API access patterns
+
+## Rate Limiting
+
+Authenticated requests have higher rate limits:
+- **Authenticated**: 1000 requests per hour
+- **Unauthenticated**: 100 requests per hour
+
+Rate limit headers are included in all responses:
+```
+X-RateLimit-Limit: 1000
+X-RateLimit-Remaining: 999
+X-RateLimit-Reset: 1640995200
+```
+
+## Testing Authentication
+
+Use our test endpoint to verify your authentication setup:
+
+```bash
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://api.tolstoy.dev/auth/test
+```
+
+**Success Response:**
+```json
+{
+  "authenticated": true,
+  "user_id": "usr_123",
+  "organization_id": "org_456",
+  "scopes": ["workflows:read", "workflows:write"]
+}
+```

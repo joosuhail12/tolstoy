@@ -1,0 +1,492 @@
+---
+title: "Stream Execution"
+api: "GET /executions/{id}/stream"
+description: "Stream real-time updates for a workflow execution"
+---
+
+## Overview
+
+The Stream Execution endpoint provides real-time updates about a workflow execution using Server-Sent Events (SSE). This allows you to monitor execution progress, step completions, and receive immediate notifications of status changes.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the execution to stream
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="includeStepDetails" type="boolean">
+  Whether to include detailed step information in events (defaults to true)
+</ParamField>
+
+<ParamField query="includeLogs" type="boolean">
+  Whether to include execution logs in events (defaults to false)
+</ParamField>
+
+<ParamField query="heartbeat" type="number">
+  Heartbeat interval in seconds to keep connection alive (defaults to 30)
+</ParamField>
+
+## Response
+
+**Status Code:** `200 OK`  
+**Content-Type:** `text/event-stream`
+
+The endpoint returns a stream of Server-Sent Events with the following event types:
+
+### Event Types
+
+<ResponseField name="execution.started" type="object">
+  Fired when execution begins
+  
+  <Expandable title="Event Data">
+    <ResponseField name="executionId" type="string">
+      The execution ID
+    </ResponseField>
+    <ResponseField name="workflowId" type="string">
+      The workflow ID
+    </ResponseField>
+    <ResponseField name="startedAt" type="string">
+      ISO timestamp when execution started
+    </ResponseField>
+    <ResponseField name="totalSteps" type="number">
+      Total number of steps to execute
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="step.started" type="object">
+  Fired when a step begins execution
+  
+  <Expandable title="Event Data">
+    <ResponseField name="stepId" type="string">
+      Step identifier
+    </ResponseField>
+    <ResponseField name="stepName" type="string">
+      Step name
+    </ResponseField>
+    <ResponseField name="stepIndex" type="number">
+      Step position in workflow
+    </ResponseField>
+    <ResponseField name="startedAt" type="string">
+      ISO timestamp when step started
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="step.completed" type="object">
+  Fired when a step completes successfully
+  
+  <Expandable title="Event Data">
+    <ResponseField name="stepId" type="string">
+      Step identifier
+    </ResponseField>
+    <ResponseField name="stepName" type="string">
+      Step name
+    </ResponseField>
+    <ResponseField name="completedAt" type="string">
+      ISO timestamp when step completed
+    </ResponseField>
+    <ResponseField name="duration" type="number">
+      Step duration in milliseconds
+    </ResponseField>
+    <ResponseField name="outputs" type="object">
+      Step outputs (if includeStepDetails=true)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="step.failed" type="object">
+  Fired when a step fails
+  
+  <Expandable title="Event Data">
+    <ResponseField name="stepId" type="string">
+      Step identifier
+    </ResponseField>
+    <ResponseField name="stepName" type="string">
+      Step name
+    </ResponseField>
+    <ResponseField name="failedAt" type="string">
+      ISO timestamp when step failed
+    </ResponseField>
+    <ResponseField name="error" type="object">
+      Error details
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="execution.progress" type="object">
+  Fired periodically with execution progress updates
+  
+  <Expandable title="Event Data">
+    <ResponseField name="progress" type="number">
+      Progress percentage (0-100)
+    </ResponseField>
+    <ResponseField name="completedSteps" type="number">
+      Number of completed steps
+    </ResponseField>
+    <ResponseField name="totalSteps" type="number">
+      Total number of steps
+    </ResponseField>
+    <ResponseField name="currentStep" type="string">
+      Currently executing step name
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="execution.completed" type="object">
+  Fired when execution completes successfully
+  
+  <Expandable title="Event Data">
+    <ResponseField name="executionId" type="string">
+      The execution ID
+    </ResponseField>
+    <ResponseField name="completedAt" type="string">
+      ISO timestamp when execution completed
+    </ResponseField>
+    <ResponseField name="duration" type="number">
+      Total execution duration in milliseconds
+    </ResponseField>
+    <ResponseField name="outputs" type="object">
+      Final workflow outputs
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="execution.failed" type="object">
+  Fired when execution fails
+  
+  <Expandable title="Event Data">
+    <ResponseField name="executionId" type="string">
+      The execution ID
+    </ResponseField>
+    <ResponseField name="failedAt" type="string">
+      ISO timestamp when execution failed
+    </ResponseField>
+    <ResponseField name="error" type="object">
+      Error details
+    </ResponseField>
+    <ResponseField name="failedStep" type="string">
+      Step where execution failed
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="execution.canceled" type="object">
+  Fired when execution is canceled
+  
+  <Expandable title="Event Data">
+    <ResponseField name="executionId" type="string">
+      The execution ID
+    </ResponseField>
+    <ResponseField name="canceledAt" type="string">
+      ISO timestamp when execution was canceled
+    </ResponseField>
+    <ResponseField name="canceledBy" type="string">
+      User ID who canceled the execution
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="heartbeat" type="object">
+  Periodic heartbeat to keep connection alive
+  
+  <Expandable title="Event Data">
+    <ResponseField name="timestamp" type="string">
+      Current server timestamp
+    </ResponseField>
+    <ResponseField name="connectionAge" type="number">
+      How long the connection has been active in seconds
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error Responses
+
+<ResponseField name="404" type="object">
+  Not Found - Execution does not exist
+</ResponseField>
+
+<ResponseField name="403" type="object">
+  Forbidden - Insufficient permissions to stream this execution
+</ResponseField>
+
+<ResponseField name="410" type="object">
+  Gone - Execution is too old to stream (older than 24 hours)
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -N -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012" \
+  "https://api.tolstoy.com/v1/executions/exec_abc123/stream?includeStepDetails=true"
+```
+
+```javascript JavaScript
+const eventSource = new EventSource('/api/v1/executions/exec_abc123/stream', {
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+// Handle different event types
+eventSource.addEventListener('execution.started', (event) => {
+  const data = JSON.parse(event.data);
+  console.log(`Execution started: ${data.executionId}`);
+  console.log(`Total steps: ${data.totalSteps}`);
+});
+
+eventSource.addEventListener('step.completed', (event) => {
+  const data = JSON.parse(event.data);
+  console.log(`Step completed: ${data.stepName} (${data.duration}ms)`);
+});
+
+eventSource.addEventListener('execution.progress', (event) => {
+  const data = JSON.parse(event.data);
+  console.log(`Progress: ${data.progress}% (${data.completedSteps}/${data.totalSteps})`);
+});
+
+eventSource.addEventListener('execution.completed', (event) => {
+  const data = JSON.parse(event.data);
+  console.log(`Execution completed in ${data.duration}ms`);
+  eventSource.close();
+});
+
+eventSource.addEventListener('execution.failed', (event) => {
+  const data = JSON.parse(event.data);
+  console.error(`Execution failed: ${data.error.message}`);
+  eventSource.close();
+});
+
+// Handle connection errors
+eventSource.onerror = (error) => {
+  console.error('Stream error:', error);
+  eventSource.close();
+};
+```
+
+```python Python
+import requests
+import json
+
+def stream_execution(execution_id, api_token, org_id, user_id):
+    headers = {
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": org_id,
+        "X-User-ID": user_id,
+        "Accept": "text/event-stream",
+        "Cache-Control": "no-cache"
+    }
+    
+    url = f"https://api.tolstoy.com/v1/executions/{execution_id}/stream"
+    
+    with requests.get(url, headers=headers, stream=True) as response:
+        if response.status_code != 200:
+            print(f"Error: {response.status_code}")
+            return
+            
+        for line in response.iter_lines(decode_unicode=True):
+            if line.startswith('event: '):
+                event_type = line[7:]  # Remove 'event: ' prefix
+            elif line.startswith('data: '):
+                event_data = line[6:]  # Remove 'data: ' prefix
+                try:
+                    data = json.loads(event_data)
+                    handle_event(event_type, data)
+                except json.JSONDecodeError:
+                    pass
+
+def handle_event(event_type, data):
+    if event_type == 'execution.started':
+        print(f"🚀 Execution started: {data['executionId']}")
+        print(f"   Total steps: {data['totalSteps']}")
+    
+    elif event_type == 'step.completed':
+        print(f"✅ Step completed: {data['stepName']} ({data['duration']}ms)")
+    
+    elif event_type == 'step.failed':
+        print(f"❌ Step failed: {data['stepName']} - {data['error']['message']}")
+    
+    elif event_type == 'execution.progress':
+        print(f"📊 Progress: {data['progress']}% ({data['completedSteps']}/{data['totalSteps']})")
+    
+    elif event_type == 'execution.completed':
+        print(f"🎉 Execution completed in {data['duration']}ms")
+    
+    elif event_type == 'execution.failed':
+        print(f"💥 Execution failed: {data['error']['message']}")
+
+# Usage
+stream_execution('exec_abc123', api_token, 'org_123456', 'user_789012')
+```
+
+</CodeGroup>
+
+## Connection Management
+
+### Automatic Reconnection
+
+```javascript
+function createReconnectingEventSource(url, options = {}) {
+  let eventSource;
+  let reconnectAttempts = 0;
+  const maxReconnectAttempts = options.maxReconnectAttempts || 5;
+  const reconnectInterval = options.reconnectInterval || 5000;
+
+  function connect() {
+    eventSource = new EventSource(url, {
+      headers: options.headers || {}
+    });
+
+    eventSource.onopen = () => {
+      console.log('Stream connected');
+      reconnectAttempts = 0;
+    };
+
+    eventSource.onerror = () => {
+      console.log('Stream disconnected');
+      eventSource.close();
+      
+      if (reconnectAttempts < maxReconnectAttempts) {
+        setTimeout(() => {
+          reconnectAttempts++;
+          console.log(`Reconnecting... (attempt ${reconnectAttempts})`);
+          connect();
+        }, reconnectInterval);
+      }
+    };
+
+    return eventSource;
+  }
+
+  return connect();
+}
+
+// Usage with auto-reconnect
+const stream = createReconnectingEventSource(
+  '/api/v1/executions/exec_abc123/stream',
+  {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': 'org_123456',
+      'X-User-ID': 'user_789012'
+    },
+    maxReconnectAttempts: 3,
+    reconnectInterval: 2000
+  }
+);
+```
+
+### Progress Tracking
+
+```javascript
+class ExecutionTracker {
+  constructor(executionId, apiToken, orgId, userId) {
+    this.executionId = executionId;
+    this.progress = 0;
+    this.steps = [];
+    this.startTime = null;
+    
+    this.eventSource = new EventSource(`/api/v1/executions/${executionId}/stream`, {
+      headers: {
+        'Authorization': `Bearer ${apiToken}`,
+        'X-Org-ID': orgId,
+        'X-User-ID': userId
+      }
+    });
+    
+    this.setupEventHandlers();
+  }
+  
+  setupEventHandlers() {
+    this.eventSource.addEventListener('execution.started', (event) => {
+      const data = JSON.parse(event.data);
+      this.startTime = new Date(data.startedAt);
+      this.updateUI({ status: 'running', totalSteps: data.totalSteps });
+    });
+    
+    this.eventSource.addEventListener('execution.progress', (event) => {
+      const data = JSON.parse(event.data);
+      this.progress = data.progress;
+      this.updateUI({ 
+        progress: data.progress, 
+        currentStep: data.currentStep,
+        completedSteps: data.completedSteps
+      });
+    });
+    
+    this.eventSource.addEventListener('step.completed', (event) => {
+      const data = JSON.parse(event.data);
+      this.steps.push({ ...data, status: 'completed' });
+      this.updateStepList();
+    });
+    
+    this.eventSource.addEventListener('execution.completed', (event) => {
+      const data = JSON.parse(event.data);
+      const duration = data.duration;
+      this.updateUI({ status: 'completed', duration });
+      this.eventSource.close();
+    });
+  }
+  
+  updateUI(data) {
+    // Update your UI with execution data
+    console.log('UI Update:', data);
+  }
+  
+  updateStepList() {
+    // Update step list in UI
+    console.log('Steps:', this.steps);
+  }
+}
+
+// Usage
+const tracker = new ExecutionTracker(
+  'exec_abc123', 
+  apiToken, 
+  'org_123456', 
+  'user_789012'
+);
+```
+
+## Stream Limitations
+
+- **Connection Duration**: Maximum 24 hours per connection
+- **Execution Age**: Cannot stream executions older than 24 hours
+- **Concurrent Connections**: Maximum 10 concurrent streams per user
+- **Rate Limiting**: Subject to normal API rate limits
+
+## Event Reliability
+
+- Events are delivered in order
+- No event deduplication (may receive duplicates on reconnect)
+- Events older than 1 hour are not replayed on reconnect
+- Use heartbeat events to detect connection issues
+
+## Related Endpoints
+
+- [Get Execution](/api/endpoints/executions/get-execution) - Get execution snapshot
+- [List Executions](/api/endpoints/executions/list-executions) - List all executions
+- [Cancel Execution](/api/endpoints/executions/cancel-execution) - Cancel execution
+- [Retry Execution](/api/endpoints/executions/retry-execution) - Retry execution

@@ -1,0 +1,32 @@
+---
+title: "Execution-logs API"
+description: "View detailed execution history and logs"
+---
+
+# Execution-logs API
+
+View detailed execution history and logs
+
+## Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Create Execution Log" icon="api" href="/api/endpoints/execution-logs/executionlogscontroller_create">
+    Create a log entry for workflow step execution. This tracks the execution history, inputs, outputs, and any errors.
+  </Card>
+  <Card title="List Execution Logs" icon="api" href="/api/endpoints/execution-logs/executionlogscontroller_findall">
+    Get all execution logs for the organization. This provides a complete history of workflow step executions.
+  </Card>
+  <Card title="Get Execution Log" icon="api" href="/api/endpoints/execution-logs/executionlogscontroller_findone">
+    Get a specific execution log entry by ID
+  </Card>
+  <Card title="Update Execution Log" icon="api" href="/api/endpoints/execution-logs/executionlogscontroller_update">
+    Update execution log entry. Typically used to add outputs or update status after step completion.
+  </Card>
+  <Card title="Delete Execution Log" icon="api" href="/api/endpoints/execution-logs/executionlogscontroller_remove">
+    Delete an execution log entry. Use with caution as this removes audit trail information.
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="api-footer.mdx" />

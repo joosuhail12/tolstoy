@@ -1,0 +1,70 @@
+<svg width="800" height="500" xmlns="http://www.w3.org/2000/svg">
+  <rect width="800" height="500" fill="#ffffff" stroke="#e9ecef" stroke-width="2"/>
+  <text x="400" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#495057">Tolstoy Signup Flow</text>
+  
+  <!-- Step 1: Sign Up -->
+  <rect x="50" y="80" width="140" height="80" fill="#e3f2fd" stroke="#1976d2" stroke-width="2" rx="8"/>
+  <text x="120" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1976d2">1. Sign Up</text>
+  <text x="120" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1976d2">Create account</text>
+  <text x="120" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#1976d2">Email verification</text>
+  
+  <!-- Step 2: Choose Plan -->
+  <rect x="230" y="80" width="140" height="80" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="2" rx="8"/>
+  <text x="300" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#7b1fa2">2. Choose Plan</text>
+  <text x="300" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#7b1fa2">Free / Pro / Enterprise</text>
+  <text x="300" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#7b1fa2">Feature selection</text>
+  
+  <!-- Step 3: Create Organization -->
+  <rect x="410" y="80" width="140" height="80" fill="#e8f5e8" stroke="#388e3c" stroke-width="2" rx="8"/>
+  <text x="480" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#388e3c">3. Organization</text>
+  <text x="480" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#388e3c">Set up workspace</text>
+  <text x="480" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#388e3c">Configure settings</text>
+  
+  <!-- Step 4: Onboarding -->
+  <rect x="590" y="80" width="140" height="80" fill="#fff3e0" stroke="#f57c00" stroke-width="2" rx="8"/>
+  <text x="660" y="110" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#f57c00">4. Onboarding</text>
+  <text x="660" y="130" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#f57c00">Tutorial walkthrough</text>
+  <text x="660" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#f57c00">Sample workflows</text>
+  
+  <!-- Sub-steps -->
+  <rect x="120" y="220" width="100" height="50" fill="#f8f9fa" stroke="#6c757d" stroke-width="1" rx="4"/>
+  <text x="170" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6c757d">Email</text>
+  <text x="170" y="255" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6c757d">Password</text>
+  
+  <rect x="250" y="220" width="100" height="50" fill="#f8f9fa" stroke="#6c757d" stroke-width="1" rx="4"/>
+  <text x="300" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6c757d">Billing</text>
+  <text x="300" y="255" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6c757d">Payment</text>
+  
+  <rect x="430" y="220" width="100" height="50" fill="#f8f9fa" stroke="#6c757d" stroke-width="1" rx="4"/>
+  <text x="480" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6c757d">Team invite</text>
+  <text x="480" y="255" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6c757d">Permissions</text>
+  
+  <rect x="560" y="220" width="100" height="50" fill="#f8f9fa" stroke="#6c757d" stroke-width="1" rx="4"/>
+  <text x="610" y="240" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6c757d">First workflow</text>
+  <text x="610" y="255" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#6c757d">Tool setup</text>
+  
+  <!-- Dashboard -->
+  <rect x="250" y="330" width="300" height="100" fill="#e8f4fd" stroke="#0277bd" stroke-width="2" rx="8"/>
+  <text x="400" y="360" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#0277bd">Welcome to Tolstoy Dashboard</text>
+  <text x="400" y="380" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0277bd">✓ Account created successfully</text>
+  <text x="400" y="395" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0277bd">✓ Organization configured</text>
+  <text x="400" y="410" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0277bd">✓ Ready to create workflows</text>
+  
+  <!-- Arrows -->
+  <path d="M 190 120 L 230 120" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 370 120 L 410 120" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 550 120 L 590 120" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <path d="M 170 160 L 170 220" stroke="#666" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 300 160 L 300 220" stroke="#666" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 480 160 L 480 220" stroke="#666" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 610 160 L 610 220" stroke="#666" stroke-width="1" marker-end="url(#arrowhead)"/>
+  
+  <path d="M 400 290 L 400 330" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+    </marker>
+  </defs>
+</svg>

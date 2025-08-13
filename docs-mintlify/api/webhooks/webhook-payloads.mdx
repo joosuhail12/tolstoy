@@ -1,0 +1,299 @@
+---
+title: "Webhook Payloads"
+description: "Detailed documentation of webhook payload structures and event types"
+---
+
+## Overview
+
+This guide provides comprehensive documentation for all webhook payload structures sent by the Tolstoy platform. Understanding these payloads is essential for implementing robust webhook handlers.
+
+## Common Payload Structure
+
+All webhook payloads follow a consistent structure:
+
+```json
+{
+  "id": "event_abc123",
+  "type": "workflow.completed",
+  "version": "1.0",
+  "timestamp": "2024-01-15T10:30:00Z",
+  "organizationId": "org_123456",
+  "data": {
+    // Event-specific data
+  },
+  "metadata": {
+    "attempt": 1,
+    "maxAttempts": 3,
+    "signature": "sha256=..."
+  }
+}
+```
+
+## Event Types
+
+### Workflow Events
+
+#### workflow.started
+Triggered when a workflow execution begins.
+
+```json
+{
+  "type": "workflow.started",
+  "data": {
+    "executionId": "exec_abc123",
+    "workflowId": "workflow_def456",
+    "workflowName": "Payment Processing",
+    "triggeredBy": "user_789012",
+    "inputs": {
+      "amount": 100.00,
+      "currency": "USD"
+    },
+    "startedAt": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+#### workflow.completed
+Triggered when a workflow execution completes successfully.
+
+```json
+{
+  "type": "workflow.completed",
+  "data": {
+    "executionId": "exec_abc123",
+    "workflowId": "workflow_def456",
+    "workflowName": "Payment Processing",
+    "completedAt": "2024-01-15T10:35:00Z",
+    "duration": 300000,
+    "outputs": {
+      "transactionId": "txn_xyz789",
+      "status": "success"
+    }
+  }
+}
+```
+
+#### workflow.failed
+Triggered when a workflow execution fails.
+
+```json
+{
+  "type": "workflow.failed",
+  "data": {
+    "executionId": "exec_abc123",
+    "workflowId": "workflow_def456",
+    "failedAt": "2024-01-15T10:32:00Z",
+    "error": {
+      "code": "PAYMENT_DECLINED",
+      "message": "Payment was declined by the processor",
+      "step": "process_payment"
+    }
+  }
+}
+```
+
+### Tool Events
+
+#### tool.connected
+Triggered when a tool is successfully connected.
+
+```json
+{
+  "type": "tool.connected",
+  "data": {
+    "toolId": "tool_abc123",
+    "toolName": "Stripe",
+    "authType": "oauth2",
+    "connectedAt": "2024-01-15T10:30:00Z",
+    "connectedBy": "user_789012"
+  }
+}
+```
+
+#### tool.disconnected
+Triggered when a tool connection is removed.
+
+```json
+{
+  "type": "tool.disconnected",
+  "data": {
+    "toolId": "tool_abc123",
+    "toolName": "Stripe",
+    "disconnectedAt": "2024-01-15T10:30:00Z",
+    "disconnectedBy": "user_789012",
+    "reason": "user_action"
+  }
+}
+```
+
+### Organization Events
+
+#### user.invited
+Triggered when a new user is invited to the organization.
+
+```json
+{
+  "type": "user.invited",
+  "data": {
+    "inviteId": "invite_abc123",
+    "email": "newuser@example.com",
+    "role": "member",
+    "invitedBy": "user_789012",
+    "invitedAt": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+## Webhook Security
+
+### Signature Verification
+
+All webhook payloads include a signature for verification:
+
+```javascript
+const crypto = require('crypto');
+
+function verifyWebhookSignature(payload, signature, secret) {
+  const expectedSignature = crypto
+    .createHmac('sha256', secret)
+    .update(payload)
+    .digest('hex');
+  
+  return `sha256=${expectedSignature}` === signature;
+}
+
+// Usage
+const isValid = verifyWebhookSignature(
+  req.body, 
+  req.headers['x-webhook-signature'], 
+  'your_webhook_secret'
+);
+```
+
+### Retry Logic
+
+Webhooks follow an exponential backoff retry pattern:
+- Attempt 1: Immediate
+- Attempt 2: 5 seconds
+- Attempt 3: 25 seconds
+- Attempt 4: 125 seconds
+- Attempt 5: 625 seconds (final attempt)
+
+## Implementation Examples
+
+### Node.js Express Handler
+
+```javascript
+const express = require('express');
+const crypto = require('crypto');
+
+const app = express();
+app.use(express.raw({ type: 'application/json' }));
+
+app.post('/webhook', (req, res) => {
+  const signature = req.headers['x-webhook-signature'];
+  const payload = req.body;
+  
+  // Verify signature
+  if (!verifyWebhookSignature(payload, signature, process.env.WEBHOOK_SECRET)) {
+    return res.status(401).send('Invalid signature');
+  }
+  
+  const event = JSON.parse(payload);
+  
+  switch (event.type) {
+    case 'workflow.completed':
+      handleWorkflowCompleted(event.data);
+      break;
+    case 'workflow.failed':
+      handleWorkflowFailed(event.data);
+      break;
+    default:
+      console.log(`Unhandled event type: ${event.type}`);
+  }
+  
+  res.status(200).send('OK');
+});
+
+function handleWorkflowCompleted(data) {
+  console.log(`Workflow ${data.workflowName} completed`);
+  // Handle successful workflow
+}
+
+function handleWorkflowFailed(data) {
+  console.log(`Workflow failed: ${data.error.message}`);
+  // Handle failed workflow
+}
+```
+
+### Python Flask Handler
+
+```python
+import hashlib
+import hmac
+import json
+from flask import Flask, request
+
+app = Flask(__name__)
+
+def verify_signature(payload, signature, secret):
+    expected = hmac.new(
+        secret.encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+    return f"sha256={expected}" == signature
+
+@app.route('/webhook', methods=['POST'])
+def handle_webhook():
+    signature = request.headers.get('X-Webhook-Signature')
+    payload = request.get_data()
+    
+    if not verify_signature(payload, signature, 'your_webhook_secret'):
+        return 'Invalid signature', 401
+    
+    event = json.loads(payload)
+    
+    if event['type'] == 'workflow.completed':
+        handle_workflow_completed(event['data'])
+    elif event['type'] == 'workflow.failed':
+        handle_workflow_failed(event['data'])
+    
+    return 'OK', 200
+
+def handle_workflow_completed(data):
+    print(f"Workflow {data['workflowName']} completed")
+
+def handle_workflow_failed(data):
+    print(f"Workflow failed: {data['error']['message']}")
+```
+
+## Testing Webhooks
+
+Use the webhook test endpoint to validate your implementation:
+
+```javascript
+// Test webhook delivery
+const testWebhook = await fetch('/api/v1/webhooks/webhook_abc123/test', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    eventType: 'workflow.completed',
+    testData: {
+      executionId: 'test_execution',
+      workflowName: 'Test Workflow'
+    }
+  })
+});
+```
+
+## Related Documentation
+
+- [Create Webhook](/api/endpoints/webhooks/create-webhook) - Set up new webhooks
+- [Test Webhook](/api/endpoints/webhooks/test-webhook) - Test webhook delivery
+- [Webhook Overview](/public/product/webhooks/overview) - Conceptual overview

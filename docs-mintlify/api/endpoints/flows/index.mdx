@@ -1,0 +1,50 @@
+---
+title: "Flows API"
+description: "Build and execute complex multi-step workflows"
+---
+
+# Flows API
+
+Build and execute complex multi-step workflows
+
+## Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Create Flow" icon="api" href="/api/endpoints/flows/flowscontroller_create">
+    Create a new workflow with steps and configuration
+  </Card>
+  <Card title="List Flows" icon="api" href="/api/endpoints/flows/flowscontroller_findall">
+    Get all workflows for the organization
+  </Card>
+  <Card title="Get Flow" icon="api" href="/api/endpoints/flows/flowscontroller_findone">
+    Get a specific workflow by ID
+  </Card>
+  <Card title="Update Flow" icon="api" href="/api/endpoints/flows/flowscontroller_update">
+    Update workflow definition and configuration
+  </Card>
+  <Card title="Delete Flow" icon="api" href="/api/endpoints/flows/flowscontroller_remove">
+    Delete a workflow permanently
+  </Card>
+  <Card title="Execute Flow" icon="api" href="/api/endpoints/flows/flowscontroller_executeflow">
+    Execute a workflow either synchronously or asynchronously with optional input variables
+  </Card>
+  <Card title="Get Flow Executions" icon="api" href="/api/endpoints/flows/flowscontroller_getflowexecutions">
+    Get execution history for a specific flow
+  </Card>
+  <Card title="Get Execution Status" icon="api" href="/api/endpoints/flows/flowscontroller_getexecutionstatus">
+    Get detailed status of a specific flow execution
+  </Card>
+  <Card title="Cancel Execution" icon="api" href="/api/endpoints/flows/flowscontroller_cancelexecution">
+    Cancel a running flow execution
+  </Card>
+  <Card title="Retry Execution" icon="api" href="/api/endpoints/flows/flowscontroller_retryexecution">
+    Retry a failed flow execution
+  </Card>
+  <Card title="Get Execution Metrics" icon="api" href="/api/endpoints/flows/flowscontroller_getexecutionmetrics">
+    Get execution metrics and statistics for a flow
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="api-footer.mdx" />

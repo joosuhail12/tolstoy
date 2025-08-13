@@ -1,0 +1,75 @@
+<svg width="700" height="500" xmlns="http://www.w3.org/2000/svg">
+  <rect width="700" height="500" fill="#fafafa" stroke="#e0e0e0" stroke-width="2"/>
+  <text x="350" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#424242">Organization Hierarchy</text>
+  
+  <!-- Organization Level -->
+  <rect x="250" y="60" width="200" height="60" fill="#e1f5fe" stroke="#0277bd" stroke-width="3" rx="8"/>
+  <text x="350" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#0277bd">Organization</text>
+  <text x="350" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" fill="#0277bd">Global scope & settings</text>
+  
+  <!-- Admin Level -->
+  <rect x="50" y="180" width="150" height="50" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="2" rx="6"/>
+  <text x="125" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#7b1fa2">Administrators</text>
+  <text x="125" y="215" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#7b1fa2">Full permissions</text>
+  
+  <!-- Teams Level -->
+  <rect x="275" y="180" width="150" height="50" fill="#e8f5e8" stroke="#388e3c" stroke-width="2" rx="6"/>
+  <text x="350" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#388e3c">Teams</text>
+  <text x="350" y="215" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#388e3c">Grouped access</text>
+  
+  <!-- Users Level -->
+  <rect x="500" y="180" width="150" height="50" fill="#fff3e0" stroke="#f57c00" stroke-width="2" rx="6"/>
+  <text x="575" y="200" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#f57c00">Users</text>
+  <text x="575" y="215" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#f57c00">Individual access</text>
+  
+  <!-- Resources Level -->
+  <rect x="100" y="300" width="120" height="50" fill="#ffebee" stroke="#d32f2f" stroke-width="2" rx="6"/>
+  <text x="160" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#d32f2f">Workflows</text>
+  <text x="160" y="335" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#d32f2f">Process automation</text>
+  
+  <rect x="240" y="300" width="120" height="50" fill="#e8eaf6" stroke="#3f51b5" stroke-width="2" rx="6"/>
+  <text x="300" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#3f51b5">Tools</text>
+  <text x="300" y="335" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#3f51b5">External connections</text>
+  
+  <rect x="380" y="300" width="120" height="50" fill="#f1f8e9" stroke="#689f38" stroke-width="2" rx="6"/>
+  <text x="440" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#689f38">Actions</text>
+  <text x="440" y="335" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#689f38">Workflow building blocks</text>
+  
+  <rect x="520" y="300" width="120" height="50" fill="#fce4ec" stroke="#ad1457" stroke-width="2" rx="6"/>
+  <text x="580" y="320" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ad1457">Data</text>
+  <text x="580" y="335" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#ad1457">Execution logs & metrics</text>
+  
+  <!-- Permissions boxes -->
+  <rect x="50" y="400" width="80" height="30" fill="#e0f2f1" stroke="#00695c" stroke-width="1" rx="4"/>
+  <text x="90" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#00695c">Read/Write/Admin</text>
+  
+  <rect x="150" y="400" width="80" height="30" fill="#e0f2f1" stroke="#00695c" stroke-width="1" rx="4"/>
+  <text x="190" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#00695c">Team-specific</text>
+  
+  <rect x="250" y="400" width="80" height="30" fill="#e0f2f1" stroke="#00695c" stroke-width="1" rx="4"/>
+  <text x="290" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#00695c">Role-based</text>
+  
+  <rect x="350" y="400" width="80" height="30" fill="#e0f2f1" stroke="#00695c" stroke-width="1" rx="4"/>
+  <text x="390" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#00695c">Resource-level</text>
+  
+  <!-- Arrows -->
+  <path d="M 350 120 L 125 180" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 350 120 L 350 180" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 350 120 L 575 180" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <path d="M 200 230 L 160 300" stroke="#999" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 275 230 L 300 300" stroke="#999" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 425 230 L 440 300" stroke="#999" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 500 230 L 580 300" stroke="#999" stroke-width="1" marker-end="url(#arrowhead)"/>
+  
+  <path d="M 200 350 L 90 400" stroke="#ccc" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 300 350 L 190 400" stroke="#ccc" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 440 350 L 290 400" stroke="#ccc" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 580 350 L 390 400" stroke="#ccc" stroke-width="1" marker-end="url(#arrowhead)"/>
+  
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#666"/>
+    </marker>
+  </defs>
+</svg>

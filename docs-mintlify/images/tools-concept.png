@@ -1,0 +1,69 @@
+<svg width="600" height="450" xmlns="http://www.w3.org/2000/svg">
+  <rect width="600" height="450" fill="#ffffff" stroke="#ddd" stroke-width="1"/>
+  <text x="300" y="30" text-anchor="middle" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#333">Tool Integration Architecture</text>
+  
+  <!-- Tolstoy Core -->
+  <rect x="220" y="60" width="160" height="60" fill="#e3f2fd" stroke="#1976d2" stroke-width="3" rx="8"/>
+  <text x="300" y="85" text-anchor="middle" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#1976d2">Tolstoy Platform</text>
+  <text x="300" y="105" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" fill="#1976d2">Workflow Orchestration</text>
+  
+  <!-- Authentication Layer -->
+  <rect x="200" y="160" width="200" height="40" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="2" rx="5"/>
+  <text x="300" y="175" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#7b1fa2">Authentication Layer</text>
+  <text x="300" y="190" text-anchor="middle" font-family="Arial, sans-serif" font-size="10" fill="#7b1fa2">OAuth2, API Keys, Basic Auth</text>
+  
+  <!-- External Tools -->
+  <rect x="50" y="250" width="100" height="50" fill="#fff3e0" stroke="#f57c00" stroke-width="2" rx="5"/>
+  <text x="100" y="270" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#f57c00">Stripe</text>
+  <text x="100" y="285" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#f57c00">Payment Processing</text>
+  
+  <rect x="170" y="250" width="100" height="50" fill="#e8f5e8" stroke="#388e3c" stroke-width="2" rx="5"/>
+  <text x="220" y="270" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#388e3c">Salesforce</text>
+  <text x="220" y="285" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#388e3c">CRM Integration</text>
+  
+  <rect x="290" y="250" width="100" height="50" fill="#ffebee" stroke="#d32f2f" stroke-width="2" rx="5"/>
+  <text x="340" y="270" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#d32f2f">SendGrid</text>
+  <text x="340" y="285" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#d32f2f">Email Service</text>
+  
+  <rect x="410" y="250" width="100" height="50" fill="#e8eaf6" stroke="#3f51b5" stroke-width="2" rx="5"/>
+  <text x="460" y="270" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#3f51b5">Slack</text>
+  <text x="460" y="285" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#3f51b5">Team Communication</text>
+  
+  <!-- Connection Types -->
+  <rect x="80" y="340" width="80" height="30" fill="#f1f8e9" stroke="#689f38" stroke-width="1" rx="3"/>
+  <text x="120" y="360" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#689f38">REST API</text>
+  
+  <rect x="180" y="340" width="80" height="30" fill="#f1f8e9" stroke="#689f38" stroke-width="1" rx="3"/>
+  <text x="220" y="360" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#689f38">SOAP API</text>
+  
+  <rect x="320" y="340" width="80" height="30" fill="#f1f8e9" stroke="#689f38" stroke-width="1" rx="3"/>
+  <text x="360" y="360" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#689f38">GraphQL</text>
+  
+  <rect x="420" y="340" width="80" height="30" fill="#f1f8e9" stroke="#689f38" stroke-width="1" rx="3"/>
+  <text x="460" y="360" text-anchor="middle" font-family="Arial, sans-serif" font-size="9" fill="#689f38">Webhooks</text>
+  
+  <!-- Data Flow -->
+  <rect x="200" y="400" width="200" height="30" fill="#fce4ec" stroke="#ad1457" stroke-width="2" rx="5"/>
+  <text x="300" y="420" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#ad1457">Secure Data Exchange</text>
+  
+  <!-- Arrows -->
+  <path d="M 300 120 L 300 160" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <path d="M 250 200 L 100 250" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 280 200 L 220 250" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 320 200 L 340 250" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  <path d="M 350 200 L 460 250" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <path d="M 120 300 L 120 340" stroke="#999" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 220 300 L 220 340" stroke="#999" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 360 300 L 360 340" stroke="#999" stroke-width="1" marker-end="url(#arrowhead)"/>
+  <path d="M 460 300 L 460 340" stroke="#999" stroke-width="1" marker-end="url(#arrowhead)"/>
+  
+  <path d="M 300 370 L 300 400" stroke="#666" stroke-width="2" marker-end="url(#arrowhead)"/>
+  
+  <defs>
+    <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="#666"/>
+    </marker>
+  </defs>
+</svg>

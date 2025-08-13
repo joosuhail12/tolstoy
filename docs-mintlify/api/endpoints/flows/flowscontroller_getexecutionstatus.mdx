@@ -1,0 +1,80 @@
+---
+title: "Get Execution Status"
+api: "GET /flows/{id}/executions/{executionId}"
+description: "Get detailed status of a specific flow execution"
+---
+
+# Get Execution Status
+
+Get detailed status of a specific flow execution
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID
+</ParamField>
+
+<ParamField path="id" type="string" required>
+  Flow ID
+</ParamField>
+
+<ParamField path="executionId" type="string" required>
+  Execution ID
+</ParamField>
+
+
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:3000/flows/{id}/executions/{executionId}" \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc"
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const result = await tolstoy.flows.flowscontroller_getexecutionstatus();
+console.log(result);
+```
+</CodeGroup>
+
+## Responses
+
+<ResponseExample>
+```json 200 OK
+{
+  "executionId": "exec_abc123",
+  "status": "running",
+  "currentStep": "step_2",
+  "progress": 0.6,
+  "startedAt": "2024-01-15T10:30:00.000Z",
+  "variables": {
+    "userId": "user_123"
+  },
+  "output": {
+    "result": "success"
+  }
+}
+```
+</ResponseExample>
+
+### 404 Not Found
+
+Execution not found
+
+---
+
+<Snippet file="api-footer.mdx" />

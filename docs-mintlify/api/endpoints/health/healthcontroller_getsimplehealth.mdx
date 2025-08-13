@@ -1,0 +1,60 @@
+---
+title: "Load Balancer Health Check"
+api: "GET /health"
+description: "Simple health check endpoint for load balancers and monitoring systems"
+---
+
+# Load Balancer Health Check
+
+Simple health check endpoint for load balancers and monitoring systems
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID
+</ParamField>
+
+
+
+
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X GET "http://localhost:3000/health" \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc"
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const result = await tolstoy.health.healthcontroller_getsimplehealth();
+console.log(result);
+```
+</CodeGroup>
+
+## Responses
+
+<ResponseExample>
+```json 200 OK
+{
+  "status": "ok"
+}
+```
+</ResponseExample>
+
+---
+
+<Snippet file="api-footer.mdx" />

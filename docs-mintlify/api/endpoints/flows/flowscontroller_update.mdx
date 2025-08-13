@@ -1,0 +1,63 @@
+---
+title: "Update Flow"
+api: "PUT /flows/{id}"
+description: "Update workflow definition and configuration"
+---
+
+# Update Flow
+
+Update workflow definition and configuration
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID
+</ParamField>
+
+<ParamField path="id" type="string" required>
+  Flow ID
+</ParamField>
+
+
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X PUT "http://localhost:3000/flows/{id}" \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc" \
+  -d '{}'
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const result = await tolstoy.flows.flowscontroller_update();
+console.log(result);
+```
+</CodeGroup>
+
+## Responses
+
+### 200 OK
+
+Flow updated successfully
+
+### 404 Not Found
+
+Flow not found
+
+---
+
+<Snippet file="api-footer.mdx" />

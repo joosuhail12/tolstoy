@@ -1,0 +1,67 @@
+---
+title: "Delete Tool"
+api: "DELETE /tools/{id}"
+description: "Delete a tool permanently (will affect workflows using this tool)"
+---
+
+# Delete Tool
+
+Delete a tool permanently (will affect workflows using this tool)
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Your organization ID
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  Your user ID
+</ParamField>
+
+<ParamField path="id" type="string" required>
+  Tool ID
+</ParamField>
+
+
+
+## Examples
+
+<CodeGroup>
+```bash cURL
+curl -X DELETE "http://localhost:3000/tools/{id}" \
+  -H "Content-Type: application/json" \
+  -H "x-org-id: org_abc123def456" \
+  -H "x-user-id: user_xyz789abc" \
+  -d '{}'
+```
+
+```javascript JavaScript SDK
+import { TolstoyClient } from '@tolstoy/sdk';
+
+const tolstoy = new TolstoyClient({
+  orgId: 'org_abc123def456',
+  userId: 'user_xyz789abc'
+});
+
+const result = await tolstoy.tools.toolscontroller_remove();
+console.log(result);
+```
+</CodeGroup>
+
+## Responses
+
+### 204 No Content
+
+Tool deleted successfully
+
+### 404 Not Found
+
+Tool not found
+
+### 409 Conflict
+
+Tool is being used by active workflows and cannot be deleted
+
+---
+
+<Snippet file="api-footer.mdx" />

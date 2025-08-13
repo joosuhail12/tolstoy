@@ -1,0 +1,194 @@
+---
+title: "tolstoy validate"
+description: "Validate workflow definitions and configurations"
+---
+
+## Overview
+
+The `tolstoy validate` command validates your workflow definitions, action configurations, and project structure without deploying them. This is useful for catching errors early in development.
+
+## Syntax
+
+```bash
+tolstoy validate [options]
+```
+
+## Options
+
+<ParamField query="--config" type="string">
+  Path to configuration file. Defaults to `tolstoy.config.json`.
+</ParamField>
+
+<ParamField query="--strict" type="boolean">
+  Enable strict validation mode (treats warnings as errors).
+</ParamField>
+
+<ParamField query="--format" type="string">
+  Output format: json, table, or summary. Defaults to table.
+</ParamField>
+
+<ParamField query="--fix" type="boolean">
+  Automatically fix formatting issues where possible.
+</ParamField>
+
+<ParamField query="--verbose" type="boolean">
+  Show detailed validation information.
+</ParamField>
+
+## Examples
+
+### Basic Validation
+
+Validate all configurations in the current project:
+
+```bash
+tolstoy validate
+```
+
+### Strict Mode
+
+Validate with strict mode enabled:
+
+```bash
+tolstoy validate --strict
+```
+
+### JSON Output
+
+Get validation results in JSON format:
+
+```bash
+tolstoy validate --format json
+```
+
+### Auto-fix Issues
+
+Automatically fix formatting problems:
+
+```bash
+tolstoy validate --fix
+```
+
+## Validation Checks
+
+### Workflow Validation
+- **Syntax**: YAML/JSON syntax validation
+- **Schema**: Workflow definition schema compliance
+- **Dependencies**: Action and tool dependencies
+- **Variables**: Variable usage and scope validation
+- **Logic**: Conditional logic and loop validation
+
+### Action Validation
+- **Configuration**: Action parameter validation
+- **HTTP Methods**: Valid HTTP method configurations
+- **Authentication**: Tool authentication requirements
+- **Outputs**: Output mapping validation
+
+### Tool Validation
+- **Authentication**: Auth configuration completeness
+- **API Compatibility**: API version compatibility
+- **Credentials**: Credential format validation
+
+## Output Formats
+
+### Table Format (Default)
+```
+╔══════════════════════════════════════════════════════════════╗
+║                     Validation Results                      ║
+╠══════════════════════════════════════════════════════════════╣
+║ File                    │ Status │ Issues │ Warnings        ║
+╠══════════════════════════════════════════════════════════════╣
+║ workflows/payment.yml   │ ✓      │ 0      │ 1               ║
+║ actions/stripe.yml      │ ✗      │ 2      │ 0               ║
+║ tools/database.yml      │ ✓      │ 0      │ 0               ║
+╚══════════════════════════════════════════════════════════════╝
+```
+
+### JSON Format
+```json
+{
+  "summary": {
+    "totalFiles": 15,
+    "validFiles": 13,
+    "errors": 3,
+    "warnings": 5
+  },
+  "results": [
+    {
+      "file": "workflows/payment.yml",
+      "status": "valid",
+      "issues": [],
+      "warnings": [
+        {
+          "line": 25,
+          "message": "Consider adding error handling",
+          "code": "W001"
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Error Codes
+
+### Errors (E-codes)
+- **E001**: Invalid YAML/JSON syntax
+- **E002**: Missing required field
+- **E003**: Invalid field type
+- **E004**: Circular dependency
+- **E005**: Unknown action reference
+- **E006**: Invalid tool configuration
+
+### Warnings (W-codes)
+- **W001**: Missing error handling
+- **W002**: Unused variable
+- **W003**: Deprecated field usage
+- **W004**: Performance concern
+- **W005**: Security recommendation
+
+## Integration
+
+### Pre-commit Hook
+
+Add validation to your pre-commit hooks:
+
+```bash
+# .git/hooks/pre-commit
+#!/bin/bash
+tolstoy validate --strict
+exit $?
+```
+
+### CI/CD Pipeline
+
+Include validation in your CI/CD pipeline:
+
+```yaml
+# .github/workflows/validate.yml
+name: Validate Tolstoy Configurations
+
+on: [push, pull_request]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Tolstoy CLI
+        run: npm install -g @tolstoy/cli
+      - name: Validate configurations
+        run: tolstoy validate --strict --format json
+```
+
+## Exit Codes
+
+- `0`: All validations passed
+- `1`: Validation errors found
+- `2`: Configuration file not found
+- `3`: Invalid command options
+
+## Related Commands
+
+- [`tolstoy deploy`](/cli/commands/deploy/deploy) - Deploy after validation
+- [`tolstoy init`](/cli/commands/init/init) - Initialize new project with templates

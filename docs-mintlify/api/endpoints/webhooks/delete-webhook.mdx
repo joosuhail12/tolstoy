@@ -1,0 +1,312 @@
+---
+title: "Delete Webhook"
+api: "DELETE /webhooks/{id}"
+description: "Permanently delete a webhook configuration"
+---
+
+## Overview
+
+The Delete Webhook endpoint permanently removes a webhook configuration from your organization. This action cannot be undone, and the webhook will immediately stop receiving event notifications.
+
+## Authentication
+
+<ParamField header="x-org-id" type="string" required>
+  Organization ID for multi-tenant access control
+</ParamField>
+
+<ParamField header="x-user-id" type="string" required>
+  User ID of the requesting user for authorization
+</ParamField>
+
+<ParamField header="authorization" type="string" required>
+  Bearer token for API authentication
+</ParamField>
+
+## Path Parameters
+
+<ParamField path="id" type="string" required>
+  The unique identifier of the webhook to delete
+</ParamField>
+
+## Response
+
+**Status Code:** `204 No Content`
+
+Successfully deleted webhook returns no content.
+
+## Error Responses
+
+<ResponseField name="404" type="object">
+  Not Found - Webhook does not exist
+  
+  <Expandable title="Error Schema">
+    <ResponseField name="error" type="string">
+      Error type identifier
+    </ResponseField>
+    <ResponseField name="message" type="string">
+      Human-readable error description
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="403" type="object">
+  Forbidden - Insufficient permissions to delete this webhook
+</ResponseField>
+
+<ResponseField name="409" type="object">
+  Conflict - Cannot delete webhook with pending deliveries
+</ResponseField>
+
+## Usage Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X DELETE "https://api.tolstoy.com/v1/webhooks/webhook_abc123" \
+  -H "Authorization: Bearer $API_TOKEN" \
+  -H "X-Org-ID: org_123456" \
+  -H "X-User-ID: user_789012"
+```
+
+```javascript JavaScript
+const deleteResponse = await fetch('/api/v1/webhooks/webhook_abc123', {
+  method: 'DELETE',
+  headers: {
+    'Authorization': `Bearer ${apiToken}`,
+    'X-Org-ID': 'org_123456',
+    'X-User-ID': 'user_789012'
+  }
+});
+
+if (deleteResponse.ok) {
+  console.log('Webhook deleted successfully');
+} else if (deleteResponse.status === 404) {
+  console.error('Webhook not found');
+} else {
+  const error = await deleteResponse.json();
+  console.error('Delete failed:', error.message);
+}
+```
+
+```python Python
+import requests
+
+response = requests.delete(
+    "https://api.tolstoy.com/v1/webhooks/webhook_abc123",
+    headers={
+        "Authorization": f"Bearer {api_token}",
+        "X-Org-ID": "org_123456",
+        "X-User-ID": "user_789012"
+    }
+)
+
+if response.status_code == 204:
+    print("Webhook deleted successfully")
+elif response.status_code == 404:
+    print("Webhook not found")
+else:
+    error = response.json()
+    print(f"Delete failed: {error['message']}")
+```
+
+</CodeGroup>
+
+## Safe Deletion Process
+
+### Check Dependencies Before Deletion
+
+```javascript
+// 1. First, check if webhook has pending deliveries
+const webhook = await fetch(`/api/v1/webhooks/webhook_abc123`, {
+  headers: { /* auth headers */ }
+});
+
+const webhookData = await webhook.json();
+if (webhookData.stats.pendingDeliveries > 0) {
+  console.warn(`Warning: ${webhookData.stats.pendingDeliveries} pending deliveries will be lost`);
+}
+
+// 2. Optionally disable webhook first to stop new events
+await fetch(`/api/v1/webhooks/webhook_abc123/toggle`, {
+  method: 'POST',
+  headers: { /* auth headers */ },
+  body: JSON.stringify({ enabled: false })
+});
+
+// 3. Wait for pending deliveries to complete or timeout
+await new Promise(resolve => setTimeout(resolve, 30000)); // Wait 30 seconds
+
+// 4. Delete the webhook
+const deleteResponse = await fetch(`/api/v1/webhooks/webhook_abc123`, {
+  method: 'DELETE',
+  headers: { /* auth headers */ }
+});
+```
+
+### Bulk Deletion
+
+```javascript
+async function deleteMultipleWebhooks(webhookIds, apiToken, orgId, userId) {
+  const results = [];
+  
+  for (const webhookId of webhookIds) {
+    try {
+      const response = await fetch(`/api/v1/webhooks/${webhookId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${apiToken}`,
+          'X-Org-ID': orgId,
+          'X-User-ID': userId
+        }
+      });
+      
+      results.push({
+        webhookId,
+        success: response.ok,
+        status: response.status
+      });
+      
+      // Add delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+    } catch (error) {
+      results.push({
+        webhookId,
+        success: false,
+        error: error.message
+      });
+    }
+  }
+  
+  return results;
+}
+
+// Usage
+const webhookIds = ['webhook_123', 'webhook_456', 'webhook_789'];
+const results = await deleteMultipleWebhooks(webhookIds, apiToken, 'org_123456', 'user_789012');
+
+results.forEach(result => {
+  if (result.success) {
+    console.log(`✅ Deleted webhook ${result.webhookId}`);
+  } else {
+    console.error(`❌ Failed to delete webhook ${result.webhookId}: ${result.error || result.status}`);
+  }
+});
+```
+
+## Deletion Considerations
+
+### Data Retention
+- **Delivery History**: Webhook delivery logs are retained for 30 days after deletion
+- **Statistics**: Webhook statistics are permanently removed
+- **Configuration**: Webhook configuration cannot be recovered
+
+### Impact Assessment
+Before deleting a webhook, consider:
+- **Active Integrations**: Check if external systems depend on this webhook
+- **Pending Deliveries**: Allow time for pending deliveries to complete
+- **Backup Configuration**: Export webhook configuration if needed for recreation
+
+### Recovery Options
+```javascript
+// Export webhook configuration before deletion
+const webhook = await fetch('/api/v1/webhooks/webhook_abc123', {
+  headers: { /* auth headers */ }
+});
+
+const config = await webhook.json();
+
+// Store configuration for potential recreation
+const backupConfig = {
+  url: config.url,
+  events: config.events,
+  name: config.name,
+  description: config.description,
+  headers: config.headers,
+  timeout: config.timeout,
+  retryPolicy: config.retryPolicy,
+  filters: config.filters
+};
+
+localStorage.setItem(`webhook_backup_${config.id}`, JSON.stringify(backupConfig));
+
+// Now safe to delete
+await fetch('/api/v1/webhooks/webhook_abc123', {
+  method: 'DELETE',
+  headers: { /* auth headers */ }
+});
+```
+
+## Validation Before Deletion
+
+### Pre-deletion Checklist
+
+```javascript
+async function validateWebhookDeletion(webhookId, apiToken, orgId, userId) {
+  const issues = [];
+  
+  // Check if webhook exists
+  const webhook = await fetch(`/api/v1/webhooks/${webhookId}`, {
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'X-Org-ID': orgId,
+      'X-User-ID': userId
+    }
+  });
+  
+  if (!webhook.ok) {
+    issues.push('Webhook does not exist or access denied');
+    return issues;
+  }
+  
+  const webhookData = await webhook.json();
+  
+  // Check for pending deliveries
+  if (webhookData.stats.pendingDeliveries > 0) {
+    issues.push(`${webhookData.stats.pendingDeliveries} pending deliveries will be lost`);
+  }
+  
+  // Check if webhook is currently enabled
+  if (webhookData.enabled) {
+    issues.push('Webhook is currently enabled and receiving events');
+  }
+  
+  // Check recent activity
+  const lastDelivery = new Date(webhookData.stats.lastDeliveryAt);
+  const hoursSinceLastDelivery = (Date.now() - lastDelivery.getTime()) / (1000 * 60 * 60);
+  
+  if (hoursSinceLastDelivery < 1) {
+    issues.push('Webhook received events within the last hour');
+  }
+  
+  return issues;
+}
+
+// Usage
+const issues = await validateWebhookDeletion('webhook_abc123', apiToken, 'org_123456', 'user_789012');
+
+if (issues.length > 0) {
+  console.warn('Deletion warnings:');
+  issues.forEach(issue => console.warn(`- ${issue}`));
+  
+  const confirmed = confirm('Are you sure you want to delete this webhook?');
+  if (!confirmed) {
+    console.log('Deletion cancelled');
+    return;
+  }
+}
+
+// Proceed with deletion
+await fetch('/api/v1/webhooks/webhook_abc123', {
+  method: 'DELETE',
+  headers: { /* auth headers */ }
+});
+```
+
+## Related Endpoints
+
+- [List Webhooks](/api/endpoints/webhooks/list-webhooks) - View all webhooks
+- [Create Webhook](/api/endpoints/webhooks/create-webhook) - Create new webhook
+- [Update Webhook](/api/endpoints/webhooks/update-webhook) - Modify webhook settings
+- [Toggle Webhook](/api/endpoints/webhooks/toggle-webhook) - Enable/disable webhook
+- [Test Webhook](/api/endpoints/webhooks/test-webhook) - Test webhook delivery

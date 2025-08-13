@@ -1,0 +1,692 @@
+---
+title: "Error Handling"
+description: "Comprehensive guide to handling errors in the Tolstoy API"
+---
+
+## Overview
+
+The Tolstoy API uses conventional HTTP response codes to indicate success or failure of API requests. This guide covers error types, response formats, and best practices for handling errors in your applications.
+
+## HTTP Status Codes
+
+### Success Codes
+
+<ResponseField name="200 OK" type="object">
+  Request succeeded. Response includes requested data.
+</ResponseField>
+
+<ResponseField name="201 Created" type="object">
+  Resource was successfully created. Response includes the new resource.
+</ResponseField>
+
+<ResponseField name="204 No Content" type="object">
+  Request succeeded but there's no content to return (common for DELETE operations).
+</ResponseField>
+
+### Client Error Codes
+
+<ResponseField name="400 Bad Request" type="object">
+  Request was invalid or cannot be served. Check request parameters.
+</ResponseField>
+
+<ResponseField name="401 Unauthorized" type="object">
+  Authentication is required or invalid. Check API token.
+</ResponseField>
+
+<ResponseField name="403 Forbidden" type="object">
+  Request is authenticated but not authorized for this resource.
+</ResponseField>
+
+<ResponseField name="404 Not Found" type="object">
+  Requested resource does not exist.
+</ResponseField>
+
+<ResponseField name="409 Conflict" type="object">
+  Request conflicts with current state of resource.
+</ResponseField>
+
+<ResponseField name="422 Unprocessable Entity" type="object">
+  Request is well-formed but contains validation errors.
+</ResponseField>
+
+<ResponseField name="429 Too Many Requests" type="object">
+  Rate limit exceeded. Retry after the specified time.
+</ResponseField>
+
+### Server Error Codes
+
+<ResponseField name="500 Internal Server Error" type="object">
+  Unexpected server error occurred.
+</ResponseField>
+
+<ResponseField name="502 Bad Gateway" type="object">
+  Server received invalid response from upstream service.
+</ResponseField>
+
+<ResponseField name="503 Service Unavailable" type="object">
+  Service is temporarily unavailable (maintenance, overload).
+</ResponseField>
+
+<ResponseField name="504 Gateway Timeout" type="object">
+  Server timeout while waiting for upstream service.
+</ResponseField>
+
+## Error Response Format
+
+All error responses follow a consistent JSON structure:
+
+```json
+{
+  "error": {
+    "type": "validation_error",
+    "code": "INVALID_PARAMETER",
+    "message": "The 'email' field is required",
+    "details": {
+      "field": "email",
+      "reason": "missing_required_field"
+    },
+    "requestId": "req_abc123",
+    "timestamp": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+### Error Object Fields
+
+<ResponseField name="type" type="string">
+  High-level error category (e.g., validation_error, authentication_error)
+</ResponseField>
+
+<ResponseField name="code" type="string">
+  Specific error code for programmatic handling
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Human-readable error description
+</ResponseField>
+
+<ResponseField name="details" type="object">
+  Additional context about the error (field-specific information)
+</ResponseField>
+
+<ResponseField name="requestId" type="string">
+  Unique identifier for the request (useful for support)
+</ResponseField>
+
+<ResponseField name="timestamp" type="string">
+  ISO timestamp when the error occurred
+</ResponseField>
+
+## Error Types and Codes
+
+### Authentication Errors (401)
+
+<CodeGroup>
+
+```json Invalid API Token
+{
+  "error": {
+    "type": "authentication_error",
+    "code": "INVALID_TOKEN",
+    "message": "The provided API token is invalid or expired"
+  }
+}
+```
+
+```json Missing API Token
+{
+  "error": {
+    "type": "authentication_error", 
+    "code": "MISSING_TOKEN",
+    "message": "API token is required for this endpoint"
+  }
+}
+```
+
+</CodeGroup>
+
+### Authorization Errors (403)
+
+<CodeGroup>
+
+```json Insufficient Permissions
+{
+  "error": {
+    "type": "authorization_error",
+    "code": "INSUFFICIENT_PERMISSIONS",
+    "message": "You don't have permission to access this resource",
+    "details": {
+      "required_permission": "workflows:write",
+      "user_permissions": ["workflows:read"]
+    }
+  }
+}
+```
+
+```json Organization Access Denied
+{
+  "error": {
+    "type": "authorization_error",
+    "code": "ORG_ACCESS_DENIED", 
+    "message": "You don't have access to this organization",
+    "details": {
+      "organizationId": "org_123456"
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+### Validation Errors (422)
+
+<CodeGroup>
+
+```json Field Validation Error
+{
+  "error": {
+    "type": "validation_error",
+    "code": "FIELD_VALIDATION_FAILED",
+    "message": "Validation failed for one or more fields",
+    "details": {
+      "fields": {
+        "email": ["Must be a valid email address"],
+        "age": ["Must be a number between 18 and 120"]
+      }
+    }
+  }
+}
+```
+
+```json Missing Required Field
+{
+  "error": {
+    "type": "validation_error",
+    "code": "MISSING_REQUIRED_FIELD",
+    "message": "Required field is missing",
+    "details": {
+      "field": "workflowId",
+      "location": "body"
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+### Resource Errors (404, 409)
+
+<CodeGroup>
+
+```json Resource Not Found
+{
+  "error": {
+    "type": "resource_error",
+    "code": "RESOURCE_NOT_FOUND",
+    "message": "The requested workflow was not found",
+    "details": {
+      "resourceType": "workflow",
+      "resourceId": "workflow_abc123"
+    }
+  }
+}
+```
+
+```json Resource Conflict
+{
+  "error": {
+    "type": "resource_error",
+    "code": "RESOURCE_CONFLICT",
+    "message": "A workflow with this name already exists",
+    "details": {
+      "conflictingField": "name",
+      "conflictingValue": "payment-processor"
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+### Rate Limiting (429)
+
+```json
+{
+  "error": {
+    "type": "rate_limit_error",
+    "code": "RATE_LIMIT_EXCEEDED",
+    "message": "API rate limit exceeded",
+    "details": {
+      "limit": 1000,
+      "remaining": 0,
+      "resetTime": "2024-01-15T11:00:00Z",
+      "retryAfter": 3600
+    }
+  }
+}
+```
+
+### Server Errors (5xx)
+
+<CodeGroup>
+
+```json Internal Server Error
+{
+  "error": {
+    "type": "server_error",
+    "code": "INTERNAL_ERROR",
+    "message": "An unexpected error occurred",
+    "details": {
+      "incident_id": "inc_abc123"
+    }
+  }
+}
+```
+
+```json Service Unavailable
+{
+  "error": {
+    "type": "server_error",
+    "code": "SERVICE_UNAVAILABLE",
+    "message": "Service is temporarily unavailable",
+    "details": {
+      "retryAfter": 300,
+      "maintenanceWindow": "2024-01-15T10:00:00Z"
+    }
+  }
+}
+```
+
+</CodeGroup>
+
+## Error Handling Best Practices
+
+### Client-Side Error Handling
+
+<CodeGroup>
+
+```javascript JavaScript/TypeScript
+async function handleApiRequest(url, options) {
+  try {
+    const response = await fetch(url, options);
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new ApiError(response.status, errorData.error);
+    }
+    
+    return await response.json();
+    
+  } catch (error) {
+    if (error instanceof ApiError) {
+      handleApiError(error);
+    } else {
+      handleNetworkError(error);
+    }
+    throw error;
+  }
+}
+
+class ApiError extends Error {
+  constructor(status, errorData) {
+    super(errorData.message);
+    this.status = status;
+    this.type = errorData.type;
+    this.code = errorData.code;
+    this.details = errorData.details;
+    this.requestId = errorData.requestId;
+  }
+}
+
+function handleApiError(error) {
+  switch (error.code) {
+    case 'INVALID_TOKEN':
+      // Redirect to login
+      window.location.href = '/login';
+      break;
+      
+    case 'RATE_LIMIT_EXCEEDED':
+      // Implement exponential backoff
+      const retryAfter = error.details.retryAfter * 1000;
+      setTimeout(() => {
+        // Retry the request
+      }, retryAfter);
+      break;
+      
+    case 'FIELD_VALIDATION_FAILED':
+      // Show field-specific errors
+      showValidationErrors(error.details.fields);
+      break;
+      
+    default:
+      // Show generic error message
+      showErrorMessage(error.message);
+  }
+}
+```
+
+```python Python
+import requests
+from typing import Dict, Any
+import time
+
+class TolstoyAPIError(Exception):
+    def __init__(self, status_code: int, error_data: Dict[str, Any]):
+        self.status_code = status_code
+        self.type = error_data.get('type')
+        self.code = error_data.get('code')
+        self.message = error_data.get('message')
+        self.details = error_data.get('details', {})
+        self.request_id = error_data.get('requestId')
+        super().__init__(self.message)
+
+def make_api_request(url: str, **kwargs) -> Dict[str, Any]:
+    try:
+        response = requests.request(**kwargs, url=url)
+        
+        if not response.ok:
+            error_data = response.json().get('error', {})
+            raise TolstoyAPIError(response.status_code, error_data)
+            
+        return response.json()
+        
+    except requests.RequestException as e:
+        # Handle network errors
+        raise NetworkError(f"Network error: {str(e)}")
+        
+    except TolstoyAPIError as e:
+        handle_api_error(e)
+        raise
+
+def handle_api_error(error: TolstoyAPIError):
+    if error.code == 'INVALID_TOKEN':
+        # Clear stored token and redirect to auth
+        clear_auth_token()
+        
+    elif error.code == 'RATE_LIMIT_EXCEEDED':
+        # Implement exponential backoff
+        retry_after = error.details.get('retryAfter', 60)
+        time.sleep(retry_after)
+        
+    elif error.code == 'FIELD_VALIDATION_FAILED':
+        # Handle validation errors
+        for field, errors in error.details.get('fields', {}).items():
+            print(f"Validation error for {field}: {', '.join(errors)}")
+            
+    else:
+        # Log error for monitoring
+        log_error(error)
+```
+
+</CodeGroup>
+
+### Retry Logic
+
+Implement exponential backoff for retryable errors:
+
+<CodeGroup>
+
+```javascript Exponential Backoff
+class ApiClient {
+  async requestWithRetry(url, options, maxRetries = 3) {
+    let attempt = 0;
+    
+    while (attempt <= maxRetries) {
+      try {
+        return await this.makeRequest(url, options);
+        
+      } catch (error) {
+        if (!this.isRetryableError(error) || attempt === maxRetries) {
+          throw error;
+        }
+        
+        const delay = Math.min(1000 * Math.pow(2, attempt), 30000);
+        await this.sleep(delay);
+        attempt++;
+      }
+    }
+  }
+  
+  isRetryableError(error) {
+    return [429, 500, 502, 503, 504].includes(error.status);
+  }
+  
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+}
+```
+
+```python Python Retry Logic
+import time
+import random
+from typing import List
+
+def retry_api_request(
+    func,
+    max_retries: int = 3,
+    backoff_factor: float = 1.0,
+    retryable_status_codes: List[int] = [429, 500, 502, 503, 504]
+):
+    def wrapper(*args, **kwargs):
+        attempt = 0
+        
+        while attempt <= max_retries:
+            try:
+                return func(*args, **kwargs)
+                
+            except TolstoyAPIError as e:
+                if e.status_code not in retryable_status_codes or attempt == max_retries:
+                    raise
+                    
+                # Calculate delay with jitter
+                delay = backoff_factor * (2 ** attempt) + random.uniform(0, 1)
+                time.sleep(min(delay, 30))  # Cap at 30 seconds
+                attempt += 1
+                
+        return func(*args, **kwargs)
+    
+    return wrapper
+
+# Usage
+@retry_api_request(max_retries=3)
+def create_workflow(data):
+    return make_api_request('/api/v1/workflows', method='POST', json=data)
+```
+
+</CodeGroup>
+
+### Error Monitoring and Logging
+
+<CodeGroup>
+
+```javascript Error Monitoring
+// Log errors for monitoring and debugging
+function logApiError(error, context) {
+  const errorLog = {
+    timestamp: new Date().toISOString(),
+    requestId: error.requestId,
+    status: error.status,
+    type: error.type,
+    code: error.code,
+    message: error.message,
+    details: error.details,
+    context: context,
+    userAgent: navigator.userAgent,
+    url: window.location.href
+  };
+  
+  // Send to monitoring service
+  analytics.track('API Error', errorLog);
+  
+  // Log to console in development
+  if (process.env.NODE_ENV === 'development') {
+    console.error('API Error:', errorLog);
+  }
+}
+```
+
+```python Python Error Logging
+import logging
+import json
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+def log_api_error(error: TolstoyAPIError, context: dict = None):
+    error_log = {
+        'timestamp': datetime.utcnow().isoformat(),
+        'request_id': error.request_id,
+        'status_code': error.status_code,
+        'type': error.type,
+        'code': error.code,
+        'message': error.message,
+        'details': error.details,
+        'context': context or {}
+    }
+    
+    logger.error(f"API Error: {json.dumps(error_log)}")
+    
+    # Send to monitoring service
+    monitoring.report_error(error_log)
+```
+
+</CodeGroup>
+
+## Error Recovery Strategies
+
+### Graceful Degradation
+
+When non-critical APIs fail, provide fallback behavior:
+
+```javascript
+async function getWorkflowMetrics(workflowId) {
+  try {
+    return await api.get(`/workflows/${workflowId}/metrics`);
+  } catch (error) {
+    if (error.status >= 500) {
+      // Server error - show cached data or placeholder
+      return getCachedMetrics(workflowId) || getDefaultMetrics();
+    }
+    throw error; // Re-throw client errors
+  }
+}
+```
+
+### Circuit Breaker Pattern
+
+Prevent cascading failures by implementing circuit breakers:
+
+```javascript
+class CircuitBreaker {
+  constructor(threshold = 5, timeout = 60000) {
+    this.threshold = threshold;
+    this.timeout = timeout;
+    this.failureCount = 0;
+    this.state = 'CLOSED'; // CLOSED, OPEN, HALF_OPEN
+    this.nextAttempt = Date.now();
+  }
+  
+  async call(fn) {
+    if (this.state === 'OPEN') {
+      if (Date.now() < this.nextAttempt) {
+        throw new Error('Circuit breaker is OPEN');
+      }
+      this.state = 'HALF_OPEN';
+    }
+    
+    try {
+      const result = await fn();
+      this.onSuccess();
+      return result;
+    } catch (error) {
+      this.onFailure();
+      throw error;
+    }
+  }
+  
+  onSuccess() {
+    this.failureCount = 0;
+    this.state = 'CLOSED';
+  }
+  
+  onFailure() {
+    this.failureCount++;
+    if (this.failureCount >= this.threshold) {
+      this.state = 'OPEN';
+      this.nextAttempt = Date.now() + this.timeout;
+    }
+  }
+}
+```
+
+## Testing Error Scenarios
+
+### Unit Testing Error Handling
+
+<CodeGroup>
+
+```javascript Jest Testing
+describe('API Error Handling', () => {
+  it('should handle validation errors', async () => {
+    const mockError = {
+      status: 422,
+      error: {
+        type: 'validation_error',
+        code: 'FIELD_VALIDATION_FAILED',
+        message: 'Validation failed',
+        details: {
+          fields: {
+            email: ['Must be a valid email']
+          }
+        }
+      }
+    };
+    
+    fetch.mockRejectedValueOnce(mockError);
+    
+    await expect(createUser({})).rejects.toThrow('Validation failed');
+    expect(showValidationErrors).toHaveBeenCalledWith({
+      email: ['Must be a valid email']
+    });
+  });
+});
+```
+
+```python Python Testing
+import pytest
+from unittest.mock import patch
+
+def test_api_error_handling():
+    error_response = {
+        'error': {
+            'type': 'validation_error',
+            'code': 'FIELD_VALIDATION_FAILED',
+            'message': 'Validation failed',
+            'details': {
+                'fields': {
+                    'email': ['Must be a valid email']
+                }
+            }
+        }
+    }
+    
+    with patch('requests.post') as mock_post:
+        mock_post.return_value.ok = False
+        mock_post.return_value.status_code = 422
+        mock_post.return_value.json.return_value = error_response
+        
+        with pytest.raises(TolstoyAPIError) as exc_info:
+            create_user({})
+            
+        assert exc_info.value.code == 'FIELD_VALIDATION_FAILED'
+        assert 'email' in exc_info.value.details['fields']
+```
+
+</CodeGroup>
+
+## Related Documentation
+
+- [Authentication](/api/authentication) - API authentication guide
+- [Rate Limiting](/api/rate-limiting) - Rate limiting policies
+- [API Reference](/api) - Complete API reference

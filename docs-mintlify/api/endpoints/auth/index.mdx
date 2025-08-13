@@ -1,0 +1,23 @@
+---
+title: "Auth API"
+description: "Manage auth resources"
+---
+
+# Auth API
+
+Manage auth resources
+
+## Endpoints
+
+<CardGroup cols={2}>
+  <Card title="Initiate OAuth2 login for a user" icon="api" href="/api/endpoints/auth/oauthcontroller_initiatelogin">
+    Redirects the user to the OAuth provider authorization page. The user must grant permission, after which they will be redirected back to the callback endpoint.
+  </Card>
+  <Card title="Handle OAuth2 callback from provider" icon="api" href="/api/endpoints/auth/oauthcontroller_handlecallback">
+    Processes the authorization code returned by the OAuth provider, exchanges it for access tokens, and stores the user credentials.
+  </Card>
+</CardGroup>
+
+---
+
+<Snippet file="api-footer.mdx" />
