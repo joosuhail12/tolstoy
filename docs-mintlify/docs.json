@@ -25,28 +25,19 @@
     "url": "https://tolstoy.getpullse.com"
   },
   "navigation": [
-    "index"
-  ],
-  "tabs": [
+    "index",
     {
-      "name": "Product",
-      "url": "public"
+      "group": "Product",
+      "pages": [
+        "public/product/index",
+        "public/product/getting-started/installation"
+      ]
     },
     {
-      "name": "API Reference", 
-      "url": "api"
-    },
-    {
-      "name": "CLI",
-      "url": "cli"
-    },
-    {
-      "name": "SDKs",
-      "url": "sdk"
-    },
-    {
-      "name": "Internal",
-      "url": "internal"
+      "group": "API Reference",
+      "pages": [
+        "api/index"
+      ]
     }
   ],
   "anchors": [
